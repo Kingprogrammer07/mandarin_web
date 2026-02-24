@@ -49,11 +49,8 @@ export default function PaymentFilters({ onFilterChange, isLoading = false }: Pa
   const handleQuickDateRange = (range: 'today' | 'week' | 'month') => {
     const now = new Date();
     let startDate: string;
-<<<<<<< HEAD
     const endDate: string = getTashkentDateIso(now);
-=======
-    let endDate: string = getTashkentDateIso(now);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
     switch (range) {
       case 'today':
@@ -209,11 +206,8 @@ export default function PaymentFilters({ onFilterChange, isLoading = false }: Pa
                 ].map((provider) => (
                   <Button
                     key={provider.value}
-<<<<<<< HEAD
                     onClick={() => handleProviderChange(provider.value as 'cash' | 'click' | 'payme' | 'all')}
-=======
-                    onClick={() => handleProviderChange(provider.value as any)}
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
                     size="sm"
                     variant={filters.provider === provider.value ? 'default' : 'outline'}
                     className="text-xs"

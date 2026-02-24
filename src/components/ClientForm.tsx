@@ -30,11 +30,8 @@ import {
 } from '@/components/ui/select';
 import ImageUpload from './ImageUpload';
 import StatusAnimation from './StatusAnimation';
-<<<<<<< HEAD
 import { createClient, updateClient, deleteClient as deleteClientApi, type Client, type ClientCreateRequest } from '@/api/services/client';
-=======
-import { createClient, updateClient, deleteClient as deleteClientApi, type Client } from '@/api/services/client';
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 import { regions } from '@/lib/validation';
 
 // O'zbekiston passport seriyalari
@@ -256,26 +253,18 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
 
         setIsLoadingImages(false);
         setSubmitMessage('');
-<<<<<<< HEAD
       } catch (error: unknown) {
         console.error('Error loading client:', error);
         setIsLoadingImages(false);
         setSubmitStatus('error');
         setSubmitMessage(getErrorMessage(error, t('client.messages.error')));
-=======
-      } catch (error: any) {
-        console.error('Error loading client:', error);
-        setIsLoadingImages(false);
-        setSubmitStatus('error');
-        setSubmitMessage(error.response?.data?.message || error.message || t('client.messages.error'));
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       }
     };
 
     loadClientData();
   }, [mode, clientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-<<<<<<< HEAD
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (typeof error === 'object' && error !== null) {
       const e = error as { message?: string; data?: { detail?: string; message?: string } };
@@ -284,8 +273,6 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
     return fallback;
   };
 
-=======
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
   // Calendar open state
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -380,15 +367,10 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
 
     try {
       // Build request data matching backend field names
-<<<<<<< HEAD
       const requestData: ClientCreateRequest = {
         full_name: data.full_name,
         telegram_id: data.telegram_id ? parseInt(data.telegram_id, 10) : undefined,
-=======
-      const requestData: any = {
-        telegram_id: data.telegram_id ? parseInt(data.telegram_id, 10) : null,
-        full_name: data.full_name,
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       };
 
       // Include client_code for edit mode
@@ -445,15 +427,10 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
         }
       }, 2000);
 
-<<<<<<< HEAD
     } catch (error: unknown) {
       console.error('Client form error:', error);
       const errorMessage = getErrorMessage(error, t('client.messages.error'));
-=======
-    } catch (error: any) {
-      console.error('Client form error:', error);
-      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || t('client.messages.error');
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       setSubmitStatus('error');
       setSubmitMessage(errorMessage);
     }
@@ -486,15 +463,10 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
           window.Telegram.WebApp.close();
         }
       }, 2000);
-<<<<<<< HEAD
     } catch (error: unknown) {
       console.error('Delete client error:', error);
       const errorMessage = getErrorMessage(error, t('client.messages.error'));
-=======
-    } catch (error: any) {
-      console.error('Delete client error:', error);
-      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || t('client.messages.error');
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       setSubmitStatus('error');
       setSubmitMessage(errorMessage);
     }

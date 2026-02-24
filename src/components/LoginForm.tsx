@@ -71,27 +71,20 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
         if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
       }, 2000);
       
-<<<<<<< HEAD
     } catch (error: unknown) {
       const status = typeof error === 'object' && error && 'status' in (error as object) ? (error as { status?: number }).status : undefined;
       const detail = typeof error === 'object' && error && 'data' in (error as object) ? (error as { data?: { detail?: string } }).data?.detail : undefined;
       const message = typeof error === 'object' && error && 'message' in (error as object) ? (error as { message?: string }).message : undefined;
       if (status === 428 || detail === "address_required") {
-=======
-    } catch (error: any) {
-      if (error?.status === 428 || error?.data?.detail === "address_required") {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
         setSubmitStatus('idle');
         setSubmitMessage('');
         setCredentials({ clientCode: data.clientCode, phoneNumber: data.phoneNumber });
         setShowAddressDrawer(true);
       } else {
         setSubmitStatus('error');
-<<<<<<< HEAD
         setSubmitMessage(detail || message || t('login.messages.generalError'));
-=======
-        setSubmitMessage(error?.data?.detail || error.message || t('login.messages.generalError'));
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       }
     }
   };
@@ -118,17 +111,12 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
       setTimeout(() => {
         if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
       }, 2000);
-<<<<<<< HEAD
     } catch (error: unknown) {
       setSubmitStatus('error');
       const detail = typeof error === 'object' && error && 'data' in (error as object) ? (error as { data?: { detail?: string } }).data?.detail : undefined;
       const message = typeof error === 'object' && error && 'message' in (error as object) ? (error as { message?: string }).message : undefined;
       setSubmitMessage(detail || message || t('login.messages.generalError'));
-=======
-    } catch (error: any) {
-      setSubmitStatus('error');
-      setSubmitMessage(error.response?.data?.detail || error.message || t('login.messages.generalError'));
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     }
   };
 
@@ -390,8 +378,5 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
       )}
     </>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+

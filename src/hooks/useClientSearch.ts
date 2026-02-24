@@ -1,10 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { apiClient } from '@/api/client';
-<<<<<<< HEAD
 import type { ClientSearchResult, ClientSearchApiResponse } from '@/api/verification';
-=======
-import type { ClientSearchResult } from '@/api/verification';
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 import { normalizeSearchResult } from '@/api/verification';
 import axios from 'axios';
 
@@ -87,11 +83,7 @@ export function useClientSearch(): UseClientSearchReturn {
     setError(null);
 
     try {
-<<<<<<< HEAD
       const response = await apiClient.get<{ client: ClientSearchApiResponse['client'] }>( // API returns { client: ... }
-=======
-      const response = await apiClient.get<{ client: ClientSearchResult }>( // API returns { client: ... }
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
         '/api/v1/verification/search',
         {
           params: { q: query },
@@ -110,11 +102,7 @@ export function useClientSearch(): UseClientSearchReturn {
         // And we have normalizeSearchResult which takes ClientSearchApiResponse['client'].
         // Let's cast correct types first.
         const clientData = data.client;
-<<<<<<< HEAD
         const normalized = normalizeSearchResult(clientData);
-=======
-        const normalized = normalizeSearchResult(clientData as any); // Cast to any to accept Raw vs Normalized mismatch if any
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
         setResults([normalized]);
       } else {
         setResults([]);

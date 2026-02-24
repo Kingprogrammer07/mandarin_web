@@ -21,11 +21,8 @@ export default function PieDonutChart({
   innerRadius = 60,
   valueFormatter = (value) => value.toString()
 }: PieDonutChartProps) {
-<<<<<<< HEAD
   const renderLabel = (entry: { value: number }) => {
-=======
-  const renderLabel = (entry: any) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     const percent = ((entry.value / data.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1);
     return `${percent}%`;
   };

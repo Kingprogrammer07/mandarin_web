@@ -43,11 +43,7 @@ export default function ClientSearchPage({ onSelectClient }: ClientSearchPagePro
 
   // Load recent searches on mount
   useEffect(() => {
-<<<<<<< HEAD
     queueMicrotask(() => setRecentSearches(getRecentSearches()));
-=======
-    setRecentSearches(getRecentSearches());
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
   }, []);
 
   // Sort: Newest first (Primary constraint)

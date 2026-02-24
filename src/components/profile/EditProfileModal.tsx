@@ -26,7 +26,6 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
     useEffect(() => {
         if (user) {
-<<<<<<< HEAD
             queueMicrotask(() => {
                 setFormData({
                     full_name: user.full_name,
@@ -34,13 +33,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                     address: user.address,
                     region: user.region
                 });
-=======
-            setFormData({
-                full_name: user.full_name,
-                phone: user.phone,
-                address: user.address,
-                region: user.region
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             });
         }
     }, [user, isOpen]);

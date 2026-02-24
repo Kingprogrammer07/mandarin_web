@@ -74,17 +74,12 @@ export default function ImportPage() {
         }
       }, 2000);
 
-<<<<<<< HEAD
     } catch (error: unknown) {
       console.error('Import error:', error);
       const errorMessage =
         (typeof error === 'object' && error !== null && 'message' in (error as object) && (error as { message?: string }).message) ||
         t('import.messages.error');
-=======
-    } catch (error: any) {
-      console.error('Import error:', error);
-      const errorMessage = error.message || t('import.messages.error');
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       setSubmitStatus('error');
       setSubmitMessage(errorMessage);
     }

@@ -47,7 +47,6 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
     });
 
     // Mutations
-<<<<<<< HEAD
     const getErrorMessage = (error: unknown, fallback: string) => {
         if (typeof error === 'object' && error !== null) {
             const e = error as { message?: string; data?: { detail?: string } };
@@ -56,8 +55,6 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
         return fallback;
     };
 
-=======
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     const payDebtMutation = useMutation({
         mutationFn: walletService.payDebt,
         onSuccess: () => {
@@ -65,13 +62,9 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
             queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
             handleClose();
         },
-<<<<<<< HEAD
         onError: (error: unknown) => {
             toast.error(getErrorMessage(error, "Xatolik yuz berdi"));
-=======
-        onError: (error: any) => {
-            toast.error(error.message || "Xatolik yuz berdi");
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
         }
     });
 
@@ -82,13 +75,9 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
             queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
             handleClose();
         },
-<<<<<<< HEAD
         onError: (error: unknown) => {
             toast.error(getErrorMessage(error, "Xatolik yuz berdi"));
-=======
-        onError: (error: any) => {
-            toast.error(error.message || "Xatolik yuz berdi");
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
         }
     });
 

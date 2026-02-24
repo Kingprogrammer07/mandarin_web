@@ -197,7 +197,6 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
    * Background queue processor
    */
   useEffect(() => {
-<<<<<<< HEAD
     const getErrorMessage = (error: unknown, fallback: string) => {
       if (typeof error === 'object' && error !== null) {
         const e = error as { message?: string; data?: { detail?: string } };
@@ -208,8 +207,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
     const hasResponse = (error: unknown): error is { response: unknown } =>
       typeof error === 'object' && error !== null && 'response' in (error as object);
 
-=======
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     const processQueue = async () => {
       const pending = uploadQueue.find(item => item.status === 'pending');
       if (!pending) {
@@ -255,7 +253,6 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           setUploadQueue(prev => prev.filter(item => item.id !== pending.id));
         }, 3000);
 
-<<<<<<< HEAD
       } catch (error: unknown) {
         const errorMessage = getErrorMessage(error, t('cargo.messages.uploadError'));
 
@@ -264,13 +261,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           (typeof error === 'object' && error !== null && 'message' in (error as object) && (error as { message?: string }).message === 'Network Error') ||
           !window.navigator.onLine;
         if (!hasResponse(error) || isNetworkError) {
-=======
-      } catch (error: any) {
-        const errorMessage = error.response?.data?.detail || error.message || t('cargo.messages.uploadError');
 
-        // CHECK: If network error (status 0 or 'Network Error'), save to offline storage
-        if (!error.response || error.message === 'Network Error' || !window.navigator.onLine) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
           try {
             const failedItem = {
               id: pending.id,
@@ -554,8 +545,5 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
       </div>
     </>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+

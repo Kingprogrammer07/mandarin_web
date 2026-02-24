@@ -31,12 +31,8 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
         const saved = localStorage.getItem(HISTORY_KEY);
         if (saved) {
             try {
-<<<<<<< HEAD
                 const parsed = JSON.parse(saved) as HistoryItem[];
                 queueMicrotask(() => setHistory(parsed));
-=======
-                setHistory(JSON.parse(saved));
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
             } catch (e) {
                 console.error("Failed to parse history", e);
             }
@@ -85,11 +81,7 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
             // Find flight name from items
             const flightName = data.items_in_uzbekistan[0]?.flight_name || data.items_in_china[0]?.flight_name;
             if (activeSearch) {
-<<<<<<< HEAD
                 queueMicrotask(() => addToHistory(activeSearch, flightName || undefined));
-=======
-                addToHistory(activeSearch, flightName || undefined);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
             }
         }
     }, [data, activeSearch]);

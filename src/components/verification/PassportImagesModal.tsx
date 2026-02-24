@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 import { useState, useEffect, useCallback } from 'react';
-=======
-import { useState, useEffect } from 'react';
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 import {
   Dialog,
   DialogContent,
@@ -31,18 +28,9 @@ export function PassportImagesModal({
   const [error, setError] = useState<string | null>(null);
 
   // Fetch passport images metadata when modal opens
-<<<<<<< HEAD
 
   const fetchPassportImages = useCallback(async () => {
-=======
-  useEffect(() => {
-    if (isOpen && clientId) {
-      fetchPassportImages();
-    }
-  }, [isOpen, clientId]);
 
-  const fetchPassportImages = async () => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     if (!clientId) return;
 
     setIsLoading(true);
@@ -52,23 +40,17 @@ export function PassportImagesModal({
       const response = await getPassportImagesMetadata(clientId, true);
       setImages(response.images);
       setSelectedIndex(0);
-<<<<<<< HEAD
     } catch (err: unknown) {
       console.error('Failed to fetch passport images:', err);
       const message =
         (typeof err === 'object' && err !== null && 'message' in (err as object) && (err as { message?: string }).message) ||
         'Pasport rasmlarini yuklashda xatolik yuz berdi';
       setError(message);
-=======
-    } catch (err: any) {
-      console.error('Failed to fetch passport images:', err);
-      setError(err.message || 'Pasport rasmlarini yuklashda xatolik yuz berdi');
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       setImages([]);
     } finally {
       setIsLoading(false);
     }
-<<<<<<< HEAD
   }, [clientId]);
 
   useEffect(() => {
@@ -76,9 +58,7 @@ export function PassportImagesModal({
       fetchPassportImages();
     }
   }, [isOpen, clientId, fetchPassportImages]);
-=======
-  };
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
   const handlePrev = () => {
     if (selectedIndex > 0) {

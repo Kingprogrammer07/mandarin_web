@@ -24,11 +24,7 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
    const [mounted, setMounted] = useState(false);
 
    useEffect(() => {
-<<<<<<< HEAD
       queueMicrotask(() => setMounted(true));
-=======
-      setMounted(true);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
    }, []);
 
    useEffect(() => {
@@ -375,8 +371,4 @@ const ProfileSkeleton = memo(() => {
 });
 ProfileSkeleton.displayName = 'ProfileSkeleton';
 
-<<<<<<< HEAD
 export default UserPage;
-=======
-export default UserPage;
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753

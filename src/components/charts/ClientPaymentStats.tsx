@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import type { ReactElement } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { Users, DollarSign, Calendar } from 'lucide-react';
 import type { ClientPaymentStatsResponse, ClientPaymentStats } from '@/api/services/stats';
@@ -22,7 +23,7 @@ const PROVIDER_LABELS = {
   account: 'Hisob'
 };
 
-export default function ClientPaymentStatsComponent({ data }: ClientPaymentStatsProps) {
+export default function ClientPaymentStatsComponent({ data }: ClientPaymentStatsProps): ReactElement {
   const topClients = data.clients.slice(0, 10);
 
   const getClientProviderData = (client: ClientPaymentStats) => [
@@ -32,21 +33,13 @@ export default function ClientPaymentStatsComponent({ data }: ClientPaymentStats
     { name: PROVIDER_LABELS.account, value: client.providers.account, provider: 'account' }
   ].filter(item => item.value > 0);
 
-<<<<<<< HEAD
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name?: string; client_code?: string; value?: number; amount?: number; count?: number } }> }) => {
-=======
-  const CustomTooltip = ({ active, payload }: any) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     if (active && payload && payload[0]) {
       const data = payload[0].payload;
       return (
         <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
           <p className="font-medium text-gray-900">{data.name || data.client_code}</p>
-<<<<<<< HEAD
-            <p className="text-sm text-gray-600">Summa: {formatCurrencyUz(data.value ?? data.amount ?? 0)} so'm</p>
-=======
-            <p className="text-sm text-gray-600">Summa: {formatCurrencyUz(data.value || data.amount)} so'm</p>
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+            <p className="text-sm text-gray-600">Summa: {formatCurrencyUz((data.value ?? data.amount ?? 0) as number)} so'm</p>
           {data.count && <p className="text-sm text-gray-600">Soni: {data.count}</p>}
         </div>
       );

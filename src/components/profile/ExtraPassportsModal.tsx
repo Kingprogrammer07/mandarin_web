@@ -137,7 +137,6 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
             queryClient.invalidateQueries({ queryKey: ['extra-passports'] });
             handleBack();
         },
-<<<<<<< HEAD
         onError: (error: unknown) => {
             const msg = (() => {
                 if (typeof error === 'object' && error !== null) {
@@ -146,10 +145,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                 }
                 return null;
             })() || t('form.messages.generalError') || "Pasport qo'shishda xatolik";
-=======
-        onError: (error: any) => {
-            const msg = error.response?.data?.detail || t('form.messages.generalError') || "Pasport qo'shishda xatolik";
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             toast.error(msg);
         }
     });

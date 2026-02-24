@@ -61,11 +61,7 @@ export const useUpdateProfile = () => {
             // Update cache
             queryClient.setQueryData(['profile', 'me'], newData);
         },
-<<<<<<< HEAD
         onError: (error: unknown) => {
-=======
-        onError: (error: any) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
             console.error("Profile update failed", error);
         }
     });

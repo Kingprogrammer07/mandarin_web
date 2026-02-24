@@ -1,9 +1,5 @@
 import './i18n/config';
-<<<<<<< HEAD
 import { useState, useEffect, useCallback } from 'react';
-=======
-import { useState, useEffect } from 'react';
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 import NavigationBar from './components/NavigationBar';
 import { VerificationNav, type Page as VerificationPage } from './components/navigation/VerificationNav';
 import RegistrationForm from './components/RegistrationForm';
@@ -79,11 +75,7 @@ function App() {
   ].includes(currentPage);
 
   const resolvePageFromPath = (path: string): RouteInfo => {
-<<<<<<< HEAD
     const flightMatch = path.match(/\/flights\/([^/]+)/);
-=======
-    const flightMatch = path.match(/\/flights\/([^\/]+)/);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     const flightName = flightMatch ? decodeURIComponent(flightMatch[1]) : undefined;
 
     const clientMatch = path.match(/\/client\/edit\/(\d+)/);
@@ -92,17 +84,11 @@ function App() {
     const verificationProfileMatch = path.match(/\/verification\/profile\/(\d+)/);
     const verificationClientId = verificationProfileMatch ? parseInt(verificationProfileMatch[1], 10) : undefined;
 
-<<<<<<< HEAD
     const verificationTransactionsMatch = path.match(/\/verification\/transactions\/([^/]+)/);
     const transactionsClientCode = verificationTransactionsMatch ? decodeURIComponent(verificationTransactionsMatch[1]) : undefined;
 
     const verificationUnpaidMatch = path.match(/\/verification\/unpaid\/([^/]+)/);
-=======
-    const verificationTransactionsMatch = path.match(/\/verification\/transactions\/([^\/]+)/);
-    const transactionsClientCode = verificationTransactionsMatch ? decodeURIComponent(verificationTransactionsMatch[1]) : undefined;
 
-    const verificationUnpaidMatch = path.match(/\/verification\/unpaid\/([^\/]+)/);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     const unpaidClientCode = verificationUnpaidMatch ? decodeURIComponent(verificationUnpaidMatch[1]) : undefined;
 
     if (path === '/auth/register') {
@@ -162,13 +148,7 @@ function App() {
     return '/auth/login';
   };
 
-<<<<<<< HEAD
   const applyRouteFromUrl = useCallback(() => {
-
-
-=======
-  const applyRouteFromUrl = () => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     const routeInfo = resolvePageFromPath(window.location.pathname);
     setCurrentPage(routeInfo.page);
     if (routeInfo.flightName) {
@@ -180,11 +160,7 @@ function App() {
     if (routeInfo.clientCode) {
       setSelectedClientCode(routeInfo.clientCode);
     }
-<<<<<<< HEAD
   }, []);
-=======
-  };
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 
   const navigateToPage = (page: Page, flightName?: string, clientId?: number, clientCode?: string) => {
     const path = getPathForPage(page, flightName, clientId, clientCode);
@@ -207,12 +183,8 @@ function App() {
   };
 
   useEffect(() => {
-<<<<<<< HEAD
     // Defer URL-driven state update to avoid cascading renders
     queueMicrotask(() => applyRouteFromUrl());
-=======
-    applyRouteFromUrl();
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 
     const handlePopState = () => {
       applyRouteFromUrl();
@@ -220,11 +192,7 @@ function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-<<<<<<< HEAD
   }, [applyRouteFromUrl]);
-=======
-  }, []);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 
   const handleViewPassportImages = (clientId: number) => {
     setPassportClientId(clientId);

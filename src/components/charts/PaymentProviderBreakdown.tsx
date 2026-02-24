@@ -1,9 +1,7 @@
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-<<<<<<< HEAD
 import type { TooltipContentProps } from 'recharts';
-=======
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 import { TrendingUp, TrendingDown, DollarSign, CreditCard, Smartphone, Wallet } from 'lucide-react';
 import type { ProviderTotals, ProviderSharePercentages, GrowthMetrics } from '@/api/services/stats';
 import { formatCurrencyUz } from '@/lib/format';
@@ -53,24 +51,16 @@ export default function PaymentProviderBreakdown({
     { name: PROVIDER_LABELS.account, value: providers.account, provider: 'account' }
   ].filter(item => item.value > 0);
 
-<<<<<<< HEAD
   const renderCustomLabel = (entry: { value: number }) => {
-=======
-  const renderCustomLabel = (entry: any) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     const percent = ((entry.value / providers.total) * 100).toFixed(1);
     return `${percent}%`;
   };
 
-<<<<<<< HEAD
   const CustomTooltip = ({ active, payload }: TooltipContentProps<number, string>) => {
     if (active && payload && payload.length > 0) {
       const data = payload[0]?.payload as { name: string; amount?: number; value: number };
-=======
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload[0]) {
-      const data = payload[0].payload;
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       return (
         <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
           <p className="font-medium text-gray-900">{data.name}</p>
@@ -220,11 +210,8 @@ export default function PaymentProviderBreakdown({
                       />
                     ))}
                   </Pie>
-<<<<<<< HEAD
                   <Tooltip content={CustomTooltip} />
-=======
-                  <Tooltip content={<CustomTooltip />} />
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
                   <Legend 
                     verticalAlign="bottom" 
                     height={36}

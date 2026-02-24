@@ -72,11 +72,7 @@ export default function StatusAnimation({ status, message, onComplete }: StatusA
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-<<<<<<< HEAD
     queueMicrotask(() => setShow(true));
-=======
-    setShow(true);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     if (status !== 'loading' && onComplete) {
       const t = setTimeout(() => onComplete(), 2000);
       return () => clearTimeout(t);
@@ -154,8 +150,4 @@ export default function StatusAnimation({ status, message, onComplete }: StatusA
       </div>
     </>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753

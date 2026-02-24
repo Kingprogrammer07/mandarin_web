@@ -117,22 +117,14 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
       fetchFlights();
       fetchUnpaidCargo(true);
     }
-<<<<<<< HEAD
   }, [clientCode, fetchFlights, fetchUnpaidCargo]);
-=======
-  }, [clientCode]);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 
   useEffect(() => {
     if (clientCode) {
       setOffset(0);
       fetchUnpaidCargo(true);
     }
-<<<<<<< HEAD
   }, [flightFilter, clientCode, fetchUnpaidCargo]);
-=======
-  }, [flightFilter]);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 
   const setFlightFilter = useCallback((flight: string | null) => {
     setFlightFilterState(flight);

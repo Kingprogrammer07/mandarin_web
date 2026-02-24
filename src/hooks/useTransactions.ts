@@ -118,11 +118,7 @@ export function useTransactions(clientCode: string | null): UseTransactionsRetur
     if (filters.clientCode) {
       fetchTransactions(true);
     }
-<<<<<<< HEAD
   }, [filters.clientCode, filters.filterType, filters.sortOrder, filters.flightCode, fetchTransactions]);
-=======
-  }, [filters.clientCode, filters.filterType, filters.sortOrder, filters.flightCode]);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
 
   const setFilterType = useCallback((type: FilterType) => {
     setFilters((prev) => ({ ...prev, filterType: type, offset: 0 }));

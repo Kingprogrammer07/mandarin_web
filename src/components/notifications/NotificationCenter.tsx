@@ -18,13 +18,9 @@ import { format, isToday, isYesterday } from 'date-fns';
 import { uz, ru } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 
-<<<<<<< HEAD
 import { notificationService, type Notification, type NotificationListResponse } from '@/api/services/notificationService';
 import { reportService, type ReportResponse } from '@/api/services/reportService';
-=======
-import { notificationService, type Notification } from '@/api/services/notificationService';
-import { reportService } from '@/api/services/reportService';
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -39,11 +35,8 @@ type CombinedNotification = {
     date: string; // ISO string
     is_read: boolean;
     iconType?: string; // for API notifications
-<<<<<<< HEAD
     metadata?: { flightName?: string }; // Extra data like flight name
-=======
-    metadata?: any; // Extra data like flight name
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 };
 
 // --- Utility: Date Formatting ---
@@ -304,11 +297,8 @@ export default function NotificationCenter() {
     });
 
     // Calculate Unread counts
-<<<<<<< HEAD
     const webFlightsList = webFlights;
-=======
-    const webFlightsList = Array.isArray(webFlights) ? webFlights : (webFlights as any)?.items || [];
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
     const lastSeenFlightCount = parseInt(localStorage.getItem('last_seen_flight_count') || '0');
     const reportUnreadCount = Math.max(0, webFlightsList.length - lastSeenFlightCount);
@@ -340,17 +330,11 @@ export default function NotificationCenter() {
 
         // 2. Reports
         const reportsListPlain: CombinedNotification[] = [];
-<<<<<<< HEAD
         const rawReports: ReportResponse[] = reportsHistory ?? [];
 
         if (rawReports) {
             rawReports.forEach((r: ReportResponse, index: number) => {
-=======
-        const rawReports = Array.isArray(reportsHistory) ? reportsHistory : (reportsHistory as any)?.items;
 
-        if (rawReports) {
-            rawReports.forEach((r: any, index: number) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
                 const isReportUnread = index < reportUnreadCount;
 
                 reportsListPlain.push({
@@ -372,7 +356,6 @@ export default function NotificationCenter() {
     }, [notificationsData, reportsHistory, reportUnreadCount]);
 
     // --- Mutations ---
-<<<<<<< HEAD
     const markReadMutation = useMutation<{ status: string }, unknown, number, { previousList: NotificationListResponse | undefined }>({
         mutationFn: notificationService.markAsRead,
         onMutate: async (id) => {
@@ -391,23 +374,7 @@ export default function NotificationCenter() {
                     };
                 }
             );
-=======
-    const markReadMutation = useMutation({
-        mutationFn: notificationService.markAsRead,
-        onMutate: async (id) => {
-            await queryClient.cancelQueries({ queryKey: ['notifications'] });
-            const previousList = queryClient.getQueryData(['notifications', 'list']);
-            // Optimistic Update
-            queryClient.setQueryData(['notifications', 'list'], (old: any) => {
-                if (!old) return old;
-                return {
-                    ...old,
-                    items: old.items.map((n: Notification) =>
-                        n.id === id ? { ...n, is_read: true } : n
-                    )
-                };
-            });
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             return { previousList };
         },
         onError: (_err, _newList, context) => {
@@ -426,11 +393,8 @@ export default function NotificationCenter() {
             queryClient.invalidateQueries({ queryKey: ['notifications', 'unread'] });
 
             // Also mark local reports as read
-<<<<<<< HEAD
             const currentFlights = webFlights;
-=======
-            const currentFlights = Array.isArray(webFlights) ? webFlights : (webFlights as any)?.items || [];
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             if (currentFlights.length > 0) {
                 localStorage.setItem('last_seen_flight_count', currentFlights.length.toString());
                 queryClient.invalidateQueries({ queryKey: ['webFlights'] });
@@ -446,11 +410,8 @@ export default function NotificationCenter() {
         if (item.type === 'report') {
             // Update local storage to mark reports as read
             if (!item.is_read) {
-<<<<<<< HEAD
                 const currentFlights = webFlights;
-=======
-                const currentFlights = Array.isArray(webFlights) ? webFlights : (webFlights as any)?.items || [];
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
                 localStorage.setItem('last_seen_flight_count', currentFlights.length.toString());
                 queryClient.invalidateQueries({ queryKey: ['webFlights'] });
             }

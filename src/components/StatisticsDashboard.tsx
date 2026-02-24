@@ -170,20 +170,13 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
   }, [i18n.language]);
 
   // Error handler helper
-<<<<<<< HEAD
   const getErrorMessage = useCallback((error: unknown) => {
     let errorMessage = t('stats.loadingErrorDesc');
     let errorTitle = t('stats.loadingError');
 
     const hasResponse = typeof error === 'object' && error !== null && 'response' in (error as object);
     if (hasResponse && (error as { response?: { status?: number; data?: { detail?: string } } }).response?.status) {
-=======
-  const getErrorMessage = useCallback((error: any) => {
-    let errorMessage = t('stats.loadingErrorDesc');
-    let errorTitle = t('stats.loadingError');
 
-    if (error.response?.status) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
       const statusMessages: Record<number, { title: string; message: string }> = {
         400: { title: '❌ Bad Request', message: 'Noto\'g\'ri parametrlar. Sanalarni tekshiring.' },
         401: { title: '❌ Unauthorized', message: 'Tizimga kirish uchun avtorizatsiya talab qilinadi.' },
@@ -195,17 +188,13 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
         503: { title: '❌ Service Unavailable', message: 'Xizmat vaqtincha mavjud emas. Iltimos keyinroq urinib ko\'ring.' }
       };
 
-<<<<<<< HEAD
       const statusError = statusMessages[(error as { response: { status: number } }).response.status];
-=======
-      const statusError = statusMessages[error.response.status];
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       if (statusError) {
         errorTitle = statusError.title;
         errorMessage = statusError.message;
       } else {
         errorTitle = `❌ ${t('stats.loadingError')}`;
-<<<<<<< HEAD
         const status = (error as { response: { status: number } }).response.status;
         const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
         const message = (error as { message?: string }).message;
@@ -215,14 +204,7 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
       errorTitle = '❌ Network Error';
       errorMessage = 'Tarmoq xatoligi. Internet ulanishini tekshiring.';
     } else if (typeof error === 'object' && error !== null && 'code' in (error as object) && (error as { code?: string }).code === 'TIMEOUT') {
-=======
-        errorMessage = `HTTP ${error.response.status}: ${error.response.data?.detail || error.message}`;
-      }
-    } else if (error.code === 'NETWORK_ERROR') {
-      errorTitle = '❌ Network Error';
-      errorMessage = 'Tarmoq xatoligi. Internet ulanishini tekshiring.';
-    } else if (error.code === 'TIMEOUT') {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       errorTitle = '❌ Timeout';
       errorMessage = 'So\'rov muddati o\'tib ketdi. Iltimos yana urinib ko\'ring.';
     }
@@ -308,11 +290,8 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
          });
       }
 
-<<<<<<< HEAD
     } catch (error: unknown) {
-=======
-    } catch (error: any) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       console.error('Critical failure in loadAllStatistics:', error);
       const { errorTitle, errorMessage } = getErrorMessage(error);
       toast({ title: errorTitle, description: errorMessage, variant: 'error' });

@@ -123,7 +123,6 @@ export default function EditCargoModal({ cargo, onClose, onSuccess }: EditCargoM
       onSuccess(updatedCargo.photo);
       onClose();
 
-<<<<<<< HEAD
     } catch (error: unknown) {
       const errorMessage = (() => {
         if (typeof error === 'object' && error !== null) {
@@ -132,10 +131,7 @@ export default function EditCargoModal({ cargo, onClose, onSuccess }: EditCargoM
         }
         return null;
       })() || t('cargo.messages.updateError');
-=======
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || error.message || t('cargo.messages.updateError');
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
       toast({
         title: `❌ ${t('cargo.messages.updateError')}`,

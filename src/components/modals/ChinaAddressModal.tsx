@@ -34,11 +34,8 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
     // Fetch data when opened
     useEffect(() => {
         if (isOpen && !data) {
-<<<<<<< HEAD
             // Avoid setState here; loading state is managed by fetchChinaAddress's promise chain
-=======
-            setLoading(true);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             fetchChinaAddress()
                 .then(setData)
                 .finally(() => setLoading(false));

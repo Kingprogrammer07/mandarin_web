@@ -145,11 +145,8 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
             },
             audio: false,
           });
-<<<<<<< HEAD
         } catch {
-=======
-        } catch (_envError) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: 'user',
@@ -377,10 +374,8 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
     // ─── Cleanup: stop everything on unmount ───────────────────────────
 
     useEffect(() => {
-<<<<<<< HEAD
       const urlsMap = previewUrlsRef.current;
-=======
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       return () => {
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((t) => t.stop());
@@ -388,13 +383,9 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         }
         document.body.style.overflow = '';
 
-<<<<<<< HEAD
         urlsMap.forEach((url) => URL.revokeObjectURL(url));
         urlsMap.clear();
-=======
-        previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-        previewUrlsRef.current.clear();
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
       };
     }, []);
 

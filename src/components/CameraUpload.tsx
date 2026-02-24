@@ -5,11 +5,8 @@ import { useTranslation } from 'react-i18next';
 
 interface CameraUploadProps {
   label: string;
-<<<<<<< HEAD
   value?: File | null;
-=======
-  value?: File | null; // eslint-disable-line @typescript-eslint/no-unused-vars
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
   onChange: (file: File | null) => void;
   error?: string;
   onCameraClose?: () => void; // Callback when camera closes after capture
@@ -32,11 +29,8 @@ export default function CameraUpload({
   const streamRef = useRef<MediaStream | null>(null);
 
   // Handle file selection from gallery
-<<<<<<< HEAD
   const handleFileChange = useCallback((file: File | null) => {
-=======
-  const handleFileChange = (file: File | null) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     if (file && file.type.startsWith('image/')) {
       onChange(file);
       const reader = new FileReader();
@@ -45,11 +39,8 @@ export default function CameraUpload({
       };
       reader.readAsDataURL(file);
     }
-<<<<<<< HEAD
   }, [onChange]);
-=======
-  };
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
   /**
    * CRITICAL: Stop all media tracks to prevent memory leaks and camera lock

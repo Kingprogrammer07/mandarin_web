@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 import { useState, useEffect, useMemo, useCallback } from 'react';
-=======
-import { useState, useEffect, useMemo } from 'react';
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -36,27 +33,15 @@ export default function OfflineCargoManager({ onClose, onRefreshHost, flightName
     // Edit Mode
     const [editingItem, setEditingItem] = useState<FailedItem | null>(null);
 
-<<<<<<< HEAD
     const loadItems = useCallback(async () => {
-=======
-    // Load items on mount
-    useEffect(() => {
-        loadItems();
-    }, []);
 
-    const loadItems = async () => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
         try {
             setLoading(true);
             const data = await offlineStorage.getAllItems(flightName);
             setItems(data);
-<<<<<<< HEAD
         } catch {
             console.error('Failed to load offline items');
-=======
-        } catch (error) {
-            console.error('Failed to load offline items:', error);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             toast({
                 title: 'Xatolik',
                 description: 'Ma\'lumotlarni yuklashda xatolik yuz berdi',
@@ -65,17 +50,13 @@ export default function OfflineCargoManager({ onClose, onRefreshHost, flightName
         } finally {
             setLoading(false);
         }
-<<<<<<< HEAD
     }, [flightName, toast]);
 
     // Load items on mount
     useEffect(() => {
         loadItems();
     }, [loadItems]);
-=======
-    };
 
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     // Filter & Sort
     const filteredItems = useMemo(() => {
         return items
@@ -98,11 +79,8 @@ export default function OfflineCargoManager({ onClose, onRefreshHost, flightName
             setItems(prev => prev.filter(item => item.id !== id));
             toast({ title: 'O\'chirildi', variant: 'success' });
             onRefreshHost();
-<<<<<<< HEAD
         } catch {
-=======
-        } catch (error) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             toast({ title: 'Xatolik', description: 'O\'chirishda xatolik', variant: 'error' });
         }
     };
@@ -115,11 +93,8 @@ export default function OfflineCargoManager({ onClose, onRefreshHost, flightName
             toast({ title: 'Tozalandi', variant: 'success' });
             onRefreshHost();
             onClose();
-<<<<<<< HEAD
         } catch {
-=======
-        } catch (error) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             toast({ title: 'Xatolik', variant: 'error' });
         }
     };
@@ -147,18 +122,14 @@ export default function OfflineCargoManager({ onClose, onRefreshHost, flightName
                 variant: 'success'
             });
             onRefreshHost();
-<<<<<<< HEAD
+
         } catch (error: unknown) {
             console.error(error);
             const msg =
                 (typeof error === 'object' && error !== null && 'data' in (error as object) && (error as { data?: { detail?: string } }).data?.detail) ||
                 (typeof error === 'object' && error !== null && 'message' in (error as object) && (error as { message?: string }).message) ||
                 '';
-=======
-        } catch (error: any) {
-            console.error(error);
-            const msg = error.response?.data?.detail || error.message;
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             toast({
                 title: 'Xatolik',
                 description: msg,
@@ -212,11 +183,8 @@ export default function OfflineCargoManager({ onClose, onRefreshHost, flightName
             setItems(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
             setEditingItem(null);
             toast({ title: 'Saqlandi', variant: 'success' });
-<<<<<<< HEAD
         } catch {
-=======
-        } catch (e) {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
             toast({ title: 'Xatolik', description: 'Saqlashda xatolik', variant: 'error' });
         }
     };
@@ -336,28 +304,18 @@ function OfflineItemCard({ item, onDelete, onRetry, onEdit }: {
     useEffect(() => {
         if (!showPhotos) {
             objectUrls.forEach(url => URL.revokeObjectURL(url));
-<<<<<<< HEAD
             queueMicrotask(() => setObjectUrls([]));
         } else {
             // Generate URLs
             const urls = item.photos.map(file => URL.createObjectURL(file));
             queueMicrotask(() => setObjectUrls(urls));
-=======
-            setObjectUrls([]);
-        } else {
-            // Generate URLs
-            const urls = item.photos.map(file => URL.createObjectURL(file));
-            setObjectUrls(urls);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
         }
         return () => {
             objectUrls.forEach(url => URL.revokeObjectURL(url));
         };
-<<<<<<< HEAD
     }, [showPhotos, item.photos, objectUrls]);
-=======
-    }, [showPhotos, item.photos]);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in">

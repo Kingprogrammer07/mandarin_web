@@ -389,11 +389,8 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
     } finally {
       setIsLoading(false);
     }
-<<<<<<< HEAD
   }, [flightName, toast, t]);
-=======
-  }, [flightName, toast]);
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
 
   useEffect(() => {
     loadData();
@@ -507,7 +504,6 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
         description: '',
         variant: 'success'
       });
-<<<<<<< HEAD
     } catch (error: unknown) {
       console.error('Failed to delete cargo:', error);
       toast({
@@ -515,13 +511,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
         description:
           (typeof error === 'object' && error !== null && 'message' in (error as object) && (error as { message?: string }).message) ||
           t('cargo.messages.deleteError'),
-=======
-    } catch (error: any) {
-      console.error('Failed to delete cargo:', error);
-      toast({
-        title: `❌ ${t('cargo.messages.deleteError')}`,
-        description: error.message || t('cargo.messages.deleteError'),
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
         variant: 'error'
       });
     } finally {
@@ -548,7 +538,6 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
         description: '',
         variant: 'success'
       });
-<<<<<<< HEAD
     } catch (err: unknown) {
       let errorMessage = t('cargo.excelExport.error');
 
@@ -563,19 +552,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
         errorMessage = t('cargo.excelExport.networkError');
       } else if (message && message !== 'Export failed') {
         errorMessage = message;
-=======
-    } catch (err: any) {
-      let errorMessage = t('cargo.excelExport.error');
 
-      if (err.message === 'rate_limit' || err.status === 429) {
-        errorMessage = t('cargo.excelExport.rateLimit');
-      } else if (err.message === 'no_data' || err.status === 404) {
-        errorMessage = t('cargo.excelExport.noData');
-      } else if (err.message === 'network_error' || err.status === 0) {
-        errorMessage = t('cargo.excelExport.networkError');
-      } else if (err.message && err.message !== 'Export failed') {
-        errorMessage = err.message;
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
       }
 
       toast({

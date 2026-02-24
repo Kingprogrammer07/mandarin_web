@@ -28,16 +28,13 @@ const FlightSummaryCard = ({
     isExpanded,
     onToggle
 }: {
-<<<<<<< HEAD
     summary: {
         flight_name: string;
         last_update: string;
         total_weight: number;
         total_count: number;
     },
-=======
-    summary: any,
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     isExpanded: boolean,
     onToggle: () => void
 }) => {
@@ -377,16 +374,13 @@ export default function ClientCargoHistory() {
                     {history.map((flight) => (
                         <div key={flight.flight_name} className="relative">
                             <FlightSummaryCard
-<<<<<<< HEAD
                                 summary={{
                                     flight_name: flight.flight_name,
                                     last_update: flight.last_update ?? '',
                                     total_weight: flight.total_weight,
                                     total_count: flight.total_count
                                 }}
-=======
-                                summary={flight}
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
                                 isExpanded={expandedFlight === flight.flight_name}
                                 onToggle={() => handleToggle(flight.flight_name)}
                             />

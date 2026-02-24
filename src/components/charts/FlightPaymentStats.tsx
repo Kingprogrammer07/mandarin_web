@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import type { ReactElement } from 'react';
 import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Plane, DollarSign, Users, TrendingUp } from 'lucide-react';
 import type { FlightPaymentStatsResponse, FlightPaymentStats } from '@/api/services/stats';
@@ -22,7 +23,7 @@ const PROVIDER_LABELS = {
   account: 'Hisob'
 };
 
-export default function FlightPaymentStatsComponent({ data }: FlightPaymentStatsProps) {
+export default function FlightPaymentStatsComponent({ data }: FlightPaymentStatsProps): ReactElement {
   const getFlightProviderData = (flight: FlightPaymentStats) => [
     { name: PROVIDER_LABELS.cash, value: flight.providers.cash, provider: 'cash' },
     { name: PROVIDER_LABELS.click, value: flight.providers.click, provider: 'click' },
@@ -32,21 +33,13 @@ export default function FlightPaymentStatsComponent({ data }: FlightPaymentStats
 
   const topFlights = data.flights.slice(0, 10);
 
-<<<<<<< HEAD
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name?: string; value?: number; amount?: number; flight_name?: string; count?: number; unique_clients?: number } }> }) => {
-=======
-  const CustomTooltip = ({ active, payload }: any) => {
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     if (active && payload && payload[0]) {
       const flightData = payload[0].payload;
       return (
         <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
           <p className="font-medium text-gray-900">{flightData.flight_name || flightData.name}</p>
-<<<<<<< HEAD
-          <p className="text-sm text-gray-600">Summa: {formatCurrencyUz(flightData.value ?? flightData.amount ?? 0)} so'm</p>
-=======
-          <p className="text-sm text-gray-600">Summa: {formatCurrencyUz(flightData.value || flightData.amount)} so'm</p>
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+          <p className="text-sm text-gray-600">Summa: {formatCurrencyUz((flightData.value ?? flightData.amount ?? 0) as number)} so'm</p>
           {flightData.count && <p className="text-sm text-gray-600">Soni: {flightData.count}</p>}
           {flightData.unique_clients && <p className="text-sm text-gray-600">Mijozlar: {flightData.unique_clients}</p>}
         </div>

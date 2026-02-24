@@ -71,16 +71,11 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
       setTimeout(() => {
         if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
       }, 2000);
-<<<<<<< HEAD
     } catch (error: unknown) {
       setSubmitStatus('error');
       const message = typeof error === 'object' && error !== null && 'message' in (error as object) ? (error as { message?: string }).message : undefined;
       setSubmitMessage(message || t('form.messages.generalError'));
-=======
-    } catch (error: any) {
-      setSubmitStatus('error');
-      setSubmitMessage(error.message || t('form.messages.generalError'));
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
+
     }
   };
 
