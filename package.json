@@ -48,11 +48,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^4.2.2",
-<<<<<<< HEAD
     "eslint": "^10.0.2",
-=======
-    "eslint": "^9.39.1",
->>>>>>> 2b04cc3da2bdd52664f4a733cead166e9c977753
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
