@@ -32,7 +32,7 @@ import ImageUpload from './ImageUpload';
 import StatusAnimation from './StatusAnimation';
 import { createClient, updateClient, deleteClient as deleteClientApi, type Client, type ClientCreateRequest } from '@/api/services/client';
 
-import { regions } from '@/lib/validation';
+import { regions, DISTRICTS } from '@/lib/validation';
 
 // O'zbekiston passport seriyalari
 const UZBEKISTAN_NATIVE_PASSPORT_SERIES = [
@@ -114,6 +114,12 @@ const clientSchema = z.object({
     .refine((val) => !val || (val.length >= 2 && val.length <= 128), {
       message: 'client.validation.regionLength',
     }),
+  district: z
+    .string()
+    .optional()
+    .refine((val) => !val || (val.length >= 2 && val.length <= 128), {
+      message: 'client.validation.districtLength',
+    }),
   address: z
     .string()
     .optional()
@@ -175,6 +181,7 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       passport_series: clientData?.passport_series || '',
       date_of_birth: undefined,
       region: clientData?.region || '',
+      district: clientData?.district || '',
       address: clientData?.address || '',
       phone: clientData?.phone?.replace('+998', '') || '',
       pinfl: clientData?.pinfl || '',
@@ -211,6 +218,7 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
           form.setValue('client_code', data.extra_code || data.client_code || '');
           form.setValue('passport_series', data.passport_series || '');
           form.setValue('region', data.region || '');
+          form.setValue('district', data.district || '');
           form.setValue('address', data.address || '');
           form.setValue('phone', data.phone?.replace('+998', '') || '');
           form.setValue('pinfl', data.pinfl || '');
@@ -275,6 +283,16 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
 
   // Calendar open state
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  // Watch region for district dependency
+  const selectedRegion = form.watch('region');
+
+  // Clear district when region changes (but not on initial load)
+  useEffect(() => {
+    if (selectedRegion) {
+      form.setValue('district', '');
+    }
+  }, [selectedRegion, form]);
 
   // Passport series formatter - IDENTICAL to RegistrationForm
   const handlePassportInput = (value: string) => {
@@ -390,6 +408,9 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       }
       if (data.region) {
         requestData.region = data.region;
+      }
+      if (data.district) {
+        requestData.district = data.district;
       }
       if (data.address) {
         requestData.address = data.address;
@@ -698,6 +719,45 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
                     </Select>
                     {form.formState.errors.region && (
                       <p className="text-red-500 text-sm">{t(form.formState.errors.region.message as string)}</p>
+                    )}
+                  </FormItem>
+                )}
+              />
+
+              {/* District */}
+              <FormField
+                control={form.control}
+                name="district"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-orange-500" />
+                      {t('client.district')}
+                    </FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || ''}
+                      disabled={!selectedRegion}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full bg-orange-50/50 border-orange-200 focus:border-orange-500 focus:ring-orange-500">
+                          <SelectValue placeholder={t('client.districtPlaceholder')} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectedRegion && DISTRICTS[selectedRegion as keyof typeof DISTRICTS]?.map((dist) => (
+                          <SelectItem
+                            key={dist.value}
+                            value={dist.value}
+                            className="cursor-pointer hover:bg-orange-50 focus:bg-orange-100"
+                          >
+                            {t(dist.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.district && (
+                      <p className="text-red-500 text-sm">{t(form.formState.errors.district.message as string)}</p>
                     )}
                   </FormItem>
                 )}

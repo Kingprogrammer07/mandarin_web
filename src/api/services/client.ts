@@ -13,6 +13,7 @@ export interface Client {
   pinfl: string | null;
   date_of_birth: string | null;
   region: string | null;
+  district: string | null;
   address: string | null;
   client_code: string | null;
   extra_code: string | null;
@@ -30,6 +31,7 @@ export interface ClientCreateRequest {
   passport_series?: string;
   date_of_birth?: string; // YYYY-MM-DD
   region?: string;
+  district?: string;
   address?: string;
   phone?: string;
   pinfl?: string;
@@ -115,6 +117,7 @@ export async function createClient(data: ClientCreateRequest): Promise<Client> {
   if (data.passport_series) formData.append('passport_series', data.passport_series);
   if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
   if (data.region) formData.append('region', data.region);
+  if (data.district) formData.append('district', data.district);
   if (data.address) formData.append('address', data.address);
   if (data.phone) formData.append('phone', data.phone);
   if (data.pinfl) formData.append('pinfl', data.pinfl);
@@ -145,6 +148,7 @@ export async function updateClient(id: number, data: ClientCreateRequest): Promi
   if (data.passport_series) formData.append('passport_series', data.passport_series);
   if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
   if (data.region) formData.append('region', data.region);
+  if (data.district) formData.append('district', data.district);
   if (data.address) formData.append('address', data.address);
   if (data.phone) formData.append('phone', data.phone);
   if (data.pinfl) formData.append('pinfl', data.pinfl);
