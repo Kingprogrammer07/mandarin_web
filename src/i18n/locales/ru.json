@@ -131,6 +131,8 @@
     "dateOfBirthPlaceholder": "ДД.ММ.ГГГГ",
     "region": "Регион",
     "regionPlaceholder": "Введите ваш регион",
+    "district": "Район / Город",
+    "districtPlaceholder": "Выберите район",
     "address": "Точный адрес",
     "addressPlaceholder": "Улица, номер дома и т.д.",
     "phone": "Номер телефона",
@@ -171,7 +173,8 @@
       "dateOfBirthAge": "Вам должно быть не менее 16 лет",
       "clientCodeInvalid": "Неверный формат кода клиента (например: SS123)",
       "referrerTelegramIdInvalid": "Telegram ID должен состоять только из цифр",
-      "referrerClientCodeInvalid": "Неверный формат кода пригласившего (например: SS123)"
+      "referrerClientCodeInvalid": "Неверный формат кода пригласившего (например: SS123)",
+      "districtRequired": "Пожалуйста, выберите район"
     },
     "messages": {
       "loadingAdd": "Добавление клиента...",

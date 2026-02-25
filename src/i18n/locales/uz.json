@@ -131,6 +131,8 @@
     "dateOfBirthPlaceholder": "KK.OO.YYYY",
     "region": "Viloyat",
     "regionPlaceholder": "Viloyatingizni kiriting",
+    "district": "Tuman / Shahar",
+    "districtPlaceholder": "Tumanni tanlang",
     "address": "Aniq manzil",
     "addressPlaceholder": "Ko'cha, uy raqami va hokazo",
     "phone": "Telefon raqam",
@@ -171,7 +173,8 @@
       "dateOfBirthAge": "Yoshingiz kamida 16 dan oshgan bo'lishi kerak",
       "clientCodeInvalid": "Mijoz kodi noto'g'ri formatda (masalan: SS123)",
       "referrerTelegramIdInvalid": "Telegram ID faqat raqamlardan iborat bo'lishi kerak",
-      "referrerClientCodeInvalid": "Taklif qilgan foydalanuvchi kodi noto'g'ri formatda (masalan: SS123)"
+      "referrerClientCodeInvalid": "Taklif qilgan foydalanuvchi kodi noto'g'ri formatda (masalan: SS123)",
+      "districtRequired": "Iltimos, tumanni tanlang"
     },
     "messages": {
       "loadingAdd": "Mijoz qo'shilmoqda...",
