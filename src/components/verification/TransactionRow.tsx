@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Loader2,
   Package,
+  PackageOpen,
   AlertCircle,
   CreditCard,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ interface TransactionRowProps {
   onViewDetails: (transaction: Transaction) => void;
   onViewImages: (transactionId: number) => void;
   onPay: (transaction: Transaction) => void;
+  onDeliveryRequest?: (transaction: Transaction) => void;
   onTakenSuccess: () => void;
 }
 
@@ -26,6 +28,7 @@ export function TransactionRow({
   onViewDetails,
   onViewImages,
   onPay,
+  onDeliveryRequest,
   onTakenSuccess,
 }: TransactionRowProps) {
   const [isMarkingTaken, setIsMarkingTaken] = useState(false);
@@ -123,41 +126,62 @@ export function TransactionRow({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-2 border-t">
-        <Button variant="outline" size="sm" onClick={() => onViewDetails(transaction)} className="w-full sm:w-auto h-11 sm:h-9">
-          <Eye className="h-4 w-4 sm:mr-1" />
-          <span className="ml-2 sm:ml-0">Batafsil</span>
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => onViewImages(transaction.id)} className="w-full sm:w-auto h-11 sm:h-9">
-          <Image className="h-4 w-4 sm:mr-1" />
-          <span className="ml-2 sm:ml-0">Rasmlar</span>
-        </Button>
-        {(transaction.remaining_amount ?? 0) > 0 && (
-          <Button
-            size="sm"
-            onClick={() => onPay(transaction)}
-            className="w-full sm:w-auto h-11 sm:h-9 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <CreditCard className="h-4 w-4 sm:mr-1" />
-            <span className="ml-2 sm:ml-0">To'lov</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t mt-2">
+        {/* Left: Secondary Actions */}
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => onViewDetails(transaction)} className="text-gray-500 hover:text-gray-700 h-8 px-2">
+            <Eye className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Tafsilot</span>
           </Button>
-        )}
-        {!transaction.is_taken_away && (transaction.payment_status === 'paid' || transaction.payment_status === 'partial') && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleMarkAsTaken}
-            disabled={isMarkingTaken}
-            className="w-full sm:w-auto h-11 sm:h-9"
-          >
-            {isMarkingTaken ? (
-              <Loader2 className="h-4 w-4 sm:mr-1 animate-spin" />
-            ) : (
-              <CheckCircle className="h-4 w-4 sm:mr-1" />
-            )}
-            <span className="ml-2 sm:ml-0">Olingan</span>
+          <Button variant="ghost" size="sm" onClick={() => onViewImages(transaction.id)} className="text-gray-500 hover:text-gray-700 h-8 px-2">
+            <Image className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Rasm</span>
           </Button>
-        )}
+        </div>
+
+        {/* Right: Primary Actions */}
+        <div className="flex gap-2 flex-wrap items-center justify-end">
+          {(transaction.remaining_amount ?? 0) > 0 && (
+            <Button
+              size="sm"
+              onClick={() => onPay(transaction)}
+              className="h-8 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <CreditCard className="h-4 w-4 mr-1" />
+              <span>To'lov</span>
+            </Button>
+          )}
+
+          {/* Delivery Button */}
+          {onDeliveryRequest && !transaction.is_taken_away && (transaction.payment_status === 'paid' || transaction.payment_status === 'partial') && (
+            <Button
+              size="sm"
+              onClick={() => onDeliveryRequest(transaction)}
+              className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-3 rounded-lg shadow-sm"
+            >
+              <PackageOpen className="h-4 w-4 mr-1.5" />
+              <span>Yetkazish</span>
+            </Button>
+          )}
+
+          {/* Mark as Taken */}
+          {!transaction.is_taken_away && (transaction.payment_status === 'paid' || transaction.payment_status === 'partial') && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkAsTaken}
+              disabled={isMarkingTaken}
+              className="h-8"
+            >
+              {isMarkingTaken ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+              )}
+              <span>Olingan</span>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

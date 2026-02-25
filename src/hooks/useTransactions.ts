@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getTransactions, type Transaction, type TransactionFilters, type FilterType, type SortOrder } from '@/api/transactions';
 import axios from 'axios';
 
@@ -61,14 +61,14 @@ export function useTransactions(clientCode: string | null): UseTransactionsRetur
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  // Default filter set to 'all' as requested
-  const [filters, setFilters] = useState<TransactionFilters>({
+  const [filters, setFilters] = useState<Omit<TransactionFilters, 'offset'>>({
     clientCode: clientCode || '',
     filterType: 'all',
     sortOrder: 'desc',
     limit: LIMIT,
-    offset: 0,
   });
+
+  const offsetRef = useRef(0);
 
   const fetchTransactions = useCallback(async (resetList = true) => {
     if (!filters.clientCode) return;
@@ -77,7 +77,7 @@ export function useTransactions(clientCode: string | null): UseTransactionsRetur
     setError(null);
 
     try {
-      const currentOffset = resetList ? 0 : filters.offset || 0;
+      const currentOffset = resetList ? 0 : offsetRef.current;
       const response = await getTransactions({
         ...filters,
         offset: currentOffset,
@@ -99,10 +99,11 @@ export function useTransactions(clientCode: string | null): UseTransactionsRetur
       const currentPage = Math.floor(currentOffset / LIMIT) + 1;
       setHasMore(currentPage < response.total_pages);
 
-      setFilters((prev) => ({ ...prev, offset: currentOffset + transactionsList.length }));
+      offsetRef.current = currentOffset + transactionsList.length;
     } catch (err: unknown) {
       const errorMessage = normalizeError(err);
       setError(errorMessage);
+      if (resetList) setTransactions([]);
     } finally {
       setIsLoading(false);
     }
@@ -110,26 +111,31 @@ export function useTransactions(clientCode: string | null): UseTransactionsRetur
 
   useEffect(() => {
     if (clientCode) {
-      setFilters((prev) => ({ ...prev, clientCode: clientCode, offset: 0 }));
+      offsetRef.current = 0;
+      setFilters((prev) => ({ ...prev, clientCode: clientCode }));
     }
   }, [clientCode]);
 
   useEffect(() => {
     if (filters.clientCode) {
+      offsetRef.current = 0;
       fetchTransactions(true);
     }
   }, [filters.clientCode, filters.filterType, filters.sortOrder, filters.flightCode, fetchTransactions]);
 
   const setFilterType = useCallback((type: FilterType) => {
-    setFilters((prev) => ({ ...prev, filterType: type, offset: 0 }));
+    offsetRef.current = 0;
+    setFilters((prev) => ({ ...prev, filterType: type }));
   }, []);
 
   const setSortOrder = useCallback((order: SortOrder) => {
-    setFilters((prev) => ({ ...prev, sortOrder: order, offset: 0 }));
+    offsetRef.current = 0;
+    setFilters((prev) => ({ ...prev, sortOrder: order }));
   }, []);
 
   const setFlightCode = useCallback((code: string | undefined | null) => {
-    setFilters((prev) => ({ ...prev, flightCode: code ?? undefined, offset: 0 }));
+    offsetRef.current = 0;
+    setFilters((prev) => ({ ...prev, flightCode: code ?? undefined }));
   }, []);
 
   const loadMore = useCallback(() => {
@@ -139,7 +145,7 @@ export function useTransactions(clientCode: string | null): UseTransactionsRetur
   }, [isLoading, hasMore, fetchTransactions]);
 
   const refetch = useCallback(async () => {
-    setFilters((prev) => ({ ...prev, offset: 0 }));
+    offsetRef.current = 0;
     await fetchTransactions(true);
   }, [fetchTransactions]);
 

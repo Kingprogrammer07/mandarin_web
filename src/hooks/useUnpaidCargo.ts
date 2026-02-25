@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getUnpaidCargo, getUnpaidCargoFlights, type UnpaidCargoItem, type UnpaidCargoApiResponse } from '@/api/verification';
 import axios from 'axios';
 
@@ -52,7 +52,7 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
+  const offsetRef = useRef(0);
   const [flightFilter, setFlightFilterState] = useState<string | null>(null);
 
   const fetchUnpaidCargo = useCallback(async (resetList = true) => {
@@ -62,7 +62,7 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
     setError(null);
 
     try {
-      const currentOffset = resetList ? 0 : offset;
+      const currentOffset = resetList ? 0 : offsetRef.current;
 
       // Backend requires ALL filter params
       const response: UnpaidCargoApiResponse = await getUnpaidCargo({
@@ -89,15 +89,15 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
       const currentPage = Math.floor(currentOffset / LIMIT) + 1;
       setHasMore(currentPage < response.total_pages);
 
-      setOffset(currentOffset + itemsList.length);
+      offsetRef.current = currentOffset + itemsList.length;
     } catch (err: unknown) {
       const errorMessage = normalizeError(err);
       setError(errorMessage);
-      setCargos([]);
+      if (resetList) setCargos([]);
     } finally {
       setIsLoading(false);
     }
-  }, [clientCode, offset, flightFilter]);
+  }, [clientCode, flightFilter]);
 
   // Use dedicated endpoint for unpaid cargo flights
   const fetchFlights = useCallback(async () => {
@@ -121,7 +121,7 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
 
   useEffect(() => {
     if (clientCode) {
-      setOffset(0);
+      offsetRef.current = 0;
       fetchUnpaidCargo(true);
     }
   }, [flightFilter, clientCode, fetchUnpaidCargo]);
@@ -137,7 +137,7 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
   }, [isLoading, hasMore, fetchUnpaidCargo]);
 
   const refetch = useCallback(async () => {
-    setOffset(0);
+    offsetRef.current = 0;
     await fetchUnpaidCargo(true);
   }, [fetchUnpaidCargo]);
 

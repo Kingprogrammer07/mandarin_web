@@ -6,6 +6,7 @@ import { TransactionFilters } from '@/components/verification/TransactionFilters
 import { TransactionRow } from '@/components/verification/TransactionRow';
 import { CargoImagesModal } from '@/components/verification/CargoImagesModal';
 import { PaymentModal } from '@/components/verification/PaymentModal'; // Added import
+import { DeliveryRequestModal } from '@/components/delivery/DeliveryRequestModal';
 
 import type { Transaction } from '@/api/transactions';
 import {
@@ -67,6 +68,10 @@ export default function TransactionsPage({ clientCode, client_id, onBack }: Tran
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedPaymentTransaction, setSelectedPaymentTransaction] = useState<Transaction | null>(null);
 
+  // New state for delivery modal
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [selectedDeliveryTransaction, setSelectedDeliveryTransaction] = useState<Transaction | null>(null);
+
   const handleViewDetails = useCallback((transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setDetailsModalOpen(true);
@@ -80,6 +85,11 @@ export default function TransactionsPage({ clientCode, client_id, onBack }: Tran
   const handlePay = useCallback((transaction: Transaction) => {
     setSelectedPaymentTransaction(transaction);
     setPaymentModalOpen(true);
+  }, []);
+
+  const handleDeliveryRequest = useCallback((transaction: Transaction) => {
+    setSelectedDeliveryTransaction(transaction);
+    setDeliveryModalOpen(true);
   }, []);
 
   const handleTakenSuccess = useCallback(() => {
@@ -185,6 +195,7 @@ export default function TransactionsPage({ clientCode, client_id, onBack }: Tran
                 onViewDetails={handleViewDetails}
                 onViewImages={handleViewImages}
                 onPay={handlePay}
+                onDeliveryRequest={handleDeliveryRequest}
                 onTakenSuccess={handleTakenSuccess}
               />
             </motion.div>
@@ -236,7 +247,7 @@ export default function TransactionsPage({ clientCode, client_id, onBack }: Tran
                   <p className="text-sm text-muted-foreground">To'lov turi</p>
                   <p className="font-medium">
                     {selectedTransaction.payment_type === 'cash' ? 'Naqd' :
-                     selectedTransaction.payment_type === 'card' ? 'Kartaga to\'lov' : 'Online'}
+                      selectedTransaction.payment_type === 'card' ? 'Kartaga to\'lov' : 'Online'}
                   </p>
                 </div>
               </div>
@@ -325,6 +336,22 @@ export default function TransactionsPage({ clientCode, client_id, onBack }: Tran
         }
         onSuccess={handlePaymentSuccess}
         walletBalance={profile?.client_balance}
+      />
+
+      {/* Delivery Request Modal */}
+      <DeliveryRequestModal
+        isOpen={deliveryModalOpen}
+        onClose={() => {
+          setDeliveryModalOpen(false);
+          setSelectedDeliveryTransaction(null);
+        }}
+        transaction={selectedDeliveryTransaction}
+        clientProfile={profile}
+        onSuccess={() => {
+          refetch();
+          setDeliveryModalOpen(false);
+          setSelectedDeliveryTransaction(null);
+        }}
       />
     </div>
   );
