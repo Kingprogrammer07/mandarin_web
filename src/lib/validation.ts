@@ -3,7 +3,7 @@ import { z } from 'zod';
 // O'zbekistonda tug'ilgan fuqarolarning passport seriyalari
 // Faqat mahalliy (native) fuqarolar uchun
 const UZBEKISTAN_NATIVE_PASSPORT_SERIES = [
-  'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK', 'AL', 'AM', 'AN', 'AB',
+  'AA', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK', 'AL', 'AM', 'AN', 'AB',
   'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'K', 'KA'
 ];
 
