@@ -23,6 +23,7 @@ export interface Client {
   is_admin: boolean;
   language_code: string;
   created_at: string;
+  current_balance?: number;
 }
 
 export interface ClientCreateRequest {
@@ -39,6 +40,9 @@ export interface ClientCreateRequest {
   referrer_client_code?: string;
   client_code?: string;
   passport_images?: File[];
+  adjustment_amount?: number;
+  adjustment_reason?: string;
+  adjustment_type?: 'bonus' | 'penalty' | 'silent';
 }
 
 export interface ClientDeleteResponse {
@@ -159,6 +163,11 @@ export async function updateClient(id: number, data: ClientCreateRequest): Promi
   // Also support updating telegram_id if needed (backend supports it)
   if (data.telegram_id != null) formData.append('telegram_id', data.telegram_id.toString());
 
+  // Balance adjustment fields
+  if (data.adjustment_amount != null) formData.append('adjustment_amount', data.adjustment_amount.toString());
+  if (data.adjustment_reason) formData.append('adjustment_reason', data.adjustment_reason);
+  if (data.adjustment_type) formData.append('adjustment_type', data.adjustment_type.toString());
+
   // Passport images - faqat yangi rasm yuklangan bo'lsa yuborish
   if (data.passport_images && data.passport_images.length > 0) {
     data.passport_images.forEach((file) => {
@@ -178,5 +187,24 @@ export async function updateClient(id: number, data: ClientCreateRequest): Promi
  */
 export async function deleteClient(id: number): Promise<ClientDeleteResponse> {
   const response = await apiClient.delete<ClientDeleteResponse>(`/api/v1/clients/${id}`);
+  return response.data;
+}
+
+export interface CodePreviewResponse {
+  preview_code: string;
+  prefix: string;
+  is_tashkent: boolean;
+}
+
+/**
+ * Frontendda jonli kodni ko'rsatish uchun API
+ */
+export async function previewClientCode(
+  region: string, 
+  district: string
+): Promise<CodePreviewResponse> {
+  const response = await apiClient.get<CodePreviewResponse>('/api/v1/clients/preview-code', {
+    params: { region, district }
+  });
   return response.data;
 }

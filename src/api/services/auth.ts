@@ -16,6 +16,18 @@ export interface LoginResponse {
   phone: string | null;
   telegram_id: number;
   created_at: string;
+  access_token: string | null;
+  token_type: string | null;
+  role: string;
+}
+
+export interface AuthMeResponse {
+  id: number;
+  client_code: string | null;
+  full_name: string;
+  phone: string | null;
+  telegram_id: number | null;
+  role: string;
 }
 
 export interface RegisterRequest {
@@ -105,6 +117,16 @@ export async function validateInitData(
 }
 
 /**
+ * Telegram auto-login - initData orqali avtomatik kirish
+ */
+export async function telegramAutoLogin(initData: string): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>('/auth/telegram-login', {
+    init_data: initData,
+  });
+  return response.data;
+}
+
+/**
  * Telegram WebApp ma'lumotlarini olish
  */
 export function getTelegramWebAppData() {
@@ -126,4 +148,12 @@ export function getTelegramWebAppData() {
         }
       : null,
   };
+}
+
+/**
+ * Get current authenticated user profile and role
+ */
+export async function fetchAuthMe(): Promise<AuthMeResponse> {
+  const response = await apiClient.get<AuthMeResponse>('/auth/me');
+  return response.data;
 }

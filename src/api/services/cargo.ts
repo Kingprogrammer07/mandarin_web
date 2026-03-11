@@ -65,23 +65,28 @@ export interface CargoItemResponse {
   item_name_ru?: string;
   quantity?: string;
   weight_kg?: string;
-  price_per_kg?: string;
-  total_payment?: string;
+  price_per_kg_usd?: string;
+  price_per_kg_uzs?: string;
+  total_payment_usd?: string;
+  total_payment_uzs?: string;
+  exchange_rate?: string;
   box_number?: string;
 
   // Status and Dates
-  checkin_status: 'pre' | 'post';
+  checkin_status: string; // 'pre' for China, 'post' for Uzbekistan
   pre_checkin_date?: string;
   post_checkin_date?: string;
-  is_sent?: boolean;
+
+  // Flight cargo / billing status
+  is_sent_web?: boolean;
   is_taken_away?: boolean;
+  taken_away_date?: string;
 }
 
 export interface TrackCodeSearchResponse {
   found: boolean;
   track_code: string;
-  items_in_uzbekistan: CargoItemResponse[];
-  items_in_china: CargoItemResponse[];
+  items: CargoItemResponse[];
   total_count: number;
 }
 

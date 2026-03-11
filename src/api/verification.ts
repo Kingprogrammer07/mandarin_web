@@ -83,6 +83,7 @@ export interface ClientProfileApiResponse {
     pinfl: string | null;
     date_of_birth: string | null;
     region: string | null;
+    district: string | null;
     address: string | null;
     is_admin: boolean;
     referral_count: number;
@@ -105,6 +106,7 @@ export interface ClientProfile {
   passport_series: string | null;
   pinfl: string | null;
   region: string | null;
+  district: string | null;
   address: string | null;
   date_of_birth: string | null;
   created_at: string;
@@ -130,6 +132,7 @@ export function normalizeClientProfile(raw: ClientProfileApiResponse['client']):
     passport_series: raw.passport_series,
     pinfl: raw.pinfl,
     region: raw.region,
+    district: raw.district,
     address: raw.address,
     date_of_birth: raw.date_of_birth,
     created_at: raw.created_at,

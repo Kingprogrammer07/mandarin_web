@@ -2,10 +2,12 @@ export interface ProfileResponse {
     full_name: string;
     phone: string;
     client_code: string;
+    extra_code?: string | null;
     passport_series: string;
     pinfl: string;
     date_of_birth?: string; // dd.mm.yyyy
     region: string;
+    district?: string | null;
     address: string;
     created_at: string; // dd.mm.yyyy hh:mm
     referral_count: number;
@@ -19,6 +21,7 @@ export interface UpdateProfileRequest {
     full_name?: string;
     phone?: string;
     region?: string;
+    district?: string;
     address?: string;
 }
 

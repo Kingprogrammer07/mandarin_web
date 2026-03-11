@@ -199,7 +199,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
     const handleDateInput = (v: string, onChange: (d?: Date) => void) => {
         // Only allow numbers and slashes
         let c = v.replace(/[^\d/]/g, '');
-        
+
         // If the user is deleting (new value is shorter than old state), just update state
         if (c.length < dateInputValue.length) {
             setDateInputValue(c);
@@ -211,7 +211,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
         // Auto-insert slashes
         if (c.length === 2 && !c.includes('/')) c += '/';
         if (c.length === 5 && c.split('/').length === 2) c += '/';
-        
+
         // Max length 10 (DD/MM/YYYY)
         if (c.length > 10) c = c.substring(0, 10);
 
@@ -492,7 +492,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
 
                                                                     <div className="flex-1 min-w-0">
                                                                         <h3 className="font-semibold text-lg truncate">{passport.passport_series}</h3>
-                                                                        <p className="text-sm text-gray-500 truncate">JSHSHIR: {passport.pinfl}</p>
+                                                                        <p className="text-sm text-gray-500 truncate">{t('form.pinfl', 'JSHSHIR (PINFL)')}: {passport.pinfl}</p>
                                                                         <p className="text-xs text-gray-400 mt-1">{passport.date_of_birth}</p>
                                                                     </div>
 
@@ -514,7 +514,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                             onClick={() => setIsAdding(true)}
                                                         >
                                                             <Plus className="h-4 w-4 mr-2" />
-                                                            {t('passport.addNew', "Yangi pasport qo'shish")}
+                                                            {t('passport.addNewFull', "Yangi pasport qo'shish")}
                                                         </Button>
                                                     </div>
                                                 )}
@@ -579,7 +579,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                     <div className="glass-panel p-6 rounded-3xl bg-white/10 backdrop-blur-md border border-white/10 text-white shadow-xl md:sticky md:top-8">
                                         <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                                             <FileText className="h-6 w-6 text-emerald-400" />
-                                            {t('passport.details', "Pasport Ma'lumotlari")}
+                                            {t('passport.details', "Pasport ma'lumotlari")}
                                         </h3>
 
                                         <div className="space-y-6">

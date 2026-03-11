@@ -346,7 +346,7 @@ export default function TransactionsPage({ clientCode, client_id, onBack }: Tran
           setSelectedDeliveryTransaction(null);
         }}
         transaction={selectedDeliveryTransaction}
-        clientProfile={profile}
+        clientProfile={profile || null}
         onSuccess={() => {
           refetch();
           setDeliveryModalOpen(false);

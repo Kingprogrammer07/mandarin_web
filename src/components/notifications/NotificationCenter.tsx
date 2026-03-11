@@ -40,7 +40,7 @@ type CombinedNotification = {
 };
 
 // --- Utility: Date Formatting ---
-const formatNotificationDate = (dateString: string, localeCode: string) => {
+const formatNotificationDate = (dateString: string, localeCode: string, yesterdayLabel?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     const locale = localeCode === 'ru' ? ru : uz;
@@ -49,7 +49,7 @@ const formatNotificationDate = (dateString: string, localeCode: string) => {
         return format(date, 'HH:mm', { locale });
     }
     if (isYesterday(date)) {
-        return localeCode === 'ru' ? 'Вчера' : 'Kecha';
+        return yesterdayLabel || (localeCode === 'ru' ? 'Вчера' : 'Kecha');
     }
     return format(date, 'dd MMM', { locale });
 };
@@ -62,7 +62,7 @@ const NotificationItem = ({
     item: CombinedNotification;
     onClick: (item: CombinedNotification) => void;
 }) => {
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
 
     const getIcon = (type: string, iconType?: string) => {
         if (type === 'report') return <Plane className="w-4 h-4 text-sky-500" />;
@@ -111,19 +111,19 @@ const NotificationItem = ({
                         </p>
                         {item.type === 'notification' && (
                             <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                                System
+                                {t('notifications.system')}
                             </span>
                         )}
                     </div>
                     <span className="text-[10px] text-gray-400 dark:text-zinc-500 shrink-0 mt-0.5">
-                        {formatNotificationDate(item.date, i18n.language)}
+                        {formatNotificationDate(item.date, i18n.language, t('notifications.yesterday'))}
                     </span>
                 </div>
                 <p className={cn(
                     "text-xs mt-0.5 line-clamp-2 leading-relaxed",
                     item.is_read ? "text-gray-500 dark:text-zinc-500" : "text-gray-600 dark:text-zinc-300"
                 )}>
-                    {item.body}
+                    {item.body.replace(/<\/?b>/g, ' ')}
                 </p>
             </div>
 
@@ -142,11 +142,13 @@ const DetailDialog = ({
     onClose,
     localeCode,
     closeLabel,
+    yesterdayLabel,
 }: {
     notification: CombinedNotification | null;
     onClose: () => void;
     localeCode: string;
     closeLabel: string;
+    yesterdayLabel: string;
 }) => {
     // Keyboard escape handler
     useEffect(() => {
@@ -199,7 +201,7 @@ const DetailDialog = ({
                                             {notification.title}
                                         </h3>
                                         <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
-                                            {notification.date && formatNotificationDate(notification.date, localeCode)}
+                                            {notification.date && formatNotificationDate(notification.date, localeCode, yesterdayLabel)}
                                         </p>
                                     </div>
                                 </div>
@@ -214,7 +216,7 @@ const DetailDialog = ({
                             {/* Body */}
                             <div className="p-5">
                                 <p className="text-sm text-gray-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">
-                                    {notification.body}
+                                    {notification.body.replace(/<\/?b>/g, ' ')}
                                 </p>
                             </div>
 
@@ -340,8 +342,8 @@ export default function NotificationCenter() {
                 reportsListPlain.push({
                     id: `report-${r.flight_name}`,
                     type: 'report',
-                    title: `Reys: ${r.flight_name}`,
-                    body: `Jami: ${r.total_weight}kg | $${r.total_price_usd}`,
+                    title: t('notifications.reportTitle', { name: r.flight_name }),
+                    body: t('notifications.reportDesc', { weight: r.total_weight, price: r.total_price_usd }),
                     date: r.is_sent_web_date,
                     is_read: !isReportUnread,
                     metadata: { flightName: r.flight_name }
@@ -353,7 +355,7 @@ export default function NotificationCenter() {
 
         // 3. Combine: API notifications pinned first, then reports
         return [...apiList, ...reportsListPlain];
-    }, [notificationsData, reportsHistory, reportUnreadCount]);
+    }, [notificationsData, reportsHistory, reportUnreadCount, t]);
 
     // --- Mutations ---
     const markReadMutation = useMutation<{ status: string }, unknown, number, { previousList: NotificationListResponse | undefined }>({
@@ -486,14 +488,14 @@ export default function NotificationCenter() {
                 {(isNotifLoading) && !notificationsData ? (
                     <div className="flex flex-col items-center justify-center py-10 gap-2">
                         <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-                        <span className="text-xs text-gray-400">Yuklanmoqda...</span>
+                        <span className="text-xs text-gray-400">{t('notifications.loading')}</span>
                     </div>
                 ) : combinedNotifications.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500 dark:text-zinc-500 gap-3">
                         <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-zinc-800/50 flex items-center justify-center">
                             <Bell className="w-6 h-6 text-gray-400 dark:text-zinc-600" />
                         </div>
-                        <p className="text-sm">Bildirishnomalar yo'q</p>
+                        <p className="text-sm">{t('notifications.empty')}</p>
                     </div>
                 ) : (
                     <div className="space-y-1">
@@ -528,7 +530,8 @@ export default function NotificationCenter() {
                 notification={selectedNotification}
                 onClose={closeDetailDialog}
                 localeCode={i18n.language}
-                closeLabel={t('common.close', 'Yopish')}
+                closeLabel={t('notifications.close')}
+                yesterdayLabel={t('notifications.yesterday')}
             />
 
             {/* === Bell Button + Desktop Popover === */}

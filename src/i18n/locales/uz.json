@@ -1,7 +1,11 @@
 {
   "navigation": {
     "selectLanguage": "Tilni tanlang",
-    "statistics": "Statistika"
+    "statistics": "Statistika",
+    "home": "Bosh sahifa",
+    "reports": "Hisobotlarim",
+    "history": "Tarix",
+    "profile": "Profil"
   },
   "form": {
     "title": "Ro'yxatdan o'tish",
@@ -491,6 +495,85 @@
       "back": "Orqaga"
     }
   },
+  "profile": {
+    "hero": {
+      "registeredDate": "Ro'yhatdan o'tgan sana: {{date}}",
+      "balance": "Mavjud mablag'",
+      "currency": "so'm",
+      "idCopied": "ID nusxalandi",
+      "debt": "Qarz",
+      "debtLabel": "Qarz",
+      "availableLabel": "Mavjud",
+      "tapToOpen": "Batafsil ko'rish uchun bosing"
+    },
+    "personalInfo": {
+      "title": "Shaxsiy Ma'lumotlar",
+      "passport": "Pasport Seriya",
+      "pinfl": "JSHSHIR (PINFL)",
+      "address": "Manzil",
+      "dateOfBirth": "Tug'ilgan sana",
+      "region": "Hudud",
+      "district": "Tuman",
+      "referrals": "Referallar",
+      "referralCount": "{{count}} ta",
+      "extraCode": "Yangi Kod",
+      "notAvailable": "Mavjud emas"
+    },
+    "edit": {
+      "title": "Profilni Tahrirlash",
+      "description": "Shaxsiy ma'lumotlaringizni o'zgartiring.",
+      "fullName": "Ism Familiya",
+      "phone": "Telefon Raqam",
+      "region": "Hudud",
+      "district": "Tuman",
+      "address": "Manzil",
+      "cancel": "Bekor qilish",
+      "save": "Saqlash",
+      "saved": "Muvaffaqiyatli saqlandi",
+      "loading": "Yuklanmoqda..."
+    },
+    "quickActions": {
+      "payments": "Hamyonim",
+      "addPassport": "Passport qo'shish",
+      "myCards": "Mening Kartalarim"
+    },
+    "session": {
+      "title": "Faollik tarixi",
+      "loading": "Yuklanmoqda...",
+      "empty": "Tarix topilmadi",
+      "prev": "Ortga",
+      "next": "Oldinga",
+      "page": "Sahifa {{page}}"
+    },
+    "payments": {
+      "title": "To'lovlar",
+      "cargoPayment": "Yuk to'lovi",
+      "remaining": "Qoldiq",
+      "totalCharged": "Jami hisoblangan:",
+      "totalPaid": "To'lab berildi:",
+      "payNow": "To'lash",
+      "count": "{{count}} ta"
+    },
+    "documents": {
+      "title": "Shaxsiy Hujjatlar",
+      "noDocuments": "Hujjatlar yo'q",
+      "noDocumentsDesc": "Tasdiqlangan pasport rasmlari mavjud emas."
+    },
+    "error": {
+      "title": "Yuklanmadi",
+      "description": "Ma'lumotlarni yuklashda xatolik yuz berdi. Internetni tekshiring.",
+      "retry": "Qayta urinish"
+    },
+    "editProfile": "Profilni Tahrirlash",
+    "logout": "Tizimdan Chiqish",
+    "version": "Versiya 2.0 • Mandarin Cargo",
+    "logoutConfirm": {
+      "title": "Tizimdan chiqish",
+      "description": "Haqiqatan ham hisobingizdan chiqmoqchimisiz?",
+      "cancel": "Bekor qilish",
+      "confirm": "Chiqish"
+    }
+  },
   "districts": {
     "bektemir": "Bektemir tumani",
     "chilonzor": "Chilonzor tumani",
@@ -706,5 +789,525 @@
     "xonqa": "Xonqa tumani",
     "urganch_s": "Urganch shahri",
     "xiva_s": "Xiva shahri"
+  },
+  "common": {
+    "deleted": "O'chirildi",
+    "error": "Xatolik yuz berdi",
+    "confirmDelete": "O'chirishni tasdiqlaysizmi?",
+    "copied": "nusxalandi",
+    "saving": "Saqlanmoqda...",
+    "save": "Saqlash"
+  },
+  "passport": {
+    "addNew": "Yangi pasport",
+    "addNewFull": "Yangi pasport qo'shish",
+    "extraPassports": "Qo'shimcha pasportlar",
+    "noPassports": "Hozircha pasportlar yo'q",
+    "addPrompt": "Yangi pasport qo'shish uchun pastdagi tugmani bosing",
+    "add": "Pasport qo'shish",
+    "details": "Pasport Ma'lumotlari"
+  },
+  "wallet": {
+    "cards": {
+      "newCard": "Yangi karta",
+      "myCards": "Mening Kartalarim",
+      "cardNumber": "Karta raqami",
+      "cardHolder": "Egasi",
+      "cardHolderName": "Egasi ismi",
+      "saving": "Saqlanmoqda...",
+      "save": "Saqlash",
+      "cancel": "Bekor qilish",
+      "noCards": "Hozircha kartalar yo'q",
+      "addPrompt": "To'lovlarni tezroq amalga oshirish uchun karta qo'shing",
+      "addCard": "Karta qo'shish",
+      "addNewCard": "Yangi karta qo'shish",
+      "successAdd": "Karta qo'shildi",
+      "errorAdd": "Karta qo'shishda xatolik",
+      "successDelete": "Karta o'chirildi",
+      "errorDelete": "Karta o'chirishda xatolik",
+      "errorIncomplete": "Ma'lumotlarni to'liq kiriting",
+      "errorLength": "Karta raqami 16 ta raqamdan iborat bo'lishi kerak",
+      "confirmDelete": "Kartani o'chirishni tasdiqlaysizmi?"
+    },
+    "tabs": {
+      "reminders": "Eslatmalar",
+      "payDebt": "Qarz to'lash",
+      "refund": "Pul qaytarish"
+    },
+    "modal": {
+      "receiptSent": "To'lov cheki muvaffaqiyatli yuborildi",
+      "errorOccurred": "Xatolik yuz berdi. Qayta urinib ko'ring.",
+      "refundSent": "Pul qaytarish so'rovi yuborildi",
+      "formatError": "Faqat rasm (JPG, PNG, HEIC) yoki PDF formatidagi fayllarni yuklang.",
+      "sizeError": "Fayl hajmi 10MB dan oshmasligi kerak.",
+      "copiedState": "Karta raqami nusxalandi",
+      "loading": "Ma'lumotlar yuklanmoqda...",
+      "debtExists": "Qarzdorlik mavjud",
+      "debtMessage": "Sizda {{amount}} so'm qarzdorlik mavjud. Iltimos, quyidagi kartaga to'lov qiling va chekni yuklang.",
+      "copySuccess": "Nusxalandi",
+      "copyAction": "Nusxalash",
+      "paymentPaused": "To'lov qabul qilish vaqtincha to'xtatilgan",
+      "noActiveCard": "Hozirda faol karta mavjud emas. Keyinroq urinib ko'ring yoki administratorga murojaat qiling.",
+      "uploadReceipt": "To'lov chekini yuklang",
+      "clickToChange": "O'zgartirish uchun bosing",
+      "clickToSelect": "Chekni tanlash uchun bosing",
+      "sendReceipt": "Chekni yuborish",
+      "sufficientFunds": "Mablag' yetarli",
+      "refundAvailable": "Mavjud mablag': {{amount}} so'm. Pulni kartangizga qaytarib olishingiz mumkin.",
+      "refundAmount": "Qaytariladigan summa",
+      "maxAmount": "Maksimal: {{amount}} so'm",
+      "minRefundWarning": "Minimal qaytarish miqdori 5,000 so'm",
+      "selectCard": "Kartangizni tanlang",
+      "noCardsAvailable": "Karta mavjud emas. Avval karta qo'shing.",
+      "sendRequest": "So'rov yuborish",
+      "insufficientBalance": "Mablag' yetarli emas",
+      "minBalanceRequired": "Pul qaytarish uchun minimal mablag' 5,000 so'm. Hozirgi balans: {{amount}} so'm.",
+      "title": "Moliyaviy markaz",
+      "description": "Balans, to'lovlar va qarzlarni boshqarish",
+      "availableBalance": "Mavjud mablag'",
+      "activeDebt": "Umumiy qarz",
+      "noDebt": "Sizda qarz yo'q",
+      "allClear": "Hamma to'lovlar bajarilgan!",
+      "noActions": "Hozircha hech qanday amal talab qilinmaydi.",
+      "comingSoon": "Ushbu xizmat tez kunda ishga tushadi"
+    }
+  },
+  "reports": {
+    "title": "Mening Yuklarim",
+    "subtitle": "Barcha reyslar tarixi",
+    "back": "Ortga",
+    "flight": "Reys",
+    "details": "{{flight}} - Tafsilotlar",
+    "noReports": "Hozircha hisobotlar yo'q",
+    "notFound": "Ma'lumot topilmadi",
+    "searchResult": "Qidiruv Natijasi",
+    "cargoReport": "Yuk hisoboti",
+    "unknownDate": "Noma'lum",
+    "status": {
+      "paid": "To'langan",
+      "partial": "Qisman",
+      "unpaid": "To'lanmagan"
+    },
+    "weight": "Vazn",
+    "totalPrice": "Jami Narx",
+    "photos": "Hisobot rasmlari",
+    "trackCodes": "Trek-kodlar",
+    "pay": "To'lov qilish",
+    "payRemaining": "Qolganini to'lash",
+    "errorTitle": "Xatolik yuz berdi",
+    "retry": "Qayta urinish",
+    "noFlightSelected": "Reys tanlanmagan",
+    "trackCodeNotFound": "Trek-kod ma'lumotlari topilmadi"
+  },
+  "dashboard": {
+    "tabs": {
+      "home": "Bosh sahifa",
+      "track": "Trek-kod",
+      "schedule": "Jadval",
+      "request": "Yetkazib berish",
+      "history": "Zayafkalar Tarixi"
+    },
+    "loading": "Ma'lumotlar yuklanmoqda...",
+    "carousel": {
+      "news": { "title": "Yangiliklar", "sub": "O'qish" },
+      "prohibited": { "title": "Taqiqlangan yuklar", "sub": "Ro'yxatni ko'rish" },
+      "id": { "title": "ID olish", "sub": "Qo'llanma" },
+      "delivery": { "title": "Yetkazib berish", "sub": "Qo'llanma" },
+      "help": { "title": "Yordam", "sub": "Savol-javob" }
+    },
+    "actions": {
+      "calculator": { "label": "Kalkulyator", "desc": "Yuk narxini hisoblash", "badge": "Live", "action": "Hisoblash" },
+      "china": { "label": "Xitoy manzili", "desc": "Guangzhou, Yiwu", "badge": "Manzil", "action": "Ko'rish" },
+      "schedule": { "label": "Reyslar Jadvali", "desc": "Uchish va kelish vaqtlari", "badge": "Jadval", "action": "Ochish" },
+      "request": { "label": "Zayafka qoldirish", "desc": "Buyurtma berish", "badge": "Yangi", "action": "Bosing" },
+      "history": { "label": "Zayavkalar tarixi", "desc": "So'rovlar holati", "badge": "Tarix", "action": "Ko'rish" },
+      "payment": { "label": "To'lov qilish", "desc": "Balansni to'ldirish", "badge": "To'lov", "action": "To'lash" }
+    },
+    "sections": {
+      "important": "Muhim ma'lumotlar",
+      "reportsAndPayments": "Hisobotlar va to'lovlar",
+      "myCargo": "Mening yuklarim",
+      "cargoReport": "Yuklaringiz hisoboti",
+      "paymentHistory": "To'lovlar tarixi",
+      "receipts": "Cheklar va taqsimot",
+      "services": "Xizmatlar",
+      "feedback": "Taklif va shikoyatlar",
+      "contactUs": "Biz bilan bog'laning"
+    },
+    "toast": {
+      "comingSoon": "{{id}} tanlandi (Tez orada...)"
+    }
+  },
+  "chinaAddress": {
+    "title": "Xitoy Ombor Manzili",
+    "clientCode": "Kod:",
+    "fullAddress": "To'liq manzil:",
+    "copyButton": "Manzilni Nusxalash",
+    "copied": "Nusxalandi",
+    "openButton": "Ochish",
+    "downloadButton": "Yuklab Olish",
+    "loading": "Yuklanmoqda...",
+    "retry": "Qayta urinish",
+    "error": {
+      "generic": "Ma'lumotlarni yuklab bo'lmadi. Qayta urinib ko'ring."
+    },
+    "toast": {
+      "copied": "Manzil nusxalandi!",
+      "downloading": "Rasm yuklab olinmoqda...",
+      "downloadFailed": "Yuklab bo'lmadi. Rasm yangi oynada ochildi."
+    }
+  },
+  "flightSchedule": {
+    "title": "Reyslar Jadvali",
+    "calendar": {
+      "months": ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"],
+      "weekdays": ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
+    },
+    "status": {
+      "aksiya": "Maxsus Aksiya",
+      "arrived": "Yetib kelgan",
+      "delayed": "Kechikyapti",
+      "scheduled": "Rejalashtirilgan"
+    },
+    "today": "Bugun",
+    "noFlights": "Bu kunda reyslar yo'q",
+    "cta": {
+      "title": "Yukingiz bormi?",
+      "desc": "Yukingizni qaysi reysda ekanligini bilish uchun Trek-kod bo'limidan foydalaning.",
+      "button": "Trek-kodni tekshirish"
+    },
+    "upcoming": "Keyingi Reyslar",
+    "googleCalendar": {
+      "title": "Reys: {{name}} kelishi",
+      "details": "Mandarin Cargo: {{name}} reysi {{date}} kuni yetib kelishi kutilmoqda.",
+      "tooltip": "Google Calendar ga qo'shish"
+    }
+  },
+  "deliveryRequest": {
+    "headerTitle": "Zayavka qoldirish",
+    "headerTitleShort": "Zayavka",
+    "historyButton": "Tarix",
+    "steps": {
+      "type": {
+        "title": "Yetkazish turini tanlang",
+        "subtitle": "Sizga qulay usulni tanlang"
+      },
+      "flight": {
+        "title": "Reyslarni tanlang",
+        "subtitle": "Yetkazmoqchi bo'lgan reyslaringizni belgilang",
+        "mandarinNote": "Yetkazib berish narxi: 30 000 so'm",
+        "yandexNote": "Yukingiz yetib borgandan keyin to'lov qilasiz",
+        "btsNote": "Yukingiz yetib borgandan keyin to'lov qilasiz",
+        "empty": "Hozircha reyslar topilmadi",
+        "emptyDesc": "To'langan reyslaringiz yo'q",
+        "flightLabel": "Reys",
+        "continueButton": "Davom etish"
+      },
+      "confirm": {
+        "title": "Tasdiqlash",
+        "subtitle": "Ma'lumotlarni tekshiring va tasdiqlang",
+        "deliveryType": "Yetkazish turi",
+        "selectedFlights": "Tanlangan reyslar",
+        "infoMessage": "Siz <strong>{{type}}</strong> pochtasi va <strong>{{flights}}</strong> reyslarini tanladingiz. Tasdiqlash tugmasi bosilgach arizangiz adminga yuboriladi.",
+        "submitButton": "Tasdiqlash"
+      },
+      "uzpost": {
+        "calcTitle": "Hisob-kitob",
+        "calcDesc": "Hisoblanmoqda...",
+        "warningTitle": "Ogohlantirish",
+        "weightExceeded": "Og'irlik chegaradan oshdi!",
+        "backButton": "Orqaga",
+        "paymentTitle": "UzPost to'lov",
+        "flightsFor": "{{flights}} reyslari uchun",
+        "totalWeight": "Umumiy og'irlik",
+        "totalAmount": "Jami summa",
+        "walletPay": "Hamyondan to'lash",
+        "walletBalance": "Balans: {{balance}} so'm",
+        "fromWallet": "Hamyondan",
+        "remainingPayment": "Qoldiq to'lov",
+        "paymentCard": "To'lov kartasi",
+        "uploadReceipt": "Chekni yuklash (Rasm yoki PDF)",
+        "uploadButton": "Bosing va faylni tanlang",
+        "uploadHint": "JPG, PNG yoki PDF · Max 10 MB",
+        "submitButton": "Jo'natish"
+      },
+      "success": {
+        "title": "Muvaffaqiyatli!",
+        "desc": "Arizangiz muvaffaqiyatli yuborildi! Admin tez orada ko'rib chiqadi.",
+        "homeButton": "Bosh sahifaga qaytish"
+      }
+    },
+    "profile": {
+      "title": "Profil to'liq emas",
+      "desc": "Zayavka yuborish uchun profilingizda ism, telefon, viloyat va manzil to'ldirilishi kerak.",
+      "fillButton": "Profilni to'ldirish"
+    },
+    "options": {
+      "uzpost": "Pochta orqali yetkazish",
+      "yandex": "Tez yetkazib berish",
+      "mandarin": "Faqat Toshkent shahrida",
+      "bts": "Qulay narxda"
+    },
+    "toast": {
+      "copied": "Nusxalandi!",
+      "flightsError": "Reyslarni yuklashda xatolik",
+      "calcError": "Hisoblashda xatolik",
+      "submitError": "Xatolik yuz berdi"
+    }
+  },
+  "deliveryHistory": {
+    "title": "Zayavkalar tarixi",
+    "types": {
+      "uzpost": "UzPost",
+      "yandex": "Yandex",
+      "mandarin": "Mandarin",
+      "bts": "BTS"
+    },
+    "status": {
+      "pending": "Kutilmoqda",
+      "approved": "Tasdiqlandi",
+      "rejected": "Rad etildi"
+    },
+    "emptyState": {
+      "title": "Hozircha zayavkalar yo'q",
+      "desc": "Yangi zayavka qoldirganingizda, u shu yerda ko'rinadi"
+    },
+    "card": {
+      "rejectedReason": "Rad etish sababi",
+      "processedAt": "Ko'rib chiqildi: {{date}}"
+    },
+    "loadingMore": "Yuklanmoqda...",
+    "loadMore": "Yana yuklash",
+    "error": {
+      "loadFailed": "Ma'lumotlarni yuklashda xatolik yuz berdi",
+      "retry": "Qayta urinish"
+    }
+  },
+  "calculator": {
+    "title": "Kalkulyator",
+    "subtitle": "Taxminiy narxni hisoblang",
+    "tabs": {
+      "normal": "Oddiy yuk",
+      "dimensional": "Gabarit yuk"
+    },
+    "inputs": {
+      "weightLabel": "Yukning haqiqiy vazni (kg)",
+      "dimensionsLabel": "O'lchamlar (santimetrda)",
+      "length": "Uzunligi",
+      "lengthUnit": "Uzunligi (sm)",
+      "width": "Eni",
+      "widthUnit": "Eni (sm)",
+      "height": "Bo'yi",
+      "heightUnit": "Bo'yi (sm)",
+      "kg": "KG"
+    },
+    "results": {
+      "calculating": "Hisoblanmoqda...",
+      "emptyState": "Vaznni kiriting va natijani darhol ko'ring",
+      "chargeableWeight": "Hisoblangan vazn",
+      "pricePerKg": "1 kg narxi",
+      "estimatedPayment": "Taxminiy to'lov",
+      "currencyUzs": "so'm"
+    },
+    "dimensionalInfo": {
+      "title": "Nega vazn ko'proq chiqdi? (Gabarit)",
+      "desc": "Agar yukingiz yengil, lekin katta joyni egallasa (masalan, avtomobil bamperi), samolyot qoidalariga ko'ra uning hajmiga qarab \"Gabarit vazn\" hisoblanadi. Tizim qaysi vazn kattaroq bo'lsa, shuni tanlaydi.",
+      "discount": "Katta hajmli (gabarit) yuklar uchun bizda maxsus chegirmalar bor! Kalkulyator ko'rsatgan narx yakuniy emas.",
+      "contactAdmin": "Admin bilan chegirma haqida gaplashish"
+    },
+    "footerNote": "* Bu kalkulyator faqat taxminiy narxni ko'rsatadi. Yakuniy narx yuk omborga yetib kelib taroziga qo'yilganda aniq bo'ladi."
+  },
+  "prohibitedItems": {
+    "title": "Taqiqlangan yuklar",
+    "imageAlt": "Taqiqlangan yuk {{index}}",
+    "error": "Ma'lumotlarni yuklab bo'lmadi",
+    "retry": "Qayta yuklash",
+    "understood": "Tushunarli"
+  },
+  "paymentHistory": {
+    "title": "To'lovlar tarixi",
+    "subtitle": "To'lovlar",
+    "desc": "Cheklar, to'lov statuslari va taqsimot",
+    "back": "Orqaga",
+    "status": {
+      "paid": "To'langan",
+      "partial": "Qisman to'langan",
+      "pending": "Kutilmoqda"
+    },
+    "card": {
+      "flight": "Reys",
+      "totalAmount": "Umumiy summa",
+      "paid": "To'langan",
+      "remaining": "Qolgan",
+      "paymentType": "To'lov turi",
+      "takenAway": "Olib ketilgan",
+      "notTakenAway": "Olib ketilmagan",
+      "breakdown": "To'lov taqsimoti"
+    },
+    "breakdownTypes": {
+      "click": "Click",
+      "payme": "Payme",
+      "cash": "Naqd",
+      "card": "Karta"
+    },
+    "error": {
+      "title": "Ma'lumotlarni yuklab bo'lmadi",
+      "desc": "Iltimos, internetni tekshirib qaytadan urinib ko'ring.",
+      "retry": "Qayta yuklash",
+      "home": "Bosh sahifa"
+    },
+    "emptyState": {
+      "title": "To'lovlar topilmadi",
+      "desc": "Sizda hozircha to'lovlar tarixi mavjud emas."
+    },
+    "loadMore": "Yana ko'rish ({{current}}/{{total}})",
+    "loading": "Yuklanmoqda..."
+  },
+  "cargoHistory": {
+    "flight": "REYS: {{name}}",
+    "noDate": "Sana yo'q",
+    "totalWeight": "Jami Vazn",
+    "totalCount": "Yuklar Soni",
+    "weightUnit": "{{weight}} kg",
+    "countUnit": "{{count}} ta",
+    "error": "Ma'lumotlarni yuklashda xatolik yuz berdi.",
+    "emptyFlight": "Bu reysda yuklar topilmadi.",
+    "box": "Quti: {{number}}",
+    "names": {
+      "cn": "Xitoycha nomi (CN)",
+      "ru": "Ruscha nomi (RU)",
+      "notEntered": "Kiritilmagan"
+    },
+    "details": {
+      "weight": "Vazn",
+      "actualWeight": "Haqiqiy Vazn",
+      "count": "Soni",
+      "boxCount": "Quti (Joy)",
+      "notMeasured": "O'lchanmadi"
+    },
+    "financials": {
+      "pricePerKg": "Narxi (1 kg)",
+      "totalPayment": "Jami To'lov",
+      "notCalculated": "Hisoblanmagan",
+      "exchangeRate": "Kurs: 1$ = {{rate}} so'm"
+    },
+    "loadMore": "Ko'proq yuklash...",
+    "emptyState": {
+      "title": "Tarix topilmadi",
+      "desc": "Sizda hali yakunlangan parvozlar tarixi mavjud emas."
+    }
+  },
+  "cargoSteps": {
+    "china": "Xitoyda",
+    "onWay": "Yo'lda",
+    "uzb": "O'zbekistonda",
+    "report": "Hisobot",
+    "distribute": "Tarqatish"
+  },
+  "cargoStatus": {
+    "taken": "Olib ketilgan",
+    "reportReady": "Hisobot tayyor",
+    "inUzb": "O'zbekistonda",
+    "inChina": "Xitoyda",
+    "pending": "Kutilmoqda"
+  },
+  "notifications": {
+    "title": "Bildirishnomalar",
+    "markAll": "O'qilgan qilish",
+    "loading": "Yuklanmoqda...",
+    "empty": "Bildirishnomalar yo'q",
+    "yesterday": "Kecha",
+    "system": "System",
+    "reportTitle": "Reys: {{name}}",
+    "reportDesc": "Jami: {{weight}}kg | ${{price}}",
+    "close": "Yopish"
+  },
+  "tracking": {
+    "title": "Yukni kuzatish",
+    "historyTitle": "Yuklar Tarixi",
+    "back": "Ortga",
+    "myCargo": "Mening yuklarim",
+    "placeholder": "Track kodni kiriting (masalan: AB12345)",
+    "validation": "Kod kamida 3 ta belgidan iborat bo'lishi kerak",
+    "recentSearches": "Oxirgi qidiruvlar",
+    "searching": "Qidirilmoqda...",
+    "error": "Xatolik yuz berdi. Internetni tekshirib qayta urinib ko'ring.",
+    "notFoundTitle": "Topilmadi",
+    "notFoundDesc": "\"{{code}}\" kodi bo'yicha hech narsa topilmadi. Kodni to'g'riligini tekshiring.",
+    "dateLabel": "Sana:",
+    "noDate": "Mavjud emas"
+  },
+  "makePayment": {
+    "title": "To'lov qilish",
+    "stepFlight": "Reys tanlash",
+    "stepDetails": "To'lov ma'lumotlari",
+    "stepConfirm": "Tasdiqlash",
+    "selectFlight": "Reysni tanlang",
+    "noFlights": "To'lov kutayotgan reyslar yo'q",
+    "noFlightsDesc": "Barcha to'lovlaringiz bajarilgan yoki hali reys tayinlanmagan.",
+    "unpaid": "To'lanmagan",
+    "partial": "Qisman to'langan",
+    "remaining": "Qoldiq",
+    "totalPayment": "Jami to'lov",
+    "reportNotReady": "Hisobot hali tayyor emas",
+    "totalAmount": "Jami summa",
+    "yourBalance": "Sizning balansingiz",
+    "useWallet": "Balansdan foydalanish",
+    "walletApplied": "Balansdan ishlatiladi",
+    "youPay": "Siz to'laysiz",
+    "customAmount": "Boshqa summa",
+    "enterAmount": "Summani kiriting",
+    "partialAllowed": "Qisman to'lov mumkin",
+    "minAmount": "Minimal: {{amount}}",
+    "maxAmount": "Maksimal: {{amount}}",
+    "payOnline": "Karta orqali to'lash",
+    "payCash": "Naqd to'lash",
+    "payWallet": "Balansdan to'lash",
+    "walletCoversAll": "Balansingiz butun summani qoplaydi!",
+    "cashConfirmTitle": "Naqd to'lov",
+    "cashConfirmDesc": "To'lovingiz administrator tomonidan tasdiqlanadi. Iltimos, ofisga tashrif buyuring.",
+    "cashSubmitted": "Naqd to'lov so'rovi yuborildi",
+    "walletConfirmTitle": "Balansdan to'lov",
+    "walletConfirmDesc": "Balansingizdan {{amount}} yechib olinadi.",
+    "walletSubmitted": "Balansdan to'lov yuborildi",
+    "onlineTitle": "Karta orqali to'lov",
+    "transferTo": "Quyidagi kartaga o'tkazing",
+    "cardOwner": "Karta egasi",
+    "copyCard": "Nusxalash",
+    "copied": "Nusxalandi!",
+    "uploadReceipt": "Chekni yuklash",
+    "uploadReceiptDesc": "To'lov cheki rasmini yoki PDF faylini yuklang",
+    "dragOrClick": "Bu yerga tashlang yoki bosing",
+    "fileSelected": "Fayl tanlandi",
+    "changeFile": "O'zgartirish",
+    "submitReceipt": "Chekni yuborish",
+    "submitting": "Yuborilmoqda...",
+    "onlineSubmitted": "To'lov cheki yuborildi",
+    "successTitle": "Muvaffaqiyat!",
+    "successDesc": "To'lovingiz administrator tasdiqini kutmoqda.",
+    "done": "Tayyor",
+    "back": "Orqaga",
+    "next": "Keyingi",
+    "confirm": "Tasdiqlash",
+    "close": "Yopish",
+    "retry": "Qayta urinish",
+    "errorOccurred": "Xatolik yuz berdi",
+    "weight": "Vazn",
+    "pricePerKg": "Narx (kg)",
+    "trackCodes": "Trek kodlar",
+    "existingPaid": "Oldin to'langan",
+    "existingRemaining": "Qolgan summa",
+    "noCardAvailable": "Hozirda faol karta yo'q. Keyinroq urinib ko'ring.",
+    "fullPayment": "To'liq to'lov",
+    "partialPayment": "Qisman to'lov",
+    "payRemaining": "Qoldiqni to'lash",
+    "formatError": "Faqat rasm (JPG, PNG, HEIC) yoki PDF yuklang",
+    "sizeError": "Fayl hajmi 10MB dan oshmasin"
+  },
+  "beta": {
+    "badge": "Beta",
+    "title": "Beta Versiya",
+    "desc": "Platforma hozirda sinov (beta) rejimida ishlamoqda. Ayrim xatoliklar yoki kamchiliklar kuzatilishi mumkin. Agar biron muammoga duch kelsangiz, iltimos bizga xabar bering.",
+    "action": "Adminga yozish"
   }
 }

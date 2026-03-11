@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import { Calendar as CalendarIcon, MapPin, Phone, Sparkles } from 'lucide-react';
 import { format, parse, isValid } from 'date-fns';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { register as registerApi, getTelegramWebAppData } from '@/api/services/auth';
 import StatusAnimation from './StatusAnimation';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,14 @@ interface RegistrationFormProps {
 
 export default function RegistrationForm({ onNavigateToLogin }: RegistrationFormProps) {
   const { t } = useTranslation();
+
+  // Reverse Auth Guard fallback: redirect if already authenticated
+  useEffect(() => {
+    if (sessionStorage.getItem('access_token') && onNavigateToLogin) {
+      onNavigateToLogin();
+    }
+  }, [onNavigateToLogin]);
+
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [dateInputValue, setDateInputValue] = useState('');
@@ -69,8 +77,10 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
       setBackImage(null);
       setDateInputValue('');
       setTimeout(() => {
-        if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
-      }, 2000);
+        if (onNavigateToLogin) {
+          onNavigateToLogin();
+        }
+      }, 1500);
     } catch (error: unknown) {
       setSubmitStatus('error');
       const message = typeof error === 'object' && error !== null && 'message' in (error as object) ? (error as { message?: string }).message : undefined;

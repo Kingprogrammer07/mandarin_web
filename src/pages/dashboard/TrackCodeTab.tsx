@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import ClientCargoHistory from "../../components/history/ClientCargoHistory";
 import { ArrowLeft, History as HistoryIcon } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 
 const HISTORY_KEY = "track_code_history_v2"; // Changed key to avoid conflict with old string-only history
 
@@ -21,6 +22,7 @@ interface TrackCodeTabProps {
 }
 
 export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabProps) {
+    const { t } = useTranslation();
     const [query, setQuery] = useState("");
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [activeSearch, setActiveSearch] = useState<string | null>(null);
@@ -79,7 +81,7 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
     useEffect(() => {
         if (data && data.found) {
             // Find flight name from items
-            const flightName = data.items_in_uzbekistan[0]?.flight_name || data.items_in_china[0]?.flight_name;
+            const flightName = data.items?.[0]?.flight_name;
             if (activeSearch) {
                 queueMicrotask(() => addToHistory(activeSearch, flightName || undefined));
             }
@@ -89,7 +91,7 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
     const handleSearch = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!query || query.length < 3) {
-            toast.error("Kod kamida 3 ta belgidan iborat bo'lishi kerak");
+            toast.error(t('tracking.validation'));
             return;
         }
         const clean = query.trim().toUpperCase();
@@ -110,7 +112,7 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
             <div className="flex items-center justify-between mb-4 px-1">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                     <span className="w-1 h-6 bg-purple-500 rounded-full inline-block" />
-                    {showHistory ? "Yuklar Tarixi" : "Yukni kuzatish"}
+                    {showHistory ? t('tracking.historyTitle') : t('tracking.title')}
                 </h2>
 
                 <button
@@ -124,12 +126,12 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
                     {showHistory ? (
                         <>
                             <ArrowLeft className="w-4 h-4" />
-                            <span>Ortga</span>
+                            <span>{t('tracking.back')}</span>
                         </>
                     ) : (
                         <>
                             <HistoryIcon className="w-4 h-4" />
-                            <span>Mening yuklarim</span>
+                            <span>{t('tracking.myCargo')}</span>
                         </>
                     )}
                 </button>
@@ -148,7 +150,7 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value.toUpperCase())}
-                            placeholder="Track kodni kiriting (masalan: AB12345)"
+                            placeholder={t('tracking.placeholder')}
                             className="
             w-full pl-12 pr-4 py-3 rounded-2xl border-none outline-none
             bg-white dark:bg-white/10 shadow-lg shadow-purple-500/5 
@@ -171,7 +173,7 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 ml-1">
                                 <History className="w-4 h-4" />
-                                <span>Oxirgi qidiruvlar</span>
+                                <span>{t('tracking.recentSearches')}</span>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {history.map(item => (
@@ -206,14 +208,14 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
                         {isLoading && (
                             <div className="flex flex-col items-center justify-center py-10 opacity-70">
                                 <Loader2 className="w-10 h-10 animate-spin text-purple-500 mb-2" />
-                                <p className="text-sm font-medium">Qidirilmoqda...</p>
+                                <p className="text-sm font-medium">{t('tracking.searching')}</p>
                             </div>
                         )}
 
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400">
                                 <AlertCircle className="w-6 h-6 flex-shrink-0" />
-                                <p className="text-sm font-medium">Xatolik yuz berdi. Internetni tekshirib qayta urinib ko'ring.</p>
+                                <p className="text-sm font-medium">{t('tracking.error')}</p>
                             </div>
                         )}
 
@@ -238,9 +240,9 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
                                         <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
                                             <Search className="w-10 h-10 text-gray-300 dark:text-gray-600" />
                                         </div>
-                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Topilmadi</h3>
+                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('tracking.notFoundTitle')}</h3>
                                         <p className="text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
-                                            "{activeSearch}" kodi bo'yicha hech narsa topilmadi. Kodni to'g'riligini tekshiring.
+                                            {t('tracking.notFoundDesc', { code: activeSearch })}
                                         </p>
                                     </motion.div>
                                 )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, FileText, History, UserCircle } from 'lucide-react';
 import { FloatingNavbar, type FloatingNavItem } from './FloatingNavbar';
+import { useTranslation } from 'react-i18next';
 
 // Reuse Page type from VerificationNav for now, or ideally from a shared type file
 // We need to extend it for user pages if they are not there
@@ -22,28 +23,29 @@ export const UserNav: React.FC<UserNavProps> = ({
     currentPage,
     onNavigate
 }) => {
+    const { t } = useTranslation();
     const navItems: FloatingNavItem<string>[] = [
         {
             id: 'home',
-            label: 'Bosh sahifa',
+            label: t('navigation.home'),
             icon: Home,
             page: 'user-home',
         },
         {
             id: 'reports',
-            label: 'Hisobotlarim',
+            label: t('navigation.reports'),
             icon: FileText,
             page: 'user-reports',
         },
         {
             id: 'history',
-            label: 'Tarix',
+            label: t('navigation.history'),
             icon: History,
             page: 'user-history',
         },
         {
             id: 'profile',
-            label: 'Profil',
+            label: t('navigation.profile'),
             icon: UserCircle,
             page: 'user-profile',
         },

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { History, Smartphone, LogOut, ShieldCheck, CalendarCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useSessionHistory } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,6 @@ import { useState, memo } from 'react';
 import { cn } from '@/lib/utils';
 import { type SessionLogItem } from '@/types/profile';
 
-// Helper to get icon for event type
 const getEventIcon = (type: string) => {
   switch (type.toLowerCase()) {
     case 'event-login': return <Smartphone size={16} />;
@@ -56,6 +56,7 @@ LogItem.displayName = 'LogItem';
 export const SessionHistory = memo(() => {
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching } = useSessionHistory(page);
+  const { t } = useTranslation();
 
   if (isLoading) return <SessionHistorySkeleton />;
 
@@ -64,14 +65,14 @@ export const SessionHistory = memo(() => {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <History className="text-orange-500" size={20} />
-          Faollik tarixi
+          {t('profile.session.title')}
         </h3>
-        {isFetching && <span className="text-xs text-muted-foreground animate-pulse">Yuklanmoqda...</span>}
+        {isFetching && <span className="text-xs text-muted-foreground animate-pulse">{t('profile.session.loading')}</span>}
       </div>
 
       <div className="bg-white dark:bg-[#1e1a45] rounded-3xl shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden">
         {data?.logs.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">Tarix topilmadi</div>
+          <div className="p-8 text-center text-gray-400">{t('profile.session.empty')}</div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-white/5 md:divide-y-0 md:grid md:grid-cols-1 xl:grid-cols-2 md:gap-1">
             {data?.logs.map((log, idx) => (
@@ -80,7 +81,6 @@ export const SessionHistory = memo(() => {
           </div>
         )}
 
-        {/* Simple Pagination */}
         <div className="p-3 bg-gray-50 dark:bg-black/20 flex justify-between md:col-span-full">
           <Button
             variant="ghost"
@@ -88,16 +88,16 @@ export const SessionHistory = memo(() => {
             disabled={page === 1}
             onClick={() => setPage(p => Math.max(1, p - 1))}
           >
-            Ortga
+            {t('profile.session.prev')}
           </Button>
-          <span className="text-sm text-gray-500 flex items-center">Sahifa {page}</span>
+          <span className="text-sm text-gray-500 flex items-center">{t('profile.session.page', { page })}</span>
           <Button
             variant="ghost"
             size="sm"
             disabled={!data?.logs || data.logs.length < 10}
             onClick={() => setPage(p => p + 1)}
           >
-            Oldinga
+            {t('profile.session.next')}
           </Button>
         </div>
       </div>

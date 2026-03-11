@@ -19,6 +19,12 @@ apiClient.interceptors.request.use(
       config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
     }
 
+    // Opaque Session Token ni qo'shish
+    const token = sessionStorage.getItem('access_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+
     // Tanlangan tilni qo'shish (i18next dan)
     const currentLanguage = i18n.language || 'uz';
     config.headers['Accept-Language'] = currentLanguage;
@@ -38,6 +44,13 @@ apiClient.interceptors.response.use(
   (error) => {
     // Xatolik xabarini tarjima qilish yoki formatlash
     if (error.response) {
+      // Global 401/403 Error handler -> Logout & Redirect
+      if (error.response.status === 401 || error.response.status === 403) {
+        sessionStorage.removeItem('access_token');
+        window.location.href = '/auth/login';
+        return Promise.reject(error);
+      }
+
       // Server javob berdi lekin xatolik kodi bilan (404, 500, etc.)
       const errorMessage = error.response.data?.detail || 'Serverda xatolik yuz berdi';
       return Promise.reject({
@@ -77,6 +90,12 @@ apiClientFormData.interceptors.request.use(
       config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
     }
 
+    // Opaque Session Token ni qo'shish
+    const token = sessionStorage.getItem('access_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+
     // Tanlangan tilni qo'shish (i18next dan)
     const currentLanguage = i18n.language || 'uz';
     config.headers['Accept-Language'] = currentLanguage;
@@ -94,6 +113,13 @@ apiClientFormData.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
+      // Global 401/403 Error handler -> Logout & Redirect
+      if (error.response.status === 401 || error.response.status === 403) {
+        sessionStorage.removeItem('access_token');
+        window.location.href = '/auth/login';
+        return Promise.reject(error);
+      }
+
       const errorMessage = error.response.data?.detail || 'Serverda xatolik yuz berdi';
       return Promise.reject({
         message: errorMessage,

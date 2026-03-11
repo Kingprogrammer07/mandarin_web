@@ -1,5 +1,6 @@
 import { CreditCard, FilePlus, UserCog } from 'lucide-react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface QuickActionsProps {
     onWalletClick: () => void;
@@ -8,25 +9,27 @@ interface QuickActionsProps {
 }
 
 export const QuickActions = memo(({ onWalletClick, onCardsClick, onPassportsClick }: QuickActionsProps) => {
+    const { t } = useTranslation();
+
     return (
         <div className="grid grid-cols-3 gap-3 px-4 mb-6 md:mb-0 md:px-0 md:max-w-none md:gap-4 max-w-lg mx-auto md:mx-0">
             <ActionButton
                 icon={<CreditCard className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
-                label="To'lovlar"
+                label={t('profile.quickActions.payments')}
                 onClick={onWalletClick}
                 delay={0.1}
                 bgColor="bg-orange-100 dark:bg-orange-500/20"
             />
             <ActionButton
                 icon={<FilePlus className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />}
-                label="Passport qo'shish"
+                label={t('profile.quickActions.addPassport')}
                 onClick={onPassportsClick}
                 delay={0.2}
                 bgColor="bg-emerald-100 dark:bg-emerald-500/20"
             />
             <ActionButton
                 icon={<UserCog className="h-6 w-6 text-gray-600 dark:text-gray-400" />}
-                label="Mening Kartalarim"
+                label={t('profile.quickActions.myCards')}
                 onClick={onCardsClick}
                 delay={0.3}
                 bgColor="bg-gray-100 dark:bg-gray-500/20"
@@ -59,7 +62,6 @@ const ActionButton = memo(({ icon, label, onClick, delay, bgColor }: ActionButto
             onClick={onClick}
             style={{ animationDelay: `${delay}s` }}
         >
-            {/* Icon Container with Squircle & Soft Background */}
             <div className={`
                 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center mb-3 
                 transition-transform duration-300 group-hover:scale-110 group-active:scale-90
@@ -68,7 +70,6 @@ const ActionButton = memo(({ icon, label, onClick, delay, bgColor }: ActionButto
                 {icon}
             </div>
 
-            {/* Label */}
             <span className="text-xs md:text-sm font-bold text-gray-800 dark:text-gray-200 tracking-wide">
                 {label}
             </span>

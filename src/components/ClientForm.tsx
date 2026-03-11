@@ -28,9 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import ImageUpload from './ImageUpload';
 import StatusAnimation from './StatusAnimation';
-import { createClient, updateClient, deleteClient as deleteClientApi, type Client, type ClientCreateRequest } from '@/api/services/client';
+import { createClient, updateClient, deleteClient as deleteClientApi, type Client, type ClientCreateRequest, previewClientCode } from '@/api/services/client';
 
 import { regions, DISTRICTS } from '@/lib/validation';
 
@@ -150,6 +151,9 @@ const clientSchema = z.object({
     .refine((files) => !files || files.every((file) => file.type.startsWith('image/')), {
       message: 'client.validation.passportImagesType',
     }),
+  adjustment_amount: z.string().optional(),
+  adjustment_reason: z.string().optional(),
+  adjustment_type: z.enum(['bonus', 'penalty', 'silent', '']).optional(),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
@@ -172,6 +176,15 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
   const [dateInputValue, setDateInputValue] = useState('');
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState<string>('');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  // Live Preview statelari
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [autoUpdateCode, setAutoUpdateCode] = useState(false);
+  const [originalCode, setOriginalCode] = useState<string>('');
+  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
+
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
@@ -188,8 +201,85 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       referrer_telegram_id: clientData?.referrer_telegram_id?.toString() || '',
       referrer_client_code: clientData?.referrer_client_code || '',
       passportImages: [],
+      adjustment_amount: '',
+      adjustment_reason: '',
+      adjustment_type: '',
     },
   });
+  
+  // Region va District ni kuzatamiz
+  const selectedDistrict = form.watch('district');
+  const selectedRegion = form.watch('region');
+  // Debounce bilan Live Preview API ni chaqirish va Avto-to'ldirish
+  useEffect(() => {
+    // 1. Dastlabki qiymatlarni aniqlaymiz
+    const initialRegion = clientData?.region || '';
+    const initialDistrict = clientData?.district || '';
+
+    // 2. Haqiqatan ham Viloyat yoki Tuman O'ZGARDI'mi? 
+    // (Add rejimida doim ishlaydi, Edit rejimida faqat o'zgarganda ishlaydi)
+    const isChanged = mode === 'add' || 
+                      (selectedRegion !== initialRegion) || 
+                      (selectedDistrict !== initialDistrict);
+
+    if (!selectedRegion || !selectedDistrict || !isChanged) {
+      setPreviewCode(null);
+      setIsLoadingPreview(false);
+      setPreviewError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewError(null);
+
+    // 500ms kutib keyin API ga so'rov yuboramiz
+    const timeoutId = setTimeout(() => {
+      setIsLoadingPreview(true);
+      
+      previewClientCode(selectedRegion, selectedDistrict)
+        .then((data) => {
+          if (!cancelled) {
+            setPreviewCode(data.preview_code);
+            setPreviewError(null);
+
+            // Add rejimda client_code ni avtomatik to'ldirish
+            if (mode === 'add') {
+              form.setValue('client_code', data.preview_code, { 
+                shouldValidate: true, 
+                shouldDirty: true 
+              });
+            }
+            // Edit rejimda faqat autoUpdateCode yoqilgan bo'lsa
+            if (mode === 'edit' && autoUpdateCode) {
+              form.setValue('client_code', data.preview_code, { 
+                shouldValidate: true, 
+                shouldDirty: true 
+              });
+            }
+          }
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            console.error('Preview error:', error);
+            setPreviewCode(null);
+            const msg = (error && typeof error === 'object' && 'message' in error)
+              ? String((error as { message: string }).message)
+              : 'Preview code olishda xatolik';
+            setPreviewError(msg);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoadingPreview(false);
+          }
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [selectedRegion, selectedDistrict, mode, clientData, form, autoUpdateCode]);
 
   // Load existing data in edit mode
   useEffect(() => {
@@ -215,7 +305,9 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
 
           form.setValue('telegram_id', data.telegram_id?.toString() || '');
           form.setValue('full_name', data.full_name || '');
-          form.setValue('client_code', data.extra_code || data.client_code || '');
+          const fetchedCode = data.extra_code || data.client_code || '';
+          setOriginalCode(fetchedCode);
+          form.setValue('client_code', fetchedCode);
           form.setValue('passport_series', data.passport_series || '');
           form.setValue('region', data.region || '');
           form.setValue('district', data.district || '');
@@ -224,6 +316,8 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
           form.setValue('pinfl', data.pinfl || '');
           form.setValue('referrer_telegram_id', data.referrer_telegram_id?.toString() || '');
           form.setValue('referrer_client_code', data.referrer_client_code || '');
+
+          setCurrentBalance(data.current_balance ?? 0);
 
           // date_of_birth ni parse qilish
           if (data.date_of_birth) {
@@ -280,12 +374,6 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
     }
     return fallback;
   };
-
-  // Calendar open state
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-
-  // Watch region for district dependency
-  const selectedRegion = form.watch('region');
 
   // Clear district when region changes (but not on initial load)
   useEffect(() => {
@@ -391,8 +479,8 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
 
       };
 
-      // Include client_code for edit mode
-      if (mode === 'edit' && data.client_code) {
+      // client_code: Add rejimida faqat Manual bo'lsa yuborish, Edit rejimida doim yuborish
+      if (data.client_code && mode === 'edit') {
         requestData.client_code = data.client_code.trim().toUpperCase();
       }
 
@@ -428,6 +516,13 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       // FAQAT yangi rasm yuklangan bo'lsa passport_images ni yuborish
       if (data.passportImages && data.passportImages.length > 0) {
         requestData.passport_images = data.passportImages;
+      }
+
+      // Balance adjustment (edit mode only)
+      if (mode === 'edit' && data.adjustment_amount && data.adjustment_type) {
+        requestData.adjustment_amount = parseFloat(data.adjustment_amount);
+        requestData.adjustment_reason = data.adjustment_reason || 'Admin tahriri';
+        requestData.adjustment_type = data.adjustment_type as 'bonus' | 'penalty' | 'silent';
       }
 
       if (mode === 'add') {
@@ -759,9 +854,53 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
                     {form.formState.errors.district && (
                       <p className="text-red-500 text-sm">{t(form.formState.errors.district.message as string)}</p>
                     )}
+                    {/* YAngi qo'shilgan Live Preview UI */}
+                    {selectedDistrict && (
+                      <div className="mt-2 animate-in fade-in slide-in-from-top-1">
+                        {isLoadingPreview ? (
+                          <span className="text-orange-500 text-sm flex items-center gap-2 animate-pulse">
+                            <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                            Hisoblanmoqda...
+                          </span>
+                        ) : previewCode ? (
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
+                            <Hash className="w-3.5 h-3.5" />
+                            Kutilayotgan kod: <span className="font-bold text-green-800 tracking-wide">{previewCode}</span>
+                          </div>
+                        ) : previewError ? (
+                          <span className="text-red-500 text-sm">{previewError}</span>
+                        ) : null}
+                      </div>
+                    )}
                   </FormItem>
                 )}
               />
+
+              {/* Kod avto-yangilansinmi? Toggle - faqat edit rejimda va tuman tanlanganda */}
+              {mode === 'edit' && selectedDistrict && (
+                <div className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50/50 px-4 py-3">
+                  <span className="text-sm font-medium text-gray-700">
+                    {t('client.autoUpdateCode', 'Kod avto-yangilansinmi?')}
+                  </span>
+                  <Switch
+                    checked={autoUpdateCode}
+                    onCheckedChange={(checked) => {
+                      setAutoUpdateCode(checked);
+                      if (checked && previewCode) {
+                        form.setValue('client_code', previewCode, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      } else if (!checked) {
+                        form.setValue('client_code', originalCode, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Address */}
               <FormField
@@ -931,6 +1070,86 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
                   <p className="text-gray-600 bg-orange-50/50 px-3 py-2 rounded-lg border border-orange-200">
                     {clientData.created_at}
                   </p>
+                </div>
+              )}
+
+              {/* Balance Adjustment Section (Edit mode only) */}
+              {mode === 'edit' && (
+                <div className="p-4 border border-orange-200 rounded-xl bg-white space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-700">Balans boshqaruvi</h3>
+                    {currentBalance !== null && (
+                      <span className={`text-lg font-bold ${
+                        currentBalance > 0 ? 'text-green-600' : currentBalance < 0 ? 'text-red-600' : 'text-gray-500'
+                      }`}>
+                        Joriy balans: {currentBalance.toFixed(2)} so'm
+                      </span>
+                    )}
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="adjustment_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-medium">Amal turi</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <FormControl>
+                            <SelectTrigger className="bg-orange-50/50">
+                              <SelectValue placeholder="Tanlang..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="bonus">🎁 Bonus berish</SelectItem>
+                            <SelectItem value="penalty">🛑 Jarima / Pul yechish</SelectItem>
+                            <SelectItem value="silent">🤫 Yashirin tahrirlash (Kassa)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
+                  {form.watch('adjustment_type') && form.watch('adjustment_type') !== '' && (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="adjustment_amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-gray-700 font-medium">Miqdor (so'm)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400"
+                                {...field}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="adjustment_reason"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-gray-700 font-medium">Sabab</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="Sababni yozing..."
+                                className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400"
+                                {...field}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
                 </div>
               )}
 

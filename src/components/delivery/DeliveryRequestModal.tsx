@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
+import type { FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
@@ -44,11 +45,22 @@ const deliverySchema = z.object({
 
 type DeliveryFormData = z.infer<typeof deliverySchema>;
 
+interface ClientProfile {
+    id?: string | number;
+    client_code: string;
+    full_name: string;
+    phone?: string | null;
+    region: string | null;
+    district: string | null;
+    address?: string | null;
+    client_balance: number;
+}
+
 interface DeliveryRequestModalProps {
     isOpen: boolean;
     onClose: () => void;
     transaction: Transaction | null;
-    clientProfile: any;
+    clientProfile: ClientProfile | null;
     onSuccess: () => void;
 }
 
@@ -102,7 +114,7 @@ export function DeliveryRequestModal({
             setReceiptFile(null);
             setErrorStatus(null);
         }
-    }, [isOpen, clientProfile, form]);
+    }, [isOpen, clientProfile, form, previewUrl]);
 
     useEffect(() => {
         if (selectedRegion && clientProfile?.region !== selectedRegion) {
@@ -130,7 +142,7 @@ export function DeliveryRequestModal({
     }
     const remainingAmount = uzpostMockPrice - applicableWallet;
 
-    const handleFileSelect = (file: File) => {
+    const handleFileSelect = useCallback((file: File) => {
         if (!file.type.startsWith('image/')) {
             setErrorStatus('Faqat rasm fayllari (JPG, PNG) qabul qilinadi.');
             return;
@@ -139,7 +151,7 @@ export function DeliveryRequestModal({
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(URL.createObjectURL(file));
         setErrorStatus(null);
-    };
+    }, [previewUrl]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -167,7 +179,7 @@ export function DeliveryRequestModal({
 
         window.addEventListener('paste', handlePaste);
         return () => window.removeEventListener('paste', handlePaste);
-    }, [isOpen, deliveryType]);
+    }, [isOpen, deliveryType, handleFileSelect]);
 
     // Cleanup object URL on unmount
     useEffect(() => {
@@ -215,15 +227,16 @@ export function DeliveryRequestModal({
 
             onSuccess();
             onClose();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to submit delivery request', err);
-            setErrorStatus(err.message || 'Xatolik yuz berdi. Iltimos qayta urinib ko\'ring.');
+            const errorMessage = err instanceof Error ? err.message : 'Xatolik yuz berdi. Iltimos qayta urinib ko\'ring.';
+            setErrorStatus(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const onFormError = (errors: any) => {
+    const onFormError = (errors: FieldValues) => {
         console.error("Validation errors:", errors);
         setIsEditingClient(true); // Open edit mode automatically to reveal errors
         setErrorStatus("Iltimos, mijozning barcha kerakli ma'lumotlarini to'g'ri kiriting.");
@@ -261,7 +274,7 @@ export function DeliveryRequestModal({
                                 {[
                                     { id: 'uzpost', label: 'Uzpost', icon: <Package className="w-5 h-5 text-blue-500" /> },
                                     { id: 'yandex', label: 'Yandex Dostavka', icon: <Car className="w-5 h-5 text-yellow-500" /> },
-                                    { id: 'mandarin', label: 'Mandarin', icon: <Store className="w-5 h-5 text-orange-500" /> },
+                                    { id: 'mandarin', label: 'Mandarin Dastavka', icon: <Store className="w-5 h-5 text-orange-500" /> },
                                     { id: 'bts', label: 'BTS', icon: <Truck className="w-5 h-5 text-indigo-500" /> },
                                 ].map((svc) => (
                                     <div

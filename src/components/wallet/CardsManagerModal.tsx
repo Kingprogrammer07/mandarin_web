@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { walletService } from '@/api/services/walletService';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 interface CardsManagerModalProps {
     isOpen: boolean;
@@ -32,6 +33,7 @@ const slideVariants = {
 };
 
 export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
+    const { t } = useTranslation();
     const queryClient = useQueryClient();
     const [isAdding, setIsAdding] = useState(false);
     const [cardNumber, setCardNumber] = useState('');
@@ -48,23 +50,23 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
     const addCardMutation = useMutation({
         mutationFn: walletService.addWalletCard,
         onSuccess: () => {
-            toast.success("Karta qo'shildi");
+            toast.success(t('wallet.cards.successAdd', "Karta qo'shildi"));
             queryClient.invalidateQueries({ queryKey: ['walletCards'] });
             handleBack();
         },
         onError: () => {
-            toast.error("Karta qo'shishda xatolik");
+            toast.error(t('wallet.cards.errorAdd', "Karta qo'shishda xatolik"));
         }
     });
 
     const deleteCardMutation = useMutation({
         mutationFn: walletService.deleteWalletCard,
         onSuccess: () => {
-            toast.success("Karta o'chirildi");
+            toast.success(t('wallet.cards.successDelete', "Karta o'chirildi"));
             queryClient.invalidateQueries({ queryKey: ['walletCards'] });
         },
         onError: () => {
-            toast.error("Karta o'chirishda xatolik");
+            toast.error(t('wallet.cards.errorDelete', "Karta o'chirishda xatolik"));
         }
     });
 
@@ -100,11 +102,11 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
 
         // Basic validation before sending
         if (!rawCardNumber || !cardHolder) {
-            toast.error("Ma'lumotlarni to'liq kiriting");
+            toast.error(t('wallet.cards.errorIncomplete', "Ma'lumotlarni to'liq kiriting"));
             return;
         }
         if (rawCardNumber.length !== 16) {
-            toast.error("Karta raqami 16 ta raqamdan iborat bo'lishi kerak");
+            toast.error(t('wallet.cards.errorLength', "Karta raqami 16 ta raqamdan iborat bo'lishi kerak"));
             return;
         }
 
@@ -115,7 +117,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
     };
 
     const handleDeleteCard = (id: number) => {
-        if (confirm("Kartani o'chirishni tasdiqlaysizmi?")) {
+        if (confirm(t('wallet.cards.confirmDelete', "Kartani o'chirishni tasdiqlaysizmi?"))) {
             deleteCardMutation.mutate(id);
         }
     };
@@ -140,11 +142,11 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
                         )}
-                        <DialogTitle>{isAdding ? "Yangi karta" : "Mening Kartalarim"}</DialogTitle>
+                        <DialogTitle>{isAdding ? t('wallet.cards.newCard', "Yangi karta") : t('wallet.cards.myCards', "Mening Kartalarim")}</DialogTitle>
                     </div>
                 </DialogHeader>
 
-                <div className="py-4 relative flex-1 overflow-hidden">
+                <div className="py-4 relative flex-1 grid overflow-hidden">
                     <AnimatePresence mode="wait" initial={false} custom={isAdding ? 1 : -1}>
                         {isAdding ? (
                             <motion.div
@@ -155,7 +157,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 animate="center"
                                 exit="exit"
                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className="space-y-4 absolute inset-0 bg-transparent px-1 overflow-y-auto"
+                                className="space-y-4 col-start-1 row-start-1 w-full h-full bg-transparent px-1 overflow-y-auto"
                             >
                                 <div className="space-y-4 pb-6">
                                     <div className="p-6 rounded-xl bg-gradient-to-br from-gray-900 to-gray-800 text-white shadow-xl mb-6">
@@ -165,12 +167,12 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         </div>
                                         <div className="space-y-4">
                                             <div>
-                                                <p className="text-xs text-gray-400 uppercase mb-1">Karta raqami</p>
+                                                <p className="text-xs text-gray-400 uppercase mb-1">{t('wallet.cards.cardNumber', "Karta raqami")}</p>
                                                 <p className="font-mono text-base sm:text-xl tracking-widest truncate">{cardNumber || '0000 0000 0000 0000'}</p>
                                             </div>
                                             <div className="flex justify-between">
                                                 <div>
-                                                    <p className="text-xs text-gray-400 uppercase mb-1">Egasi</p>
+                                                    <p className="text-xs text-gray-400 uppercase mb-1">{t('wallet.cards.cardHolder', "Egasi")}</p>
                                                     <p className="font-medium uppercase tracking-wide truncate max-w-[200px]">{cardHolder || 'ISMI FAMILIYASI'}</p>
                                                 </div>
                                             </div>
@@ -178,7 +180,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Karta raqami</Label>
+                                        <Label>{t('wallet.cards.cardNumber', "Karta raqami")}</Label>
                                         <Input
                                             placeholder="0000 0000 0000 0000"
                                             value={cardNumber}
@@ -190,7 +192,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Egasi ismi</Label>
+                                        <Label>{t('wallet.cards.cardHolderName', "Egasi ismi")}</Label>
                                         <Input
                                             placeholder="ISMI FAMILIYASI"
                                             value={cardHolder}
@@ -205,11 +207,11 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/20"
                                     >
                                         {addCardMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                                        {addCardMutation.isPending ? "Saqlanmoqda..." : "Saqlash"}
+                                        {addCardMutation.isPending ? t('wallet.cards.saving', "Saqlanmoqda...") : t('wallet.cards.save', "Saqlash")}
                                     </Button>
 
                                     <Button variant="ghost" className="w-full" onClick={handleBack}>
-                                        Bekor qilish
+                                        {t('wallet.cards.cancel', "Bekor qilish")}
                                     </Button>
                                 </div>
                             </motion.div>
@@ -222,7 +224,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 animate="center"
                                 exit="exit"
                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className="space-y-4 absolute inset-0 bg-transparent px-1 overflow-y-auto"
+                                className="space-y-4 col-start-1 row-start-1 w-full h-full bg-transparent px-1 overflow-y-auto"
                             >
                                 {isLoading ? (
                                     <div className="flex justify-center p-8">
@@ -233,14 +235,14 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         <div className="h-16 w-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
                                             <CreditCard className="h-8 w-8 text-gray-400" />
                                         </div>
-                                        <p className="font-medium mb-1">Hozircha kartalar yo'q</p>
-                                        <p className="text-sm text-gray-400 mb-6 max-w-xs">To'lovlarni tezroq amalga oshirish uchun karta qo'shing</p>
+                                        <p className="font-medium mb-1">{t('wallet.cards.noCards', "Hozircha kartalar yo'q")}</p>
+                                        <p className="text-sm text-gray-400 mb-6 max-w-xs">{t('wallet.cards.addPrompt', "To'lovlarni tezroq amalga oshirish uchun karta qo'shing")}</p>
                                         <Button
                                             onClick={() => setIsAdding(true)}
                                             className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6"
                                         >
                                             <Plus className="h-4 w-4 mr-2" />
-                                            Karta qo'shish
+                                            {t('wallet.cards.addCard', "Karta qo'shish")}
                                         </Button>
                                     </div>
                                 ) : (
@@ -284,7 +286,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                             onClick={() => setIsAdding(true)}
                                         >
                                             <Plus className="h-4 w-4 mr-2" />
-                                            Yangi karta qo'shish
+                                            {t('wallet.cards.addNewCard', "Yangi karta qo'shish")}
                                         </Button>
                                     </div>
                                 )}
@@ -293,6 +295,6 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                     </AnimatePresence>
                 </div>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

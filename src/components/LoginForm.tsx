@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { login as loginApi, getTelegramWebAppData } from '@/api/services/auth';
+import { login as loginApi, getTelegramWebAppData, fetchAuthMe } from '@/api/services/auth';
 import StatusAnimation from './StatusAnimation';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
@@ -29,18 +29,35 @@ type AddressFormData = z.infer<typeof addressSchema>;
 
 interface LoginFormProps {
   onNavigateToRegister?: () => void;
+  onLoginSuccess?: (role: string) => void;
 }
 
-export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
+export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: LoginFormProps) {
   const { t } = useTranslation();
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
-  
+
   const [showAddressDrawer, setShowAddressDrawer] = useState(false);
   const [credentials, setCredentials] = useState<{ clientCode: string; phoneNumber: string } | null>(null);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  // Reverse Auth Guard: agar token mavjud bo'lsa, /auth/me dan haqiqiy roleni olib yo'naltirish
+  useEffect(() => {
+    const token = sessionStorage.getItem('access_token');
+    if (!token || !onLoginSuccess) return;
+
+    // Token bor — haqiqiy roleni backenddan olamiz
+    fetchAuthMe()
+      .then((userData) => {
+        onLoginSuccess(userData.role ?? 'user');
+      })
+      .catch(() => {
+        // Token eskirgan yoki noto'g'ri — o'chirib tashlaymiz, login ko'rsatamiz
+        sessionStorage.removeItem('access_token');
+      });
+  }, [onLoginSuccess]);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -63,20 +80,25 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
         phone_number: `+998${data.phoneNumber}`,
         telegram_id: telegramData.user.id,
       });
-      
-      setSubmitStatus('success');
-      setSubmitMessage(t('login.messages.success', { name: response.full_name }));
-      form.reset();
-      setTimeout(() => {
-        if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
-      }, 2000);
-      
+
+      if (response.access_token) {
+        sessionStorage.setItem('access_token', response.access_token);
+        setSubmitStatus('success');
+        setSubmitMessage(t('login.messages.success', { name: response.full_name }));
+        form.reset();
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess(response.role);
+          }
+        }, 1500);
+      }
+
     } catch (error: unknown) {
       const status = typeof error === 'object' && error && 'status' in (error as object) ? (error as { status?: number }).status : undefined;
       const detail = typeof error === 'object' && error && 'data' in (error as object) ? (error as { data?: { detail?: string } }).data?.detail : undefined;
       const message = typeof error === 'object' && error && 'message' in (error as object) ? (error as { message?: string }).message : undefined;
-      if (status === 428 || detail === "address_required") {
 
+      if (status === 428 || detail === 'address_required') {
         setSubmitStatus('idle');
         setSubmitMessage('');
         setCredentials({ clientCode: data.clientCode, phoneNumber: data.phoneNumber });
@@ -84,7 +106,6 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
       } else {
         setSubmitStatus('error');
         setSubmitMessage(detail || message || t('login.messages.generalError'));
-
       }
     }
   };
@@ -102,21 +123,26 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
         region: data.region,
         district: data.district,
       });
-      setShowAddressDrawer(false);
-      setSubmitStatus('success');
-      setSubmitMessage(t('login.messages.success', { name: response.full_name }));
-      form.reset();
-      addressForm.reset();
-      setCredentials(null);
-      setTimeout(() => {
-        if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
-      }, 2000);
+
+      if (response.access_token) {
+        sessionStorage.setItem('access_token', response.access_token);
+        setShowAddressDrawer(false);
+        setSubmitStatus('success');
+        setSubmitMessage(t('login.messages.success', { name: response.full_name }));
+        form.reset();
+        addressForm.reset();
+        setCredentials(null);
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess(response.role);
+          }
+        }, 1500);
+      }
     } catch (error: unknown) {
       setSubmitStatus('error');
       const detail = typeof error === 'object' && error && 'data' in (error as object) ? (error as { data?: { detail?: string } }).data?.detail : undefined;
       const message = typeof error === 'object' && error && 'message' in (error as object) ? (error as { message?: string }).message : undefined;
       setSubmitMessage(detail || message || t('login.messages.generalError'));
-
     }
   };
 
@@ -282,101 +308,104 @@ export default function LoginForm({ onNavigateToRegister }: LoginFormProps) {
                 onClick={() => setShowAddressDrawer(false)}
               />
               <motion.div
-                initial={{ y: "100%" }}
+                initial={{ y: '100%' }}
                 animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white dark:bg-zinc-950 z-[10000] rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] h-[80vh] overflow-y-auto flex flex-col"
               >
-              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-800 rounded-full mx-auto mb-6" />
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {t('login.addressDrawer.title', 'Yashash manzilingizni kiriting')}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {t('login.addressDrawer.subtitle', 'Davom etish uchun viloyat va tumaningizni belgilang')}
-                </p>
-              </div>
+                <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-800 rounded-full mx-auto mb-6" />
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {t('login.addressDrawer.title', 'Yashash manzilingizni kiriting')}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {t('login.addressDrawer.subtitle', 'Davom etish uchun viloyat va tumaningizni belgilang')}
+                  </p>
+                </div>
 
-              <Form {...addressForm}>
-                <form onSubmit={addressForm.handleSubmit(onAddressSubmit)} className="space-y-5">
-                  <FormField control={addressForm.control} name="region" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-orange-500" />
-                        {t('form.region')}
-                      </FormLabel>
-                      <Select onValueChange={(value) => {
-                        field.onChange(value);
-                        addressForm.setValue('district', '');
-                      }} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className={`${inp} w-full`}>
-                            <SelectValue placeholder={t('form.regionPlaceholder')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="z-[10010] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
-                          {regions.map((r) => (
-                            <SelectItem
-                              key={r.value}
-                              value={r.value}
-                              className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
-                            >
-                              {t(r.label)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <TranslatedFormMessage />
-                    </FormItem>
-                  )} />
+                <Form {...addressForm}>
+                  <form onSubmit={addressForm.handleSubmit(onAddressSubmit)} className="space-y-5">
+                    <FormField control={addressForm.control} name="region" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-500" />
+                          {t('form.region')}
+                        </FormLabel>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          addressForm.setValue('district', '');
+                        }} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className={`${inp} w-full`}>
+                              <SelectValue placeholder={t('form.regionPlaceholder')} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="z-[10010] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
+                            {regions.map((r) => (
+                              <SelectItem
+                                key={r.value}
+                                value={r.value}
+                                className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
+                              >
+                                {t(r.label)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <TranslatedFormMessage />
+                      </FormItem>
+                    )} />
 
-                  <FormField control={addressForm.control} name="district" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-orange-500 opacity-50" />
-                        {t('form.district')}
-                      </FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!addressForm.watch('region')}>
-                        <FormControl>
-                          <SelectTrigger className={`${inp} w-full`}>
-                            <SelectValue placeholder={t('form.districtPlaceholder')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="z-[10010] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
-                          {addressForm.watch('region') && DISTRICTS[addressForm.watch('region')]?.map((d) => (
-                            <SelectItem
-                              key={d.value}
-                              value={d.value}
-                              className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
-                            >
-                              {t(d.label)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <TranslatedFormMessage />
-                    </FormItem>
-                  )} />
+                    <FormField control={addressForm.control} name="district" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-500 opacity-50" />
+                          {t('form.district')}
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={!addressForm.watch('region')}
+                        >
+                          <FormControl>
+                            <SelectTrigger className={`${inp} w-full`}>
+                              <SelectValue placeholder={t('form.districtPlaceholder')} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="z-[10010] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
+                            {addressForm.watch('region') && DISTRICTS[addressForm.watch('region')]?.map((d) => (
+                              <SelectItem
+                                key={d.value}
+                                value={d.value}
+                                className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
+                              >
+                                {t(d.label)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <TranslatedFormMessage />
+                      </FormItem>
+                    )} />
 
-                  <div className="pt-2">
-                    <Button
-                      type="submit"
-                      disabled={submitStatus === 'loading'}
-                      className="w-full h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:brightness-95 text-white font-bold text-base tracking-wide rounded-xl shadow-md shadow-orange-500/30 transition-opacity duration-150 disabled:opacity-50 disabled:cursor-not-allowed border-0"
-                    >
-                      {t('login.addressDrawer.submit', 'Saqlash va Kirish')}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </motion.div>
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={submitStatus === 'loading'}
+                        className="w-full h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:brightness-95 text-white font-bold text-base tracking-wide rounded-xl shadow-md shadow-orange-500/30 transition-opacity duration-150 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+                      >
+                        {t('login.addressDrawer.submit', 'Saqlash va Kirish')}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </motion.div>
             </>
           )}
         </AnimatePresence>,
-        document.body
+        document.body,
       )}
     </>
   );
 }
-

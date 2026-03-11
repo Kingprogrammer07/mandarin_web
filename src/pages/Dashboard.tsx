@@ -1,89 +1,65 @@
-import { useState, memo, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, memo, useRef, useEffect, useMemo, lazy, Suspense } from "react";
 import {
     MapPin,
     Calendar,
     Rocket,
     Edit3,
-    Info,
+    // Info,
+    ChevronLeft,
     ChevronRight,
     IdCard,
     Home,
     ScanBarcode,
     ShieldOff,
     Plane,
-    HelpCircle,
+    // HelpCircle,
     ShieldAlert,
-    Newspaper,
+    // Newspaper,
     FileText,
     Wallet,
-    History,
-    MessageSquare
+    ReceiptText,
+    MessageSquare,
+    ListOrdered,
+    Calculator // Calculator bu yerda import qilingan
 } from "lucide-react";
 import TrackCodeTab from "./dashboard/TrackCodeTab";
 import { toast } from "sonner";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
-
-// --- Types ---
-interface ActionItemData {
-    id: string;
-    icon: React.ReactNode;
-    label: string;
-    desc: string;
-    theme: "amber" | "emerald" | "sky" | "rose" | "violet";
-}
+import { ActionButton, type ActionItemData } from "@/components/user_page/ActionButtons";
+import { useTranslation } from 'react-i18next';
 
 interface CarouselItemData {
     id: number;
-    type: "feature" | "ad";         // New: distinguish between app features and ads
-    title?: string;                 // Optional for ads
-    sub?: string;                   // Optional for ads
-    gradient?: string;              // Only for features
-    bgIcon?: React.ReactNode;       // Only for features
-    mainIcon?: React.ReactNode;     // Only for features
-    mediaType?: "image" | "video" | "gif";  // Only for ads
-    mediaUrl?: string;              // Only for ads
-    actionUrl?: string;             // Only for ads (external link)
-    textColor?: string;             // Optional custom text color for ads
+    type: "feature" | "ad";
+    titleKey?: string;
+    subKey?: string;
+    title?: string;
+    sub?: string;
+    gradient?: string;
+    bgIcon?: React.ReactNode;
+    mainIcon?: React.ReactNode;
+    mediaType?: "image" | "video" | "gif";
+    mediaUrl?: string;
+    actionUrl?: string;
+    textColor?: string;
 }
-
-
 
 // --- Data ---
 const CAROUSEL_ITEMS: CarouselItemData[] = [
-    {
-        id: 101, // ID to distinguish
-        type: "ad",
-        mediaType: "gif",
-        mediaUrl: "https://assets-v2.lottiefiles.com/a/6a21fb9a-1178-11ee-a809-cbf4c1cb708c/KS4fSTQC7T.gif", // Sample e-commerce/sale image
-        actionUrl: "https://google.com",
-        title: "Katta Chegirmalar!",
-        sub: "Batafsil ma'lumot",
-        textColor: "#ffffff"
-    },
-    {
-        id: 102, // ID to distinguish
-        type: "ad",
-        mediaType: "video",
-        mediaUrl: "https://static.vecteezy.com/system/resources/previews/001/616/378/mp4/close-up-of-beautiful-orange-flames-drawing-random-shapes-in-4k-slow-motion-free-video.mp4", // Sample e-commerce/sale image
-        actionUrl: "https://google.com",
-        title: "Katta Chegirmalar!",
-        sub: "Batafsil ma'lumot",
-        textColor: "#ffffff"
-    },
-    {
-        id: 5,
-        type: "feature",
-        title: "Yangiliklar",
-        sub: "O'qish",
-        gradient: "from-pink-900 to-pink-600",
-        bgIcon: <Newspaper className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
-        mainIcon: <Newspaper className="text-white/90" style={{ width: 32, height: 32 }} />,
-    },
+    // {
+    //     id: 5,
+    //     type: "feature",
+    //     titleKey: "dashboard.carousel.news.title",
+    //     subKey: "dashboard.carousel.news.sub",
+    //     gradient: "from-pink-900 to-pink-600",
+    //     bgIcon: <Newspaper className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
+    //     mainIcon: <Newspaper className="text-white/90" style={{ width: 32, height: 32 }} />,
+    // },
     {
         id: 1,
         type: "feature",
-        title: "Taqiqlanganlar",
-        sub: "Ro'yxatni ko'rish",
+        titleKey: "dashboard.carousel.prohibited.title",
+        subKey: "dashboard.carousel.prohibited.sub",
         gradient: "from-red-900 to-red-600",
         bgIcon: <ShieldAlert className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
         mainIcon: <ShieldOff className="text-white/90" style={{ width: 32, height: 32 }} />,
@@ -91,8 +67,8 @@ const CAROUSEL_ITEMS: CarouselItemData[] = [
     {
         id: 2,
         type: "feature",
-        title: "ID olish",
-        sub: "Qo'llanma",
+        titleKey: "dashboard.carousel.id.title",
+        subKey: "dashboard.carousel.id.sub",
         gradient: "from-blue-900 to-blue-600",
         bgIcon: <IdCard className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
         mainIcon: <IdCard className="text-white/90" style={{ width: 32, height: 32 }} />,
@@ -100,70 +76,91 @@ const CAROUSEL_ITEMS: CarouselItemData[] = [
     {
         id: 3,
         type: "feature",
-        title: "Yetkazib berish",
-        sub: "Qo'llanma",
+        titleKey: "dashboard.carousel.delivery.title",
+        subKey: "dashboard.carousel.delivery.sub",
         gradient: "from-purple-900 to-purple-600",
         bgIcon: <Rocket className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
         mainIcon: <Plane className="text-white/90" style={{ width: 32, height: 32 }} />,
     },
-    {
-        id: 4,
-        type: "feature",
-        title: "Yordam",
-        sub: "Savol-javob",
-        gradient: "from-cyan-900 to-cyan-600",
-        bgIcon: <HelpCircle className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
-        mainIcon: <Info className="text-white/90" style={{ width: 32, height: 32 }} />,
-    },
+    // {
+    //     id: 4,
+    //     type: "feature",
+    //     titleKey: "dashboard.carousel.help.title",
+    //     subKey: "dashboard.carousel.help.sub",
+    //     gradient: "from-cyan-900 to-cyan-600",
+    //     bgIcon: <HelpCircle className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
+    //     mainIcon: <Info className="text-white/90" style={{ width: 32, height: 32 }} />,
+    // },
 ];
 
-const MAIN_ACTIONS: ActionItemData[] = [
+const MAIN_ACTIONS: (Omit<ActionItemData, 'label' | 'desc' | 'badge' | 'actionLabel'> & { labelKey: string; descKey: string; badgeKey: string; actionLabelKey: string })[] = [
+    {
+        id: "calculator",
+        icon: <Calculator className="w-5 h-5" />,
+        bgIcon: <Calculator style={{ width: 80, height: 80 }} />,
+        labelKey: "dashboard.actions.calculator.desc",
+        descKey: "dashboard.actions.calculator.label",
+        badgeKey: "dashboard.actions.calculator.badge",
+        actionLabelKey: "dashboard.actions.calculator.action",
+        theme: "cyan",
+    },
     {
         id: "china",
-        icon: <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />,
-        label: "Xitoy manzili",
-        desc: "Guangzhou, Yiwu",
-        theme: "amber"
+        icon: <MapPin className="w-5 h-5" />,
+        bgIcon: <MapPin style={{ width: 80, height: 80 }} />,
+        labelKey: "dashboard.actions.china.label",
+        descKey: "dashboard.actions.china.desc",
+        badgeKey: "dashboard.actions.china.badge",
+        actionLabelKey: "dashboard.actions.china.action",
+        theme: "amber",
     },
-    {
-        id: "schedule",
-        icon: <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />,
-        label: "Reyslar Jadvali",
-        desc: "Uchish va kelish vaqtlari",
-        theme: "sky"
-    },
+    // {
+    //     id: "schedule",
+    //     icon: <Calendar className="w-5 h-5" />,
+    //     bgIcon: <Calendar style={{ width: 80, height: 80 }} />,
+    //     labelKey: "dashboard.actions.schedule.label",
+    //     descKey: "dashboard.actions.schedule.desc",
+    //     badgeKey: "dashboard.actions.schedule.badge",
+    //     actionLabelKey: "dashboard.actions.schedule.action",
+    //     theme: "sky",
+    // },
     {
         id: "request",
-        icon: <Edit3 className="w-5 h-5 sm:w-6 sm:h-6" />,
-        label: "Zayafka qoldirish",
-        desc: "Buyurtma berish",
-        theme: "emerald"
+        icon: <Edit3 className="w-5 h-5" />,
+        bgIcon: <Edit3 style={{ width: 80, height: 80 }} />,
+        labelKey: "dashboard.actions.request.label",
+        descKey: "dashboard.actions.request.desc",
+        badgeKey: "dashboard.actions.request.badge",
+        actionLabelKey: "dashboard.actions.request.action",
+        theme: "emerald",
     },
     {
-        id: "report",
-        icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6" />,
-        label: "Hisobotni ko'rish",
-        desc: "Barcha hisobotlar",
-        theme: "sky"
+        id: "delivery_history",
+        icon: <ListOrdered className="w-5 h-5" />,
+        bgIcon: <ListOrdered style={{ width: 80, height: 80 }} />,
+        labelKey: "dashboard.actions.history.label",
+        descKey: "dashboard.actions.history.desc",
+        badgeKey: "dashboard.actions.history.badge",
+        actionLabelKey: "dashboard.actions.history.action",
+        theme: "violet",
     },
     {
         id: "payment",
-        icon: <Wallet className="w-5 h-5 sm:w-6 sm:h-6" />,
-        label: "To'lov qilish",
-        desc: "Balansni to'ldirish",
-        theme: "rose"
-    },
-    {
-        id: "history",
-        icon: <History className="w-5 h-5 sm:w-6 sm:h-6" />,
-        label: "Mening yuklarim",
-        desc: "Sizning barcha yuklaringiz tarixi",
-        theme: "violet"
+        icon: <Wallet className="w-5 h-5" />,
+        bgIcon: <Wallet style={{ width: 80, height: 80 }} />,
+        labelKey: "dashboard.actions.payment.label",
+        descKey: "dashboard.actions.payment.desc",
+        badgeKey: "dashboard.actions.payment.badge",
+        actionLabelKey: "dashboard.actions.payment.action",
+        theme: "rose",
     },
 ];
 
 const CarouselCard = memo(({ item }: { item: CarouselItemData }) => {
+    const { t } = useTranslation();
     const isAd = item.type === "ad";
+    const title = item.titleKey ? t(item.titleKey) : item.title;
+    const sub = item.subKey ? t(item.subKey) : item.sub;
 
     const handleClick = () => {
         if (isAd && item.actionUrl) {
@@ -182,7 +179,6 @@ const CarouselCard = memo(({ item }: { item: CarouselItemData }) => {
                     border border-white/10 shadow-lg group
                 "
             >
-                {/* Background Media */}
                 {item.mediaType === "video" ? (
                     <video
                         src={item.mediaUrl}
@@ -200,22 +196,20 @@ const CarouselCard = memo(({ item }: { item: CarouselItemData }) => {
                     />
                 )}
 
-                {/* Gradient Overlay for Text Readability */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-                {/* Content */}
                 <div className="absolute inset-0 p-5 flex flex-col justify-end">
-                    {item.title && (
+                    {title && (
                         <h3
                             className="font-bold text-xl leading-tight mb-0.5"
                             style={{ color: item.textColor || "white" }}
                         >
-                            {item.title}
+                            {title}
                         </h3>
                     )}
-                    {item.sub && (
+                    {sub && (
                         <p className="text-white/80 text-sm font-medium flex items-center gap-1">
-                            {item.sub} <ChevronRight className="w-4 h-4" />
+                            {sub} <ChevronRight className="w-4 h-4" />
                         </p>
                     )}
                 </div>
@@ -223,124 +217,35 @@ const CarouselCard = memo(({ item }: { item: CarouselItemData }) => {
         );
     }
 
-    // Default Feature Card
     return (
         <div
             className={`
-                flex-shrink-0 w-[85%] sm:w-[45%] lg:w-full 
+                flex-shrink-0 w-[85%] sm:w-[45%] md:w-[280px] lg:w-[300px] 
                 h-40 rounded-3xl p-5 relative overflow-hidden 
                 snap-start cursor-pointer hover:scale-[0.98] transition-transform duration-200
                 bg-gradient-to-br ${item.gradient}
                 border border-white/10 shadow-lg
             `}
         >
-            {/* Large decorative background icon */}
             {item.bgIcon}
 
             <div className="h-full flex flex-col justify-between relative z-10">
-                {/* Main icon top-left */}
                 <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
                     {item.mainIcon}
                 </div>
 
-                {/* Text bottom */}
                 <div>
-                    <h3 className="text-white font-bold text-xl leading-tight mb-1">{item.title}</h3>
-                    <p className="text-white/70 text-sm font-medium">{item.sub}</p>
+                    <h3 className="text-white font-bold text-xl leading-tight mb-1">{title}</h3>
+                    <p className="text-white/70 text-sm font-medium">{sub}</p>
                 </div>
             </div>
         </div>
     );
 });
 
-
-
-const ActionButton = memo(({ item, onClick }: { item: ActionItemData; onClick?: () => void }) => {
-    // Theme configurations - Refined for "Glass/Clean" look
-    // Removed heavy container backgrounds, kept icon colors for identity
-    const themes = {
-        amber: {
-            iconBg: "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
-            title: "text-gray-900 dark:text-gray-100", // Neutral text for clean look
-            desc: "text-gray-500 dark:text-gray-400",
-            arrow: "text-amber-500"
-        },
-        emerald: {
-            iconBg: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
-            title: "text-gray-900 dark:text-gray-100",
-            desc: "text-gray-500 dark:text-gray-400",
-            arrow: "text-emerald-500"
-        },
-        sky: {
-            iconBg: "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400",
-            title: "text-gray-900 dark:text-gray-100",
-            desc: "text-gray-500 dark:text-gray-400",
-            arrow: "text-sky-500"
-        },
-        rose: {
-            iconBg: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
-            title: "text-gray-900 dark:text-gray-100",
-            desc: "text-gray-500 dark:text-gray-400",
-            arrow: "text-rose-500"
-        },
-        violet: {
-            iconBg: "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400",
-            title: "text-gray-900 dark:text-gray-100",
-            desc: "text-gray-500 dark:text-gray-400",
-            arrow: "text-violet-500"
-        }
-    };
-
-    const theme = themes[item.theme];
-
-    return (
-        <div
-            className="
-                relative overflow-hidden rounded-2xl p-3 sm:p-4 flex items-center justify-between cursor-pointer
-                hover:scale-[0.98] transition-all duration-200 group h-20 sm:h-24
-                bg-white dark:bg-white/5 border-2 border-white/20 dark:border-white/10 shadow-sm
-                backdrop-blur-md
-            "
-            onClick={onClick}
-        >
-            <div className="flex items-center gap-3 sm:gap-4">
-                {/* Icon Left */}
-                <div
-                    className={`
-                        w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-colors shrink-0
-                        ${theme.iconBg}
-                    `}
-                >
-                    {item.icon}
-                </div>
-
-                {/* Text Content */}
-                <div>
-                    <h3 className={`font-bold text-sm sm:text-base leading-tight mb-0.5 ${theme.title}`}>
-                        {item.label}
-                    </h3>
-                    <p className={`text-[10px] sm:text-xs font-medium ${theme.desc}`}>
-                        {item.desc}
-                    </p>
-                </div>
-            </div>
-
-            {/* Arrow Right */}
-            <div className={`mr-1 sm:mr-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 ${theme.arrow}`}>
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-        </div>
-    );
-});
-// --- Unique Background SVG ---
-// Diagonal grid + radial amber/gold orbs + top-left dark ink blot aesthetic
 const UniqueBackground = () => (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 dark:block hidden">
-
-        {/* Base dark canvas */}
         <div className="absolute inset-0 bg-[#0d0a04]" />
-
-        {/* Diagonal mesh grid lines — thin, barely visible */}
         <svg
             className="absolute inset-0 w-full h-full opacity-[0.035]"
             xmlns="http://www.w3.org/2000/svg"
@@ -354,7 +259,6 @@ const UniqueBackground = () => (
             <rect width="100%" height="100%" fill="url(#diag-grid)" />
         </svg>
 
-        {/* Noise grain overlay */}
         <svg className="absolute inset-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
             <filter id="grain">
                 <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch" />
@@ -363,7 +267,6 @@ const UniqueBackground = () => (
             <rect width="100%" height="100%" filter="url(#grain)" />
         </svg>
 
-        {/* Primary amber orb — bottom-left */}
         <div
             className="absolute"
             style={{
@@ -377,7 +280,6 @@ const UniqueBackground = () => (
             }}
         />
 
-        {/* Secondary warm orb — top-right, copper tone */}
         <div
             className="absolute"
             style={{
@@ -391,7 +293,6 @@ const UniqueBackground = () => (
             }}
         />
 
-        {/* Thin accent orb — center, very subtle warm white */}
         <div
             className="absolute"
             style={{
@@ -405,7 +306,6 @@ const UniqueBackground = () => (
             }}
         />
 
-        {/* Decorative circle ring — bottom-right */}
         <svg
             className="absolute opacity-[0.06]"
             style={{ bottom: "5%", right: "3%", width: "320px", height: "320px" }}
@@ -417,21 +317,18 @@ const UniqueBackground = () => (
             <circle cx="160" cy="160" r="60" fill="none" stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="3 8" />
         </svg>
 
-        {/* Top-left cargo icon watermark */}
         <svg
             className="absolute opacity-[0.03]"
             style={{ top: "8%", left: "-2%", width: "280px", height: "280px" }}
             viewBox="0 0 100 100"
             xmlns="http://www.w3.org/2000/svg"
         >
-            {/* Stylized box / package shape */}
             <rect x="15" y="35" width="70" height="50" rx="3" fill="none" stroke="#f59e0b" strokeWidth="2" />
             <polyline points="15,35 50,15 85,35" fill="none" stroke="#f59e0b" strokeWidth="2" />
             <line x1="50" y1="15" x2="50" y2="85" stroke="#f59e0b" strokeWidth="1.5" />
             <line x1="15" y1="55" x2="85" y2="55" stroke="#f59e0b" strokeWidth="1" />
         </svg>
 
-        {/* Horizontal scan line — ultra subtle */}
         <div
             className="absolute left-0 right-0 h-px opacity-[0.06]"
             style={{
@@ -442,7 +339,6 @@ const UniqueBackground = () => (
     </div>
 );
 
-// Detect dark mode
 function useDarkMode() {
     const [dark, setDark] = useState(
         () => document.documentElement.classList.contains("dark")
@@ -457,12 +353,72 @@ function useDarkMode() {
     return dark;
 }
 
+// --- Beta Badge Component ---
+const BetaBadge = memo(() => {
+    const [isOpen, setIsOpen] = useState(false);
+    const { t } = useTranslation();
+
+    return (
+        <div className="absolute top-4 right-4 sm:top-8 sm:right-4 z-50 mt-12">
+            {/* The Badge Button */}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:border-amber-500/40 backdrop-blur-md transition-all shadow-sm active:scale-95"
+            >
+                {/* Ping Animation Dot */}
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 border-2 border-white dark:border-[#0d0a04]"></span>
+                </span>
+                
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span className="text-[10px] sm:text-xs font-bold tracking-widest uppercase">
+                    {t('beta.badge', 'Beta')}
+                </span>
+            </button>
+
+            {/* The Popup Content */}
+            {isOpen && (
+                <>
+                    {/* Backdrop for closing when clicked outside */}
+                    <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)} />
+                    
+                    <div className="absolute right-0 top-12 w-72 sm:w-80 p-5 bg-white/95 dark:bg-[#1a1814]/95 backdrop-blur-xl border border-amber-100 dark:border-amber-900/30 rounded-2xl shadow-2xl z-[70] animate-in fade-in slide-in-from-top-2 zoom-in-95 duration-200">
+                        <div className="flex justify-between items-start mb-3">
+                            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <ShieldAlert className="w-4 h-4 text-amber-500" />
+                                {t('beta.title', 'Beta Versiya')}
+                            </h3>
+                            <button 
+                                onClick={() => setIsOpen(false)} 
+                                className="p-1 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
+                            {t('beta.desc', 'Platforma hozirda sinov (beta) rejimida ishlamoqda. Ayrim xatoliklar yoki kamchiliklar kuzatilishi mumkin. Agar biron muammoga duch kelsangiz, iltimos bizga xabar bering.')}
+                        </p>
+                        <button 
+                            onClick={() => window.open("https://t.me/mandarin_admin", "_blank")}
+                            className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-amber-500/25 transition-all active:scale-[0.98]"
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            {t('beta.action', 'Adminga yozish')}
+                        </button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+});
+
 // --- Premium Tab Component ---
 const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
     const isHome = activeTab === "home";
     const dark = useDarkMode();
+    const { t } = useTranslation();
 
-    // Indicator styles via inline to guarantee visibility in both modes
     const indicatorStyle: React.CSSProperties = dark
         ? {
             position: "absolute",
@@ -510,13 +466,10 @@ const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setAc
 
     return (
         <div className="relative mt-14 mb-6 z-10">
-            {/* Outer container */}
             <div className="relative flex rounded-2xl p-1 gap-1" style={wrapperStyle}>
 
-                {/* Animated sliding indicator — inline styles, no Tailwind compound classes */}
                 <div style={indicatorStyle} />
 
-                {/* Home Tab */}
                 <button
                     onClick={() => setActiveTab("home")}
                     className={`
@@ -535,10 +488,9 @@ const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setAc
                             strokeWidth: isHome ? 2.5 : 2,
                         }}
                     />
-                    <span>Bosh sahifa</span>
+                    <span>{t('dashboard.tabs.home')}</span>
                 </button>
 
-                {/* Track Tab */}
                 <button
                     onClick={() => setActiveTab("track")}
                     className={`
@@ -573,11 +525,10 @@ const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setAc
                             strokeWidth: !isHome ? 2.5 : 2,
                         }}
                     />}
-                    <span>{activeTab === 'track' ? 'Trek-kod' : activeTab === 'schedule' ? 'Jadval' : 'Trek-kod'}</span>
+                    <span>{activeTab === 'track' ? t('dashboard.tabs.track') : activeTab === 'schedule' ? t('dashboard.tabs.schedule') : activeTab === 'request' ? t('dashboard.tabs.request') : activeTab === 'delivery_history' ? t('dashboard.tabs.history') : t('dashboard.tabs.track')}</span>
                 </button>
             </div>
 
-            {/* Bottom glow accent — dark only, shifts with active tab */}
             {dark && (
                 <div
                     style={{
@@ -595,46 +546,72 @@ const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setAc
     );
 });
 
+const PageLoadingFallback = memo(() => {
+    const { t } = useTranslation();
+    return (
+        <div className="min-h-[60vh] flex flex-col items-center justify-center w-full animate-in fade-in duration-300">
+            <div className="w-16 h-16 relative flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-4 border-gray-100 dark:border-white/5"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 dark:border-t-amber-500 dark:border-r-amber-500 animate-spin"></div>
+                <Plane className="w-6 h-6 text-blue-500 dark:text-amber-500 animate-pulse absolute" />
+            </div>
+            <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400 animate-pulse">
+                {t('dashboard.loading')}
+            </p>
+        </div>
+    );
+});
 
-
-
-
-// --- Lazy Load Components ---
 const ChinaAddressModal = lazy(() => import('../components/modals/ChinaAddressModal'));
+const MakePaymentModal = lazy(() => import('../components/modals/MakePaymentModal'));
 const FlightSchedulePage = lazy(() => import('../components/pages/FlightSchedulePage'));
+const DeliveryRequestPage = lazy(() => import('../components/pages/DeliveryRequestPage'));
+const DeliveryHistoryPage = lazy(() => import('../components/pages/DeliveryHistoryPage'));
+const CalculatorModal = lazy(() => import('../components/modals/CalculatorModal'));
+const ProhibitedItemsModal = lazy(() => import('../components/modals/ProhibitedItemsModal'));
 
-// --- Main Component ---
-export default function Dashboard() {
+interface DashboardProps {
+    onNavigateToReports?: () => void;
+    onNavigateToHistory?: () => void;
+}
+
+export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: DashboardProps) {
     const [activeTab, setActiveTab] = useState("home");
-    const [initialTrackView, setInitialTrackView] = useState<'search' | 'history'>('search');
+    const [initialTrackView] = useState<'search' | 'history'>('search');
     const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
+    const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+    const [isProhibitedModalOpen, setIsProhibitedModalOpen] = useState(false);
+    const { t } = useTranslation();
+
+    const sortedCarouselItems = useMemo(() => {
+        const ads = CAROUSEL_ITEMS.filter(i => i.type === "ad").sort((a, b) => a.id - b.id);
+        const features = CAROUSEL_ITEMS.filter(i => i.type === "feature").sort((a, b) => a.id - b.id);
+        return [...ads, ...features];
+    }, []);
+    
     const touchStartX = useRef<number | null>(null);
     const touchStartY = useRef<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isPaused, setIsPaused] = useState(false);
 
-    // --- Auto-scroll Logic ---
     useEffect(() => {
-        // If not home or paused by interaction, don't auto-scroll
         if (activeTab !== "home" || isPaused) return;
 
         const interval = setInterval(() => {
             if (scrollRef.current) {
                 const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
 
-                // If reasonably close to the end, snap back to start
                 const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 50;
 
                 if (isAtEnd) {
                     scrollRef.current.scrollTo({ left: 0, behavior: "smooth" });
                 } else {
-                    // Scroll by ~ one card width (assuming ~85% width on mobile or just partial)
-                    // We'll scroll by half the container width to be safe for snapping
                     scrollRef.current.scrollBy({ left: clientWidth * 0.6, behavior: "smooth" });
                 }
             }
-        }, 4000); // 4 seconds
+        }, 4000); 
 
         return () => clearInterval(interval);
     }, [activeTab, isPaused]);
@@ -642,7 +619,7 @@ export default function Dashboard() {
     const onTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.targetTouches[0].clientX;
         touchStartY.current = e.targetTouches[0].clientY;
-        setIsPaused(true); // Pause auto-scroll on touch
+        setIsPaused(true); 
     };
 
     const onTouchEnd = (e: React.TouchEvent) => {
@@ -655,14 +632,10 @@ export default function Dashboard() {
         const distanceY = touchStartY.current - touchEndY;
         const minSwipeDistance = 50;
 
-        // Check if horizontal swipe dominant (horizontal distance > vertical distance)
-        // to prevent accidental tab switch during scroll
         if (Math.abs(distanceX) > Math.abs(distanceY)) {
-            // Swipe Left (Home -> Track)
             if (distanceX > minSwipeDistance) {
                 setActiveTab("track");
             }
-            // Swipe Right (Track -> Home)
             if (distanceX < -minSwipeDistance) {
                 setActiveTab("home");
             }
@@ -671,33 +644,36 @@ export default function Dashboard() {
         touchStartX.current = null;
         touchStartY.current = null;
 
-        // Resume auto-scroll after a delay
         setTimeout(() => setIsPaused(false), 3000);
     };
 
     const handleActionClick = (id: string) => {
-        if (id === 'history') {
-            setInitialTrackView('history');
-            setActiveTab('track');
+        if (id === 'calculator') {
+        setIsCalculatorOpen(true);
+        return;
+        } else if (id === 'history') {
+            onNavigateToHistory?.();
+            return;
         } else if (id === 'china') {
             setIsChinaModalOpen(true);
             return;
         } else if (id === 'schedule') {
             setActiveTab('schedule');
             return;
+        } else if (id === 'request') {
+            setActiveTab('request');
+            return;
+        } else if (id === 'delivery_history') {
+            setActiveTab('delivery_history');
+            return;
+        } else if (id === 'payment') {
+            setIsPaymentModalOpen(true);
+            return;
+        } else if (id === 'report') {
+            onNavigateToReports?.();
+            return;
         } else {
-            // Assuming `toast` is defined elsewhere or this is a placeholder for a notification system
-            // The original code had `console.log("Action clicked:", id);` here.
-            // The provided snippet implies a `toast.info` call for other actions.
-            // I'm placing it as the final fallback.
-            // If `toast` is not defined, this line will cause an error.
-            // Please ensure `toast` is imported/defined if this is the intended behavior.
-            // For now, I'll assume it's available or a placeholder.
-            // If not, it should revert to `console.log`.
-            // Given the instruction is only to add the 'schedule' case,
-            // and the snippet includes `toast.info` as a general fallback,
-            // I'll include it as the new default fallback.
-            toast.info(`${id} tanlandi (Tez orada...)`);
+            toast.info(t('dashboard.toast.comingSoon', { id }));
         }
     };
 
@@ -707,18 +683,19 @@ export default function Dashboard() {
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
         >
-
-            {/* Unique Background — replaces the old blue/purple blobs */}
             <UniqueBackground />
 
-            <div className="relative z-10 max-w-4xl mx-auto px-4 pt-4 sm:pt-8">
+            <div className="relative z-10 max-w-4xl mx-auto px-4 pt-12 sm:pt-16">
+                
+                {/* Yopiladigan Beta Badge Shu Yerga Qo'yildi */}
+                
+                <BetaBadge />
 
-                {/* Premium Header Tabs */}
                 <HeaderTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
 
                 {activeTab === 'schedule' && (
-                    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black/95 animate-pulse" />}>
+                    <Suspense fallback={<PageLoadingFallback />}>
                         <FlightSchedulePage
                             onBack={() => setActiveTab('home')}
                             onNavigateToTrack={() => setActiveTab('track')}
@@ -726,37 +703,124 @@ export default function Dashboard() {
                     </Suspense>
                 )}
 
+                {activeTab === 'request' && (
+                    <Suspense fallback={<PageLoadingFallback />}>
+                        <DeliveryRequestPage
+                            onBack={() => setActiveTab('home')}
+                            onNavigateToProfile={() => {/* Handle profile navigation if needed */}}
+                            onNavigateToHistory={() => setActiveTab('delivery_history')}
+                        />
+                    </Suspense>
+                )}
+
+                {activeTab === 'delivery_history' && (
+                    <Suspense fallback={<PageLoadingFallback />}>
+                        <DeliveryHistoryPage onBack={() => setActiveTab('home')} />
+                    </Suspense>
+                )}
+
                 {activeTab === "home" ? (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                        {/* Hero Carousel */}
                         <section>
-                            <h2 className="text-lg font-bold mb-4 ml-1 flex items-center gap-2">
-                                <span className="w-1 h-5 bg-blue-500 rounded-full inline-block"></span>
-                                Muhim ma'lumotlar
-                            </h2>
+                            <div className="flex items-center justify-between mb-4 ml-1">
+                                <h2 className="text-lg font-bold flex items-center gap-2">
+                                    <span className="w-1 h-5 bg-blue-500 rounded-full inline-block"></span>
+                                    {t('dashboard.sections.important')}
+                                </h2>
+
+                                <div className="hidden md:flex items-center gap-2">
+                                    <button
+                                        onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })}
+                                        className="p-1.5 rounded-full bg-gray-200 dark:bg-white/10 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 transition-colors active:scale-95"
+                                    >
+                                        <ChevronLeft className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })}
+                                        className="p-1.5 rounded-full bg-gray-200 dark:bg-white/10 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 transition-colors active:scale-95"
+                                    >
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+
                             <div
                                 ref={scrollRef}
-                                className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide lg:grid lg:grid-cols-4 lg:mx-0 lg:px-0 lg:pb-0 lg:gap-5"
+                                className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide lg:mx-0 lg:px-0 lg:pb-4"
                                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                                 onTouchStart={(e) => { e.stopPropagation(); setIsPaused(true); }}
                                 onTouchEnd={(e) => { e.stopPropagation(); setTimeout(() => setIsPaused(false), 3000); }}
+                                onMouseEnter={() => setIsPaused(true)}
+                                onMouseLeave={() => setIsPaused(false)}
                             >
-                                {CAROUSEL_ITEMS.map((item) => (
-                                    <CarouselCard key={item.id} item={item} />
+                                {sortedCarouselItems.map((item) => (
+                                    <div 
+                                        key={item.id} 
+                                        className="group contents cursor-pointer" 
+                                        onClick={() => {
+                                            if (item.id === 1) setIsProhibitedModalOpen(true);
+                                        }}
+                                    > 
+                                        <CarouselCard item={item} />
+                                    </div>
                                 ))}
                             </div>
                         </section>
 
-                        {/* Main Action Grid */}
+                        <section className="mb-4">
+                            <div className="flex items-center justify-between mb-3 ml-1 mr-1">
+                                <h2 className="text-lg font-bold flex items-center gap-2">
+                                    <span className="w-1 h-5 bg-emerald-500 rounded-full inline-block"></span>
+                                    {t('dashboard.sections.reportsAndPayments')}
+                                </h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                <button
+                                    onClick={onNavigateToReports}
+                                    className="relative overflow-hidden rounded-3xl p-3 sm:p-4 text-left border border-white/15 bg-white/80 dark:bg-white/5 backdrop-blur-xl shadow-lg transition hover:-translate-y-[2px] active:scale-[0.99]"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-br from-amber-400/30 via-orange-400/10 to-transparent dark:from-amber-500/30 dark:via-orange-500/10" />
+                                    <div className="absolute inset-0 pointer-events-none opacity-25 blur-3xl bg-amber-200/60 dark:bg-amber-500/30" />
+
+                                    <div className="relative flex flex-col items-center text-center gap-2 sm:gap-3">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center bg-white/70 dark:bg-white/10 text-amber-600 dark:text-amber-300 shadow-inner shrink-0">
+                                            <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+                                        </div>
+                                        <div className="space-y-0.5 min-w-0 w-full">
+                                            <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">{t('dashboard.sections.myCargo')}</h3>
+                                            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300/70 leading-snug line-clamp-2">{t('dashboard.sections.cargoReport')}</p>
+                                        </div>
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={onNavigateToHistory}
+                                    className="relative overflow-hidden rounded-3xl p-3 sm:p-4 text-left border border-white/15 bg-white/80 dark:bg-white/5 backdrop-blur-xl shadow-lg transition hover:-translate-y-[2px] active:scale-[0.99]"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-br from-sky-500/25 via-indigo-500/15 to-transparent dark:from-sky-500/25 dark:via-indigo-500/20" />
+                                    <div className="absolute inset-0 pointer-events-none opacity-25 blur-3xl bg-sky-200/50 dark:bg-indigo-600/25" />
+
+                                    <div className="relative flex flex-col items-center text-center gap-2 sm:gap-3">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center bg-white/70 dark:bg-white/10 text-sky-600 dark:text-indigo-200 shadow-inner shrink-0">
+                                            <ReceiptText className="w-5 h-5 sm:w-6 sm:h-6" />
+                                        </div>
+                                        <div className="space-y-0.5 min-w-0 w-full">
+                                            <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">{t('dashboard.sections.paymentHistory')}</h3>
+                                            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300/70 leading-snug line-clamp-2">{t('dashboard.sections.receipts')}</p>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        </section>
+
                         <section className="mb-6">
                             <div className="flex items-center justify-between mb-4 ml-1 mr-1">
                                 <h2 className="text-lg font-bold flex items-center gap-2">
                                     <span className="w-1 h-5 bg-amber-500 rounded-full inline-block"></span>
-                                    Xizmatlar
+                                    {t('dashboard.sections.services')}
                                 </h2>
-
-                                {/* Notification Box */}
                                 <NotificationCenter />
                             </div>
 
@@ -764,14 +828,19 @@ export default function Dashboard() {
                                 {MAIN_ACTIONS.map((action) => (
                                     <ActionButton
                                         key={action.id}
-                                        item={action}
+                                        item={{
+                                            ...action,
+                                            label: t(action.labelKey),
+                                            desc: t(action.descKey),
+                                            badge: t(action.badgeKey),
+                                            actionLabel: t(action.actionLabelKey),
+                                        }}
                                         onClick={() => handleActionClick(action.id)}
                                     />
                                 ))}
                             </div>
                         </section>
 
-                        {/* Feedback Footer */}
                         <section className="pb-8 px-1">
                             <button
                                 className="
@@ -780,26 +849,25 @@ export default function Dashboard() {
                                     border border-gray-200 dark:border-white/10
                                     active:scale-[0.98] transition-all duration-200 group shadow-sm hover:shadow-md
                                 "
-                                onClick={() => window.open("https://t.me/java_strong", "_blank")}
+                                onClick={() => window.open("https://t.me/mandarin_admin", "_blank")}
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-full bg-white dark:bg-white/10 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform text-blue-500 dark:text-blue-400">
                                         <MessageSquare className="w-5 h-5" />
                                     </div>
                                     <div className="text-left">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Taklif va shikoyatlar</h3>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">{t('dashboard.sections.feedback')}</h3>
                                         <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
-                                            Biz bilan bog'laning
+                                            {t('dashboard.sections.contactUs')}
                                         </p>
                                     </div>
                                 </div>
-
                                 <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 group-hover:translate-x-1 transition-transform" />
                             </button>
 
                             <div className="text-center mt-6">
                                 <p className="text-[10px] text-gray-300 dark:text-white/10 font-mono">
-                                    v1.0.2
+                                    v2.0
                                 </p>
                             </div>
                         </section>
@@ -810,11 +878,22 @@ export default function Dashboard() {
                 ) : null
                 }
 
-                {/* --- Modals --- */}
                 <Suspense fallback={null}>
                     <ChinaAddressModal
                         isOpen={isChinaModalOpen}
                         onClose={() => setIsChinaModalOpen(false)}
+                    />
+                    <MakePaymentModal
+                        isOpen={isPaymentModalOpen}
+                        onClose={() => setIsPaymentModalOpen(false)}
+                    />
+                    <CalculatorModal
+                        isOpen={isCalculatorOpen}
+                        onClose={() => setIsCalculatorOpen(false)}
+                    />
+                    <ProhibitedItemsModal
+                        isOpen={isProhibitedModalOpen}
+                        onClose={() => setIsProhibitedModalOpen(false)}
                     />
                 </Suspense>
 

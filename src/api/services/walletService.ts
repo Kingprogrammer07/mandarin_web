@@ -1,8 +1,22 @@
 import { apiClient, apiClientFormData } from '@/api/client';
 
+export interface PaymentReminderItem {
+    flight: string;
+    total: number;
+    paid: number;
+    remaining: number;
+    deadline: string;
+    is_partial: boolean;
+}
+
 export interface WalletBalanceResponse {
-    balance: number;
+    wallet_balance: number;
+    debt: number;
     currency: string;
+    reminders: PaymentReminderItem[];
+    warning_text?: string;
+    /** @deprecated Use wallet_balance and debt separately. Computed as wallet_balance + debt for legacy compat. */
+    balance?: number;
 }
 
 export interface CardResponse {
@@ -54,7 +68,10 @@ export const walletService = {
     // Balance
     getWalletBalance: async (): Promise<WalletBalanceResponse> => {
         const response = await apiClient.get<WalletBalanceResponse>('/api/v1/wallet/balance');
-        return response.data;
+        const data = response.data;
+        // Compute legacy balance fallback
+        data.balance = (data.wallet_balance ?? 0) + (data.debt ?? 0);
+        return data;
     },
 
     // Cards

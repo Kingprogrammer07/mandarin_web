@@ -90,6 +90,7 @@ export const useLogout = () => {
         mutationFn: logoutUser,
         onSuccess: () => {
             queryClient.clear();
+            sessionStorage.removeItem('access_token');
             // Navigate to login or reload
             window.location.href = '/auth/login';
         }

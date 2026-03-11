@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/hooks/useProfile';
 import { reportService, type ReportResponse } from '@/api/services/reportService';
@@ -28,6 +28,8 @@ import { format } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import MakePaymentModal from '@/components/modals/MakePaymentModal';
+import { useTranslation } from 'react-i18next';
 
 // --- Types ---
 
@@ -42,11 +44,14 @@ interface ReportHistoryItemProps {
     report: ReportResponse;
     onPay: (amount: number) => void;
     onTrackClick: (code: string) => void;
+    onImageClick: (url: string) => void;
 }
 
 // --- Components ---
 
-const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => (
+const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
+    const { t } = useTranslation();
+    return (
     <motion.div
         layoutId={`flight-${flightName}`}
         onClick={onClick}
@@ -66,19 +71,21 @@ const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => (
             </div>
 
             <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Reys</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">{t('reports.flight')}</p>
                 <h3 className="text-2xl font-black text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors tracking-tight">
                     {flightName}
                 </h3>
             </div>
         </CardContent>
     </motion.div>
-));
+    );
+});
 
-const ReportHistoryItem = memo(({ report, onPay, onTrackClick }: ReportHistoryItemProps) => {
+const ReportHistoryItem = memo(({ report, onPay, onTrackClick, onImageClick }: ReportHistoryItemProps) => {
+    const { t } = useTranslation();
     const sentDate = report.is_sent_web_date
         ? format(new Date(report.is_sent_web_date), 'dd MMMM, HH:mm', { locale: uz })
-        : 'Noma\'lum';
+        : t('reports.unknownDate');
 
     return (
         <motion.div
@@ -93,7 +100,7 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick }: ReportHistoryIt
                         <Package className="w-5 h-5" />
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">Yuk hisoboti</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{t('reports.cargoReport')}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                             <Calendar className="w-3 h-3" /> {sentDate}
                         </p>
@@ -113,22 +120,22 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick }: ReportHistoryIt
                     {report.payment_status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> :
                         report.payment_status === 'partial' ? <Clock className="w-3 h-3" /> :
                             <XCircle className="w-3 h-3" />}
-                    {report.payment_status === 'paid' ? "To'langan" :
-                        report.payment_status === 'partial' ? "Qisman" : "To'lanmagan"}
+                    {report.payment_status === 'paid' ? t('reports.status.paid') :
+                        report.payment_status === 'partial' ? t('reports.status.partial') : t('reports.status.unpaid')}
                 </div>
             </div>
 
             {/* Info Grid */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-50 dark:bg-black/20 rounded-2xl p-3">
-                    <span className="text-[10px] uppercase text-gray-400 font-semibold">Vazn</span>
+                    <span className="text-[10px] uppercase text-gray-400 font-semibold">{t('reports.weight')}</span>
                     <div className="flex items-center gap-1 text-gray-900 dark:text-white font-bold text-base mt-0.5">
                         <Scale className="w-4 h-4 text-orange-500" />
                         {report.total_weight} <span className="text-xs font-normal text-gray-500">kg</span>
                     </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-black/20 rounded-2xl p-3">
-                    <span className="text-[10px] uppercase text-gray-400 font-semibold">Jami Narx</span>
+                    <span className="text-[10px] uppercase text-gray-400 font-semibold">{t('reports.totalPrice')}</span>
                     <div className="flex items-start gap-1 text-gray-900 dark:text-white font-bold text-base mt-0.5">
                         <DollarSign className="w-4 h-4 text-emerald-500 mt-1" />
                         <div className="flex flex-col">
@@ -144,10 +151,35 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick }: ReportHistoryIt
                 </div>
             </div>
 
+            {/* Photos Grid */}
+            {report.photo_file_ids && report.photo_file_ids.length > 0 && (
+                <div className="mb-4">
+                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-2">{t('reports.photos')}</p>
+                    <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+                        {report.photo_file_ids.map((photoId, i) => (
+                            <div 
+                                key={i} 
+                                onClick={() => onImageClick(photoId)}
+                                className="flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 relative group cursor-pointer"
+                            >
+                                <img
+                                    src={`${photoId}`}
+                                    alt={`Cargo photo ${i + 1}`}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/png?text=Rasm+Topilmadi';
+                                    }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Track Codes */}
             {report.track_codes.length > 0 && (
                 <div>
-                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-2">Trek-kodlar</p>
+                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-2">{t('reports.trackCodes')}</p>
                     <div className="flex flex-wrap gap-2">
                         {report.track_codes.map((code, i) => (
                             <button
@@ -173,7 +205,7 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick }: ReportHistoryIt
                     onClick={() => onPay(report.total_price_uzs - report.paid_amount)}
                 >
                     <CreditCard className="w-4 h-4 mr-2" />
-                    {report.payment_status === 'unpaid' ? "To'lov qilish" : "Qolganini to'lash"}
+                    {report.payment_status === 'unpaid' ? t('reports.pay') : t('reports.payRemaining')}
                     <span className="ml-1 opacity-90 text-xs font-normal">
                         ({(report.expected_amount - report.paid_amount).toLocaleString()} so'm)
                     </span>
@@ -182,6 +214,43 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick }: ReportHistoryIt
         </motion.div>
     );
 });
+
+// --- Image Preview Modal ---
+interface ImagePreviewModalProps {
+    src: string | null;
+    onClose: () => void;
+}
+
+const ImagePreviewModal = ({ src, onClose }: ImagePreviewModalProps) => (
+    <AnimatePresence>
+        {src && (
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 cursor-zoom-out"
+            >
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors z-50"
+                >
+                    <XCircle className="w-8 h-8" />
+                </button>
+                <motion.img
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    src={src}
+                    alt="Preview"
+                    className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl cursor-default"
+                    onClick={(e) => e.stopPropagation()}
+                />
+            </motion.div>
+        )}
+    </AnimatePresence>
+);
 
 // --- Custom Drawer Component ---
 interface BottomDrawerProps {
@@ -224,6 +293,7 @@ const BottomDrawer = ({ open, onClose, children }: BottomDrawerProps) => (
 
 export default function UserReportsPage() {
     const { data: user, isLoading: isUserLoading, isError: isUserError } = useProfile();
+    const { t } = useTranslation();
 
     // State
     const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
@@ -233,6 +303,13 @@ export default function UserReportsPage() {
     const [selectedTrackCode, setSelectedTrackCode] = useState<string | null>(null);
     const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
     const [isTrackLoading, setIsTrackLoading] = useState(false);
+
+    // Payment Modal State
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+    const [paymentFlightName, setPaymentFlightName] = useState<string | null>(null);
+
+    // Image Preview State
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     // --- Data Fetching (TanStack Query) ---
 
@@ -283,16 +360,33 @@ export default function UserReportsPage() {
             setTrackData(data);
         } catch (error) {
             console.error("Track error", error);
-            toast.error("Trek-kod ma'lumotlari topilmadi");
+            toast.error(t('reports.trackCodeNotFound'));
             // Don't close immediately, let user see empty state or error
         } finally {
             setIsTrackLoading(false);
         }
     };
 
-    const handlePay = (amount: number) => {
-        toast.info(`Tez orada: ${amount.toLocaleString()} so'm to'lov funksiyasi`);
-    };
+    const openPaymentModal = useCallback(() => {
+        if (!selectedFlight) {
+            toast.error(t('reports.noFlightSelected'));
+            return;
+        }
+        setPaymentFlightName(selectedFlight);
+        setIsPaymentOpen(true);
+    }, [selectedFlight, t]);
+
+    const handlePay = useCallback(
+        () => openPaymentModal(),
+        [openPaymentModal],
+    ) as (amount: number) => void;
+
+    const handlePaymentClose = useCallback(() => {
+        setIsPaymentOpen(false);
+        setPaymentFlightName(null);
+        // Refresh history after payment
+        if (selectedFlight) refetchHistory();
+    }, [selectedFlight, refetchHistory]);
 
     // --- Render Helpers ---
 
@@ -310,9 +404,9 @@ export default function UserReportsPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] pt-24 text-center">
                 <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-                <h3 className="text-lg font-bold">Xatolik yuz berdi</h3>
+                <h3 className="text-lg font-bold">{t('reports.errorTitle')}</h3>
                 <Button onClick={() => window.location.reload()} className="mt-4" variant="outline">
-                    <RefreshCw className="w-4 h-4 mr-2" /> Qayta urinish
+                    <RefreshCw className="w-4 h-4 mr-2" /> {t('reports.retry')}
                 </Button>
             </div>
         );
@@ -334,15 +428,15 @@ export default function UserReportsPage() {
                             <div className="p-2 rounded-full bg-white/50 dark:bg-white/5 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors">
                                 <ChevronLeft className="w-5 h-5" />
                             </div>
-                            <span className="font-bold text-lg">Ortga</span>
+                            <span className="font-bold text-lg">{t('reports.back')}</span>
                         </button>
                     ) : (
                         <div>
                             <h1 className="text-3xl font-black bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
-                                Mening Yuklarim
+                                {t('reports.title')}
                             </h1>
                             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                Barcha reyslar tarixi
+                                {t('reports.subtitle')}
                             </p>
                         </div>
                     )}
@@ -370,17 +464,17 @@ export default function UserReportsPage() {
                             {isLoadingFlights ? (
                                 [1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full rounded-3xl bg-gray-200 dark:bg-white/5" />)
                             ) : flights.length > 0 ? (
-                                flights.map(flight => (
+                                flights.map(flightName => (
                                     <FlightCard
-                                        key={flight}
-                                        flightName={flight}
-                                        onClick={() => setSelectedFlight(flight)}
+                                        key={flightName}
+                                        flightName={flightName}
+                                        onClick={() => setSelectedFlight(flightName)}
                                     />
                                 ))
                             ) : (
                                 <div className="text-center py-20 text-gray-400">
                                     <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                    <p>Hozircha hisobotlar yo'q</p>
+                                    <p>{t('reports.noReports')}</p>
                                 </div>
                             )}
                         </motion.div>
@@ -396,7 +490,7 @@ export default function UserReportsPage() {
                             {/* Detail Title */}
                             <div className="flex items-center gap-3 mb-2">
                                 <span className="w-1.5 h-6 bg-orange-500 rounded-full" />
-                                <h2 className="text-xl font-bold">{selectedFlight} - Tafsilotlar</h2>
+                                <h2 className="text-xl font-bold">{t('reports.details', { flight: selectedFlight })}</h2>
                             </div>
 
                             {isLoadingHistory ? (
@@ -408,22 +502,30 @@ export default function UserReportsPage() {
                                         report={item}
                                         onPay={handlePay}
                                         onTrackClick={handleTrackClick}
+                                        onImageClick={setPreviewImage}
                                     />
                                 ))
                             ) : (
-                                <div className="text-center py-10 opacity-50">Ma'lumot topilmadi</div>
+                                <div className="text-center py-10 opacity-50">{t('reports.notFound')}</div>
                             )}
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
 
+            {/* Payment Modal */}
+            <MakePaymentModal
+                isOpen={isPaymentOpen}
+                onClose={handlePaymentClose}
+                preselectedFlightName={paymentFlightName}
+            />
+
             {/* Custom Bottom Drawer for Track Details */}
             <BottomDrawer open={!!selectedTrackCode} onClose={() => setSelectedTrackCode(null)}>
                 <div className="text-left mb-4">
                     <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
                         <Search className="w-5 h-5 text-orange-500" />
-                        Qidiruv Natijasi
+                        {t('reports.searchResult')}
                     </h3>
                 </div>
 
@@ -437,10 +539,16 @@ export default function UserReportsPage() {
                 ) : (
                     <div className="flex flex-col items-center justify-center py-10 text-gray-400">
                         <Search className="w-16 h-16 opacity-20 mb-4" />
-                        <p>Ma'lumot topilmadi</p>
+                        <p>{t('reports.notFound')}</p>
                     </div>
                 )}
             </BottomDrawer>
+
+            {/* Image Preview Modal */}
+            <ImagePreviewModal
+                src={previewImage}
+                onClose={() => setPreviewImage(null)}
+            />
         </div>
     );
 }

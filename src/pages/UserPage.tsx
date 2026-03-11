@@ -1,13 +1,13 @@
 import { useProfile, useLogout } from '@/hooks/useProfile';
 import { ProfileHero } from '@/components/profile/ProfileHero';
 import { QuickActions } from '@/components/profile/QuickActions';
-import { PaymentReminders } from '@/components/profile/PaymentReminders';
 import { PersonalInfo } from '@/components/profile/PersonalInfo';
 import { SessionHistory } from '@/components/profile/SessionHistory';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogOut, RefreshCw, UserCog, FileImage, ShieldCheck, X } from 'lucide-react';
 import { useState, useCallback, lazy, Suspense, memo, useTransition, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { UniqueBackground } from '@/components/ui/UniqueBackground';
@@ -18,8 +18,15 @@ import { ExtraPassportsModal } from '@/components/profile/ExtraPassportsModal';
 // Lazy load the heavy modal
 const EditProfileModal = lazy(() => import('@/components/profile/EditProfileModal').then(module => ({ default: module.EditProfileModal })));
 
+const isApiError = (err: unknown): err is { status: number } => {
+   if (typeof err !== 'object' || err === null) return false;
+   const status = (err as { status?: unknown }).status;
+   return typeof status === 'number';
+};
+
 // --- Passport Images Component ---
 const PassportImages = memo(({ images }: { images: string[] }) => {
+   const { t } = useTranslation();
    const [selectedImage, setSelectedImage] = useState<string | null>(null);
    const [mounted, setMounted] = useState(false);
 
@@ -50,9 +57,9 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
             <div className="w-12 h-12 bg-gray-100 dark:bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-gray-400 dark:text-gray-500">
                <ShieldCheck className="w-6 h-6" />
             </div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Hujjatlar yo'q</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{t('profile.documents.noDocuments')}</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-               Tasdiqlangan pasport rasmlari mavjud emas.
+               {t('profile.documents.noDocumentsDesc')}
             </p>
          </div>
       );
@@ -63,7 +70,7 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
          <div className="space-y-3">
             <h3 className="text-sm font-bold text-gray-900 dark:text-gray-200 ml-1 flex items-center gap-2">
                <span className="w-1 h-4 bg-emerald-500 rounded-full inline-block"></span>
-               Shaxsiy Hujjatlar
+               {t('profile.documents.title')}
             </h3>
 
             <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1 snap-x scrollbar-hide">
@@ -145,16 +152,26 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
    );
 });
 PassportImages.displayName = 'PassportImages';
+
 const UserPage = () => {
-   const { data: user, isLoading, isError, refetch } = useProfile();
+   const { data: user, isLoading, isError, refetch, error } = useProfile();
    const { mutate: logout } = useLogout();
+   const { t } = useTranslation();
    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
    const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
    const [isPassportsModalOpen, setIsPassportsModalOpen] = useState(false);
+   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
    const [isModalLoading, startTransition] = useTransition();
 
+   useEffect(() => {
+      if (isError && isApiError(error) && error.status === 403) {
+         window.location.href = '/auth/login';
+      }
+   }, [isError, error]);
+
    const handleLogout = useCallback(() => {
+      setIsLogoutModalOpen(false);
       logout();
    }, [logout]);
 
@@ -184,9 +201,9 @@ const UserPage = () => {
                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-6 animate-pulse mx-auto">
                   <LogOut className="h-8 w-8 text-red-500" />
                </div>
-               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Yuklanmadi</h2>
+               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('profile.error.title')}</h2>
                <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto">
-                  Ma'lumotlarni yuklashda xatolik yuz berdi. Internetni tekshiring.
+                  {t('profile.error.description')}
                </p>
                <Button
                   onClick={handleRefetch}
@@ -194,7 +211,7 @@ const UserPage = () => {
                   className="rounded-xl bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20"
                >
                   <RefreshCw className="mr-2 h-5 w-5" />
-                  Qayta urinish
+                  {t('profile.error.retry')}
                </Button>
             </div>
          </div>
@@ -220,7 +237,7 @@ const UserPage = () => {
                      <aside className="w-full md:col-span-5 lg:col-span-4 md:sticky md:top-8 self-start z-30">
                         {/* Hero Section - Glass Effect */}
                         <div className="relative overflow-hidden rounded-b-[2.5rem] md:rounded-[2.5rem] shadow-2xl border-b border-white/10 md:border md:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-xl">
-                           <ProfileHero user={user} />
+                           <ProfileHero user={user} onBalanceClick={() => setIsWalletModalOpen(true)} />
                         </div>
 
                         {/* Desktop Only: Quick Actions & Buttons moved here */}
@@ -241,18 +258,18 @@ const UserPage = () => {
                                  onClick={handleEditOpen}
                               >
                                  {isModalLoading ? <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> : <UserCog className="mr-2 h-5 w-5" />}
-                                 {isModalLoading ? "Yuklanmoqda..." : "Profilni Tahrirlash"}
+                                 {isModalLoading ? t('profile.edit.loading') : t('profile.editProfile')}
                               </Button>
                               <Button
                                  variant="destructive"
                                  className="w-full h-14 rounded-2xl text-lg font-medium shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all active:scale-95"
-                                 onClick={handleLogout}
+                                 onClick={() => setIsLogoutModalOpen(true)}
                               >
                                  <LogOut className="mr-2 h-5 w-5" />
-                                 Tizimdan Chiqish
+                                 {t('profile.logout')}
                               </Button>
                               <p className="text-center text-xs text-gray-400 mt-2">
-                                 Versiya 1.0.0 • Mandarin Cargo
+                                 {t('profile.version')}
                               </p>
                            </div>
                         </div>
@@ -277,8 +294,6 @@ const UserPage = () => {
                               <PassportImages images={user.passport_images} />
                            </div>
 
-                           <PaymentReminders />
-
                            <PersonalInfo user={user} />
 
                            <SessionHistory />
@@ -291,18 +306,18 @@ const UserPage = () => {
                                  onClick={handleEditOpen}
                               >
                                  {isModalLoading ? <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> : <UserCog className="mr-2 h-5 w-5" />}
-                                 {isModalLoading ? "Yuklanmoqda..." : "Profilni Tahrirlash"}
+                                 {isModalLoading ? t('profile.edit.loading') : t('profile.editProfile')}
                               </Button>
                               <Button
                                  variant="destructive"
                                  className="w-full h-14 rounded-2xl text-lg font-medium shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all active:scale-95"
-                                 onClick={handleLogout}
+                                 onClick={() => setIsLogoutModalOpen(true)}
                               >
                                  <LogOut className="mr-2 h-5 w-5" />
-                                 Tizimdan Chiqish
+                                 {t('profile.logout')}
                               </Button>
                               <p className="text-center text-xs text-gray-400 mt-4 pb-8">
-                                 Versiya 1.0.0 • Mandarin Cargo
+                                 {t('profile.version')}
                               </p>
                            </div>
                         </div>
@@ -333,6 +348,59 @@ const UserPage = () => {
                      />
                   )}
                </Suspense>
+
+               {/* Logout Confirmation Modal */}
+               <AnimatePresence>
+                  {isLogoutModalOpen && (
+                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        {/* Backdrop */}
+                        <motion.div
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: 1 }}
+                           exit={{ opacity: 0 }}
+                           onClick={() => setIsLogoutModalOpen(false)}
+                           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        
+                        {/* Modal Content */}
+                        <motion.div
+                           initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                           animate={{ opacity: 1, scale: 1, y: 0 }}
+                           exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                           className="relative w-full max-w-sm bg-white dark:bg-[#120e09] border border-gray-100 dark:border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden"
+                        >
+                           <div className="flex flex-col items-center text-center">
+                              <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+                                 <LogOut className="w-8 h-8 text-red-500" />
+                              </div>
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                                 {t('profile.logoutConfirm.title', 'Tizimdan chiqish')}
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                 {t('profile.logoutConfirm.description', 'Haqiqatan ham hisobingizdan chiqmoqchimisiz?')}
+                              </p>
+                              
+                              <div className="flex w-full gap-3">
+                                 <Button
+                                    variant="outline"
+                                    className="flex-1 h-12 rounded-xl bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10"
+                                    onClick={() => setIsLogoutModalOpen(false)}
+                                 >
+                                    {t('profile.logoutConfirm.cancel', 'Bekor qilish')}
+                                 </Button>
+                                 <Button
+                                    variant="destructive"
+                                    className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20"
+                                    onClick={handleLogout}
+                                 >
+                                    {t('profile.logoutConfirm.confirm', 'Chiqish')}
+                                 </Button>
+                              </div>
+                           </div>
+                        </motion.div>
+                     </div>
+                  )}
+               </AnimatePresence>
             </motion.div>
          </AnimatePresence>
       </div>
