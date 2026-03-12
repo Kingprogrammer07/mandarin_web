@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 interface NavigationBarProps {
   onStatisticsClick?: () => void;
   onVerificationClick?: () => void;
+  currentPage?: string;
 }
 
 
@@ -184,7 +185,7 @@ const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
 };
 
 // ─── MAIN NAVBAR ────────────────────────────────────────────────────────────
-export default function NavigationBar({ onStatisticsClick, onVerificationClick }: NavigationBarProps) {
+export default function NavigationBar({ onStatisticsClick, onVerificationClick, currentPage }: NavigationBarProps) {
   const { t } = useTranslation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -208,14 +209,8 @@ export default function NavigationBar({ onStatisticsClick, onVerificationClick }
   }, []);
 
   const forceLight = !isScrolled && (isProfilePage || isDark);
-
-  const is_show_statistics =
-    window.location.pathname !== '/auth/register' &&
-    window.location.pathname !== '/auth/login' &&
-    window.location.pathname !== '/user-hisob' &&
-    window.location.pathname !== '/user-reports' &&
-    window.location.pathname !== '/user-home' &&
-    window.location.pathname !== '/user-history';
+  const HIDDEN_PAGES = ['login', 'register', 'user-profile', 'user-home', 'user-home', 'user-reports', 'user-history'];
+  const is_show_statistics = !HIDDEN_PAGES.includes(currentPage ?? '');
 
   // ─── Inline style for scrolled dark bg ──────────────────────────────────
   // rgba(13,10,4,0.78) — Dashboard #0d0a04 bilan bir xil tona, biroz transparent

@@ -83,16 +83,14 @@ export const useSessionHistory = (page = 1) => {
     });
 };
 
-export const useLogout = () => {
+export const useLogout = (onLogout?: () => void) => {
     const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: logoutUser,
         onSuccess: () => {
             queryClient.clear();
             sessionStorage.removeItem('access_token');
-            // Navigate to login or reload
-            window.location.href = '/auth/login';
+            onLogout?.(); // ← callback, href yo'q
         }
     });
 };

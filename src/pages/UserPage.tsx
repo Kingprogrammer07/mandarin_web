@@ -18,12 +18,6 @@ import { ExtraPassportsModal } from '@/components/profile/ExtraPassportsModal';
 // Lazy load the heavy modal
 const EditProfileModal = lazy(() => import('@/components/profile/EditProfileModal').then(module => ({ default: module.EditProfileModal })));
 
-const isApiError = (err: unknown): err is { status: number } => {
-   if (typeof err !== 'object' || err === null) return false;
-   const status = (err as { status?: unknown }).status;
-   return typeof status === 'number';
-};
-
 // --- Passport Images Component ---
 const PassportImages = memo(({ images }: { images: string[] }) => {
    const { t } = useTranslation();
@@ -153,9 +147,9 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
 });
 PassportImages.displayName = 'PassportImages';
 
-const UserPage = () => {
-   const { data: user, isLoading, isError, refetch, error } = useProfile();
-   const { mutate: logout } = useLogout();
+const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
+   const { data: user, isLoading, isError, refetch } = useProfile();
+   const { mutate: logout } = useLogout(onLogout);
    const { t } = useTranslation();
    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -163,12 +157,6 @@ const UserPage = () => {
    const [isPassportsModalOpen, setIsPassportsModalOpen] = useState(false);
    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
    const [isModalLoading, startTransition] = useTransition();
-
-   useEffect(() => {
-      if (isError && isApiError(error) && error.status === 403) {
-         window.location.href = '/auth/login';
-      }
-   }, [isError, error]);
 
    const handleLogout = useCallback(() => {
       setIsLogoutModalOpen(false);

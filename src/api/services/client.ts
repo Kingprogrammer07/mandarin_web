@@ -127,7 +127,7 @@ export async function createClient(data: ClientCreateRequest): Promise<Client> {
   if (data.pinfl) formData.append('pinfl', data.pinfl);
   if (data.referrer_telegram_id) formData.append('referrer_telegram_id', data.referrer_telegram_id.toString());
   if (data.referrer_client_code) formData.append('referrer_client_code', data.referrer_client_code);
-
+  if (data.client_code) formData.append('client_code', data.client_code);
   // Passport images
   if (data.passport_images && data.passport_images.length > 0) {
     data.passport_images.forEach((file) => {

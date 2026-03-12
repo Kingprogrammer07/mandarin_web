@@ -247,9 +247,16 @@ function AppContent() {
     },
     [],
   );
-
+  const handleLogout = useCallback(() => {
+      setUserRole(null);
+      applyRoute({ page: 'login' }, null, 'replace');
+  }, [applyRoute]);
   // ── Initial auth check (runs once on mount) ──────────────────────────────
-
+  useEffect(() => {
+    window.addEventListener('auth:logout', handleLogout);
+    return () => window.removeEventListener('auth:logout', handleLogout);
+  }, [handleLogout]);
+  
   useEffect(() => {
     let cancelled = false;
 
@@ -382,6 +389,7 @@ function AppContent() {
       <NavigationBar
         onStatisticsClick={() => navigateToPage('statistics')}
         onVerificationClick={() => navigateToPage('verification-search')}
+        currentPage={currentPage}
       />
 
       {isVerificationPage && (
@@ -520,7 +528,7 @@ function AppContent() {
             />
           )}
 
-          {currentPage === 'user-profile' && <UserPage />}
+          {currentPage === 'user-profile' && <UserPage onLogout={handleLogout}/>}
 
           {currentPage === 'user-home' && (
             <UserHome

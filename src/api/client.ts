@@ -47,7 +47,7 @@ apiClient.interceptors.response.use(
       // Global 401/403 Error handler -> Logout & Redirect
       if (error.response.status === 401 || error.response.status === 403) {
         sessionStorage.removeItem('access_token');
-        window.location.href = '/auth/login';
+        window.dispatchEvent(new CustomEvent('auth:logout'));
         return Promise.reject(error);
       }
 
