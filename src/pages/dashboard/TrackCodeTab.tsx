@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, History, X, Loader2, AlertCircle } from "lucide-react";
 import { trackCargo } from "@/api/services/cargo";
@@ -19,15 +19,17 @@ interface HistoryItem {
 
 interface TrackCodeTabProps {
     initialView?: 'search' | 'history';
+    autoFocus?: boolean;
+    onFocusConsumed?: () => void;
 }
 
-export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabProps) {
+export default function TrackCodeTab({ initialView = 'search', autoFocus=false, onFocusConsumed }: TrackCodeTabProps) {
     const { t } = useTranslation();
     const [query, setQuery] = useState("");
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [activeSearch, setActiveSearch] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(initialView === 'history');
-
+    const inputRef = useRef<HTMLInputElement>(null);
     // Load history
     useEffect(() => {
         const saved = localStorage.getItem(HISTORY_KEY);
@@ -40,6 +42,18 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
             }
         }
     }, []);
+
+    // autoFocus effect
+    useEffect(() => {
+        if (autoFocus && inputRef.current) {
+            // Kichik delay - tab animation tugashini kutamiz
+            const timer = setTimeout(() => {
+                inputRef.current?.focus();
+                onFocusConsumed?.();
+            }, 350);
+            return () => clearTimeout(timer);
+        }
+    }, [autoFocus, onFocusConsumed]);
 
     const addToHistory = (code: string, flightName?: string) => {
         const cleanCode = code.trim().toUpperCase();
@@ -145,28 +159,55 @@ export default function TrackCodeTab({ initialView = 'search' }: TrackCodeTabPro
                 <>
 
                     {/* Search Input */}
-                    <form onSubmit={handleSearch} className="relative">
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value.toUpperCase())}
-                            placeholder={t('tracking.placeholder')}
-                            className="
-            w-full pl-12 pr-4 py-3 rounded-2xl border-none outline-none
-            bg-white dark:bg-white/10 shadow-lg shadow-purple-500/5 
-            text-lg font-mono placeholder:font-sans
-            focus:ring-2 focus:ring-purple-500/50 transition-all placeholder:text-sm
-          "
-                        />
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-4" />
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white p-2.5 rounded-xl transition-colors disabled:opacity-50"
-                        >
-                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                        </button>
-                    </form>
+{/* Search Input */}
+<form onSubmit={handleSearch} className="space-y-3">
+    {/* Input */}
+    <div className="relative">
+        <input
+            type="text"
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value.toUpperCase())}
+            placeholder={t('tracking.placeholder')}
+            className="
+                w-full pl-12 pr-4 py-3.5 rounded-2xl
+                bg-white dark:bg-white/10
+                border border-gray-200 dark:border-white/10
+                shadow-sm focus:shadow-md
+                text-lg font-mono placeholder:font-sans placeholder:text-sm
+                focus:outline-none focus:ring-2 focus:ring-purple-500/40
+                transition-all duration-200
+            "
+        />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+    </div>
+
+    {/* Search Button */}
+    <button
+        type="submit"
+        disabled={isLoading}
+        className="
+            w-full flex items-center justify-center gap-2.5
+            py-3.5 rounded-2xl
+            bg-purple-600 hover:bg-purple-700 active:scale-[0.98]
+            text-white font-semibold text-sm tracking-wide
+            shadow-md shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/30
+            transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
+        "
+    >
+        {isLoading ? (
+            <>
+                <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                <span>{t('tracking.searching')}</span>
+            </>
+        ) : (
+            <>
+                <Search className="w-4 h-4" />
+                <span>{t('tracking.search', 'Qidirish')}</span>
+            </>
+        )}
+    </button>
+</form>
 
                     {/* History Chips */}
                     {history.length > 0 && !data && (
