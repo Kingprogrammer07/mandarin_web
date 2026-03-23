@@ -85,7 +85,29 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
     const cleaned = normalizeNumber(value);
     if (cleaned === null) return;
 
-    setWeightKg(cleaned);
+    // Allow empty input while editing
+    if (cleaned === '') {
+      setWeightKg('');
+      if (errors.weight_kg) {
+        setErrors({ ...errors, weight_kg: '' });
+      }
+      return;
+    }
+
+    const numericValue = Number(cleaned);
+
+    // Prevent invalid numbers
+    if (isNaN(numericValue) || numericValue < 0) {
+      return;
+    }
+
+    // If 100 or more => force to 99
+    if (numericValue >= 100) {
+      setWeightKg('99');
+    } else {
+      setWeightKg(cleaned);
+    }
+
     if (errors.weight_kg) {
       setErrors({ ...errors, weight_kg: '' });
     }
