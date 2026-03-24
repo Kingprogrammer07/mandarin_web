@@ -1,14 +1,26 @@
-import { useState, useRef, useEffect } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  memo,
+} from 'react';
 import { offlineStorage } from '@/utils/offlineStorage';
 import { uploadPhoto } from '@/api/services/cargo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MultiPhotoUpload from '@/components/MultiPhotoUpload';
 import type { MultiPhotoUploadHandle } from '@/components/MultiPhotoUpload';
-import { ArrowLeft, Save, Camera } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Check, ChevronDown, MapPin, Search, X } from 'lucide-react';
+import { regions, DISTRICTS } from '@/lib/validation';
+import { AVIA_CODES, REGION_PREFIXES, getRegionAndDistrictFromCode } from '@/lib/aviaCodes';
 import { useToast } from '@/hooks/useToast';
 import { useTranslation } from 'react-i18next';
 
+/* ───────────────────────────────────────────
+   Types
+   ─────────────────────────────────────────── */
 interface AddCargoFormProps {
   flightName: string;
   onBack: () => void;
@@ -27,228 +39,498 @@ interface QueuedUpload {
   error?: string;
 }
 
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+/* ───────────────────────────────────────────
+   Lightweight Searchable Select (no radix overhead)
+   ─────────────────────────────────────────── */
+interface LightSelectProps {
+  options: SelectOption[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyText: string;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+}
+
+const LightSelect = memo(function LightSelect({
+  options,
+  value,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  emptyText,
+  disabled = false,
+  icon,
+}: LightSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedLabel = useMemo(
+    () => options.find((o) => o.value === value)?.label ?? '',
+    [options, value],
+  );
+
+  const filtered = useMemo(() => {
+    if (!search) return options;
+    const q = search.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, search]);
+
+  // close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler, { passive: true });
+    document.addEventListener('touchstart', handler, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  // focus search when opened — only on non-touch devices
+  useEffect(() => {
+    if (open && searchRef.current) {
+      // Delay focus to avoid virtual keyboard flash on mobile
+      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (!isMobile) {
+        requestAnimationFrame(() => searchRef.current?.focus());
+      }
+    }
+  }, [open]);
+
+  const handleSelect = useCallback(
+    (val: string) => {
+      onChange(val);
+      setOpen(false);
+      setSearch('');
+    },
+    [onChange],
+  );
+
+  const toggle = useCallback(() => {
+    if (disabled) return;
+    setOpen((p) => {
+      if (p) setSearch('');
+      return !p;
+    });
+  }, [disabled]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={disabled}
+        className={[
+          'flex items-center w-full h-12 px-3 rounded-xl text-left',
+          'border border-gray-200 dark:border-white/10',
+          'bg-gray-50 dark:bg-white/5',
+          'text-gray-900 dark:text-white',
+          'transition-colors duration-100',
+          'active:bg-orange-50 dark:active:bg-orange-500/10',
+          disabled ? 'opacity-40 pointer-events-none' : 'cursor-pointer',
+          open ? 'border-orange-500 ring-2 ring-orange-500/20' : '',
+        ].join(' ')}
+      >
+        {icon && <span className="mr-2 shrink-0">{icon}</span>}
+        <span className={`flex-1 truncate text-sm ${value ? 'font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+          {selectedLabel || placeholder}
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className={[
+            'absolute z-50 mt-1 w-full',
+            'bg-white dark:bg-[#1a1209]',
+            'border border-gray-200 dark:border-orange-500/20',
+            'rounded-xl shadow-lg shadow-black/10 dark:shadow-black/40',
+            'overflow-hidden',
+            'animate-in fade-in zoom-in-95 duration-100',
+          ].join(' ')}
+        >
+          {/* Search — only show if > 6 options */}
+          {options.length > 6 && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-white/5">
+              <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none"
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch('')} className="p-0.5">
+                  <X className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* List */}
+          <div ref={listRef} className="max-h-56 overflow-y-auto overscroll-contain py-1">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-4 text-sm text-gray-400 text-center">{emptyText}</p>
+            ) : (
+              filtered.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSelect(opt.value)}
+                  className={[
+                    'flex items-center w-full px-3 py-2.5 text-sm text-left',
+                    'transition-colors duration-75',
+                    'active:bg-orange-100 dark:active:bg-orange-500/20',
+                    opt.value === value
+                      ? 'text-orange-600 dark:text-orange-400 bg-orange-50/70 dark:bg-orange-500/10 font-medium'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5',
+                  ].join(' ')}
+                >
+                  <Check
+                    className={`w-4 h-4 mr-2 shrink-0 ${opt.value === value ? 'opacity-100 text-orange-500' : 'opacity-0'}`}
+                  />
+                  <span className="truncate">{opt.label}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+/* ───────────────────────────────────────────
+   Helpers
+   ─────────────────────────────────────────── */
 const normalizeNumber = (value: string): string | null => {
   const normalized = value.replace(/,/g, '.');
   const cleaned = normalized.replace(/[^\d.]/g, '');
-
   const parts = cleaned.split('.');
   if (parts.length > 2) return null;
-
-  // Smart decimal: if starts with '.', prefix with '0'
   if (cleaned.startsWith('.')) return '0' + cleaned;
-
   return cleaned;
 };
 
+const INPUT_CLS = [
+  'h-12 rounded-xl',
+  'border border-gray-200 dark:border-white/10',
+  'bg-gray-50 dark:bg-white/5',
+  'text-gray-900 dark:text-white',
+  'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+  'transition-colors duration-100',
+  'focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:ring-offset-0 focus:outline-none',
+].join(' ');
+
+const ERR_CLS = 'border-red-500 focus:border-red-500 focus:ring-red-500/20';
+
+/* ───────────────────────────────────────────
+   Queue Status (memoised to avoid repainting form)
+   ─────────────────────────────────────────── */
+const QueueStatus = memo(function QueueStatus({
+  queue,
+  t,
+}: {
+  queue: QueuedUpload[];
+  t: (k: string) => string;
+}) {
+  if (queue.length === 0) return null;
+
+  const active = queue.filter((i) => i.status === 'pending' || i.status === 'uploading').length;
+
+  return (
+    <div className="space-y-2 pt-2">
+      {queue.map((item) => (
+        <div key={item.id} className="text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+          {item.status === 'pending' && (
+            <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+              {t('cargo.queuePending')}: <span className="font-semibold">{item.clientId}</span>
+            </p>
+          )}
+          {item.status === 'uploading' && (
+            <p className="text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              {t('cargo.queueUploading')}: <span className="font-semibold">{item.clientId}</span>
+            </p>
+          )}
+          {item.status === 'error' && (
+            <p className="text-red-600 dark:text-red-400 flex items-start gap-2">
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5" />
+              <span>
+                {t('cargo.queueError')} (<span className="font-semibold">{item.clientId}</span>): {item.error}
+              </span>
+            </p>
+          )}
+        </div>
+      ))}
+      {active > 0 && (
+        <p className="text-xs text-gray-400 pt-1">
+          {t('cargo.queueSummary')}: {active} {t('cargo.queueInQueue')}
+        </p>
+      )}
+    </div>
+  );
+});
+
+/* ───────────────────────────────────────────
+   Main Form
+   ─────────────────────────────────────────── */
 export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargoFormProps) {
   const { t } = useTranslation();
+
+  // ── Form state ──
   const [clientId, setClientId] = useState('');
+  const [region, setRegion] = useState('');
+  const [district, setDistrict] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [pricePerKg, setPricePerKg] = useState('');
   const [comment, setComment] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fast mode & Auto Camera settings
+  // ── Mode toggles ──
   const [fastMode, setFastMode] = useState(false);
-  const [autoCamera, setAutoCamera] = useState(true); // Restored Toggle State
+  const [autoCamera, setAutoCamera] = useState(true);
 
-  // Upload queue for background processing
+  // ── Upload queue ──
   const [uploadQueue, setUploadQueue] = useState<QueuedUpload[]>([]);
 
-  // Refs
-  const clientIdInputRef = useRef<HTMLInputElement>(null);
-  const weightInputRef = useRef<HTMLInputElement>(null);
+  // ── Refs ──
+  const clientIdRef = useRef<HTMLInputElement>(null);
+  const weightRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<MultiPhotoUploadHandle>(null);
+  const prevFastRef = useRef(false);
 
-  // Track previous fastMode value to detect toggle-on
-  const prevFastModeRef = useRef(false);
-
-  // Toast notifications
   const { toast, ToastRenderer } = useToast();
 
-  /**
-   * Client ID validation and formatting
-   */
-  const handleClientIdChange = (value: string) => {
-    const cleaned = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    setClientId(cleaned);
-    if (errors.client_id) {
-      setErrors({ ...errors, client_id: '' });
-    }
-  };
+  /** Focus client ID input and place cursor at the END of the value */
+  const focusClientIdEnd = useCallback(() => {
+    const el = clientIdRef.current;
+    if (!el) return;
+    el.focus();
+    // requestAnimationFrame ensures React has flushed the new value
+    requestAnimationFrame(() => {
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    });
+  }, []);
 
-  /**
-   * Weight validation
-   */
-  const handleWeightChange = (value: string) => {
-    const cleaned = normalizeNumber(value);
-    if (cleaned === null) return;
+  /* ── Memoised option lists ── */
+  const regionOptions = useMemo<SelectOption[]>(
+    () => regions.map((r) => ({ value: r.value, label: t(r.label) })),
+    [t],
+  );
 
-    // Allow empty input while editing
-    if (cleaned === '') {
-      setWeightKg('');
-      if (errors.weight_kg) {
-        setErrors({ ...errors, weight_kg: '' });
-      }
-      return;
-    }
+  const districtOptions = useMemo<SelectOption[]>(
+    () =>
+      region && DISTRICTS[region]
+        ? DISTRICTS[region].map((d) => ({ value: d.value, label: t(d.label) }))
+        : [],
+    [region, t],
+  );
 
-    const numericValue = Number(cleaned);
+  /* ── Handlers (stable refs) ── */
+  const clearError = useCallback((key: string) => {
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
 
-    // Prevent invalid numbers
-    if (isNaN(numericValue) || numericValue < 0) {
-      return;
-    }
+  const handleClientIdChange = useCallback(
+    (value: string) => {
+      const cleaned = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      setClientId(cleaned);
+      clearError('client_id');
 
-    // If 100 or more => force to 99
-    if (numericValue >= 100) {
-      setWeightKg('99');
-    } else {
-      setWeightKg(cleaned);
-    }
-
-    if (errors.weight_kg) {
-      setErrors({ ...errors, weight_kg: '' });
-    }
-  };
-
-  /**
-   * Price per kg validation
-   */
-  const handlePricePerKgChange = (value: string) => {
-    const cleaned = normalizeNumber(value);
-    if (cleaned === null) return;
-
-    setPricePerKg(cleaned);
-    if (errors.price_per_kg) {
-      setErrors({ ...errors, price_per_kg: '' });
-    }
-  };
-
-  /**
-   * Form validation
-   */
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!clientId.trim()) {
-      newErrors.client_id = t('cargo.validation.clientCodeRequired');
-    } else if (!/^[A-Z][A-Z0-9-]*$/.test(clientId)) {
-      newErrors.client_id = t('cargo.validation.clientCodeInvalid');
-    }
-
-    if (photos.length === 0) {
-      newErrors.photos = t('cargo.validation.photoRequired');
-    }
-
-    if (!weightKg.trim()) {
-      newErrors.weight_kg = t('cargo.validation.weightRequired');
-    } else if (isNaN(Number(weightKg))) {
-      newErrors.weight_kg = t('cargo.validation.weightInvalid');
-    }
-
-    if (pricePerKg && isNaN(Number(pricePerKg))) {
-      newErrors.price_per_kg = t('cargo.validation.weightInvalid');
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  /**
-   * PERMISSION-FIRST: When user toggles Fast Mode ON, acquire camera
-   * permission and start the stream in the background (no modal).
-   */
-  useEffect(() => {
-    if (fastMode && !prevFastModeRef.current) {
-      // FastMode turned ON -> Silent Warm Up
-      cameraRef.current?.prepareStream();
-    }
-    prevFastModeRef.current = fastMode;
-  }, [fastMode]);
-
-  /**
-   * BACKGROUND QUEUE SUBMIT FLOW
-   */
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm() || photos.length === 0) return;
-
-    // Create queue item
-    const queueItem: QueuedUpload = {
-      id: `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      flightName,
-      clientId,
-      photos,
-      weightKg: weightKg ? Number(weightKg) : undefined,
-      pricePerKg: pricePerKg ? Number(pricePerKg) : undefined,
-      comment: comment.trim() || undefined,
-      status: 'pending'
-    };
-
-    // Add to queue
-    setUploadQueue(prev => [...prev, queueItem]);
-
-    if (fastMode) {
-      // FAST MODE: Immediate reset
-      setClientId('');
-      setWeightKg('');
-      setPricePerKg('');
-      setComment('');
-      setPhotos([]);
-      setErrors({});
-
-      // LOGIC: Check Auto Camera Toggle
-      if (autoCamera) {
-        // If Auto-Camera ON: Open camera immediately (0ms delay due to warm start)
-        setTimeout(() => {
-          cameraRef.current?.openCamera();
-        }, 100);
+      if (cleaned.length >= 2) {
+        const { region: r, district: d } = getRegionAndDistrictFromCode(cleaned);
+        if (r) setRegion(r);
+        if (d) setDistrict(d);
+        else setDistrict('');
       } else {
-        // If Auto-Camera OFF: Just focus the input
-        setTimeout(() => {
-          clientIdInputRef.current?.focus();
-        }, 100);
+        setRegion('');
+        setDistrict('');
       }
+    },
+    [clearError],
+  );
+
+  const updatePrefix = useCallback((newRegion: string, newDistrict: string) => {
+    let prefix = '';
+    if (newDistrict && AVIA_CODES[newDistrict]) {
+      prefix = AVIA_CODES[newDistrict];
+    } else if (newRegion && REGION_PREFIXES[newRegion]) {
+      prefix = REGION_PREFIXES[newRegion];
     }
-  };
 
-  /**
-   * Background queue processor
-   */
-  useEffect(() => {
-    const getErrorMessage = (error: unknown, fallback: string) => {
-      if (typeof error === 'object' && error !== null) {
-        const e = error as { message?: string; data?: { detail?: string } };
-        return e.data?.detail ?? e.message ?? fallback;
-      }
-      return fallback;
-    };
-    const hasResponse = (error: unknown): error is { response: unknown } =>
-      typeof error === 'object' && error !== null && 'response' in (error as object);
-
-
-    const processQueue = async () => {
-      const pending = uploadQueue.find(item => item.status === 'pending');
-      if (!pending) {
-        if (!fastMode && uploadQueue.length > 0) {
-          const allCompleted = uploadQueue.every(item => item.status === 'success' || item.status === 'error');
-          if (allCompleted) {
-            setTimeout(() => {
-              onSuccess();
-            }, 1000);
-          }
+    if (prefix) {
+      setClientId((prev) => {
+        const { region: oldR, district: oldD } = getRegionAndDistrictFromCode(prev);
+        if (oldD && AVIA_CODES[oldD] && prev.startsWith(AVIA_CODES[oldD])) {
+          return prefix + prev.slice(AVIA_CODES[oldD].length);
         }
+        if (oldR && REGION_PREFIXES[oldR] && prev.startsWith(REGION_PREFIXES[oldR])) {
+          return prefix + prev.slice(REGION_PREFIXES[oldR].length);
+        }
+        return prefix + prev;
+      });
+    } else {
+      setClientId('');
+    }
+  }, []);
+
+  const handleRegionSelect = useCallback(
+    (r: string) => {
+      setRegion(r);
+      setDistrict('');
+      updatePrefix(r, '');
+    },
+    [updatePrefix],
+  );
+
+  const handleDistrictSelect = useCallback(
+    (d: string) => {
+      setDistrict(d);
+      updatePrefix(region, d);
+      // focus client id after district pick
+      requestAnimationFrame(() => focusClientIdEnd());
+    },
+    [region, updatePrefix],
+  );
+
+  const handleWeightChange = useCallback(
+    (value: string) => {
+      const cleaned = normalizeNumber(value);
+      if (cleaned === null) return;
+      if (cleaned === '') {
+        setWeightKg('');
+        clearError('weight_kg');
         return;
       }
+      const num = Number(cleaned);
+      if (isNaN(num) || num < 0) return;
+      setWeightKg(num >= 100 ? '99' : cleaned);
+      clearError('weight_kg');
+    },
+    [clearError],
+  );
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+  const handlePriceChange = useCallback(
+    (value: string) => {
+      const cleaned = normalizeNumber(value);
+      if (cleaned === null) return;
+      setPricePerKg(cleaned);
+      clearError('price_per_kg');
+    },
+    [clearError],
+  );
 
-      setUploadQueue(prev => prev.map(item =>
-        item.id === pending.id ? { ...item, status: 'uploading' } : item
-      ));
+  /* ── Validation ── */
+  const validate = useCallback((): boolean => {
+    const e: Record<string, string> = {};
+    if (!clientId.trim()) e.client_id = t('cargo.validation.clientCodeRequired');
+    else if (!/^[A-Z][A-Z0-9-]*$/.test(clientId)) e.client_id = t('cargo.validation.clientCodeInvalid');
+    if (photos.length === 0) e.photos = t('cargo.validation.photoRequired');
+    if (!weightKg.trim()) e.weight_kg = t('cargo.validation.weightRequired');
+    else if (isNaN(Number(weightKg))) e.weight_kg = t('cargo.validation.weightInvalid');
+    if (pricePerKg && isNaN(Number(pricePerKg))) e.price_per_kg = t('cargo.validation.weightInvalid');
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }, [clientId, photos, weightKg, pricePerKg, t]);
+
+  /* ── Fast-mode camera warm-up ── */
+  useEffect(() => {
+    if (fastMode && !prevFastRef.current) {
+      cameraRef.current?.prepareStream();
+    }
+    prevFastRef.current = fastMode;
+  }, [fastMode]);
+
+  /* ── Submit ── */
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!validate() || photos.length === 0) return;
+
+      const item: QueuedUpload = {
+        id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        flightName,
+        clientId,
+        photos,
+        weightKg: weightKg ? Number(weightKg) : undefined,
+        pricePerKg: pricePerKg ? Number(pricePerKg) : undefined,
+        comment: comment.trim() || undefined,
+        status: 'pending',
+      };
+
+      setUploadQueue((prev) => [...prev, item]);
+
+      if (fastMode) {
+        setClientId('');
+        setRegion('');
+        setDistrict('');
+        setWeightKg('');
+        setPricePerKg('');
+        setComment('');
+        setPhotos([]);
+        setErrors({});
+
+        setTimeout(() => {
+          if (autoCamera) cameraRef.current?.openCamera();
+          else focusClientIdEnd();
+        }, 80);
+      }
+    },
+    [validate, photos, flightName, clientId, weightKg, pricePerKg, comment, fastMode, autoCamera],
+  );
+
+  /* ── Background queue processor ── */
+  useEffect(() => {
+    const pending = uploadQueue.find((i) => i.status === 'pending');
+
+    if (!pending) {
+      if (!fastMode && uploadQueue.length > 0 && uploadQueue.every((i) => i.status === 'success' || i.status === 'error')) {
+        const timer = setTimeout(onSuccess, 1000);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      // Small delay so UI can breathe
+      await new Promise((r) => setTimeout(r, 800));
+      if (cancelled) return;
+
+      setUploadQueue((prev) =>
+        prev.map((i) => (i.id === pending.id ? { ...i, status: 'uploading' } : i)),
+      );
 
       try {
         await uploadPhoto(
@@ -257,35 +539,37 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           pending.photos,
           pending.weightKg,
           pending.pricePerKg,
-          pending.comment
+          pending.comment,
         );
+        if (cancelled) return;
 
-        setUploadQueue(prev => prev.map(item =>
-          item.id === pending.id ? { ...item, status: 'success' } : item
-        ));
-
+        setUploadQueue((prev) =>
+          prev.map((i) => (i.id === pending.id ? { ...i, status: 'success' } : i)),
+        );
         toast({
           title: `✅ ${t('cargo.messages.uploadSuccess')}`,
-          description: `${t('cargo.photoCard.client')} ${pending.clientId} - ${pending.photos.length} ${t('cargo.photos')}`,
+          description: `${t('cargo.photoCard.client')} ${pending.clientId} — ${pending.photos.length} ${t('cargo.photos')}`,
           variant: 'success',
-          duration: 2000
+          duration: 2000,
         });
-
         setTimeout(() => {
-          setUploadQueue(prev => prev.filter(item => item.id !== pending.id));
+          setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
         }, 3000);
-
       } catch (error: unknown) {
-        const errorMessage = getErrorMessage(error, t('cargo.messages.uploadError'));
+        if (cancelled) return;
 
-        // CHECK: If network error (status 0 or 'Network Error'), save to offline storage
-        const isNetworkError =
-          (typeof error === 'object' && error !== null && 'message' in (error as object) && (error as { message?: string }).message === 'Network Error') ||
-          !window.navigator.onLine;
-        if (!hasResponse(error) || isNetworkError) {
+        const msg =
+          (error as { data?: { detail?: string } })?.data?.detail ??
+          (error as { message?: string })?.message ??
+          t('cargo.messages.uploadError');
 
+        const isNetwork =
+          (error as { message?: string })?.message === 'Network Error' || !navigator.onLine;
+        const hasResp = typeof error === 'object' && error !== null && 'response' in error;
+
+        if (!hasResp || isNetwork) {
           try {
-            const failedItem = {
+            await offlineStorage.saveItem({
               id: pending.id,
               flightName: pending.flightName,
               clientId: pending.clientId,
@@ -293,279 +577,298 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
               weightKg: pending.weightKg,
               pricePerKg: pending.pricePerKg,
               comment: pending.comment,
-              error: errorMessage,
-              timestamp: Date.now()
-            };
-
-            await offlineStorage.saveItem(failedItem);
-
+              error: msg,
+              timestamp: Date.now(),
+            });
             toast({
               title: "⚠️ Internet yo'q",
               description: "Ma'lumot oflayn xotiraga saqlandi.",
-              variant: 'warning', // Assuming 'warning' variant exists or use 'default' with styling
-              duration: 3000
+              variant: 'warning',
+              duration: 3000,
             });
-
-            // Remove from active queue to prevent infinite retry loop or blocking
-            setUploadQueue(prev => prev.filter(item => item.id !== pending.id));
-
-          } catch (dbError) {
-            console.error("Failed to save to offline DB", dbError);
-            setUploadQueue(prev => prev.map(item =>
-              item.id === pending.id ? { ...item, status: 'error', error: "Offline save failed: " + errorMessage } : item
-            ));
+            setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
+          } catch {
+            setUploadQueue((prev) =>
+              prev.map((i) =>
+                i.id === pending.id ? { ...i, status: 'error', error: 'Offline save failed: ' + msg } : i,
+              ),
+            );
           }
         } else {
-          // Normal API error (e.g. 400 Bad Request) - Keep in queue with error state
-          setUploadQueue(prev => prev.map(item =>
-            item.id === pending.id ? { ...item, status: 'error', error: errorMessage } : item
-          ));
+          setUploadQueue((prev) =>
+            prev.map((i) => (i.id === pending.id ? { ...i, status: 'error', error: msg } : i)),
+          );
         }
       }
     };
-
-    processQueue();
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, [uploadQueue, fastMode, onSuccess, toast, t]);
 
-  /**
-   * Auto-focus Client ID when photos are added
-   */
+  /* ── Auto-focus clientId after photos ── */
   useEffect(() => {
-    if (photos.length > 0 && clientIdInputRef.current && !clientId) {
-      clientIdInputRef.current.focus();
+    if (photos.length > 0 && !clientId) {
+      focusClientIdEnd();
     }
-  }, [photos, clientId]);
+  }, [photos.length, clientId, focusClientIdEnd]);
 
+  /* ── Render ── */
   return (
     <>
       <ToastRenderer />
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="mb-8">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-orange-600 transition-colors mb-4"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">{t('cargo.flight')}</span>
-          </button>
-          <h1 className="text-3xl font-bold text-gray-800">{t('cargo.addTitle')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t('cargo.flight')}: {flightName}</p>
-        </div>
+      <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="relative bg-white dark:bg-[#0d0a04] rounded-3xl border border-orange-100/80 dark:border-orange-500/15 overflow-hidden shadow-xl">
+          {/* accent bar */}
+          <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
 
-        {/* Fast Mode Toggle */}
-        <div className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-4">
-          <div className="flex flex-col gap-3">
-            {/* Main Switch */}
-            <label className="flex items-center gap-4 cursor-pointer">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={fastMode}
-                  onChange={(e) => setFastMode(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-14 h-8 bg-gray-300 rounded-full peer-checked:bg-orange-500 peer-focus:ring-4 peer-focus:ring-orange-300 transition-all"></div>
-                <div className="absolute left-1 top-1 w-6 h-6 bg-white rounded-full shadow-md peer-checked:translate-x-6 transition-transform"></div>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-orange-600" />
-                  {t('cargo.fastMode')}
-                </p>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  {t('cargo.fastModeDescription')}
-                </p>
-              </div>
-            </label>
+          {/* dot grid */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.022] dark:opacity-[0.04]"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 1px 1px, rgb(249,115,22) 1px, transparent 0)',
+              backgroundSize: '28px 28px',
+            }}
+          />
 
-            {/* Nested Auto-Camera Toggle (Restored) */}
-            {fastMode && (
-              <div className="pl-14 pt-1 animate-in slide-in-from-top-2 fade-in">
-                <label className="flex items-center gap-3 cursor-pointer select-none group">
+          <div className="relative p-6 sm:p-8 lg:p-10">
+            {/* Header */}
+            <div className="mb-8">
+              <button
+                type="button"
+                onClick={onBack}
+                className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-500 transition-colors mb-6 active:scale-95"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="font-medium">{t('cargo.flight')}</span>
+              </button>
+
+              <div className="flex items-center gap-4 mb-2">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/40">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 bg-clip-text text-transparent">
+                    {t('cargo.addTitle')}
+                  </h1>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {t('cargo.flight')}:{' '}
+                    <span className="text-gray-800 dark:text-gray-300 font-semibold">{flightName}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Fast Mode ── */}
+            <div className="mb-8 bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 rounded-2xl p-5">
+              <div className="flex flex-col gap-4">
+                <label className="flex items-center gap-4 cursor-pointer group">
                   <div className="relative">
                     <input
                       type="checkbox"
-                      checked={autoCamera}
-                      onChange={(e) => setAutoCamera(e.target.checked)}
+                      checked={fastMode}
+                      onChange={(e) => setFastMode(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-all"></div>
-                    <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm peer-checked:translate-x-4 transition-transform"></div>
+                    <div className="w-12 h-7 bg-gray-200 dark:bg-gray-800 rounded-full peer-checked:bg-orange-500 dark:peer-checked:bg-orange-600 transition-all border border-gray-300 dark:border-gray-700 peer-checked:border-orange-500/50" />
+                    <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
                   </div>
-                  <span className="text-xs font-semibold text-gray-600 group-hover:text-gray-800 transition-colors">
-                    {t('cargo.autoOpen')}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                      <Camera className="w-4 h-4 text-orange-500" />
+                      {t('cargo.fastMode')}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                      {t('cargo.fastModeDescription')}
+                    </p>
+                  </div>
                 </label>
-              </div>
-            )}
-          </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Multi Photo Upload */}
-          <div>
-            <MultiPhotoUpload
-              ref={cameraRef}
-              label={t('cargo.photoRequired')}
-              value={photos}
-              onChange={setPhotos}
-              error={errors.photos}
-              maxPhotos={10}
-              fastMode={fastMode}
-              onCameraClose={() => {
-                if (clientIdInputRef.current && !clientId) {
-                  clientIdInputRef.current.focus();
-                }
-              }}
-            />
-          </div>
-
-          {/* Client ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('cargo.clientCode')} <span className="text-red-500">*</span>
-            </label>
-            <Input
-              ref={clientIdInputRef}
-              type="text"
-              value={clientId}
-              onChange={(e) => handleClientIdChange(e.target.value)}
-              placeholder={t('cargo.clientCodePlaceholder')}
-              className={`text-lg caret-red-500 ${errors.client_id ? 'border-red-500' : ''}`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  weightInputRef.current?.focus();
-                }
-              }}
-            />
-            {errors.client_id && (
-              <p className="text-sm text-red-600 mt-2">{errors.client_id}</p>
-            )}
-          </div>
-
-          {/* Weight */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('cargo.weight')} <span className="text-red-500">*</span>
-            </label>
-            <Input
-              ref={weightInputRef}
-              type="text"
-              inputMode="decimal"
-              value={weightKg}
-              onChange={(e) => handleWeightChange(e.target.value)}
-              placeholder={t('cargo.weightPlaceholder')}
-              className={`caret-red-500 ${errors.weight_kg ? 'border-red-500' : ''}`}
-            />
-            {errors.weight_kg && (
-              <p className="text-sm text-red-600 mt-2">{errors.weight_kg}</p>
-            )}
-          </div>
-
-          {/* Price Per Kg */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('cargo.pricePerKg')}
-            </label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={pricePerKg}
-              onChange={(e) => handlePricePerKgChange(e.target.value)}
-              placeholder={t('cargo.pricePerKgPlaceholder')}
-              className={`caret-red-500 ${errors.price_per_kg ? 'border-red-500' : ''}`}
-            />
-            {errors.price_per_kg && (
-              <p className="text-sm text-red-600 mt-2">{errors.price_per_kg}</p>
-            )}
-          </div>
-
-          {/* Comment */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('cargo.comment')}
-            </label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder={t('cargo.commentPlaceholder')}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all resize-none"
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-5 text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <Save className="w-5 h-5" />
-                  <span>{fastMode ? t('cargo.saveAndNext') : t('cargo.submit')}</span>
-                </div>
-              </Button>
-
-              <Button
-                type="button"
-                onClick={onBack}
-                variant="outline"
-                className="px-5 py-5"
-              >
-                {t('cargo.cancel')}
-              </Button>
-            </div>
-
-            {/* Upload Queue Status */}
-            {uploadQueue.length > 0 && (
-              <div className="space-y-2 pt-2">
-                {uploadQueue.map((item) => (
-                  <div key={item.id} className="text-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                    {item.status === 'pending' && (
-                      <p className="text-gray-600 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
-                        {t('cargo.queuePending')}: <span className="font-semibold">{item.clientId}</span>
-                      </p>
-                    )}
-                    {item.status === 'uploading' && (
-                      <p className="text-blue-600 flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        {t('cargo.queueUploading')}: <span className="font-semibold">{item.clientId}</span>
-                      </p>
-                    )}
-                    {item.status === 'error' && (
-                      <p className="text-red-600 flex items-start gap-2">
-                        <span className="w-2 h-2 bg-red-600 rounded-full mt-1.5"></span>
-                        <span>
-                          {t('cargo.queueError')} (<span className="font-semibold">{item.clientId}</span>): {item.error}
-                        </span>
-                      </p>
-                    )}
+                {fastMode && (
+                  <div className="pl-16 animate-in slide-in-from-top-2 fade-in duration-150">
+                    <label className="flex items-center gap-3 cursor-pointer select-none group/auto">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={autoCamera}
+                          onChange={(e) => setAutoCamera(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-200 dark:bg-gray-800 rounded-full peer-checked:bg-green-500 dark:peer-checked:bg-green-600 border border-gray-300 dark:border-gray-700 peer-checked:border-green-500 transition-all" />
+                        <div className="absolute left-[3px] top-[3px] w-3.5 h-3.5 bg-white rounded-full shadow-sm peer-checked:translate-x-4 transition-transform" />
+                      </div>
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 group-hover/auto:text-gray-800 dark:group-hover/auto:text-gray-200 transition-colors">
+                        {t('cargo.autoOpen')}
+                      </span>
+                    </label>
                   </div>
-                ))}
-
-                {/* Queue summary */}
-                {uploadQueue.filter(item => item.status === 'pending' || item.status === 'uploading').length > 0 && (
-                  <p className="text-xs text-gray-500 pt-1">
-                    {t('cargo.queueSummary')}: {uploadQueue.filter(item => item.status === 'pending' || item.status === 'uploading').length} {t('cargo.queueInQueue')}
-                  </p>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* Fast Mode Instructions */}
-          {fastMode && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm whitespace-pre-line">
-              <p className="text-blue-800">{t('cargo.fastModeInstructions')}</p>
             </div>
-          )}
-        </form>
+
+            {/* ── Form ── */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Photos */}
+              <MultiPhotoUpload
+                ref={cameraRef}
+                label={t('cargo.photoRequired')}
+                value={photos}
+                onChange={setPhotos}
+                error={errors.photos}
+                maxPhotos={10}
+                fastMode={fastMode}
+                onCameraClose={() => {
+                  if (!clientId) focusClientIdEnd();
+                }}
+              />
+
+              {/* Region */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Viloyat <span className="text-red-500">*</span>
+                </label>
+                <LightSelect
+                  options={regionOptions}
+                  value={region}
+                  onChange={handleRegionSelect}
+                  placeholder="Viloyatni tanlang"
+                  searchPlaceholder="Qidirish..."
+                  emptyText="Viloyat topilmadi."
+                  icon={<MapPin className="w-5 h-5 text-orange-500" />}
+                />
+              </div>
+
+              {/* District */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Tuman <span className="text-red-500">*</span>
+                </label>
+                <LightSelect
+                  options={districtOptions}
+                  value={district}
+                  onChange={handleDistrictSelect}
+                  placeholder="Tumanni tanlang"
+                  searchPlaceholder="Qidirish..."
+                  emptyText="Tuman topilmadi."
+                  disabled={!region || districtOptions.length === 0}
+                  icon={<MapPin className="w-5 h-5 text-orange-500 opacity-60" />}
+                />
+              </div>
+
+              {/* Client ID */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  {t('cargo.clientCode')} <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  ref={clientIdRef}
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => handleClientIdChange(e.target.value)}
+                  placeholder={t('cargo.clientCodePlaceholder')}
+                  className={`${INPUT_CLS} text-lg uppercase font-mono tracking-widest placeholder:tracking-normal placeholder:font-normal caret-orange-500 ${errors.client_id ? ERR_CLS : ''}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      weightRef.current?.focus();
+                    }
+                  }}
+                />
+                {errors.client_id && (
+                  <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">{errors.client_id}</p>
+                )}
+              </div>
+
+              {/* Weight + Price row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    {t('cargo.weight')} <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    ref={weightRef}
+                    type="text"
+                    inputMode="decimal"
+                    value={weightKg}
+                    onChange={(e) => handleWeightChange(e.target.value)}
+                    placeholder={t('cargo.weightPlaceholder')}
+                    className={`${INPUT_CLS} caret-orange-500 ${errors.weight_kg ? ERR_CLS : ''}`}
+                  />
+                  {errors.weight_kg && (
+                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">{errors.weight_kg}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    {t('cargo.pricePerKg')}
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={pricePerKg}
+                    onChange={(e) => handlePriceChange(e.target.value)}
+                    placeholder={t('cargo.pricePerKgPlaceholder')}
+                    className={`${INPUT_CLS} caret-orange-500 ${errors.price_per_kg ? ERR_CLS : ''}`}
+                  />
+                  {errors.price_per_kg && (
+                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">{errors.price_per_kg}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Comment */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  {t('cargo.comment')}
+                </label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder={t('cargo.commentPlaceholder')}
+                  rows={2}
+                  className={`${INPUT_CLS} w-full px-3 py-2.5 resize-none h-auto`}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-3 pt-4">
+                <div className="flex gap-3">
+                  <Button
+                    type="submit"
+                    className="flex-1 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:brightness-95 active:scale-[0.98] text-white font-bold text-base tracking-wide rounded-xl shadow-md shadow-orange-500/30 transition-all duration-100 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <Save className="w-5 h-5" />
+                      <span>{fastMode ? t('cargo.saveAndNext') : t('cargo.submit')}</span>
+                    </div>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={onBack}
+                    variant="outline"
+                    className="h-14 px-6 rounded-xl border-2 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 font-semibold transition-colors"
+                  >
+                    {t('cargo.cancel')}
+                  </Button>
+                </div>
+
+                <QueueStatus queue={uploadQueue} t={t} />
+              </div>
+
+              {fastMode && (
+                <div className="bg-blue-50/80 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-xl p-4 text-sm whitespace-pre-line">
+                  <p className="text-blue-800 dark:text-blue-300/90 leading-relaxed font-medium">
+                    {t('cargo.fastModeInstructions')}
+                  </p>
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
       </div>
     </>
   );
 }
-
