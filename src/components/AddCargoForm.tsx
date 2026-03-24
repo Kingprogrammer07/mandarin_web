@@ -37,6 +37,7 @@ interface QueuedUpload {
   comment?: string;
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
+  retryCount: number;
 }
 
 interface SelectOption {
@@ -246,6 +247,13 @@ const INPUT_CLS = [
 
 const ERR_CLS = 'border-red-500 focus:border-red-500 focus:ring-red-500/20';
 
+/** Max items allowed in upload queue to prevent memory overflow in fast mode */
+const MAX_QUEUE_SIZE = 20;
+/** Max retry attempts for transient (network) errors before giving up */
+const MAX_RETRIES = 2;
+/** Delay between retries in ms (doubles each attempt) */
+const RETRY_BASE_DELAY = 2000;
+
 /* ───────────────────────────────────────────
    Queue Status (memoised to avoid repainting form)
    ─────────────────────────────────────────── */
@@ -323,6 +331,31 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
   const weightRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<MultiPhotoUploadHandle>(null);
   const prevFastRef = useRef(false);
+  const processingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const timeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  /** Safe setTimeout that auto-cleans on unmount */
+  const safeTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      timeoutsRef.current.delete(id);
+      if (mountedRef.current) fn();
+    }, ms);
+    timeoutsRef.current.add(id);
+    return id;
+  }, []);
+
+  /** Track mount/unmount lifecycle */
+  useEffect(() => {
+    mountedRef.current = true;
+    const timeouts = timeoutsRef.current;
+    return () => {
+      mountedRef.current = false;
+      timeouts.forEach(clearTimeout);
+      timeouts.clear();
+      processingRef.current = false;
+    };
+  }, []);
 
   const { toast, ToastRenderer } = useToast();
 
@@ -478,6 +511,20 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
       e.preventDefault();
       if (!validate() || photos.length === 0) return;
 
+      // Prevent queue overflow in fast mode
+      const activeCount = uploadQueue.filter(
+        (i) => i.status === 'pending' || i.status === 'uploading',
+      ).length;
+      if (activeCount >= MAX_QUEUE_SIZE) {
+        toast({
+          title: '⚠️ Navbat to\'ldi',
+          description: `Iltimos, ${MAX_QUEUE_SIZE} ta yuklash tugashini kuting.`,
+          variant: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
       const item: QueuedUpload = {
         id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         flightName,
@@ -487,6 +534,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         pricePerKg: pricePerKg ? Number(pricePerKg) : undefined,
         comment: comment.trim() || undefined,
         status: 'pending',
+        retryCount: 0,
       };
 
       setUploadQueue((prev) => [...prev, item]);
@@ -501,32 +549,40 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         setPhotos([]);
         setErrors({});
 
-        setTimeout(() => {
+        safeTimeout(() => {
           if (autoCamera) cameraRef.current?.openCamera();
           else focusClientIdEnd();
         }, 80);
       }
     },
-    [validate, photos, flightName, clientId, weightKg, pricePerKg, comment, fastMode, autoCamera, focusClientIdEnd],
+    [validate, photos, flightName, clientId, weightKg, pricePerKg, comment, fastMode, autoCamera, focusClientIdEnd, safeTimeout, toast, uploadQueue],
   );
 
   /* ── Background queue processor ── */
   useEffect(() => {
+    // If already processing, skip — the current run will pick up the next item when done
+    if (processingRef.current) return;
+
     const pending = uploadQueue.find((i) => i.status === 'pending');
 
     if (!pending) {
-      if (!fastMode && uploadQueue.length > 0 && uploadQueue.every((i) => i.status === 'success' || i.status === 'error')) {
-        const timer = setTimeout(onSuccess, 1000);
-        return () => clearTimeout(timer);
+      if (
+        !fastMode &&
+        uploadQueue.length > 0 &&
+        uploadQueue.every((i) => i.status === 'success' || i.status === 'error')
+      ) {
+        const id = safeTimeout(onSuccess, 1000);
+        return () => clearTimeout(id);
       }
       return;
     }
 
-    let cancelled = false;
+    processingRef.current = true;
+
     const run = async () => {
       // Small delay so UI can breathe
-      await new Promise((r) => setTimeout(r, 800));
-      if (cancelled) return;
+      await new Promise((r) => setTimeout(r, 600));
+      if (!mountedRef.current) { processingRef.current = false; return; }
 
       setUploadQueue((prev) =>
         prev.map((i) => (i.id === pending.id ? { ...i, status: 'uploading' } : i)),
@@ -541,7 +597,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           pending.pricePerKg,
           pending.comment,
         );
-        if (cancelled) return;
+        if (!mountedRef.current) { processingRef.current = false; return; }
 
         setUploadQueue((prev) =>
           prev.map((i) => (i.id === pending.id ? { ...i, status: 'success' } : i)),
@@ -552,11 +608,14 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           variant: 'success',
           duration: 2000,
         });
-        setTimeout(() => {
+
+        // Remove success item from queue after 3s
+        safeTimeout(() => {
           setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
         }, 3000);
+
       } catch (error: unknown) {
-        if (cancelled) return;
+        if (!mountedRef.current) { processingRef.current = false; return; }
 
         const msg =
           (error as { data?: { detail?: string } })?.data?.detail ??
@@ -568,44 +627,71 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         const hasResp = typeof error === 'object' && error !== null && 'response' in error;
 
         if (!hasResp || isNetwork) {
-          try {
-            await offlineStorage.saveItem({
-              id: pending.id,
-              flightName: pending.flightName,
-              clientId: pending.clientId,
-              photos: pending.photos,
-              weightKg: pending.weightKg,
-              pricePerKg: pending.pricePerKg,
-              comment: pending.comment,
-              error: msg,
-              timestamp: Date.now(),
-            });
+          // ── RETRY for transient network errors ──
+          if (pending.retryCount < MAX_RETRIES) {
+            const delay = RETRY_BASE_DELAY * Math.pow(2, pending.retryCount);
             toast({
-              title: "⚠️ Internet yo'q",
-              description: "Ma'lumot oflayn xotiraga saqlandi.",
+              title: '🔄 Qayta urinish...',
+              description: `${pending.clientId} — ${pending.retryCount + 1}/${MAX_RETRIES}`,
               variant: 'warning',
-              duration: 3000,
+              duration: delay,
             });
-            setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
-          } catch {
+            // Put back as pending with incremented retryCount after delay
             setUploadQueue((prev) =>
               prev.map((i) =>
-                i.id === pending.id ? { ...i, status: 'error', error: 'Offline save failed: ' + msg } : i,
+                i.id === pending.id
+                  ? { ...i, status: 'pending', retryCount: i.retryCount + 1 }
+                  : i,
               ),
             );
+            // Delay before retry
+            await new Promise((r) => setTimeout(r, delay));
+          } else {
+            // Max retries exceeded → save offline
+            try {
+              await offlineStorage.saveItem({
+                id: pending.id,
+                flightName: pending.flightName,
+                clientId: pending.clientId,
+                photos: pending.photos,
+                weightKg: pending.weightKg,
+                pricePerKg: pending.pricePerKg,
+                comment: pending.comment,
+                error: msg,
+                timestamp: Date.now(),
+              });
+              if (!mountedRef.current) { processingRef.current = false; return; }
+              toast({
+                title: "⚠️ Internet yo'q",
+                description: `${pending.clientId} — oflayn xotiraga saqlandi.`,
+                variant: 'warning',
+                duration: 3000,
+              });
+              setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
+            } catch {
+              if (!mountedRef.current) { processingRef.current = false; return; }
+              setUploadQueue((prev) =>
+                prev.map((i) =>
+                  i.id === pending.id
+                    ? { ...i, status: 'error', error: 'Offline save failed: ' + msg }
+                    : i,
+                ),
+              );
+            }
           }
         } else {
+          // API error (400, 422 etc.) — no retry, show error
           setUploadQueue((prev) =>
             prev.map((i) => (i.id === pending.id ? { ...i, status: 'error', error: msg } : i)),
           );
         }
+      } finally {
+        // Unlock — state update above will trigger this effect again to pick up next item
+        processingRef.current = false;
       }
     };
     run();
-    return () => {
-      cancelled = true;
-    };
-  }, [uploadQueue, fastMode, onSuccess, toast, t]);
+  }, [uploadQueue, fastMode, onSuccess, toast, t, safeTimeout]);
 
   /* ── Auto-focus clientId after photos ── */
   useEffect(() => {
@@ -646,11 +732,11 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
               </button>
 
               <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/40">
-                  <Camera className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/40">
+                  <Camera className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 bg-clip-text text-transparent">
+                  <h1 className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 bg-clip-text text-transparent">
                     {t('cargo.addTitle')}
                   </h1>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
