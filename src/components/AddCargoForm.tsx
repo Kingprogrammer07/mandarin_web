@@ -421,7 +421,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
       // focus client id after district pick
       requestAnimationFrame(() => focusClientIdEnd());
     },
-    [region, updatePrefix],
+    [focusClientIdEnd, region, updatePrefix],
   );
 
   const handleWeightChange = useCallback(
@@ -507,7 +507,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         }, 80);
       }
     },
-    [validate, photos, flightName, clientId, weightKg, pricePerKg, comment, fastMode, autoCamera],
+    [validate, photos, flightName, clientId, weightKg, pricePerKg, comment, fastMode, autoCamera, focusClientIdEnd],
   );
 
   /* ── Background queue processor ── */
