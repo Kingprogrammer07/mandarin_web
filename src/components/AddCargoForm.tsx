@@ -1,22 +1,28 @@
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
+import { offlineStorage } from "@/utils/offlineStorage";
+import { uploadPhoto } from "@/api/services/cargo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import MultiPhotoUpload from "@/components/MultiPhotoUpload";
+import type { MultiPhotoUploadHandle } from "@/components/MultiPhotoUpload";
 import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-  memo,
-} from 'react';
-import { offlineStorage } from '@/utils/offlineStorage';
-import { uploadPhoto } from '@/api/services/cargo';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import MultiPhotoUpload from '@/components/MultiPhotoUpload';
-import type { MultiPhotoUploadHandle } from '@/components/MultiPhotoUpload';
-import { ArrowLeft, Save, Camera, Check, ChevronDown, MapPin, Search, X } from 'lucide-react';
-import { regions, DISTRICTS } from '@/lib/validation';
-import { AVIA_CODES, REGION_PREFIXES, getRegionAndDistrictFromCode } from '@/lib/aviaCodes';
-import { useToast } from '@/hooks/useToast';
-import { useTranslation } from 'react-i18next';
+  ArrowLeft,
+  Save,
+  Camera,
+  Check,
+  ChevronDown,
+  MapPin,
+  Search,
+  X,
+} from "lucide-react";
+import { regions, DISTRICTS } from "@/lib/validation";
+import {
+  AVIA_CODES,
+  REGION_PREFIXES,
+  getRegionAndDistrictFromCode,
+} from "@/lib/aviaCodes";
+import { useToast } from "@/hooks/useToast";
+import { useTranslation } from "react-i18next";
 
 /* ───────────────────────────────────────────
    Types
@@ -35,7 +41,7 @@ interface QueuedUpload {
   weightKg?: number;
   pricePerKg?: number;
   comment?: string;
-  status: 'pending' | 'uploading' | 'success' | 'error';
+  status: "pending" | "uploading" | "success" | "error";
   error?: string;
   retryCount: number;
 }
@@ -70,13 +76,13 @@ const LightSelect = memo(function LightSelect({
   icon,
 }: LightSelectProps) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const selectedLabel = useMemo(
-    () => options.find((o) => o.value === value)?.label ?? '',
+    () => options.find((o) => o.value === value)?.label ?? "",
     [options, value],
   );
 
@@ -90,16 +96,19 @@ const LightSelect = memo(function LightSelect({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
-        setSearch('');
+        setSearch("");
       }
     };
-    document.addEventListener('mousedown', handler, { passive: true });
-    document.addEventListener('touchstart', handler, { passive: true });
+    document.addEventListener("mousedown", handler, { passive: true });
+    document.addEventListener("touchstart", handler, { passive: true });
     return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
     };
   }, [open]);
 
@@ -107,7 +116,7 @@ const LightSelect = memo(function LightSelect({
   useEffect(() => {
     if (open && searchRef.current) {
       // Delay focus to avoid virtual keyboard flash on mobile
-      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isMobile = "ontouchstart" in window || navigator.maxTouchPoints > 0;
       if (!isMobile) {
         requestAnimationFrame(() => searchRef.current?.focus());
       }
@@ -118,7 +127,7 @@ const LightSelect = memo(function LightSelect({
     (val: string) => {
       onChange(val);
       setOpen(false);
-      setSearch('');
+      setSearch("");
     },
     [onChange],
   );
@@ -126,7 +135,7 @@ const LightSelect = memo(function LightSelect({
   const toggle = useCallback(() => {
     if (disabled) return;
     setOpen((p) => {
-      if (p) setSearch('');
+      if (p) setSearch("");
       return !p;
     });
   }, [disabled]);
@@ -139,22 +148,24 @@ const LightSelect = memo(function LightSelect({
         onClick={toggle}
         disabled={disabled}
         className={[
-          'flex items-center w-full h-12 px-3 rounded-xl text-left',
-          'border border-gray-200 dark:border-white/10',
-          'bg-gray-50 dark:bg-white/5',
-          'text-gray-900 dark:text-white',
-          'transition-colors duration-100',
-          'active:bg-orange-50 dark:active:bg-orange-500/10',
-          disabled ? 'opacity-40 pointer-events-none' : 'cursor-pointer',
-          open ? 'border-orange-500 ring-2 ring-orange-500/20' : '',
-        ].join(' ')}
+          "flex items-center w-full h-12 px-3 rounded-xl text-left",
+          "border border-gray-200 dark:border-white/10",
+          "bg-gray-50 dark:bg-white/5",
+          "text-gray-900 dark:text-white",
+          "transition-colors duration-100",
+          "active:bg-orange-50 dark:active:bg-orange-500/10",
+          disabled ? "opacity-40 pointer-events-none" : "cursor-pointer",
+          open ? "border-orange-500 ring-2 ring-orange-500/20" : "",
+        ].join(" ")}
       >
         {icon && <span className="mr-2 shrink-0">{icon}</span>}
-        <span className={`flex-1 truncate text-sm ${value ? 'font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+        <span
+          className={`flex-1 truncate text-sm ${value ? "font-medium" : "text-gray-400 dark:text-gray-500"}`}
+        >
           {selectedLabel || placeholder}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -162,13 +173,13 @@ const LightSelect = memo(function LightSelect({
       {open && (
         <div
           className={[
-            'absolute z-50 mt-1 w-full',
-            'bg-white dark:bg-[#1a1209]',
-            'border border-gray-200 dark:border-orange-500/20',
-            'rounded-xl shadow-lg shadow-black/10 dark:shadow-black/40',
-            'overflow-hidden',
-            'animate-in fade-in zoom-in-95 duration-100',
-          ].join(' ')}
+            "absolute z-50 mt-1 w-full",
+            "bg-white dark:bg-[#1a1209]",
+            "border border-gray-200 dark:border-orange-500/20",
+            "rounded-xl shadow-lg shadow-black/10 dark:shadow-black/40",
+            "overflow-hidden",
+            "animate-in fade-in zoom-in-95 duration-100",
+          ].join(" ")}
         >
           {/* Search — only show if > 6 options */}
           {options.length > 6 && (
@@ -183,7 +194,11 @@ const LightSelect = memo(function LightSelect({
                 className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none"
               />
               {search && (
-                <button type="button" onClick={() => setSearch('')} className="p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="p-0.5"
+                >
                   <X className="w-3.5 h-3.5 text-gray-400" />
                 </button>
               )}
@@ -191,9 +206,14 @@ const LightSelect = memo(function LightSelect({
           )}
 
           {/* List */}
-          <div ref={listRef} className="max-h-56 overflow-y-auto overscroll-contain py-1">
+          <div
+            ref={listRef}
+            className="max-h-56 overflow-y-auto overscroll-contain py-1"
+          >
             {filtered.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-gray-400 text-center">{emptyText}</p>
+              <p className="px-3 py-4 text-sm text-gray-400 text-center">
+                {emptyText}
+              </p>
             ) : (
               filtered.map((opt) => (
                 <button
@@ -201,16 +221,16 @@ const LightSelect = memo(function LightSelect({
                   type="button"
                   onClick={() => handleSelect(opt.value)}
                   className={[
-                    'flex items-center w-full px-3 py-2.5 text-sm text-left',
-                    'transition-colors duration-75',
-                    'active:bg-orange-100 dark:active:bg-orange-500/20',
+                    "flex items-center w-full px-3 py-2.5 text-sm text-left",
+                    "transition-colors duration-75",
+                    "active:bg-orange-100 dark:active:bg-orange-500/20",
                     opt.value === value
-                      ? 'text-orange-600 dark:text-orange-400 bg-orange-50/70 dark:bg-orange-500/10 font-medium'
-                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5',
-                  ].join(' ')}
+                      ? "text-orange-600 dark:text-orange-400 bg-orange-50/70 dark:bg-orange-500/10 font-medium"
+                      : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5",
+                  ].join(" ")}
                 >
                   <Check
-                    className={`w-4 h-4 mr-2 shrink-0 ${opt.value === value ? 'opacity-100 text-orange-500' : 'opacity-0'}`}
+                    className={`w-4 h-4 mr-2 shrink-0 ${opt.value === value ? "opacity-100 text-orange-500" : "opacity-0"}`}
                   />
                   <span className="truncate">{opt.label}</span>
                 </button>
@@ -227,25 +247,25 @@ const LightSelect = memo(function LightSelect({
    Helpers
    ─────────────────────────────────────────── */
 const normalizeNumber = (value: string): string | null => {
-  const normalized = value.replace(/,/g, '.');
-  const cleaned = normalized.replace(/[^\d.]/g, '');
-  const parts = cleaned.split('.');
+  const normalized = value.replace(/,/g, ".");
+  const cleaned = normalized.replace(/[^\d.]/g, "");
+  const parts = cleaned.split(".");
   if (parts.length > 2) return null;
-  if (cleaned.startsWith('.')) return '0' + cleaned;
+  if (cleaned.startsWith(".")) return "0" + cleaned;
   return cleaned;
 };
 
 const INPUT_CLS = [
-  'h-12 rounded-xl',
-  'border border-gray-200 dark:border-white/10',
-  'bg-gray-50 dark:bg-white/5',
-  'text-gray-900 dark:text-white',
-  'placeholder:text-gray-400 dark:placeholder:text-gray-500',
-  'transition-colors duration-100',
-  'focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:ring-offset-0 focus:outline-none',
-].join(' ');
+  "h-12 rounded-xl",
+  "border border-gray-200 dark:border-white/10",
+  "bg-gray-50 dark:bg-white/5",
+  "text-gray-900 dark:text-white",
+  "placeholder:text-gray-400 dark:placeholder:text-gray-500",
+  "transition-colors duration-100",
+  "focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:ring-offset-0 focus:outline-none",
+].join(" ");
 
-const ERR_CLS = 'border-red-500 focus:border-red-500 focus:ring-red-500/20';
+const ERR_CLS = "border-red-500 focus:border-red-500 focus:ring-red-500/20";
 
 /** Max items allowed in upload queue to prevent memory overflow in fast mode */
 const MAX_QUEUE_SIZE = 20;
@@ -266,29 +286,38 @@ const QueueStatus = memo(function QueueStatus({
 }) {
   if (queue.length === 0) return null;
 
-  const active = queue.filter((i) => i.status === 'pending' || i.status === 'uploading').length;
+  const active = queue.filter(
+    (i) => i.status === "pending" || i.status === "uploading",
+  ).length;
 
   return (
     <div className="space-y-2 pt-2">
       {queue.map((item) => (
-        <div key={item.id} className="text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-          {item.status === 'pending' && (
+        <div
+          key={item.id}
+          className="text-sm animate-in fade-in slide-in-from-top-1 duration-200"
+        >
+          {item.status === "pending" && (
             <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
-              {t('cargo.queuePending')}: <span className="font-semibold">{item.clientId}</span>
+              {t("cargo.queuePending")}:{" "}
+              <span className="font-semibold">{item.clientId}</span>
             </p>
           )}
-          {item.status === 'uploading' && (
+          {item.status === "uploading" && (
             <p className="text-blue-600 dark:text-blue-400 flex items-center gap-2">
               <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              {t('cargo.queueUploading')}: <span className="font-semibold">{item.clientId}</span>
+              {t("cargo.queueUploading")}:{" "}
+              <span className="font-semibold">{item.clientId}</span>
             </p>
           )}
-          {item.status === 'error' && (
+          {item.status === "error" && (
             <p className="text-red-600 dark:text-red-400 flex items-start gap-2">
               <span className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5" />
               <span>
-                {t('cargo.queueError')} (<span className="font-semibold">{item.clientId}</span>): {item.error}
+                {t("cargo.queueError")} (
+                <span className="font-semibold">{item.clientId}</span>):{" "}
+                {item.error}
               </span>
             </p>
           )}
@@ -296,7 +325,7 @@ const QueueStatus = memo(function QueueStatus({
       ))}
       {active > 0 && (
         <p className="text-xs text-gray-400 pt-1">
-          {t('cargo.queueSummary')}: {active} {t('cargo.queueInQueue')}
+          {t("cargo.queueSummary")}: {active} {t("cargo.queueInQueue")}
         </p>
       )}
     </div>
@@ -306,16 +335,20 @@ const QueueStatus = memo(function QueueStatus({
 /* ───────────────────────────────────────────
    Main Form
    ─────────────────────────────────────────── */
-export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargoFormProps) {
+export default function AddCargoForm({
+  flightName,
+  onBack,
+  onSuccess,
+}: AddCargoFormProps) {
   const { t } = useTranslation();
 
   // ── Form state ──
-  const [clientId, setClientId] = useState('');
-  const [region, setRegion] = useState('');
-  const [district, setDistrict] = useState('');
-  const [weightKg, setWeightKg] = useState('');
-  const [pricePerKg, setPricePerKg] = useState('');
-  const [comment, setComment] = useState('');
+  const [clientId, setClientId] = useState("");
+  const [region, setRegion] = useState("");
+  const [district, setDistrict] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+  const [pricePerKg, setPricePerKg] = useState("");
+  const [comment, setComment] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -397,25 +430,26 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
 
   const handleClientIdChange = useCallback(
     (value: string) => {
-      const cleaned = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      const cleaned = value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
       setClientId(cleaned);
-      clearError('client_id');
+      clearError("client_id");
 
       if (cleaned.length >= 2) {
-        const { region: r, district: d } = getRegionAndDistrictFromCode(cleaned);
+        const { region: r, district: d } =
+          getRegionAndDistrictFromCode(cleaned);
         if (r) setRegion(r);
         if (d) setDistrict(d);
-        else setDistrict('');
+        else setDistrict("");
       } else {
-        setRegion('');
-        setDistrict('');
+        setRegion("");
+        setDistrict("");
       }
     },
     [clearError],
   );
 
   const updatePrefix = useCallback((newRegion: string, newDistrict: string) => {
-    let prefix = '';
+    let prefix = "";
     if (newDistrict && AVIA_CODES[newDistrict]) {
       prefix = AVIA_CODES[newDistrict];
     } else if (newRegion && REGION_PREFIXES[newRegion]) {
@@ -424,25 +458,30 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
 
     if (prefix) {
       setClientId((prev) => {
-        const { region: oldR, district: oldD } = getRegionAndDistrictFromCode(prev);
+        const { region: oldR, district: oldD } =
+          getRegionAndDistrictFromCode(prev);
         if (oldD && AVIA_CODES[oldD] && prev.startsWith(AVIA_CODES[oldD])) {
           return prefix + prev.slice(AVIA_CODES[oldD].length);
         }
-        if (oldR && REGION_PREFIXES[oldR] && prev.startsWith(REGION_PREFIXES[oldR])) {
+        if (
+          oldR &&
+          REGION_PREFIXES[oldR] &&
+          prev.startsWith(REGION_PREFIXES[oldR])
+        ) {
           return prefix + prev.slice(REGION_PREFIXES[oldR].length);
         }
         return prefix + prev;
       });
     } else {
-      setClientId('');
+      setClientId("");
     }
   }, []);
 
   const handleRegionSelect = useCallback(
     (r: string) => {
       setRegion(r);
-      setDistrict('');
-      updatePrefix(r, '');
+      setDistrict("");
+      updatePrefix(r, "");
     },
     [updatePrefix],
   );
@@ -461,15 +500,15 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
     (value: string) => {
       const cleaned = normalizeNumber(value);
       if (cleaned === null) return;
-      if (cleaned === '') {
-        setWeightKg('');
-        clearError('weight_kg');
+      if (cleaned === "") {
+        setWeightKg("");
+        clearError("weight_kg");
         return;
       }
       const num = Number(cleaned);
       if (isNaN(num) || num < 0) return;
-      setWeightKg(num >= 100 ? '99' : cleaned);
-      clearError('weight_kg');
+      setWeightKg(num >= 100 ? "99" : cleaned);
+      clearError("weight_kg");
     },
     [clearError],
   );
@@ -479,7 +518,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
       const cleaned = normalizeNumber(value);
       if (cleaned === null) return;
       setPricePerKg(cleaned);
-      clearError('price_per_kg');
+      clearError("price_per_kg");
     },
     [clearError],
   );
@@ -487,12 +526,16 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
   /* ── Validation ── */
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
-    if (!clientId.trim()) e.client_id = t('cargo.validation.clientCodeRequired');
-    else if (!/^[A-Z][A-Z0-9-]*$/.test(clientId)) e.client_id = t('cargo.validation.clientCodeInvalid');
-    if (photos.length === 0) e.photos = t('cargo.validation.photoRequired');
-    if (!weightKg.trim()) e.weight_kg = t('cargo.validation.weightRequired');
-    else if (isNaN(Number(weightKg))) e.weight_kg = t('cargo.validation.weightInvalid');
-    if (pricePerKg && isNaN(Number(pricePerKg))) e.price_per_kg = t('cargo.validation.weightInvalid');
+    if (!clientId.trim())
+      e.client_id = t("cargo.validation.clientCodeRequired");
+    else if (!/^[A-Z][A-Z0-9-]*$/.test(clientId))
+      e.client_id = t("cargo.validation.clientCodeInvalid");
+    if (photos.length === 0) e.photos = t("cargo.validation.photoRequired");
+    if (!weightKg.trim()) e.weight_kg = t("cargo.validation.weightRequired");
+    else if (isNaN(Number(weightKg)))
+      e.weight_kg = t("cargo.validation.weightInvalid");
+    if (pricePerKg && isNaN(Number(pricePerKg)))
+      e.price_per_kg = t("cargo.validation.weightInvalid");
     setErrors(e);
     return Object.keys(e).length === 0;
   }, [clientId, photos, weightKg, pricePerKg, t]);
@@ -513,13 +556,13 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
 
       // Prevent queue overflow in fast mode
       const activeCount = uploadQueue.filter(
-        (i) => i.status === 'pending' || i.status === 'uploading',
+        (i) => i.status === "pending" || i.status === "uploading",
       ).length;
       if (activeCount >= MAX_QUEUE_SIZE) {
         toast({
-          title: '⚠️ Navbat to\'ldi',
+          title: "⚠️ Navbat to'ldi",
           description: `Iltimos, ${MAX_QUEUE_SIZE} ta yuklash tugashini kuting.`,
-          variant: 'warning',
+          variant: "warning",
           duration: 3000,
         });
         return;
@@ -533,19 +576,27 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         weightKg: weightKg ? Number(weightKg) : undefined,
         pricePerKg: pricePerKg ? Number(pricePerKg) : undefined,
         comment: comment.trim() || undefined,
-        status: 'pending',
+        status: "pending",
         retryCount: 0,
       };
 
       setUploadQueue((prev) => [...prev, item]);
 
       if (fastMode) {
-        setClientId('');
-        setRegion('');
-        setDistrict('');
-        setWeightKg('');
-        setPricePerKg('');
-        setComment('');
+        // Prefixni saqlab, faqat raqamli qismini tozala
+        setClientId((prev) => {
+          const { district: d, region: r } = getRegionAndDistrictFromCode(prev);
+          if (d && AVIA_CODES[d] && prev.startsWith(AVIA_CODES[d])) {
+            return AVIA_CODES[d]; // masalan "STCH" qoladi
+          }
+          if (r && REGION_PREFIXES[r] && prev.startsWith(REGION_PREFIXES[r])) {
+            return REGION_PREFIXES[r]; // masalan "TSH" qoladi
+          }
+          return ""; // prefix topilmasa to'liq tozala
+        });
+        setWeightKg("");
+        setPricePerKg("");
+        setComment("");
         setPhotos([]);
         setErrors({});
 
@@ -555,7 +606,21 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         }, 80);
       }
     },
-    [validate, photos, flightName, clientId, weightKg, pricePerKg, comment, fastMode, autoCamera, focusClientIdEnd, safeTimeout, toast, uploadQueue],
+    [
+      validate,
+      photos,
+      flightName,
+      clientId,
+      weightKg,
+      pricePerKg,
+      comment,
+      fastMode,
+      autoCamera,
+      focusClientIdEnd,
+      safeTimeout,
+      toast,
+      uploadQueue,
+    ],
   );
 
   /* ── Background queue processor ── */
@@ -563,13 +628,13 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
     // If already processing, skip — the current run will pick up the next item when done
     if (processingRef.current) return;
 
-    const pending = uploadQueue.find((i) => i.status === 'pending');
+    const pending = uploadQueue.find((i) => i.status === "pending");
 
     if (!pending) {
       if (
         !fastMode &&
         uploadQueue.length > 0 &&
-        uploadQueue.every((i) => i.status === 'success' || i.status === 'error')
+        uploadQueue.every((i) => i.status === "success" || i.status === "error")
       ) {
         const id = safeTimeout(onSuccess, 1000);
         return () => clearTimeout(id);
@@ -582,10 +647,15 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
     const run = async () => {
       // Small delay so UI can breathe
       await new Promise((r) => setTimeout(r, 600));
-      if (!mountedRef.current) { processingRef.current = false; return; }
+      if (!mountedRef.current) {
+        processingRef.current = false;
+        return;
+      }
 
       setUploadQueue((prev) =>
-        prev.map((i) => (i.id === pending.id ? { ...i, status: 'uploading' } : i)),
+        prev.map((i) =>
+          i.id === pending.id ? { ...i, status: "uploading" } : i,
+        ),
       );
 
       try {
@@ -597,15 +667,20 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           pending.pricePerKg,
           pending.comment,
         );
-        if (!mountedRef.current) { processingRef.current = false; return; }
+        if (!mountedRef.current) {
+          processingRef.current = false;
+          return;
+        }
 
         setUploadQueue((prev) =>
-          prev.map((i) => (i.id === pending.id ? { ...i, status: 'success' } : i)),
+          prev.map((i) =>
+            i.id === pending.id ? { ...i, status: "success" } : i,
+          ),
         );
         toast({
-          title: `✅ ${t('cargo.messages.uploadSuccess')}`,
-          description: `${t('cargo.photoCard.client')} ${pending.clientId} — ${pending.photos.length} ${t('cargo.photos')}`,
-          variant: 'success',
+          title: `✅ ${t("cargo.messages.uploadSuccess")}`,
+          description: `${t("cargo.photoCard.client")} ${pending.clientId} — ${pending.photos.length} ${t("cargo.photos")}`,
+          variant: "success",
           duration: 2000,
         });
 
@@ -613,34 +688,38 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         safeTimeout(() => {
           setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
         }, 3000);
-
       } catch (error: unknown) {
-        if (!mountedRef.current) { processingRef.current = false; return; }
+        if (!mountedRef.current) {
+          processingRef.current = false;
+          return;
+        }
 
         const msg =
           (error as { data?: { detail?: string } })?.data?.detail ??
           (error as { message?: string })?.message ??
-          t('cargo.messages.uploadError');
+          t("cargo.messages.uploadError");
 
         const isNetwork =
-          (error as { message?: string })?.message === 'Network Error' || !navigator.onLine;
-        const hasResp = typeof error === 'object' && error !== null && 'response' in error;
+          (error as { message?: string })?.message === "Network Error" ||
+          !navigator.onLine;
+        const hasResp =
+          typeof error === "object" && error !== null && "response" in error;
 
         if (!hasResp || isNetwork) {
           // ── RETRY for transient network errors ──
           if (pending.retryCount < MAX_RETRIES) {
             const delay = RETRY_BASE_DELAY * Math.pow(2, pending.retryCount);
             toast({
-              title: '🔄 Qayta urinish...',
+              title: "🔄 Qayta urinish...",
               description: `${pending.clientId} — ${pending.retryCount + 1}/${MAX_RETRIES}`,
-              variant: 'warning',
+              variant: "warning",
               duration: delay,
             });
             // Put back as pending with incremented retryCount after delay
             setUploadQueue((prev) =>
               prev.map((i) =>
                 i.id === pending.id
-                  ? { ...i, status: 'pending', retryCount: i.retryCount + 1 }
+                  ? { ...i, status: "pending", retryCount: i.retryCount + 1 }
                   : i,
               ),
             );
@@ -660,20 +739,30 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                 error: msg,
                 timestamp: Date.now(),
               });
-              if (!mountedRef.current) { processingRef.current = false; return; }
+              if (!mountedRef.current) {
+                processingRef.current = false;
+                return;
+              }
               toast({
                 title: "⚠️ Internet yo'q",
                 description: `${pending.clientId} — oflayn xotiraga saqlandi.`,
-                variant: 'warning',
+                variant: "warning",
                 duration: 3000,
               });
               setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
             } catch {
-              if (!mountedRef.current) { processingRef.current = false; return; }
+              if (!mountedRef.current) {
+                processingRef.current = false;
+                return;
+              }
               setUploadQueue((prev) =>
                 prev.map((i) =>
                   i.id === pending.id
-                    ? { ...i, status: 'error', error: 'Offline save failed: ' + msg }
+                    ? {
+                        ...i,
+                        status: "error",
+                        error: "Offline save failed: " + msg,
+                      }
                     : i,
                 ),
               );
@@ -682,7 +771,9 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
         } else {
           // API error (400, 422 etc.) — no retry, show error
           setUploadQueue((prev) =>
-            prev.map((i) => (i.id === pending.id ? { ...i, status: 'error', error: msg } : i)),
+            prev.map((i) =>
+              i.id === pending.id ? { ...i, status: "error", error: msg } : i,
+            ),
           );
         }
       } finally {
@@ -714,8 +805,9 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.022] dark:opacity-[0.04]"
             style={{
-              backgroundImage: 'radial-gradient(circle at 1px 1px, rgb(249,115,22) 1px, transparent 0)',
-              backgroundSize: '28px 28px',
+              backgroundImage:
+                "radial-gradient(circle at 1px 1px, rgb(249,115,22) 1px, transparent 0)",
+              backgroundSize: "28px 28px",
             }}
           />
 
@@ -728,7 +820,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                 className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-500 transition-colors mb-6 active:scale-95"
               >
                 <ArrowLeft className="w-5 h-5" />
-                <span className="font-medium">{t('cargo.flight')}</span>
+                <span className="font-medium">{t("cargo.flight")}</span>
               </button>
 
               <div className="flex items-center gap-4 mb-2">
@@ -737,11 +829,13 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                 </div>
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 bg-clip-text text-transparent">
-                    {t('cargo.addTitle')}
+                    {t("cargo.addTitle")}
                   </h1>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {t('cargo.flight')}:{' '}
-                    <span className="text-gray-800 dark:text-gray-300 font-semibold">{flightName}</span>
+                    {t("cargo.flight")}:{" "}
+                    <span className="text-gray-800 dark:text-gray-300 font-semibold">
+                      {flightName}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -764,10 +858,10 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                       <Camera className="w-4 h-4 text-orange-500" />
-                      {t('cargo.fastMode')}
+                      {t("cargo.fastMode")}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-                      {t('cargo.fastModeDescription')}
+                      {t("cargo.fastModeDescription")}
                     </p>
                   </div>
                 </label>
@@ -786,7 +880,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                         <div className="absolute left-[3px] top-[3px] w-3.5 h-3.5 bg-white rounded-full shadow-sm peer-checked:translate-x-4 transition-transform" />
                       </div>
                       <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 group-hover/auto:text-gray-800 dark:group-hover/auto:text-gray-200 transition-colors">
-                        {t('cargo.autoOpen')}
+                        {t("cargo.autoOpen")}
                       </span>
                     </label>
                   </div>
@@ -799,7 +893,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
               {/* Photos */}
               <MultiPhotoUpload
                 ref={cameraRef}
-                label={t('cargo.photoRequired')}
+                label={t("cargo.photoRequired")}
                 value={photos}
                 onChange={setPhotos}
                 error={errors.photos}
@@ -839,31 +933,36 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                   searchPlaceholder="Qidirish..."
                   emptyText="Tuman topilmadi."
                   disabled={!region || districtOptions.length === 0}
-                  icon={<MapPin className="w-5 h-5 text-orange-500 opacity-60" />}
+                  icon={
+                    <MapPin className="w-5 h-5 text-orange-500 opacity-60" />
+                  }
                 />
               </div>
 
               {/* Client ID */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                  {t('cargo.clientCode')} <span className="text-red-500">*</span>
+                  {t("cargo.clientCode")}{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <Input
                   ref={clientIdRef}
                   type="text"
                   value={clientId}
                   onChange={(e) => handleClientIdChange(e.target.value)}
-                  placeholder={t('cargo.clientCodePlaceholder')}
-                  className={`${INPUT_CLS} text-lg uppercase font-mono tracking-widest placeholder:tracking-normal placeholder:font-normal caret-orange-500 ${errors.client_id ? ERR_CLS : ''}`}
+                  placeholder={t("cargo.clientCodePlaceholder")}
+                  className={`${INPUT_CLS} text-lg uppercase font-mono tracking-widest placeholder:tracking-normal placeholder:font-normal caret-orange-500 ${errors.client_id ? ERR_CLS : ""}`}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       e.preventDefault();
                       weightRef.current?.focus();
                     }
                   }}
                 />
                 {errors.client_id && (
-                  <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">{errors.client_id}</p>
+                  <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
+                    {errors.client_id}
+                  </p>
                 )}
               </div>
 
@@ -871,7 +970,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                    {t('cargo.weight')} <span className="text-red-500">*</span>
+                    {t("cargo.weight")} <span className="text-red-500">*</span>
                   </label>
                   <Input
                     ref={weightRef}
@@ -879,27 +978,31 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                     inputMode="decimal"
                     value={weightKg}
                     onChange={(e) => handleWeightChange(e.target.value)}
-                    placeholder={t('cargo.weightPlaceholder')}
-                    className={`${INPUT_CLS} caret-orange-500 ${errors.weight_kg ? ERR_CLS : ''}`}
+                    placeholder={t("cargo.weightPlaceholder")}
+                    className={`${INPUT_CLS} caret-orange-500 ${errors.weight_kg ? ERR_CLS : ""}`}
                   />
                   {errors.weight_kg && (
-                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">{errors.weight_kg}</p>
+                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
+                      {errors.weight_kg}
+                    </p>
                   )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                    {t('cargo.pricePerKg')}
+                    {t("cargo.pricePerKg")}
                   </label>
                   <Input
                     type="text"
                     inputMode="decimal"
                     value={pricePerKg}
                     onChange={(e) => handlePriceChange(e.target.value)}
-                    placeholder={t('cargo.pricePerKgPlaceholder')}
-                    className={`${INPUT_CLS} caret-orange-500 ${errors.price_per_kg ? ERR_CLS : ''}`}
+                    placeholder={t("cargo.pricePerKgPlaceholder")}
+                    className={`${INPUT_CLS} caret-orange-500 ${errors.price_per_kg ? ERR_CLS : ""}`}
                   />
                   {errors.price_per_kg && (
-                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">{errors.price_per_kg}</p>
+                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
+                      {errors.price_per_kg}
+                    </p>
                   )}
                 </div>
               </div>
@@ -907,12 +1010,12 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
               {/* Comment */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                  {t('cargo.comment')}
+                  {t("cargo.comment")}
                 </label>
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder={t('cargo.commentPlaceholder')}
+                  placeholder={t("cargo.commentPlaceholder")}
                   rows={2}
                   className={`${INPUT_CLS} w-full px-3 py-2.5 resize-none h-auto`}
                 />
@@ -927,7 +1030,9 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                   >
                     <div className="flex items-center justify-center gap-2">
                       <Save className="w-5 h-5" />
-                      <span>{fastMode ? t('cargo.saveAndNext') : t('cargo.submit')}</span>
+                      <span>
+                        {fastMode ? t("cargo.saveAndNext") : t("cargo.submit")}
+                      </span>
                     </div>
                   </Button>
 
@@ -937,7 +1042,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
                     variant="outline"
                     className="h-14 px-6 rounded-xl border-2 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 font-semibold transition-colors"
                   >
-                    {t('cargo.cancel')}
+                    {t("cargo.cancel")}
                   </Button>
                 </div>
 
@@ -947,7 +1052,7 @@ export default function AddCargoForm({ flightName, onBack, onSuccess }: AddCargo
               {fastMode && (
                 <div className="bg-blue-50/80 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-xl p-4 text-sm whitespace-pre-line">
                   <p className="text-blue-800 dark:text-blue-300/90 leading-relaxed font-medium">
-                    {t('cargo.fastModeInstructions')}
+                    {t("cargo.fastModeInstructions")}
                   </p>
                 </div>
               )}
