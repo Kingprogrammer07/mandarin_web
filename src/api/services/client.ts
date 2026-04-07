@@ -1,5 +1,13 @@
 import { apiClient, apiClientFormData } from '@/api/client';
 
+// ─── Admin header helper ───────────────────────────────────────────────────────
+// client_router is protected by get_admin_user, so every request must carry the
+// X-Admin-Authorization header in addition to the standard Bearer token.
+const getAdminHeaders = () => {
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+  return { 'X-Admin-Authorization': `Bearer ${token}` };
+};
+
 // ============================================
 // CLIENT SCHEMAS - Matching Backend v2.0
 // ============================================
@@ -76,7 +84,9 @@ export interface PassportImagesMetadataResponse {
  * Get client by ID
  */
 export async function getClient(id: number): Promise<Client> {
-  const response = await apiClient.get<Client>(`/api/v1/clients/${id}`);
+  const response = await apiClient.get<Client>(`/api/v1/clients/${id}`, {
+    headers: getAdminHeaders(),
+  });
   return response.data;
 }
 
@@ -91,6 +101,7 @@ export async function getPassportImagesMetadata(
     `/api/v1/clients/${clientId}/passport-images/metadata`,
     {
       params: { resolve_urls: resolveUrls },
+      headers: getAdminHeaders(),
     }
   );
   return response.data;
@@ -104,7 +115,8 @@ export async function resolvePassportImage(
   imageIndex: number
 ): Promise<PassportImageMetadata> {
   const response = await apiClient.get<PassportImageMetadata>(
-    `/api/v1/clients/${clientId}/passport-images/resolve/${imageIndex}`
+    `/api/v1/clients/${clientId}/passport-images/resolve/${imageIndex}`,
+    { headers: getAdminHeaders() }
   );
   return response.data;
 }
@@ -137,7 +149,8 @@ export async function createClient(data: ClientCreateRequest): Promise<Client> {
 
   const response = await apiClientFormData.post<Client>(
     '/api/v1/clients',
-    formData
+    formData,
+    { headers: getAdminHeaders() }
   );
   return response.data;
 }
@@ -177,7 +190,8 @@ export async function updateClient(id: number, data: ClientCreateRequest): Promi
 
   const response = await apiClientFormData.put<Client>(
     `/api/v1/clients/${id}`,
-    formData
+    formData,
+    { headers: getAdminHeaders() }
   );
   return response.data;
 }
@@ -186,7 +200,9 @@ export async function updateClient(id: number, data: ClientCreateRequest): Promi
  * Delete client
  */
 export async function deleteClient(id: number): Promise<ClientDeleteResponse> {
-  const response = await apiClient.delete<ClientDeleteResponse>(`/api/v1/clients/${id}`);
+  const response = await apiClient.delete<ClientDeleteResponse>(`/api/v1/clients/${id}`, {
+    headers: getAdminHeaders(),
+  });
   return response.data;
 }
 
@@ -200,11 +216,12 @@ export interface CodePreviewResponse {
  * Frontendda jonli kodni ko'rsatish uchun API
  */
 export async function previewClientCode(
-  region: string, 
+  region: string,
   district: string
 ): Promise<CodePreviewResponse> {
   const response = await apiClient.get<CodePreviewResponse>('/api/v1/clients/preview-code', {
-    params: { region, district }
+    params: { region, district },
+    headers: getAdminHeaders(),
   });
   return response.data;
 }

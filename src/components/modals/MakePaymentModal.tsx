@@ -46,6 +46,7 @@ import {
 } from '@/api/services/paymentService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
+import { normalizeNumber } from '@/utils/numberFormat';
 
 // ============================================================================
 // Helpers
@@ -335,6 +336,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     enabled: !!selectedFlightName && step >= 1,
     staleTime: 30_000,
   });
+  
+  const partialAllowed = details?.partial_allowed !== false;
 
   // ---- Computed amounts ----
   const payableAmount = useMemo(() => {
@@ -347,7 +350,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
   const effectiveAmount = useMemo(() => {
     if (isPartial && customAmount) {
-      const parsed = Number(customAmount.replace(/\s/g, ''));
+      const parsed = Number(customAmount);
       return isNaN(parsed) ? 0 : parsed;
     }
     return payableAmount;
@@ -560,7 +563,6 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         </div>
       );
     }
-
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -767,7 +769,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         </AnimatePresence>
 
         {/* ---- Partial Toggle ---- */}
-        {details.partial_allowed && (
+        {partialAllowed && (
           <div className="space-y-2">
             <button
               onClick={() => setIsPartial(!isPartial)}
@@ -803,11 +805,13 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               >
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={customAmount}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/[^\d]/g, '');
-                    setCustomAmount(raw);
+                    const normalized = normalizeNumber(e.target.value);
+                    if (normalized !== null) {
+                      setCustomAmount(normalized);
+                    }
                   }}
                   placeholder={t('makePayment.enterAmount')}
                   className="w-full px-4 py-3.5 rounded-xl text-lg font-bold

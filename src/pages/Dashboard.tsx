@@ -1,4 +1,5 @@
-import { useState, memo, useRef, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, memo, useRef, useEffect, useMemo, lazy, Suspense, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
     MapPin,
     Calendar,
@@ -24,6 +25,13 @@ import {
     Search
 } from "lucide-react";
 import TrackCodeTab from "./dashboard/TrackCodeTab";
+import {
+    getActiveCarouselItems,
+    trackCarouselView,
+    trackCarouselClick,
+    type CarouselMediaItemResponse,
+} from "@/api/services/carousel";
+import CarouselMediaModal from "@/components/carousel/CarouselMediaModal";
 import { toast } from "sonner";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import { ActionButton, type ActionItemData } from "@/components/user_page/ActionButtons";
@@ -36,13 +44,20 @@ interface CarouselItemData {
     subKey?: string;
     title?: string;
     sub?: string;
+    /** Tailwind gradient classes — used for static (hardcoded) items */
     gradient?: string;
+    /** CSS gradient value — used for items fetched from the API */
+    gradientStyle?: string;
     bgIcon?: React.ReactNode;
     mainIcon?: React.ReactNode;
     mediaType?: "image" | "video" | "gif";
     mediaUrl?: string;
     actionUrl?: string;
     textColor?: string;
+    /** True when this item came from the API and should be tracked */
+    fromApi?: boolean;
+    /** Gallery slides — drives the media detail modal when length > 1 */
+    mediaItems?: CarouselMediaItemResponse[];
 }
 
 // --- Data ---
@@ -157,25 +172,36 @@ const MAIN_ACTIONS: (Omit<ActionItemData, 'label' | 'desc' | 'badge' | 'actionLa
     },
 ];
 
-const CarouselCard = memo(({ item }: { item: CarouselItemData }) => {
+const CarouselCard = memo(({ item, onView }: { item: CarouselItemData; onView?: () => void }) => {
     const { t } = useTranslation();
+    const cardRef = useRef<HTMLDivElement>(null);
     const isAd = item.type === "ad";
     const title = item.titleKey ? t(item.titleKey) : item.title;
     const sub = item.subKey ? t(item.subKey) : item.sub;
 
-    const handleClick = () => {
-        if (isAd && item.actionUrl) {
-            window.open(item.actionUrl, "_blank");
-        }
-    };
+    // Fire onView once when the card is ≥50% visible (IntersectionObserver)
+    useEffect(() => {
+        if (!onView || !cardRef.current) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    onView();
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.5 },
+        );
+        observer.observe(cardRef.current);
+        return () => observer.disconnect();
+    }, [onView]);
 
     if (isAd) {
         return (
             <div
-                onClick={handleClick}
+                ref={cardRef}
                 className="
-                    flex-shrink-0 w-[85%] sm:w-[45%] lg:w-full 
-                    h-40 rounded-3xl relative overflow-hidden 
+                    flex-shrink-0 w-[85%] sm:w-[45%] lg:w-full
+                    h-40 rounded-3xl relative overflow-hidden
                     snap-start cursor-pointer hover:scale-[0.98] transition-all duration-200
                     border border-white/10 shadow-lg group
                 "
@@ -218,30 +244,68 @@ const CarouselCard = memo(({ item }: { item: CarouselItemData }) => {
         );
     }
 
-    return (
-        <div
-            className={`
-                flex-shrink-0 w-[85%] sm:w-[45%] md:w-[280px] lg:w-[300px] 
-                h-40 rounded-3xl p-5 relative overflow-hidden 
-                snap-start cursor-pointer hover:scale-[0.98] transition-transform duration-200
-                bg-gradient-to-br ${item.gradient}
-                border border-white/10 shadow-lg
-            `}
-        >
-            {item.bgIcon}
+    // Feature card — supports both Tailwind gradient classes (static) and CSS gradient value (API)
+return (
+    <div
+        ref={cardRef}
+        className={`
+            flex-shrink-0 w-[85%] sm:w-[45%] md:w-[280px] lg:w-[300px]
+            h-40 rounded-3xl relative overflow-hidden
+            snap-start cursor-pointer hover:scale-[0.98] transition-transform duration-200
+            border border-white/10 shadow-lg
+            ${item.gradientStyle ? '' : `bg-gradient-to-br ${item.gradient}`}
+        `}
+        style={item.gradientStyle ? { background: item.gradientStyle } : undefined}
+    >
+        {item?.bgIcon}
+        {/* Background media — faqat mediaUrl bo'lib, mainIcon bo'lmaganda */}
+        {item.mediaUrl && !item.mainIcon && (
+            <>
+                <img
+                    src={item.mediaUrl}
+                    alt={item.title || "Feature"}
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+            </>
+        )}
 
-            <div className="h-full flex flex-col justify-between relative z-10">
+        {/* Content */}
+        <div className="h-full flex flex-col justify-between relative z-10 p-5">
+            {/* Top: icon yoki thumbnail */}
+            {item.mainIcon ? (
                 <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
                     {item.mainIcon}
                 </div>
-
-                <div>
-                    <h3 className="text-white font-bold text-xl leading-tight mb-1">{title}</h3>
-                    <p className="text-white/70 text-sm font-medium">{sub}</p>
+            ) : item.mediaUrl ? (
+                // mediaUrl bor, mainIcon yo'q — top-left badge
+                <div className="self-start px-2 py-0.5 rounded-md bg-white/15 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wide">
+                    Yangilik
                 </div>
+            ) : (
+                <div /> // spacer — text pastda qolsin
+            )}
+
+            {/* Bottom: title + sub */}
+            <div>
+                <h3
+                    className="font-bold text-xl leading-tight mb-1 drop-shadow-sm"
+                    style={{ color: item.textColor || "white" }}
+                >
+                    {title}
+                </h3>
+                {sub && (
+                    <p
+                        className="text-sm font-medium drop-shadow-sm"
+                        style={{ color: item.textColor ? `${item.textColor}b3` : "rgba(255,255,255,0.7)" }}
+                    >
+                        {sub}
+                    </p>
+                )}
             </div>
         </div>
-    );
+    </div>
+);
 });
 
 const UniqueBackground = () => (
@@ -609,7 +673,12 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: DashboardProps) {
-    const [activeTab, setActiveTab] = useState("home");
+    const [activeTab, setActiveTab] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get("tab");
+        const valid = ["home", "track", "schedule", "request", "delivery_history"];
+        return valid.includes(tab ?? "") ? (tab as string) : "home";
+    });
     const [initialTrackView] = useState<'search' | 'history'>('search');
     const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -617,14 +686,45 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
     const [isProhibitedModalOpen, setIsProhibitedModalOpen] = useState(false);
     const [trackAutoFocus, setTrackAutoFocus] = useState(false);
+    const [mediaModalItem, setMediaModalItem] = useState<CarouselItemData | null>(null);
 
     const { t } = useTranslation();
 
-    const sortedCarouselItems = useMemo(() => {
-        const ads = CAROUSEL_ITEMS.filter(i => i.type === "ad").sort((a, b) => a.id - b.id);
-        const features = CAROUSEL_ITEMS.filter(i => i.type === "feature").sort((a, b) => a.id - b.id);
-        return [...ads, ...features];
-    }, []);
+    const { data: apiCarouselItems } = useQuery({
+        queryKey: ['carousel-items'],
+        queryFn: getActiveCarouselItems,
+        staleTime: 5 * 60 * 1000,
+        // Don't show error toasts — silently fall back to static items
+        retry: 1,
+    });
+
+    const sortedCarouselItems = useMemo((): CarouselItemData[] => {
+        // API items (ads + admin features) come first, sorted by their `order` field
+        const fromApi: CarouselItemData[] = apiCarouselItems
+            ? [...apiCarouselItems]
+                .sort((a, b) => a.order - b.order)
+                .map((item) => ({
+                    id: item.id,
+                    type: item.type as "ad" | "feature",
+                    title: item.title ?? undefined,
+                    sub: item.sub_title ?? undefined,
+                    gradientStyle: item.gradient ?? 'linear-gradient(135deg, #1a1a2e, #16213e)',
+                    mediaType: item.media_type,
+                    mediaUrl: item.media_url,
+                    actionUrl: item.action_url ?? undefined,
+                    textColor: item.text_color,
+                    fromApi: true,
+                    mediaItems: item.media_items ?? [],
+                }))
+            : [];
+
+        // Static feature cards (prohibited items, ID card, delivery info) always appended
+        const staticFeatures = CAROUSEL_ITEMS
+            .filter(i => i.type === "feature")
+            .sort((a, b) => a.id - b.id);
+
+        return [...fromApi, ...staticFeatures];
+    }, [apiCarouselItems]);
     
     const touchStartX = useRef<number | null>(null);
     const touchStartY = useRef<number | null>(null);
@@ -651,10 +751,39 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
         return () => clearInterval(interval);
     }, [activeTab, isPaused]);
 
+    const handleSetActiveTab = useCallback((tab: string) => {
+        setActiveTab(tab);
+        const url = new URL(window.location.href);
+        if (tab === "home") {
+            url.searchParams.delete("tab");
+        } else {
+            url.searchParams.set("tab", tab);
+        }
+        window.history.replaceState(null, "", url.toString());
+    }, []);
+
     const handleQuickSearch = () => {
         setTrackAutoFocus(true);
-        setActiveTab("track");
+        handleSetActiveTab("track");
     };
+
+    const handleCarouselItemClick = useCallback((item: CarouselItemData) => {
+        if (item.fromApi) {
+            const hasGallery = (item.mediaItems?.length ?? 0) > 1;
+            if (hasGallery) {
+                // CASE B — open fullscreen media gallery modal;
+                // click is tracked only when the CTA inside the modal is tapped
+                setMediaModalItem(item);
+            } else if (item.actionUrl) {
+                // CASE A — single/no gallery: open action URL directly
+                trackCarouselClick(item.id);
+                window.open(item.actionUrl, "_blank");
+            }
+        } else {
+            // Static item special actions
+            if (item.id === 1) setIsProhibitedModalOpen(true);
+        }
+    }, []);
 
     const onTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.targetTouches[0].clientX;
@@ -674,10 +803,10 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
 
         if (Math.abs(distanceX) > Math.abs(distanceY)) {
             if (distanceX > minSwipeDistance) {
-                setActiveTab("track");
+                handleSetActiveTab("track");
             }
             if (distanceX < -minSwipeDistance) {
-                setActiveTab("home");
+                handleSetActiveTab("home");
             }
         }
 
@@ -698,13 +827,13 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
             setIsChinaModalOpen(true);
             return;
         } else if (id === 'schedule') {
-            setActiveTab('schedule');
+            handleSetActiveTab('schedule');
             return;
         } else if (id === 'request') {
-            setActiveTab('request');
+            handleSetActiveTab('request');
             return;
         } else if (id === 'delivery_history') {
-            setActiveTab('delivery_history');
+            handleSetActiveTab('delivery_history');
             return;
         } else if (id === 'payment') {
             setIsPaymentModalOpen(true);
@@ -731,7 +860,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                 
                 <BetaBadge />
 
-                <HeaderTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+                <HeaderTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
 
                 {activeTab === "home" && (
                     <QuickSearchBar onClick={handleQuickSearch} />
@@ -740,8 +869,8 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                 {activeTab === 'schedule' && (
                     <Suspense fallback={<PageLoadingFallback />}>
                         <FlightSchedulePage
-                            onBack={() => setActiveTab('home')}
-                            onNavigateToTrack={() => setActiveTab('track')}
+                            onBack={() => handleSetActiveTab('home')}
+                            onNavigateToTrack={() => handleSetActiveTab('track')}
                         />
                     </Suspense>
                 )}
@@ -749,16 +878,16 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                 {activeTab === 'request' && (
                     <Suspense fallback={<PageLoadingFallback />}>
                         <DeliveryRequestPage
-                            onBack={() => setActiveTab('home')}
+                            onBack={() => handleSetActiveTab('home')}
                             onNavigateToProfile={() => {/* Handle profile navigation if needed */}}
-                            onNavigateToHistory={() => setActiveTab('delivery_history')}
+                            onNavigateToHistory={() => handleSetActiveTab('delivery_history')}
                         />
                     </Suspense>
                 )}
 
                 {activeTab === 'delivery_history' && (
                     <Suspense fallback={<PageLoadingFallback />}>
-                        <DeliveryHistoryPage onBack={() => setActiveTab('home')} />
+                        <DeliveryHistoryPage onBack={() => handleSetActiveTab('home')} />
                     </Suspense>
                 )}
 
@@ -798,14 +927,18 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                                 onMouseLeave={() => setIsPaused(false)}
                             >
                                 {sortedCarouselItems.map((item) => (
-                                    <div 
-                                        key={item.id} 
-                                        className="group contents cursor-pointer" 
-                                        onClick={() => {
-                                            if (item.id === 1) setIsProhibitedModalOpen(true);
-                                        }}
-                                    > 
-                                        <CarouselCard item={item} />
+                                    <div
+                                        key={item.id}
+                                        className="group contents cursor-pointer"
+                                        onClick={() => handleCarouselItemClick(item)}
+                                    >
+                                        <CarouselCard
+                                            item={item}
+                                            onView={item.fromApi
+                                                ? () => { trackCarouselView(item.id); }
+                                                : undefined
+                                            }
+                                        />
                                     </div>
                                 ))}
                             </div>
@@ -944,6 +1077,16 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                         onClose={() => setIsProhibitedModalOpen(false)}
                     />
                 </Suspense>
+
+                <CarouselMediaModal
+                    isOpen={mediaModalItem !== null}
+                    onClose={() => setMediaModalItem(null)}
+                    itemId={mediaModalItem?.id ?? 0}
+                    title={mediaModalItem?.title}
+                    subTitle={mediaModalItem?.sub}
+                    actionUrl={mediaModalItem?.actionUrl}
+                    mediaItems={mediaModalItem?.mediaItems ?? []}
+                />
 
             </div >
         </div >

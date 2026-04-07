@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from "react-dom";
 import { X, Scale, Box, Calculator, DollarSign, Info, Gift, MessageCircle } from "lucide-react";
 import { apiClient } from "@/api/client";
+import { normalizeNumber } from "@/utils/numberFormat";
 
 interface CalculatorModalProps {
     isOpen: boolean;
@@ -200,7 +201,10 @@ export default function CalculatorModal({ isOpen, onClose }: CalculatorModalProp
                                     type="number"
                                     inputMode="decimal"
                                     value={weight}
-                                    onChange={(e) => setWeight(e.target.value)}
+                                    onChange={(e) => {
+                                        const normalized = normalizeNumber(e.target.value);
+                                        if (normalized !== null) setWeight(normalized);
+                                    }}
                                     placeholder="0.00"
                                     className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
                                 />
@@ -217,21 +221,30 @@ export default function CalculatorModal({ isOpen, onClose }: CalculatorModalProp
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="relative">
                                         <input
-                                            type="number" inputMode="numeric" value={length} onChange={(e) => setLength(e.target.value)} placeholder={t('calculator.inputs.length')}
+                                            type="number" inputMode="decimal" value={length} onChange={(e) => {
+                                                const normalized = normalizeNumber(e.target.value);
+                                                if (normalized !== null) setLength(normalized);
+                                            }} placeholder={t('calculator.inputs.length')}
                                             className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-3 py-3 text-center text-lg font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                                         />
                                         <span className="block text-center text-[10px] text-gray-500 mt-1">{t('calculator.inputs.lengthUnit')}</span>
                                     </div>
                                     <div className="relative">
                                         <input
-                                            type="number" inputMode="numeric" value={width} onChange={(e) => setWidth(e.target.value)} placeholder={t('calculator.inputs.width')}
+                                            type="number" inputMode="decimal" value={width} onChange={(e) => {
+                                                const normalized = normalizeNumber(e.target.value);
+                                                if (normalized !== null) setWidth(normalized);
+                                            }} placeholder={t('calculator.inputs.width')}
                                             className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-3 py-3 text-center text-lg font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                                         />
                                         <span className="block text-center text-[10px] text-gray-500 mt-1">{t('calculator.inputs.widthUnit')}</span>
                                     </div>
                                     <div className="relative">
                                         <input
-                                            type="number" inputMode="numeric" value={height} onChange={(e) => setHeight(e.target.value)} placeholder={t('calculator.inputs.height')}
+                                            type="number" inputMode="decimal" value={height} onChange={(e) => {
+                                                const normalized = normalizeNumber(e.target.value);
+                                                if (normalized !== null) setHeight(normalized);
+                                            }} placeholder={t('calculator.inputs.height')}
                                             className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-3 py-3 text-center text-lg font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                                         />
                                         <span className="block text-center text-[10px] text-gray-500 mt-1">{t('calculator.inputs.heightUnit')}</span>

@@ -282,10 +282,19 @@ function ErrorScreen() {
 
 /* ─────────────── MAIN GUARD ─────────────── */
 export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardProps) {
-  const [isValidating, setIsValidating] = useState(true);
-  const [isValid, setIsValid] = useState(false);
+  const isBrowserRoute =
+    window.location.pathname.startsWith('/admin') ||
+    window.location.pathname === '/pos' ||
+    window.location.pathname.startsWith('/flights');
+
+  const [isValidating, setIsValidating] = useState(!isBrowserRoute);
+  const [isValid, setIsValid] = useState(isBrowserRoute);
 
   useEffect(() => {
+    if (isBrowserRoute) {
+      return;
+    }
+
     const checkTelegramWebApp = async () => {
       try {
         const telegramData = getTelegramWebAppData();
@@ -304,8 +313,8 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
           window.Telegram.WebApp.expand();
         }
 
-        // Attempt auto-login if token is missing
-        if (!sessionStorage.getItem('access_token')) {
+        // Attempt auto-login if no token exists in either storage
+        if (!sessionStorage.getItem('access_token') && !localStorage.getItem('access_token')) {
           try {
             const loginResponse = await telegramAutoLogin(telegramData.initData);
             if (loginResponse && loginResponse.access_token) {

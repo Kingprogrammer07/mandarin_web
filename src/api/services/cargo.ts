@@ -19,6 +19,9 @@ export interface FlightPhotosResponse {
   photos: CargoPhoto[];
   total: number;
   unique_clients: number;
+  page: number;
+  size: number;
+  total_pages: number;
 }
 
 export interface ClientPhotosResponse {
@@ -96,9 +99,21 @@ export const trackCargo = async (trackCode: string): Promise<TrackCodeSearchResp
   return response.data;
 };
 
-// Get all photos for a flight
-export const getFlightPhotos = async (flightName: string): Promise<FlightPhotosResponse> => {
-  const response = await apiClient.get<FlightPhotosResponse>(`/api/v1/flights/${flightName}/photos`);
+// Get paginated photos for a flight with optional server-side search
+export const getFlightPhotos = async (
+  flightName: string,
+  page: number = 1,
+  size: number = 50,
+  search?: string,
+): Promise<FlightPhotosResponse> => {
+  const params: Record<string, string | number> = { page, size };
+  if (search && search.trim() !== '') {
+    params.search = search.trim();
+  }
+  const response = await apiClient.get<FlightPhotosResponse>(
+    `/api/v1/flights/${flightName}/photos`,
+    { params },
+  );
   return response.data;
 };
 
@@ -403,6 +418,9 @@ export const exportFlightCargoExcel = (
     if (window.Telegram?.WebApp?.initData) {
       xhr.setRequestHeader('X-Telegram-Init-Data', window.Telegram.WebApp.initData);
     }
+    const adminToken = localStorage.getItem('access_token');
+
+    xhr.setRequestHeader('X-Admin-Authorization', `Bearer ${adminToken}`);
 
     xhr.send();
   });

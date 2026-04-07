@@ -195,10 +195,8 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
         errorMessage = statusError.message;
       } else {
         errorTitle = `❌ ${t('stats.loadingError')}`;
-        const status = (error as { response: { status: number } }).response.status;
-        const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
-        const message = (error as { message?: string }).message;
-        errorMessage = `HTTP ${status}: ${detail || message || ''}`;
+        const err = error as { message?: string; status?: number };
+        errorMessage = `HTTP ${err.status ?? ''}: ${err.message || ''}`;
       }
     } else if (typeof error === 'object' && error !== null && 'code' in (error as object) && (error as { code?: string }).code === 'NETWORK_ERROR') {
       errorTitle = '❌ Network Error';

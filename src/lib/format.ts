@@ -16,7 +16,7 @@ export const formatNumberLocalized = (value: number, language?: string) => {
 export const formatCurrencySum = (value: number, language?: string, currency?: string) => {
   const locale = getLocaleFromLanguage(language);
   const formatted = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value);
   

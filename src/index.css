@@ -207,3 +207,9 @@
 *::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.8);
 }
+
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}

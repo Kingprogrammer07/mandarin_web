@@ -236,25 +236,3 @@ export const ActionButton = memo(({ item, onClick }: {
 ActionButton.displayName = "ActionButton";
 export type { ActionItemData };
 
-
-// ─────────────────────────────────────────────────────────
-// USAGE EXAMPLE
-// ─────────────────────────────────────────────────────────
-//
-// import { MapPin, Calendar, Edit3, ListOrdered, FileText, Wallet, History } from "lucide-react";
-//
-// const MAIN_ACTIONS: ActionItemData[] = [
-//     { id: "china",            icon: <MapPin className="w-5 h-5" />,      bgIcon: <MapPin style={{ width: 80, height: 80 }} />,      label: "Xitoy manzili",     desc: "Guangzhou, Yiwu",           badge: "Manzil",  actionLabel: "Ko'rish", theme: "amber"   },
-//     { id: "schedule",         icon: <Calendar className="w-5 h-5" />,    bgIcon: <Calendar style={{ width: 80, height: 80 }} />,    label: "Reyslar Jadvali",   desc: "Uchish va kelish vaqtlari", badge: "Jadval",  actionLabel: "Ochish",  theme: "sky"     },
-//     { id: "request",          icon: <Edit3 className="w-5 h-5" />,       bgIcon: <Edit3 style={{ width: 80, height: 80 }} />,       label: "Zayafka qoldirish", desc: "Buyurtma berish",           badge: "Yangi",   actionLabel: "Bosing",  theme: "emerald" },
-//     { id: "delivery_history", icon: <ListOrdered className="w-5 h-5" />, bgIcon: <ListOrdered style={{ width: 80, height: 80 }} />, label: "Zayavkalar tarixi", desc: "So'rovlar holati",          badge: "Tarix",   actionLabel: "Ko'rish", theme: "violet"  },
-//     { id: "report",           icon: <FileText className="w-5 h-5" />,    bgIcon: <FileText style={{ width: 80, height: 80 }} />,    label: "Hisobotni ko'rish", desc: "Barcha hisobotlar",         badge: "Hisobot", actionLabel: "Ko'rish", theme: "cyan"    },
-//     { id: "payment",          icon: <Wallet className="w-5 h-5" />,      bgIcon: <Wallet style={{ width: 80, height: 80 }} />,      label: "To'lov qilish",     desc: "Balansni to'ldirish",       badge: "To'lov",  actionLabel: "To'lash", theme: "rose"    },
-//     { id: "history",          icon: <History className="w-5 h-5" />,     bgIcon: <History style={{ width: 80, height: 80 }} />,     label: "Mening yuklarim",   desc: "Barcha yuklaringiz tarixi", badge: "Yuklar",  actionLabel: "Ko'rish", theme: "violet"  },
-// ];
-//
-// <div className="grid grid-cols-2 gap-3">
-//     {MAIN_ACTIONS.map((action) => (
-//         <ActionButton key={action.id} item={action} onClick={() => handleActionClick(action.id)} />
-//     ))}
-// </div>

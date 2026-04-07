@@ -3,36 +3,33 @@ import { getFlightPhotos, deleteCargo, getCargoImageMetadata, exportFlightCargoE
 import { getFlightByName, type Flight } from '@/api/services/flight';
 import { Button } from '@/components/ui/button';
 import {
-  ArrowLeft, Plus, Package, Trash2, Edit2, Eye, Search, X,
+  ArrowLeft, Plus, Package, Trash2, Edit2, Search, X,
   ChevronLeft, ChevronRight, CheckCircle, Clock, SlidersHorizontal,
-  ArrowUpDown, ImageIcon, Download
+  ArrowUpDown, ImageIcon, Download, RefreshCw, AlertTriangle, Lock, LogOut
 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { useConfirm } from '@/hooks/useConfirm';
 import EditCargoModal from '@/components/EditCargoModal';
-import { useTranslation } from 'react-i18next';
 import { offlineStorage, type FailedItem } from '@/utils/offlineStorage';
 import OfflineCargoManager from '@/components/OfflineCargoManager';
-
-// ==================== Custom Hook: useDebounce ====================
+import { getAdminJwtClaims } from '@/api/services/adminManagement';
+import { refreshAdminToken } from '@/api/services/adminAuth';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
-
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedValue(value), delay);
     return () => clearTimeout(timer);
   }, [value, delay]);
-
   return debouncedValue;
 }
-
-// ==================== Types ====================
 
 type FilterStatus = 'all' | 'sent' | 'pending';
 type SortOrder = 'newest' | 'oldest';
 
-// ==================== PhotoViewerModal ====================
-
+// ─────────────────────────────────────────
+// PhotoViewerModal
+// ─────────────────────────────────────────
 interface PhotoViewerModalProps {
   photo: CargoPhoto;
   onClose: () => void;
@@ -43,37 +40,28 @@ interface PhotoViewerModalProps {
 }
 
 function PhotoViewerModal({ photo, onClose, onEdit, onDelete, isDeleting, formatDate }: PhotoViewerModalProps) {
-  const { t } = useTranslation();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState<(string | null)[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
 
-  // Fetch image URLs ONLY when modal opens
   useEffect(() => {
     const fetchImageUrls = async () => {
       try {
         setIsLoadingImages(true);
         const metadata = await getCargoImageMetadata(photo.id);
-        const urls = metadata.photos
-          .sort((a, b) => a.index - b.index)
-          .map(p => p.telegram_url);
+        const urls = metadata.photos.sort((a, b) => a.index - b.index).map(p => p.telegram_url);
         setImageUrls(urls);
-      } catch (error) {
-        console.error('Failed to fetch image metadata:', error);
+      } catch {
         setImageUrls([]);
       } finally {
         setIsLoadingImages(false);
       }
     };
-
     fetchImageUrls();
   }, [photo.id]);
 
-  // ESC key to close
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
@@ -82,143 +70,108 @@ function PhotoViewerModal({ photo, onClose, onEdit, onDelete, isDeleting, format
   const canNavigate = totalPhotos > 1;
   const currentImageUrl = imageUrls[currentPhotoIndex];
 
-  const nextPhoto = () => {
-    setCurrentPhotoIndex((prev) => (prev + 1) % totalPhotos);
-  };
-
-  const prevPhoto = () => {
-    setCurrentPhotoIndex((prev) => (prev - 1 + totalPhotos) % totalPhotos);
-  };
-
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/70 z-50 animate-in fade-in"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in duration-200" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto animate-in zoom-in-95 duration-200"
-          onClick={(e) => e.stopPropagation()}
+          className="relative bg-white dark:bg-[#0d0a04] rounded-3xl shadow-2xl shadow-black/40 max-w-lg w-full max-h-[92vh] overflow-hidden pointer-events-auto animate-in zoom-in-95 duration-200 border border-orange-100/80 dark:border-orange-500/15"
+          onClick={e => e.stopPropagation()}
         >
+          {/* accent bar */}
+          <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-orange-500 to-transparent z-10" />
+
           {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-            <div className="flex items-center gap-3">
-              <div className="bg-orange-100 text-orange-700 font-bold px-3 py-1 rounded-lg text-sm">
+          <div className="flex items-center justify-between px-5 pt-6 pb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black px-3 py-1 rounded-xl text-sm tracking-wide shadow-sm shadow-orange-500/30">
                 {photo.client_id}
-              </div>
+              </span>
               {photo.is_sent ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                  <CheckCircle className="w-3 h-3" />
-                  {t('cargo.statusSent')}
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-400/10 px-2.5 py-1 rounded-full border border-green-200/60 dark:border-green-400/20">
+                  <CheckCircle className="w-3 h-3" />Yuborilgan
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                  <Clock className="w-3 h-3" />
-                  {t('cargo.statusPending')}
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-200/60 dark:border-amber-400/20">
+                  <Clock className="w-3 h-3" />Kutilmoqda
                 </span>
               )}
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
+            <button onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors">
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Photo Carousel */}
-          <div className="relative bg-gray-100 h-80 flex items-center justify-center group">
+          {/* Photo */}
+          <div className="relative bg-gray-50 dark:bg-black/40 mx-4 rounded-2xl overflow-hidden h-64 flex items-center justify-center">
             {isLoadingImages ? (
               <div className="flex flex-col items-center gap-3">
-                <div className="w-10 h-10 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-                <p className="text-sm text-gray-500">{t('cargo.loading')}</p>
+                <div className="w-8 h-8 border-[3px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+                <p className="text-xs text-gray-400">Yuklanmoqda...</p>
               </div>
             ) : currentImageUrl ? (
-              <img
-                key={currentPhotoIndex}
-                src={currentImageUrl}
-                alt={`${t('cargo.photo')} ${photo.client_id} - ${currentPhotoIndex + 1}/${totalPhotos}`}
+              <img key={currentPhotoIndex} src={currentImageUrl} alt={`Photo ${currentPhotoIndex + 1}`}
                 className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
-                }}
-              />
+                onError={e => { e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjwvc3ZnPg=='; }} />
             ) : (
-              <div className="flex flex-col items-center gap-2 text-gray-400">
-                <Package className="w-16 h-16" />
-                <p className="text-sm">{t('cargo.noPhotos')}</p>
+              <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-gray-600">
+                <Package className="w-12 h-12" /><p className="text-xs">Rasm yo'q</p>
               </div>
             )}
-
-            {/* Photo counter badge */}
             {totalPhotos > 1 && (
-              <div className="absolute top-3 left-3 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
-                {currentPhotoIndex + 1} / {totalPhotos}
+              <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                {currentPhotoIndex + 1}/{totalPhotos}
               </div>
             )}
-
-            {/* Navigation arrows */}
             {canNavigate && (
               <>
-                <button
-                  onClick={prevPhoto}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2.5 rounded-full backdrop-blur-sm transition-all"
-                >
-                  <ChevronLeft className="w-5 h-5" />
+                <button onClick={() => setCurrentPhotoIndex(p => (p - 1 + totalPhotos) % totalPhotos)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-xl backdrop-blur-sm transition-all active:scale-90">
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={nextPhoto}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2.5 rounded-full backdrop-blur-sm transition-all"
-                >
-                  <ChevronRight className="w-5 h-5" />
+                <button onClick={() => setCurrentPhotoIndex(p => (p + 1) % totalPhotos)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-xl backdrop-blur-sm transition-all active:scale-90">
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </>
             )}
           </div>
 
-          {/* Info & Actions */}
-          <div className="p-6 space-y-4">
-            {/* Weight / Price row */}
-            <div className="flex items-center gap-4">
-              {photo.weight_kg && (
-                <span className="text-gray-700 font-semibold">{photo.weight_kg} kg</span>
-              )}
-              {photo.price_per_kg && (
-                <span className="text-orange-600 font-semibold">${photo.price_per_kg}/kg</span>
-              )}
-            </div>
-
-            {photo.comment && (
-              <p className="text-sm text-gray-600">{photo.comment}</p>
-            )}
-
-            <div className="text-xs text-gray-400">
-              {formatDate(photo.created_at)}
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button
-                onClick={onEdit}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
-              >
-                <Edit2 className="w-4 h-4 mr-2" />
-                {t('cargo.editTitle')}
-              </Button>
-              <Button
-                onClick={onDelete}
-                disabled={isDeleting}
-                variant="outline"
-                className="border-red-300 text-red-600 hover:bg-red-50"
-              >
-                {isDeleting ? (
-                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
+          {/* Info */}
+          <div className="p-5 space-y-3">
+            {(photo.weight_kg || photo.price_per_kg) && (
+              <div className="flex items-center gap-2.5">
+                {photo.weight_kg && (
+                  <div className="flex-1 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl px-3 py-2">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mb-0.5">Vazn</p>
+                    <p className="text-base font-black text-gray-800 dark:text-gray-100">{photo.weight_kg} kg</p>
+                  </div>
                 )}
+                {photo.price_per_kg && (
+                  <div className="flex-1 bg-orange-50 dark:bg-orange-500/5 border border-orange-100 dark:border-orange-500/15 rounded-xl px-3 py-2">
+                    <p className="text-[10px] text-orange-400 uppercase tracking-widest font-semibold mb-0.5">Narx/kg</p>
+                    <p className="text-base font-black text-orange-600 dark:text-orange-400">${photo.price_per_kg}/kg</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {photo.comment && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-white/5 rounded-xl px-3 py-2.5 border border-gray-100 dark:border-white/5">
+                {photo.comment}
+              </p>
+            )}
+            <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(photo.created_at)}</p>
+            <div className="flex gap-2.5 pt-1">
+              <Button onClick={onEdit}
+                className="flex-1 h-11 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:scale-[0.98] text-white font-bold rounded-xl shadow-md shadow-orange-500/30 border-0 transition-all">
+                <Edit2 className="w-4 h-4 mr-2" />Tahrirlash
+              </Button>
+              <Button onClick={onDelete} disabled={isDeleting} variant="outline"
+                className="h-11 px-4 rounded-xl border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-95">
+                {isDeleting
+                  ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                  : <Trash2 className="w-4 h-4" />}
               </Button>
             </div>
           </div>
@@ -228,8 +181,9 @@ function PhotoViewerModal({ photo, onClose, onEdit, onDelete, isDeleting, format
   );
 }
 
-// ==================== PhotoCard (Lightweight — NO API calls) ====================
-
+// ─────────────────────────────────────────
+// PhotoCard
+// ─────────────────────────────────────────
 interface PhotoCardProps {
   photo: CargoPhoto;
   onView: () => void;
@@ -237,107 +191,150 @@ interface PhotoCardProps {
   onEdit: () => void;
   isDeleting: boolean;
   formatDate: (date: string) => string;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
-function PhotoCard({ photo, onView, onDelete, onEdit, isDeleting, formatDate }: PhotoCardProps) {
-  const { t } = useTranslation();
+function PhotoCard({ photo, onView, onDelete, onEdit, isDeleting, formatDate, canEdit, canDelete }: PhotoCardProps) {
   const totalPhotos = photo.photo_file_ids.length;
 
   return (
     <div
-      className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 cursor-pointer group"
+      className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-orange-100/60 dark:border-orange-500/10 shadow-sm cursor-pointer hover:border-orange-300/70 dark:hover:border-orange-500/25 hover:shadow-md transition-all overflow-hidden"
       onClick={onView}
     >
-      {/* Top section: Placeholder + status badge */}
-      <div className="relative h-40 bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 flex flex-col items-center justify-center gap-2">
-        <div className="w-14 h-14 rounded-2xl bg-white/80 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-          <ImageIcon className="w-7 h-7 text-gray-400" />
-        </div>
-        <div className="flex items-center gap-1.5 text-gray-500">
-          <Eye className="w-3.5 h-3.5" />
-          <span className="text-xs font-medium">{totalPhotos} {t('cargo.photos')}</span>
-        </div>
+      {/* Top accent line */}
+      <div className={`h-[2px] ${photo.is_sent ? 'bg-gradient-to-r from-transparent via-green-400/50 dark:via-green-500/30 to-transparent' : 'bg-gradient-to-r from-transparent via-amber-400/50 dark:via-amber-500/30 to-transparent'}`} />
 
-        {/* Status badge - top left */}
-        <div className="absolute top-3 left-3">
-          {photo.is_sent ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full shadow-sm">
-              <CheckCircle className="w-3.5 h-3.5" />
-              {t('cargo.statusSent')}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full shadow-sm">
-              <Clock className="w-3.5 h-3.5" />
-              {t('cargo.statusPending')}
-            </span>
-          )}
-        </div>
-
-        {/* Action buttons - top right */}
-        <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="bg-white/90 hover:bg-blue-500 text-gray-600 hover:text-white p-1.5 rounded-lg shadow-sm transition-all"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            disabled={isDeleting}
-            className="bg-white/90 hover:bg-red-500 text-gray-600 hover:text-white p-1.5 rounded-lg shadow-sm transition-all disabled:opacity-50"
-          >
-            {isDeleting ? (
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
-          </button>
-        </div>
+      {/* Row 1: client ID + status + actions */}
+      <div className="flex items-center gap-3 px-4 pt-3.5 pb-2">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${photo.is_sent ? 'bg-green-500' : 'bg-amber-400'}`} />
+        <span className="text-[15px] font-black text-gray-900 dark:text-white font-mono flex-1 min-w-0 truncate tracking-wide">
+          {photo.client_id}
+        </span>
+        {photo.is_sent ? (
+          <span className="text-[10px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200/60 dark:border-green-500/15 px-2 py-0.5 rounded-full shrink-0">
+            Yuborilgan
+          </span>
+        ) : (
+          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/15 px-2 py-0.5 rounded-full shrink-0">
+            Kutilmoqda
+          </span>
+        )}
       </div>
 
-      {/* Bottom section: Info */}
-      <div className="p-4 space-y-2.5">
-        {/* Client ID + Weight row */}
-        <div className="flex items-center justify-between">
-          <span className="bg-orange-100 text-orange-700 font-bold px-3 py-1 rounded-lg text-sm">
-            {photo.client_id}
+      {/* Row 2: weight, price, photo count */}
+      <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
+        {photo.weight_kg ? (
+          <span className="text-[12px] font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-white/[0.06] border border-gray-200/60 dark:border-white/[0.08] px-2.5 py-1 rounded-lg">
+            {photo.weight_kg} kg
           </span>
-          <div className="flex items-center gap-2 text-sm">
-            {photo.weight_kg && (
-              <span className="text-gray-600 font-semibold">{photo.weight_kg} kg</span>
-            )}
-            {photo.price_per_kg && (
-              <span className="text-orange-600 font-semibold">${photo.price_per_kg}/kg</span>
-            )}
-          </div>
-        </div>
-
-        {/* Comment */}
-        {photo.comment && (
-          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
-            {photo.comment}
-          </p>
+        ) : (
+          <span className="text-[12px] text-gray-300 dark:text-gray-600 px-2.5 py-1">—</span>
         )}
+        {photo.price_per_kg && (
+          <span className="text-[12px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border border-orange-200/60 dark:border-orange-500/20 px-2.5 py-1 rounded-lg">
+            ${photo.price_per_kg}/kg
+          </span>
+        )}
+        <span className="text-[12px] font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1.5 bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05] px-2.5 py-1 rounded-lg">
+          <ImageIcon className="w-3 h-3" />{totalPhotos}
+        </span>
+        {photo.comment && (
+          <span className="text-[11px] text-gray-400 dark:text-gray-500 italic truncate max-w-[120px]">
+            {photo.comment}
+          </span>
+        )}
+        <span className="ml-auto text-[10px] text-gray-300 dark:text-gray-600 flex items-center gap-1 shrink-0">
+          <Clock className="w-2.5 h-2.5" />{formatDate(photo.created_at)}
+        </span>
+      </div>
 
-        {/* Date */}
-        <div className="text-xs text-gray-400 pt-2 border-t border-gray-100">
-          {formatDate(photo.created_at)}
+      {/* Divider + action row — only shown when user has at least one action */}
+      {(canEdit || canDelete) && (
+        <div className="border-t border-gray-50 dark:border-white/[0.04] flex">
+          {canEdit && (
+            <button
+              onClick={e => { e.stopPropagation(); onEdit(); }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50/50 dark:hover:bg-orange-500/[0.05] transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Tahrirlash
+            </button>
+          )}
+          {canEdit && canDelete && <div className="w-px bg-gray-50 dark:bg-white/[0.04]" />}
+          {canDelete && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(); }}
+              disabled={isDeleting}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-semibold text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-500/[0.05] disabled:opacity-50 transition-colors"
+            >
+              {isDeleting
+                ? <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                : <Trash2 className="w-3.5 h-3.5" />}
+              {isDeleting ? "O'chirilmoqda" : "O'chirish"}
+            </button>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// StatPill
+// ─────────────────────────────────────────
+const PILL_COLOR: Record<string, string> = {
+  gray:  'text-gray-600  dark:text-gray-400  bg-gray-100  dark:bg-white/[0.06]  border-gray-200/60  dark:border-white/[0.08]',
+  green: 'text-green-700 dark:text-green-400 bg-green-50  dark:bg-green-500/10  border-green-200/60 dark:border-green-500/15',
+  amber: 'text-amber-700 dark:text-amber-400 bg-amber-50  dark:bg-amber-500/10  border-amber-200/60 dark:border-amber-500/15',
+  blue:  'text-blue-700  dark:text-blue-400  bg-blue-50   dark:bg-blue-500/10   border-blue-200/60  dark:border-blue-500/15',
+};
+
+function StatPill({ label, color }: { label: string; color: keyof typeof PILL_COLOR }) {
+  return (
+    <span className={`inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border ${PILL_COLOR[color]}`}>
+      {label}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────
+// AccessDenied
+// ─────────────────────────────────────────
+function AccessDenied() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
+      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
+        <Lock className="w-8 h-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+      </div>
+      <div>
+        <p className="text-[16px] font-bold text-gray-700 dark:text-gray-300">Ruxsat yo'q</p>
+        <p className="text-[13px] text-gray-400 dark:text-gray-500 mt-1 max-w-xs">
+          Sizda ushbu sahifani ko'rish yoki tahrirlash uchun huquq yo'q.
+        </p>
       </div>
     </div>
   );
 }
 
-// ==================== CargoListPage ==
-
+// ─────────────────────────────────────────
+// CargoListPage
+// ─────────────────────────────────────────
 interface CargoListPageProps {
   flightName: string;
   onBack: () => void;
   onAddCargo: () => void;
+  onLogout?: () => void;
 }
 
-export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoListPageProps) {
-  const { t } = useTranslation();
+export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout }: CargoListPageProps) {
+  const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
+  const hasPerm = (slug: string) => jwtClaims.isSuperAdmin || jwtClaims.permissions.has(slug);
+  const canView   = hasPerm('flights:read');
+  const canCreate = hasPerm('flights:create');
+  const canUpdate = hasPerm('flights:update');
+  const canDelete = hasPerm('flights:delete');
   const [photos, setPhotos] = useState<CargoPhoto[]>([]);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -345,244 +342,155 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
   const [uniqueClients, setUniqueClients] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingCargo, setEditingCargo] = useState<CargoPhoto | null>(null);
-
   const [showOfflineManager, setShowOfflineManager] = useState(false);
-
-  // Offline recovery
   const [failedItems, setFailedItems] = useState<FailedItem[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
-
-  // Excel export
   const [isExporting, setIsExporting] = useState(false);
-
-  // Search
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-
-  // Filters & Sort
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
-
-  // Viewing photo modal
   const [viewingPhoto, setViewingPhoto] = useState<CargoPhoto | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const { toast, ToastRenderer } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
+
+  // Silently refresh the admin token on mount so permissions reflect
+  // the latest role assignments without requiring a re-login.
+  useEffect(() => {
+    let cancelled = false;
+    refreshAdminToken()
+      .then((data) => {
+        if (cancelled) return;
+        localStorage.setItem('access_token', data.access_token);
+        setJwtClaims(getAdminJwtClaims());
+      })
+      .catch(() => { /* ignore — keep existing token */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [flightData, photosData] = await Promise.all([
         getFlightByName(flightName),
-        getFlightPhotos(flightName)
+        getFlightPhotos(flightName, currentPage, 50, debouncedSearchTerm || undefined),
       ]);
       setFlight(flightData);
       setPhotos(photosData.photos);
       setTotalPhotos(photosData.total);
       setUniqueClients(photosData.unique_clients);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-      toast({
-        title: `❌ ${t('cargo.messages.uploadError')}`,
-        description: t('cargo.loading'),
-        variant: 'error'
-      });
+      setTotalPages(photosData.total_pages ?? 1);
+    } catch {
+      toast({ title: "❌ Ma'lumotlarni yuklashda xatolik", description: 'Qayta urinib ko\'ring', variant: 'error' });
     } finally {
       setIsLoading(false);
     }
-  }, [flightName, toast, t]);
+  }, [flightName, currentPage, debouncedSearchTerm, toast]);
 
+  // Reset to first page when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm]);
 
   useEffect(() => {
     loadData();
-
-    // Check for offline items
-    const checkOfflineItems = async () => {
-      try {
-        const items = await offlineStorage.getAllItems(flightName);
-        setFailedItems(items);
-      } catch (err) {
-        console.error("Failed to load offline items", err);
-      }
+    const check = async () => {
+      try { setFailedItems(await offlineStorage.getAllItems(flightName)); } catch { /* silent */ }
     };
-    checkOfflineItems();
-  }, [flightName, loadData]); // Added flightName dependency
+    check();
+  }, [flightName, loadData]);
 
   const handleRetryAll = async () => {
     if (isRetrying || failedItems.length === 0) return;
     setIsRetrying(true);
-
     let successCount = 0;
     const remainingItems: FailedItem[] = [];
-
-    // Process sequentially to be safe, or parallel with limit?
-    // Sequential is safer for order and rate limits
     for (const item of failedItems) {
       try {
-        await uploadPhoto(
-          item.flightName,
-          item.clientId,
-          item.photos,
-          item.weightKg,
-          item.pricePerKg,
-          item.comment
-        );
+        await uploadPhoto(item.flightName, item.clientId, item.photos, item.weightKg, item.pricePerKg, item.comment);
         successCount++;
         await offlineStorage.deleteItem(item.id);
-      } catch (error) {
-        console.error(`Retry failed for ${item.clientId}`, error);
-        remainingItems.push(item);
-      }
+      } catch { remainingItems.push(item); }
     }
-
     setFailedItems(remainingItems);
     setIsRetrying(false);
-
-    if (successCount > 0) {
-      toast({
-        title: `✅ ${successCount} ta yuk qayta yuklandi`,
-        description: "",
-        variant: 'success'
-      });
-      // Refresh the main list
-      loadData();
-    }
-
-    if (remainingItems.length > 0) {
-      toast({
-        title: `⚠️ ${remainingItems.length} ta yuk yuklanmadi`,
-        description: "Internetni tekshirib qayta urinib ko'ring",
-        variant: 'warning'
-      });
-    }
+    if (successCount > 0) { toast({ title: `✅ ${successCount} ta yuk qayta yuklandi`, description: '', variant: 'success' }); loadData(); }
+    if (remainingItems.length > 0) toast({ title: `⚠️ ${remainingItems.length} ta yuk yuklanmadi`, description: "Internetni tekshirib qayta urinib ko'ring", variant: 'warning' });
   };
 
-  // Filtered + sorted photos
+  // Search is now server-side; only apply client-side status filter and sort
   const filteredPhotos = useMemo(() => {
     return photos
       .filter(item => {
-        // Search (case insensitive)
-        const matchesSearch = !debouncedSearchTerm.trim()
-          || item.client_id.toLowerCase().includes(debouncedSearchTerm.trim().toLowerCase());
-        // Status filter
-        const matchesStatus = filterStatus === 'all'
-          ? true
-          : filterStatus === 'sent' ? item.is_sent : !item.is_sent;
-        return matchesSearch && matchesStatus;
+        const matchesStatus = filterStatus === 'all' ? true : filterStatus === 'sent' ? item.is_sent : !item.is_sent;
+        return matchesStatus;
       })
       .sort((a, b) => {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return sortOrder === 'newest' ? diff : -diff;
       });
-  }, [photos, debouncedSearchTerm, filterStatus, sortOrder]);
+  }, [photos, filterStatus, sortOrder]);
+
+  // All hooks called — safe to guard now
+  if (!canView) return <AccessDenied />;
 
   const handleDelete = async (cargoId: string) => {
-    const confirmed = window.Telegram?.WebApp?.showConfirm
-      ? await new Promise<boolean>((resolve) => {
-        window.Telegram!.WebApp!.showConfirm(
-          t('cargo.messages.deleteConfirm'),
-          (result) => resolve(result)
-        );
-      })
-      : window.confirm(t('cargo.messages.deleteConfirm'));
-
+    const confirmed = await confirm({
+      message: "Yukni o'chirmoqchimisiz?",
+      description: "Bu amalni ortga qaytarib bo'lmaydi.",
+      confirmLabel: "O'chirish",
+      variant: 'danger',
+    });
     if (!confirmed) return;
-
     try {
       setDeletingId(cargoId);
       await deleteCargo(cargoId);
-
-      setPhotos(photos.filter(p => p.id !== cargoId));
+      setPhotos(prev => prev.filter(p => p.id !== cargoId));
       setTotalPhotos(prev => prev - 1);
-
-      if (viewingPhoto?.id === cargoId) {
-        setViewingPhoto(null);
-      }
-
-      toast({
-        title: `✅ ${t('cargo.messages.deleteSuccess')}`,
-        description: '',
-        variant: 'success'
-      });
+      if (viewingPhoto?.id === cargoId) setViewingPhoto(null);
+      toast({ title: "✅ Muvaffaqiyatli o'chirildi", description: '', variant: 'success' });
     } catch (error: unknown) {
-      console.error('Failed to delete cargo:', error);
-      toast({
-        title: `❌ ${t('cargo.messages.deleteError')}`,
-        description:
-          (typeof error === 'object' && error !== null && 'message' in (error as object) && (error as { message?: string }).message) ||
-          t('cargo.messages.deleteError'),
-
-        variant: 'error'
-      });
-    } finally {
-      setDeletingId(null);
-    }
+      toast({ title: "❌ O'chirishda xatolik yuz berdi", description: (error as { message?: string })?.message ?? "Qayta urinib ko'ring", variant: 'error' });
+    } finally { setDeletingId(null); }
   };
 
   const handleEditSuccess = (updatedCargo: CargoPhoto) => {
-    setPhotos(photos.map(p => p.id === updatedCargo.id ? updatedCargo : p));
-    if (viewingPhoto?.id === updatedCargo.id) {
-      setViewingPhoto(updatedCargo);
-    }
+    setPhotos(prev => prev.map(p => p.id === updatedCargo.id ? updatedCargo : p));
+    if (viewingPhoto?.id === updatedCargo.id) setViewingPhoto(updatedCargo);
   };
 
-  // Excel export handler
   const handleExportExcel = async () => {
     if (isExporting) return;
     setIsExporting(true);
-
     try {
       await exportFlightCargoExcel(flightName);
-      toast({
-        title: `✅ ${t('cargo.excelExport.success')}`,
-        description: '',
-        variant: 'success'
-      });
+      toast({ title: '✅ Excel fayl yuklab olindi', description: '', variant: 'success' });
     } catch (err: unknown) {
-      let errorMessage = t('cargo.excelExport.error');
-
-      const message = typeof err === 'object' && err !== null && 'message' in (err as object) ? (err as { message?: string }).message : undefined;
-      const status = typeof err === 'object' && err !== null && 'status' in (err as object) ? (err as { status?: number }).status : undefined;
-
-      if (message === 'rate_limit' || status === 429) {
-        errorMessage = t('cargo.excelExport.rateLimit');
-      } else if (message === 'no_data' || status === 404) {
-        errorMessage = t('cargo.excelExport.noData');
-      } else if (message === 'network_error' || status === 0) {
-        errorMessage = t('cargo.excelExport.networkError');
-      } else if (message && message !== 'Export failed') {
-        errorMessage = message;
-
-      }
-
-      toast({
-        title: `❌ ${t('cargo.excelExport.error')}`,
-        description: errorMessage,
-        variant: 'error'
-      });
-    } finally {
-      setIsExporting(false);
-    }
+      const e = err as { message?: string; status?: number };
+      let msg = "Excel yuklab olishda xatolik yuz berdi";
+      if (e.message === 'rate_limit' || e.status === 429) msg = "So'rovlar soni oshib ketdi, biroz kuting";
+      else if (e.message === 'no_data' || e.status === 404) msg = "Bu reys uchun ma'lumot topilmadi";
+      else if (e.message === 'network_error' || e.status === 0) msg = "Internet aloqasi yo'q";
+      else if (e.message && e.message !== 'Export failed') msg = e.message;
+      toast({ title: '❌ Excel yuklab olishda xatolik', description: msg, variant: 'error' });
+    } finally { setIsExporting(false); }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('uz-UZ', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-  // Active filter count (for badge)
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (sortOrder !== 'newest' ? 1 : 0);
-  const hasActiveFilters = activeFilterCount > 0 || debouncedSearchTerm.trim().length > 0;
+  const hasActiveFilters = filterStatus !== 'all' || debouncedSearchTerm.trim().length > 0;
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      <div className="min-h-screen bg-gray-50 dark:bg-[#080604] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-[3px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+          <p className="text-sm text-gray-400 font-medium">Yuklanmoqda...</p>
+        </div>
       </div>
     );
   }
@@ -590,271 +498,241 @@ export default function CargoListPage({ flightName, onBack, onAddCargo }: CargoL
   return (
     <>
       <ToastRenderer />
+      <ConfirmDialog />
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        {/* Header */}
-        <div className="mb-6">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#080604]">
+        <div className="container mx-auto px-4 pt-2 pb-8 max-w-6xl">
 
-          {/* OFFLINE WARNING BANNER */}
+          {/* Offline Banner */}
           {failedItems.length > 0 && (
-            <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-2">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="bg-amber-100 p-2 rounded-full flex-shrink-0">
-                  <Clock className="w-5 h-5 text-amber-600" />
+            <div className="mb-5 relative bg-white dark:bg-[#0d0a04] border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-200">
+              <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-10 h-10 bg-amber-100 dark:bg-amber-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    {/* Pulsing live indicator */}
+                    <span className="absolute -top-1 -right-1 w-3 h-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-black text-gray-800 dark:text-gray-200 text-sm">Saqlanmagan yuklar</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400/80 mt-0.5">
+                      <span className="font-black">{failedItems.length}</span> ta yuk serverga yuborilmagan
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-800 text-sm">Saqlanmagan yuklar mavjud</h3>
-                  <p className="text-xs text-amber-700 leading-tight">
-                    {failedItems.length} ta yuk internet yo'qligi sababli oflayn rejimda saqlandi.
-                  </p>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button onClick={() => setShowOfflineManager(true)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/15 border border-amber-200 dark:border-amber-500/20 px-3 py-2 rounded-xl transition-colors active:scale-95">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />Boshqarish
+                  </button>
+                  <button onClick={handleRetryAll} disabled={isRetrying}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 disabled:opacity-60 px-3 py-2 rounded-xl transition-all shadow-sm shadow-amber-500/30 active:scale-95">
+                    {isRetrying
+                      ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Yuklanmoqda</>
+                      : <><RefreshCw className="w-3.5 h-3.5" />Yuborish</>}
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() => setShowOfflineManager(true)}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 sm:flex-initial bg-white border-amber-300 text-amber-700 hover:bg-amber-50 text-xs justify-center"
-                >
-                  <SlidersHorizontal className="w-3 h-3 mr-2" />
-                  Boshqarish
-                </Button>
-                <Button
-                  onClick={handleRetryAll}
-                  disabled={isRetrying}
-                  size="sm"
-                  className="flex-1 sm:flex-initial bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-sm text-xs justify-center"
-                >
-                  {isRetrying ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Yuklanmoqda...</span>
-                    </div>
-                  ) : (
-                    "Barchasini yuborish"
-                  )}
-                </Button>
               </div>
             </div>
           )}
 
-          {/* Offline Manager Modal */}
           {showOfflineManager && (
-            <OfflineCargoManager
-              flightName={flightName}
-              onClose={() => setShowOfflineManager(false)}
+            <OfflineCargoManager flightName={flightName} onClose={() => setShowOfflineManager(false)}
               onRefreshHost={async () => {
-                try {
-                  const items = await offlineStorage.getAllItems(flightName);
-                  setFailedItems(items);
-                  loadData();
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
-            />
+                try { setFailedItems(await offlineStorage.getAllItems(flightName)); loadData(); } catch { /* silent */ }
+              }} />
           )}
 
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-500 hover:text-orange-600 transition-colors mb-4 text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="font-medium">{t('cargo.backToFlights')}</span>
-          </button>
-
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-1">
-                {flight?.name} — {t('cargo.cargoList')}
-              </h1>
-              <p className="text-sm text-gray-500">
-                {t('cargo.total')}: {totalPhotos} {t('cargo.itemsCount')} &middot; {uniqueClients} {t('cargo.clients')}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleExportExcel}
-                disabled={isExporting}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold shadow-sm transition-all duration-300 hover:shadow-md hover:shadow-emerald-500/20 disabled:opacity-60"
-              >
-                {isExporting ? (
-                  <div className="w-5 h-5 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Download className="w-5 h-5 mr-2" />
-                )}
-                {isExporting ? t('cargo.excelExport.downloading') : t('cargo.excelExport.button')}
-              </Button>
-              <Button
-                onClick={onAddCargo}
-                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold shadow-sm"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                {t('cargo.addCargo')}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Search + Filters Toolbar */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6 space-y-4">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={t('cargo.searchPlaceholder')}
-              className="w-full pl-12 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all placeholder:text-gray-400"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
+          {/* Header */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={onBack}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors active:scale-95">
+                <ArrowLeft className="w-3.5 h-3.5" />Reyslar
               </button>
-            )}
-          </div>
-
-          {/* Filter & Sort Row */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Status Filter (Segmented Control) */}
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-gray-400 hidden sm:block" />
-              <div className="flex bg-gray-100 rounded-lg p-0.5">
+              {onLogout && (
                 <button
-                  onClick={() => setFilterStatus('all')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterStatus === 'all'
-                    ? 'bg-white text-gray-800 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                  onClick={onLogout}
+                  title="Chiqish"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/[0.08] transition-colors"
                 >
-                  {t('cargo.statusAll')}
-                </button>
-                <button
-                  onClick={() => setFilterStatus('sent')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${filterStatus === 'sent'
-                    ? 'bg-white text-green-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <CheckCircle className="w-3 h-3" />
-                  {t('cargo.statusSent')}
-                </button>
-                <button
-                  onClick={() => setFilterStatus('pending')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${filterStatus === 'pending'
-                    ? 'bg-white text-amber-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <Clock className="w-3 h-3" />
-                  {t('cargo.statusPending')}
-                </button>
-              </div>
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-2 ml-auto">
-              <ArrowUpDown className="w-4 h-4 text-gray-400 hidden sm:block" />
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                className="bg-gray-100 border-none rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer"
-              >
-                <option value="newest">{t('cargo.sortNewest')}</option>
-                <option value="oldest">{t('cargo.sortOldest')}</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Results count */}
-          {hasActiveFilters && (
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-gray-500">
-                {t('cargo.itemsFound', { count: filteredPhotos.length })}
-              </p>
-              {(filterStatus !== 'all' || searchTerm) && (
-                <button
-                  onClick={() => { setSearchTerm(''); setFilterStatus('all'); }}
-                  className="text-xs text-orange-600 hover:text-orange-700 font-medium transition-colors"
-                >
-                  {t('cargo.statusAll')}
+                  <LogOut className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
+
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <h1 className="text-[22px] font-black tracking-tight text-gray-900 dark:text-white truncate">
+                  {flight?.name}
+                </h1>
+                {/* Stats pills */}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <StatPill label={`${totalPhotos} ta yuk`} color="gray" />
+                  <StatPill label={`${photos.filter(p => p.is_sent).length} yuborilgan`} color="green" />
+                  <StatPill label={`${photos.filter(p => !p.is_sent).length} kutilmoqda`} color="amber" />
+                  <StatPill label={`${uniqueClients} ta mijoz`} color="blue" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={handleExportExcel} disabled={isExporting}
+                  className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/20 active:scale-[0.98] disabled:opacity-60 rounded-xl transition-all">
+                  {isExporting
+                    ? <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    : <Download className="w-3.5 h-3.5" />}
+                  {isExporting ? 'Yuklanmoqda...' : 'Excel'}
+                </button>
+                {canCreate && (
+                  <button onClick={onAddCargo}
+                    className="flex items-center gap-1.5 h-9 px-4 text-[12px] font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:scale-[0.98] rounded-xl shadow-md shadow-orange-500/25 transition-all border-0">
+                    <Plus className="w-3.5 h-3.5" />Yuk qo'shish
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Search + Filters */}
+          <div className="relative bg-white dark:bg-[#0d0a04] rounded-2xl border border-orange-100/60 dark:border-orange-500/10 shadow-sm p-4 mb-5 overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-orange-400/30 dark:via-orange-500/20 to-transparent" />
+
+            <div className="relative mb-3">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Mijoz kodi bo'yicha qidirish..."
+                className="w-full h-11 pl-10 pr-9 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all" />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-gray-100 dark:bg-white/5 rounded-xl p-0.5">
+                {(['all', 'sent', 'pending'] as FilterStatus[]).map(s => (
+                  <button key={s} onClick={() => setFilterStatus(s)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      filterStatus === s
+                        ? s === 'sent' ? 'bg-white dark:bg-white/10 text-green-700 dark:text-green-400 shadow-sm'
+                          : s === 'pending' ? 'bg-white dark:bg-white/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                          : 'bg-white dark:bg-white/10 text-gray-800 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}>
+                    {s === 'all' ? 'Barchasi' : s === 'sent' ? 'Yuborilgan' : 'Kutilmoqda'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="ml-auto flex items-center gap-1.5 bg-gray-100 dark:bg-white/5 rounded-xl px-2.5 py-1">
+                <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+                <select value={sortOrder} onChange={e => setSortOrder(e.target.value as SortOrder)}
+                  className="bg-transparent border-0 text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-none cursor-pointer">
+                  <option value="newest">Eng yangi</option>
+                  <option value="oldest">Eng eski</option>
+                </select>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-white/5">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                  {filteredPhotos.length} ta natija topildi
+                </p>
+                {(filterStatus !== 'all' || searchTerm) && (
+                  <button onClick={() => { setSearchTerm(''); setFilterStatus('all'); }}
+                    className="text-xs text-orange-600 dark:text-orange-400 font-bold hover:text-orange-700 transition-colors">
+                    Tozalash
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Grid / Empty states */}
+          {photos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-500/5 dark:to-amber-500/5 border border-orange-100 dark:border-orange-500/10 flex items-center justify-center mb-5">
+                <Package className="w-10 h-10 text-orange-200 dark:text-orange-500/30" />
+              </div>
+              <p className="text-gray-700 dark:text-gray-300 font-black text-lg mb-1">Yuklar yo'q</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm mb-6">Birinchi yukni qo'shing</p>
+              {canCreate && (
+                <button onClick={onAddCargo}
+                  className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 rounded-xl shadow-md shadow-orange-500/30 transition-all active:scale-95">
+                  <Plus className="w-4 h-4" />Yuk qo'shish
+                </button>
+              )}
+            </div>
+          ) : filteredPhotos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24">
+              <div className="w-20 h-20 rounded-3xl bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-5">
+                <Search className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+              </div>
+              <p className="text-gray-700 dark:text-gray-300 font-black text-lg">Natija topilmadi</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Boshqa kalit so'z bilan qidiring</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+                {filteredPhotos.map(photo => (
+                  <PhotoCard key={photo.id} photo={photo}
+                    onView={() => setViewingPhoto(photo)}
+                    onDelete={() => handleDelete(photo.id)}
+                    onEdit={() => setEditingCargo(photo)}
+                    isDeleting={deletingId === photo.id}
+                    formatDate={formatDate}
+                    canEdit={canUpdate}
+                    canDelete={canDelete} />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 px-1">
+                  <Button
+                    variant="outline"
+                    disabled={currentPage === 1}
+                    onClick={() => { setCurrentPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="rounded-xl h-9 px-4 text-[13px] font-semibold border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-orange-300 dark:hover:border-orange-500/30 hover:text-orange-600 dark:hover:text-orange-400 transition-colors disabled:opacity-40"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Oldingi
+                  </Button>
+                  <span className="text-[13px] font-bold text-gray-500 dark:text-gray-400 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] px-4 py-1.5 rounded-xl">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    disabled={currentPage === totalPages}
+                    onClick={() => { setCurrentPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="rounded-xl h-9 px-4 text-[13px] font-semibold border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-orange-300 dark:hover:border-orange-500/30 hover:text-orange-600 dark:hover:text-orange-400 transition-colors disabled:opacity-40"
+                  >
+                    Keyingi <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {/* Cargo Grid */}
-        {photos.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-5">
-              <Package className="w-10 h-10 text-gray-300" />
-            </div>
-            <p className="text-gray-500 text-lg mb-2 font-medium">{t('cargo.noPhotos')}</p>
-            <p className="text-gray-400 text-sm mb-6">{t('cargo.addFirstPhoto')}</p>
-            <Button
-              onClick={onAddCargo}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-sm"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              {t('cargo.addCargo')}
-            </Button>
-          </div>
-        ) : filteredPhotos.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-5">
-              <Search className="w-10 h-10 text-gray-300" />
-            </div>
-            <p className="text-gray-500 text-lg font-medium">{t('cargo.noResults')}</p>
-            <p className="text-gray-400 text-sm mt-1">{t('cargo.searchPlaceholder')}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPhotos.map((photo) => (
-              <PhotoCard
-                key={photo.id}
-                photo={photo}
-                onView={() => setViewingPhoto(photo)}
-                onDelete={() => handleDelete(photo.id)}
-                onEdit={() => setEditingCargo(photo)}
-                isDeleting={deletingId === photo.id}
-                formatDate={formatDate}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Photo Viewer Modal (on-demand image loading) */}
       {viewingPhoto && (
-        <PhotoViewerModal
-          photo={viewingPhoto}
-          onClose={() => setViewingPhoto(null)}
-          onEdit={() => {
-            setEditingCargo(viewingPhoto);
-            setViewingPhoto(null);
-          }}
+        <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)}
+          onEdit={() => { setEditingCargo(viewingPhoto); setViewingPhoto(null); }}
           onDelete={() => handleDelete(viewingPhoto.id)}
           isDeleting={deletingId === viewingPhoto.id}
-          formatDate={formatDate}
-        />
+          formatDate={formatDate} />
       )}
 
-      {/* Edit Modal */}
       {editingCargo && (
-        <EditCargoModal
-          cargo={editingCargo}
-          onClose={() => setEditingCargo(null)}
-          onSuccess={handleEditSuccess}
-        />
+        <EditCargoModal cargo={editingCargo} onClose={() => setEditingCargo(null)} onSuccess={handleEditSuccess} />
       )}
-
-
     </>
   );
 }
