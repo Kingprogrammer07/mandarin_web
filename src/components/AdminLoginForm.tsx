@@ -38,6 +38,7 @@ export default function AdminLoginForm({ onAdminLoginSuccess }: AdminLoginFormPr
   const [pin, setPin] = useState(['', '', '', '']);
   const [pinError, setPinError] = useState('');
 
+  const usernameRef = useRef<HTMLInputElement>(null);
   const pinRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
@@ -49,6 +50,16 @@ export default function AdminLoginForm({ onAdminLoginSuccess }: AdminLoginFormPr
     resolver: zodResolver(usernameSchema),
     defaultValues: { system_username: '' },
   });
+
+  useEffect(() => {
+    if (step === 1) {
+      usernameRef.current?.focus();
+    } else {
+      setTimeout(() => pinRefs[0].current?.focus(), 150);
+    }
+    // refs are stable objects; only step changes which one to focus
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const checkUsernameMutation = useMutation({
     mutationFn: (username: string) => checkAdminUsername(username),
@@ -74,7 +85,6 @@ export default function AdminLoginForm({ onAdminLoginSuccess }: AdminLoginFormPr
       }
 
       setStep(2);
-      setTimeout(() => pinRefs[0].current?.focus(), 150);
     },
   });
 
@@ -206,8 +216,12 @@ export default function AdminLoginForm({ onAdminLoginSuccess }: AdminLoginFormPr
                           <User className="w-[18px] h-[18px] text-gray-400 dark:text-gray-600 group-focus-within:text-orange-500 transition-colors" />
                         </div>
                         <input
-                          type="text"
                           {...register('system_username')}
+                          ref={(e) => {
+                            usernameRef.current = e;
+                            register('system_username').ref(e);
+                          }}
+                          type="text"
                           placeholder="admin_01"
                           autoComplete="off"
                           className="w-full pl-10 pr-4 py-3.5 bg-gray-50/80 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-2xl text-[14px]
