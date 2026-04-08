@@ -53,9 +53,12 @@ export default function AdminLoginForm({ onAdminLoginSuccess }: AdminLoginFormPr
 
   useEffect(() => {
     if (step === 1) {
-      usernameRef.current?.focus();
+      // Delay past the card entry animation (duration:0.5s + delay:0.1s = 600ms)
+      // so the browser receives focus on a fully-painted, visible input.
+      setTimeout(() => usernameRef.current?.focus(), 650);
     } else {
-      setTimeout(() => pinRefs[0].current?.focus(), 150);
+      // Step-2 slide-in animation is 250ms; 300ms gives a small margin.
+      setTimeout(() => pinRefs[0].current?.focus(), 300);
     }
     // refs are stable objects; only step changes which one to focus
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -229,6 +229,10 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
     resolver: zodResolver(createAdminSchema),
   });
 
+  // Portal target for LightSelect — must be inside this component's DOM so
+  // Radix FocusScope (used by the surrounding Dialog/Drawer) does not block it.
+  const [lsPortalEl, setLsPortalEl] = useState<HTMLDivElement | null>(null);
+
   const { mutate: create, isPending } = useMutation({
     mutationFn: createAdminAccount,
     onSuccess: () => {
@@ -247,6 +251,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-4">
+      <div ref={setLsPortalEl} />
       <div>
         <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
           Mijoz kodi
@@ -303,6 +308,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
               value={field.value}
               onChange={field.onChange}
               placeholder="Rolni tanlang"
+              portalContainer={lsPortalEl}
             />
           )}
         />
@@ -347,6 +353,9 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  // Portal target for LightSelect dropdowns inside this Sheet/Dialog.
+  const [lsPortalEl, setLsPortalEl] = useState<HTMLDivElement | null>(null);
 
   const roleOptions: SelectOption[] = useMemo(() =>
     roles.map((r) => ({ value: String(r.id), label: r.name })),
@@ -552,6 +561,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                         value={field.value}
                         onChange={field.onChange}
                         placeholder="Rolni tanlang"
+                        portalContainer={lsPortalEl}
                       />
                     )}
                   />
@@ -742,6 +752,9 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
           isDesktop ? 'max-w-lg' : 'w-full'
         }`}
       >
+        {/* LightSelect dropdown portal target — inside SheetContent so Radix
+            FocusScope does not intercept pointer events on the dropdown. */}
+        <div ref={setLsPortalEl} />
         <SheetHeader className="px-4 py-3 border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

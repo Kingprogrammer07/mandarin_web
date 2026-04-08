@@ -43,6 +43,10 @@ import {
   getPOSClientTransactions,
   posMarkAsTaken,
 } from "@/api/pos";
+import {
+  useBroadcastChannel,
+  type BroadcastMessage,
+} from "@/hooks/useBroadcastChannel";
 import type {
   PaymentProvider,
   CashierLogItem,
@@ -380,6 +384,8 @@ function ClientProfileDrawer({
     queryKey: ["pos-txn", clientCode, txFilter],
     queryFn: () => getPOSClientTransactions(clientCode, txFilter, 20, 0),
   });
+
+  console.log(JSON.stringify(txData, null, 2));
 
   // Balance adjustment
   const adjustMut = useMutation({
@@ -1103,6 +1109,30 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const canAdjust  = hasPerm("pos:adjust");
   // Super-admins always have full access; others need at least one POS permission
   const hasPosAccess = jwtClaims.isSuperAdmin || canRead || canProcess || canAdjust;
+
+  // ── Warehouse → Cashier notifications via BroadcastChannel ──────────────
+  useBroadcastChannel(
+    useCallback((msg: BroadcastMessage) => {
+      if (msg.type !== "POS_NOTIFY") return;
+      const { flightName, clientCode, amount, currency } = msg.payload;
+      const amountStr =
+        amount != null
+          ? ` (${new Intl.NumberFormat("uz-UZ").format(amount)} ${currency ?? "UZS"})`
+          : "";
+      toast.info(
+        `To'lov tasdiqlansin: ${clientCode}`,
+        {
+          description: `${flightName} reysi${amountStr}`,
+          // duration:Infinity keeps the toast until the cashier dismisses it
+          duration: Infinity,
+          action: {
+            label: "Yopish",
+            onClick: () => undefined,
+          },
+        },
+      );
+    }, []),
+  );
 
   // ── Search ────────────────────────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState("");

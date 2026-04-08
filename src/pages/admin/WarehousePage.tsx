@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Lock,
 } from "lucide-react";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { getAdminJwtClaims } from "../../api/services/adminManagement";
 import { refreshAdminToken } from "../../api/services/adminAuth";
@@ -21,6 +22,7 @@ import MyActivityList from "../../components/warehouse/MyActivityList";
 import MarkTakenModal from "../../components/warehouse/MarkTakenModal";
 import WarehouseOfflineManager from "../../components/warehouse/WarehouseOfflineManager";
 import type { WarehouseTransactionItem } from "../../api/services/warehouse";
+import { useBroadcastChannel } from "../../hooks/useBroadcastChannel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -143,6 +145,27 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
   const handlePageChange = useCallback(
     (newPage: number) => setPage(newPage),
     [setPage],
+  );
+
+  const { sendMessage } = useBroadcastChannel();
+
+  const handleNotifyCashier = useCallback(
+    (item: WarehouseTransactionItem) => {
+      sendMessage({
+        type: "POS_NOTIFY",
+        payload: {
+          flightName: item.reys,
+          clientCode: item.client_code,
+          amount: item.remaining_amount > 0 ? item.remaining_amount : item.total_amount ?? undefined,
+          currency: "UZS",
+        },
+      });
+      toast.success(`Kassirga xabar yuborildi: ${item.client_code}`, {
+        description: `Reys: ${item.reys}`,
+        duration: 3000,
+      });
+    },
+    [sendMessage],
   );
 
   const handleActivityPageChange = useCallback(
@@ -278,6 +301,7 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
               onPageChange={handlePageChange}
               onMarkTaken={handleMarkTaken}
               canMarkTaken={canMarkTaken}
+              onNotifyCashier={handleNotifyCashier}
             />
           )
         ) : (

@@ -968,6 +968,9 @@ function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUploadStat
     defaultValues: defaultValues ?? EMPTY_FORM,
   });
 
+  // Portal target for LightSelect dropdowns inside this form's parent modal.
+  const [lsPortalEl, setLsPortalEl] = useState<HTMLDivElement | null>(null);
+
   // Determine initial mode: if editing and existing item has s3_key → upload mode (show success)
   const initialMode: MediaInputMode = defaultValues?.media_s3_key
     ? 'upload'
@@ -1189,6 +1192,7 @@ function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUploadStat
 
   return (
     <form id="carousel-form" onSubmit={handleSubmit(submit)} className="space-y-5">
+      <div ref={setLsPortalEl} />
 
       {/* ── Type selector (must be chosen first) ──────────────── */}
       <div className="space-y-3">
@@ -1203,6 +1207,7 @@ function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUploadStat
               onChange={field.onChange}
               placeholder="Tanlang"
               error={!!errors.type}
+              portalContainer={lsPortalEl}
             />
           )}
         />
@@ -1320,6 +1325,7 @@ function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUploadStat
                   onChange={field.onChange}
                   placeholder="Tanlang"
                   error={!!errors.media_type}
+                  portalContainer={lsPortalEl}
                 />
               )}
             />

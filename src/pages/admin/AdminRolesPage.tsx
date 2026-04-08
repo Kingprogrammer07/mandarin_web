@@ -315,6 +315,14 @@ export default function AdminRolesPage() {
   const isPending = addRoleMut.isPending || editRoleMut.isPending;
   const modalTitle = editingRole ? 'Rolni Tahrirlash' : 'Yangi Rol Yaratish';
 
+  // Portal container for LightSelect dropdowns — a div inside the modal DOM tree
+  // so Radix FocusScope does not block pointer events on the dropdown.
+  // useState (not useRef) so the component re-renders when the node is mounted.
+  const [lsPortalEl, setLsPortalEl] = useState<HTMLDivElement | null>(null);
+  const lsPortalCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    setLsPortalEl(node);
+  }, []);
+
   /**
    * Determines if the role being edited is a super-admin type — if so we show a
    * "full access" banner instead of the permission checkboxes, because super-admin
@@ -379,6 +387,7 @@ export default function AdminRolesPage() {
               onChange={field.onChange}
               placeholder="Sahifani tanlang..."
               error={!!errors.home_page}
+              portalContainer={lsPortalEl}
             />
           )}
         />
@@ -726,6 +735,10 @@ export default function AdminRolesPage() {
       {isDesktop ? (
         <Dialog open={isOpen} onOpenChange={handleModalOpenChange}>
           <DialogContent className="sm:max-w-[500px] flex flex-col gap-0 max-h-[88vh] p-0 overflow-hidden">
+            {/* LightSelect dropdown portal target — must be inside DialogContent
+                so Radix FocusScope does not block pointer events on the dropdown */}
+            <div ref={lsPortalCallbackRef} />
+
             <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-gray-100 dark:border-white/[0.06]">
               <DialogTitle>{modalTitle}</DialogTitle>
               <DialogDescription className="sr-only">
@@ -747,6 +760,9 @@ export default function AdminRolesPage() {
       ) : (
         <Drawer open={isOpen} onOpenChange={handleModalOpenChange}>
           <DrawerContent className="flex flex-col max-h-[92vh]">
+            {/* LightSelect dropdown portal target — must be inside DrawerContent */}
+            <div ref={lsPortalCallbackRef} />
+
             <DrawerHeader className="shrink-0 text-left px-4 pt-4 pb-3 border-b border-gray-100 dark:border-white/[0.06]">
               <DrawerTitle>{modalTitle}</DrawerTitle>
               <DrawerDescription className="sr-only">

@@ -8,6 +8,7 @@ import {
   Plane,
   User,
   Phone,
+  BellRing,
 } from "lucide-react";
 import type { WarehouseTransactionItem } from "../../api/services/warehouse";
 import { formatCurrencySum, formatTashkentDateTime } from "../../lib/format";
@@ -67,6 +68,8 @@ interface TransactionsTableProps {
   onPageChange: (page: number) => void;
   onMarkTaken: (transactionId: number) => void;
   canMarkTaken: boolean;
+  /** Called when the warehouse worker taps "Kassirga xabar" on an unpaid row */
+  onNotifyCashier?: (item: WarehouseTransactionItem) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -80,6 +83,7 @@ export default function TransactionsTable({
   onPageChange,
   onMarkTaken,
   canMarkTaken,
+  onNotifyCashier,
 }: TransactionsTableProps) {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
@@ -128,11 +132,12 @@ export default function TransactionsTable({
 
       {/* Transaction rows */}
       <div className="space-y-2" role="list" aria-label="Tranzaksiyalar ro'yxati">
-        {void console.log(JSON.stringify(items)) /* Debug log to verify data structure */}
         {items.map((item, idx) => {
           const paymentStyle = getPaymentStyle(item.payment_status);
           const rowAccent = getRowAccent(item);
           const isClickable = canMarkTaken && !item.is_taken_away;
+          const isUnpaid =
+            item.payment_status === "unpaid" || item.payment_status === "pending";
 
           return (
             <motion.div
@@ -234,6 +239,23 @@ export default function TransactionsTable({
                 >
                   {paymentStyle.label}
                 </span>
+
+                {/* Notify cashier button — only for unpaid/pending rows */}
+                {isUnpaid && onNotifyCashier && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      // Prevent the row's onMarkTaken click from firing
+                      e.stopPropagation();
+                      onNotifyCashier(item);
+                    }}
+                    title="Kassirga to'lov uchun xabar yuborish"
+                    className="shrink-0 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-500/20 active:scale-95 transition-all"
+                  >
+                    <BellRing className="w-3 h-3" aria-hidden="true" />
+                    Kassir
+                  </button>
+                )}
 
                 {/* Action indicator */}
                 {item.is_taken_away ? (
