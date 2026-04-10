@@ -31,6 +31,9 @@ import {
   Lock,
   UserCircle,
   LogOut,
+  Bell,
+  BellOff,
+  BellRing,
 } from "lucide-react";
 
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
@@ -82,6 +85,59 @@ const PROVIDER_CHIP: Record<string, string> = {
     "bg-cyan-50   dark:bg-cyan-500/10   text-cyan-600   dark:text-cyan-400",
 };
 
+/**
+ * Deterministic color palette assigned to other cashiers' log rows.
+ * Index is derived from `cashier_id % PEER_CASHIER_PALETTE.length`.
+ */
+const PEER_CASHIER_PALETTE = [
+  {
+    row: "border-l-2 border-blue-400 bg-blue-50/40 dark:bg-blue-500/[0.06]",
+    dot: "bg-blue-400",
+    label: "text-blue-500 dark:text-blue-400",
+  },
+  {
+    row: "border-l-2 border-purple-400 bg-purple-50/40 dark:bg-purple-500/[0.06]",
+    dot: "bg-purple-400",
+    label: "text-purple-500 dark:text-purple-400",
+  },
+  {
+    row: "border-l-2 border-teal-400 bg-teal-50/40 dark:bg-teal-500/[0.06]",
+    dot: "bg-teal-400",
+    label: "text-teal-500 dark:text-teal-400",
+  },
+  {
+    row: "border-l-2 border-rose-400 bg-rose-50/40 dark:bg-rose-500/[0.06]",
+    dot: "bg-rose-400",
+    label: "text-rose-500 dark:text-rose-400",
+  },
+  {
+    row: "border-l-2 border-indigo-400 bg-indigo-50/40 dark:bg-indigo-500/[0.06]",
+    dot: "bg-indigo-400",
+    label: "text-indigo-500 dark:text-indigo-400",
+  },
+] as const;
+
+/** Style applied to the current user's own log rows. */
+const OWN_CASHIER_STYLE = {
+  row: "border-l-2 border-orange-400 bg-orange-50/40 dark:bg-orange-500/[0.06]",
+  dot: "bg-orange-400",
+  label: "text-orange-500 dark:text-orange-400",
+} as const;
+
+/** Returns the colour tokens for a log entry given the entry's cashier_id and the current admin's id. */
+function resolveCashierStyle(
+  cashierId: number | null,
+  currentAdminId: number | null,
+): { row: string; dot: string; label: string } {
+  if (cashierId === null) {
+    return { row: "", dot: "bg-gray-300 dark:bg-gray-600", label: "text-gray-400" };
+  }
+  if (cashierId === currentAdminId) {
+    return OWN_CASHIER_STYLE;
+  }
+  return PEER_CASHIER_PALETTE[cashierId % PEER_CASHIER_PALETTE.length]!;
+}
+
 const STATUS_STYLES: Record<
   string,
   { bg: string; text: string; label: string }
@@ -130,6 +186,69 @@ function translatePayment(raw: string): string {
 
 const RECENT_KEY = "pos_recent_searches";
 const MAX_RECENT = 5;
+const SOUND_KEY = "pos_sound_enabled";
+const PENDING_NOTIFS_KEY = "pos_pending_notifs";
+
+/**
+ * A single warehouse→cashier notification that has been received but not yet
+ * acted on (dismissed or opened).  Persisted in localStorage so the cashier
+ * does not lose notifications if they briefly leave or refresh the page.
+ */
+interface PendingNotif {
+  id: string;
+  clientCode: string;
+  flightName: string;
+  amount?: number;
+  currency?: string;
+}
+
+function loadPendingNotifs(): PendingNotif[] {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_NOTIFS_KEY) ?? "[]") as PendingNotif[];
+  } catch {
+    return [];
+  }
+}
+
+function persistPendingNotifs(notifs: PendingNotif[]): void {
+  localStorage.setItem(PENDING_NOTIFS_KEY, JSON.stringify(notifs));
+}
+
+/**
+ * Plays a two-tone notification chime using the Web Audio API.
+ * No external audio file needed — the sound is synthesised on-the-fly.
+ * Silently no-ops if AudioContext is unavailable or blocked by the browser.
+ */
+function playNotificationChime(): void {
+  try {
+    const ctx = new AudioContext();
+    const master = ctx.createGain();
+    master.connect(ctx.destination);
+    master.gain.setValueAtTime(0.35, ctx.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+
+    // First tone — higher pitch
+    const osc1 = ctx.createOscillator();
+    osc1.connect(master);
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(1318, ctx.currentTime);        // E6
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.18);
+
+    // Second tone — lower pitch, slight delay
+    const osc2 = ctx.createOscillator();
+    osc2.connect(master);
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(987, ctx.currentTime + 0.18);  // B5
+    osc2.start(ctx.currentTime + 0.18);
+    osc2.stop(ctx.currentTime + 0.7);
+
+    // Release the AudioContext after the sound completes.
+    osc2.onended = () => void ctx.close();
+  } catch {
+    // AudioContext may be blocked before a user gesture on some browsers.
+  }
+}
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
@@ -211,26 +330,32 @@ function LogEntry({
   item,
   index,
   onSelect,
+  currentAdminId,
 }: {
   item: CashierLogItem;
   index: number;
   onSelect: (code: string) => void;
+  /** The current user's Admin DB PK — used to colour-code own vs. peer entries. */
+  currentAdminId: number | null;
 }) {
   const hasCode = !!item.client_code;
+  const isOwn = item.cashier_id !== null && item.cashier_id === currentAdminId;
+  const cashierStyle = resolveCashierStyle(item.cashier_id, currentAdminId);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: Math.min(index * 0.025, 0.4) }}
       onClick={() => hasCode && onSelect(item.client_code!)}
-      className={`flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 dark:border-white/[0.04] last:border-0 rounded-lg px-1 -mx-1 transition-colors ${
-        hasCode
-          ? "cursor-pointer hover:bg-orange-50/60 dark:hover:bg-orange-500/[0.05]"
-          : ""
+      className={`flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 dark:border-white/[0.04] last:border-0 rounded-lg px-2 -mx-1 transition-colors ${cashierStyle.row} ${
+        hasCode ? "cursor-pointer hover:opacity-80" : ""
       }`}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
+          {/* Coloured dot — visually groups rows by cashier */}
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cashierStyle.dot}`} />
           <span className="text-[13px] font-bold text-gray-800 dark:text-white font-mono">
             {item.client_code ?? "—"}
           </span>
@@ -240,9 +365,17 @@ function LogEntry({
             </span>
           )}
         </div>
-        <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">
-          {formatTashkentDateTime(item.created_at)}
-        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-[10px] text-gray-400 dark:text-gray-600">
+            {formatTashkentDateTime(item.created_at)}
+          </p>
+          {/* "Men" badge for own entries; cashier_id number for peers */}
+          {item.cashier_id !== null && (
+            <span className={`text-[9px] font-bold ${cashierStyle.label}`}>
+              {isOwn ? "Men" : `#${item.cashier_id}`}
+            </span>
+          )}
+        </div>
       </div>
       <div className="shrink-0 text-right">
         <p
@@ -1110,29 +1243,118 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   // Super-admins always have full access; others need at least one POS permission
   const hasPosAccess = jwtClaims.isSuperAdmin || canRead || canProcess || canAdjust;
 
-  // ── Warehouse → Cashier notifications via BroadcastChannel ──────────────
-  useBroadcastChannel(
-    useCallback((msg: BroadcastMessage) => {
-      if (msg.type !== "POS_NOTIFY") return;
-      const { flightName, clientCode, amount, currency } = msg.payload;
-      const amountStr =
-        amount != null
-          ? ` (${new Intl.NumberFormat("uz-UZ").format(amount)} ${currency ?? "UZS"})`
-          : "";
-      toast.info(
-        `To'lov tasdiqlansin: ${clientCode}`,
-        {
-          description: `${flightName} reysi${amountStr}`,
-          // duration:Infinity keeps the toast until the cashier dismisses it
-          duration: Infinity,
-          action: {
-            label: "Yopish",
-            onClick: () => undefined,
-          },
-        },
-      );
-    }, []),
+  // ── Sound preference (persisted in localStorage) ─────────────────────────
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(
+    () => localStorage.getItem(SOUND_KEY) !== "off",
   );
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+      return next;
+    });
+  }, []);
+
+  // ── Pending notifications (persisted — survive page refresh) ────────────
+  // Notifications are stored in localStorage and re-shown on mount so the
+  // cashier never misses a message even if they briefly leave the page.
+  const [pendingNotifs, setPendingNotifs] = useState<PendingNotif[]>(loadPendingNotifs);
+  const notifCount = pendingNotifs.length;
+
+  // ── Stable refs for functions used inside toast action callbacks ──────────
+  // Toast action `onClick` handlers close over these refs so they always call
+  // the latest version without creating stale closures.
+  const handleSearchRef = useRef<(code: string) => void>(() => {});
+  const sendMessageRef  = useRef<(msg: BroadcastMessage) => void>(() => {});
+  const removePendingNotifRef = useRef<(id: string) => void>(() => {});
+
+  const removePendingNotif = useCallback((id: string) => {
+    setPendingNotifs((prev) => {
+      const next = prev.filter((n) => n.id !== id);
+      persistPendingNotifs(next);
+      return next;
+    });
+    toast.dismiss(id);
+  }, []);
+  // Keep the ref current on every render so toast callbacks always call the
+  // latest version even though they were created at toast-show time.
+  removePendingNotifRef.current = removePendingNotif;
+
+  const handleDismissAllNotifs = useCallback(() => {
+    setPendingNotifs([]);
+    persistPendingNotifs([]);
+    toast.dismiss();
+  }, []);
+
+  /** Creates (or re-creates after page refresh) the Sonner toast for one pending notification. */
+  const showNotifToast = useCallback((notif: PendingNotif) => {
+    const amountStr =
+      notif.amount != null
+        ? ` · ${new Intl.NumberFormat("uz-UZ").format(notif.amount)} ${notif.currency ?? "UZS"}`
+        : "";
+
+    toast.info(`${notif.clientCode}${amountStr}`, {
+      // Stable ID lets Sonner de-duplicate if the same notif is shown twice
+      // (e.g. mount effect runs while the toast is still visible).
+      id: notif.id,
+      description: `${notif.flightName} · To'lov tasdiqlansin`,
+      duration: Infinity,
+      action: {
+        label: "Ochish",
+        onClick: () => {
+          handleSearchRef.current(notif.clientCode);
+          removePendingNotifRef.current(notif.id);
+          // Inform the warehouse operator that the cashier saw the notification.
+          sendMessageRef.current({
+            type: "CASHIER_ACK",
+            payload: { clientCode: notif.clientCode, flightName: notif.flightName },
+          });
+        },
+      },
+      cancel: {
+        label: "✕",
+        onClick: () => removePendingNotifRef.current(notif.id),
+      },
+    });
+  }, []); // all dependencies are refs — this callback is intentionally stable
+
+  // On mount: re-show toasts for notifications that arrived while the cashier
+  // was away (they are still in localStorage / pendingNotifs state).
+  useEffect(() => {
+    loadPendingNotifs().forEach((notif) => showNotifToast(notif));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only on mount
+
+  // ── Warehouse → Cashier notifications via BroadcastChannel ──────────────
+  const { sendMessage } = useBroadcastChannel(
+    useCallback(
+      (msg: BroadcastMessage) => {
+        if (msg.type !== "POS_NOTIFY") return;
+        const { flightName, clientCode, amount, currency } = msg.payload;
+
+        if (soundEnabled) playNotificationChime();
+
+        const notif: PendingNotif = {
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          clientCode,
+          flightName,
+          amount,
+          currency,
+        };
+
+        setPendingNotifs((prev) => {
+          const next = [...prev, notif];
+          persistPendingNotifs(next);
+          return next;
+        });
+
+        showNotifToast(notif);
+      },
+      [soundEnabled, showNotifToast],
+    ),
+  );
+  // Keep sendMessage ref current so toast action callbacks can send ACKs.
+  sendMessageRef.current = sendMessage;
 
   // ── Search ────────────────────────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState("");
@@ -1169,7 +1391,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   } = useQuery({
     queryKey: ["cashier-log"],
     queryFn: () => getCashierLog({ page: 1, size: 30 }),
-    refetchInterval: 60_000,
+    // Poll every 10 s so all cashiers see each other's entries in near-real-time
+    // without requiring a manual refresh.
+    refetchInterval: 10_000,
     // Only fire if the admin actually has pos:read — prevents a 403 for adjust-only roles
     enabled: canRead,
   });
@@ -1292,6 +1516,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     [searchInput],
   );
 
+  // Keep the ref in sync so the BroadcastChannel notification callback always
+  // calls the latest version of handleSearch (avoids stale closure over searchInput).
+  handleSearchRef.current = handleSearch;
+
   const handleLogEntryClick = useCallback(
     (code: string) => handleSearch(code),
     [handleSearch],
@@ -1402,6 +1630,31 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
             POS Kassa
           </span>
           <div className="flex items-center gap-1">
+            {/* Dismiss all active notifications */}
+            {notifCount > 0 && (
+              <button
+                onClick={handleDismissAllNotifs}
+                title="Barcha bildirishnomalarni yopish"
+                className="relative p-2 rounded-xl text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/[0.08] transition-colors"
+              >
+                <BellRing className="w-4 h-4" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              </button>
+            )}
+
+            {/* Sound toggle */}
+            <button
+              onClick={toggleSound}
+              title={soundEnabled ? "Ovozni o'chirish" : "Ovozni yoqish"}
+              className="p-2 rounded-xl text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/[0.08] transition-colors"
+            >
+              {soundEnabled ? (
+                <Bell className="w-4 h-4" />
+              ) : (
+                <BellOff className="w-4 h-4" />
+              )}
+            </button>
+
             <button
               onClick={() => {onNavigate("admin-profile")}}
               title="Profil va Xavfsizlik"
@@ -1470,6 +1723,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                           item={item}
                           index={i}
                           onSelect={handleLogEntryClick}
+                          currentAdminId={jwtClaims.admin_id}
                         />
                       ))
                     ) : (

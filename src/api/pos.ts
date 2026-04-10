@@ -52,7 +52,7 @@ export interface BulkPaymentResponse {
   results: BulkItemResult[];
 }
 
-/** A single entry in the cashier's personal payment audit log. */
+/** A single entry in the shared cashier payment audit log. */
 export interface CashierLogItem {
   id: number;
   transaction_id: number;
@@ -60,6 +60,12 @@ export interface CashierLogItem {
   flight: string | null;
   paid_amount: number;
   payment_provider: string;
+  /**
+   * Admin DB PK of the cashier who processed this entry.
+   * Populated for all entries — used by the frontend to colour-code rows
+   * and distinguish the current user's entries from colleagues'.
+   */
+  cashier_id: number | null;
   created_at: string;
 }
 

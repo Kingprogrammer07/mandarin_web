@@ -22,7 +22,7 @@ import MyActivityList from "../../components/warehouse/MyActivityList";
 import MarkTakenModal from "../../components/warehouse/MarkTakenModal";
 import WarehouseOfflineManager from "../../components/warehouse/WarehouseOfflineManager";
 import type { WarehouseTransactionItem } from "../../api/services/warehouse";
-import { useBroadcastChannel } from "../../hooks/useBroadcastChannel";
+import { useBroadcastChannel, type BroadcastMessage } from "../../hooks/useBroadcastChannel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -147,7 +147,16 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
     [setPage],
   );
 
-  const { sendMessage } = useBroadcastChannel();
+  const { sendMessage } = useBroadcastChannel(
+    useCallback((msg: BroadcastMessage) => {
+      if (msg.type !== "CASHIER_ACK") return;
+      const { clientCode, flightName } = msg.payload;
+      toast.success(`Kassir ko'rdi: ${clientCode}`, {
+        description: `Reys: ${flightName}`,
+        duration: 5000,
+      });
+    }, []),
+  );
 
   const handleNotifyCashier = useCallback(
     (item: WarehouseTransactionItem) => {

@@ -135,6 +135,11 @@ export interface AdminJwtClaims {
    * individual permissions from their JWT.
    */
   isSuperAdmin: boolean;
+  /**
+   * The Admin DB primary key — stored as `sub` (or `admin_id`) in the JWT.
+   * Used to identify which cashier log entries belong to the current user.
+   */
+  admin_id: number | null;
 }
 
 /**
@@ -148,6 +153,7 @@ export function getAdminJwtClaims(): AdminJwtClaims {
     role_name: '',
     home_page: null,
     isSuperAdmin: false,
+    admin_id: null,
   };
 
   const token = localStorage.getItem('access_token');
@@ -162,11 +168,16 @@ export function getAdminJwtClaims(): AdminJwtClaims {
     const role_name = String(payload.role_name ?? payload.role ?? '');
     const isSuperAdmin = role_name === 'super_admin' || role_name === 'super-admin';
 
+    // admin_id lives in `sub` (standard JWT subject) or directly as `admin_id`
+    const rawAdminId = payload.admin_id ?? payload.sub;
+    const admin_id = rawAdminId != null ? Number(rawAdminId) : null;
+
     return {
       permissions: new Set((payload.permissions as string[] | undefined) ?? []),
       role_name,
       home_page: (payload.home_page as string | undefined) ?? null,
       isSuperAdmin,
+      admin_id: Number.isFinite(admin_id) ? admin_id : null,
     };
   } catch {
     return empty;

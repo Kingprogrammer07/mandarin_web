@@ -79,14 +79,14 @@ const VALID_HOME_PAGES = [
 type ValidHomePage = (typeof VALID_HOME_PAGES)[number];
 
 const HOME_PAGE_OPTIONS: LightSelectOption[] = [
-  { value: '/admin/accounts',  label: 'Admin Hisoblar' },
+  // { value: '/admin/accounts',  label: 'Admin Hisoblar' },
   { value: '/admin/flights',   label: 'Ishchi sahifasi (Reyslar)' },
   { value: '/admin/warehouse', label: 'Omborxona' },
   { value: '/admin/clients',   label: 'Menedjer Sahifasi' },
-  { value: '/admin/carousel',  label: 'Karusel boshqaruvi' },
-  { value: '/admin/roles',     label: 'Rollar va Huquqlar' },
-  { value: '/admin/audit',     label: 'Audit Tarixi' },
-  { value: '/admin/profile',   label: 'Profil' },
+  // { value: '/admin/carousel',  label: 'Karusel boshqaruvi' },
+  // { value: '/admin/roles',     label: 'Rollar va Huquqlar' },
+  // { value: '/admin/audit',     label: 'Audit Tarixi' },
+  // { value: '/admin/profile',   label: 'Profil' },
   { value: '/pos',             label: 'Kassa (POS)' },
 ];
 

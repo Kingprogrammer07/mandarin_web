@@ -15,6 +15,7 @@ import {
   Search,
   X,
   Lock,
+  Send,
 } from "lucide-react";
 import { regions, DISTRICTS } from "@/lib/validation";
 import { normalizeNumber } from "@/utils/numberFormat";
@@ -1060,15 +1061,24 @@ export default function AddCargoForm({
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                     {t("cargo.weight")} <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    ref={weightRef}
-                    type="text"
-                    inputMode="decimal"
-                    value={weightKg}
-                    onChange={(e) => handleWeightChange(e.target.value)}
-                    placeholder={t("cargo.weightPlaceholder")}
-                    className={`${INPUT_CLS} caret-orange-500 ${errors.weight_kg ? ERR_CLS : ""}`}
-                  />
+                  <div className="relative">
+                    <Input
+                      ref={weightRef}
+                      type="text"
+                      inputMode="decimal"
+                      value={weightKg}
+                      onChange={(e) => handleWeightChange(e.target.value)}
+                      placeholder={t("cargo.weightPlaceholder")}
+                      className={`${INPUT_CLS} pr-12 caret-orange-500 ${errors.weight_kg ? ERR_CLS : ""}`}
+                    />
+                    <button
+                      type="submit"
+                      className="absolute right-1 top-1 bottom-1 w-10 flex items-center justify-center bg-orange-500 hover:bg-orange-600 active:scale-95 text-white rounded-[10px] transition-all shadow-sm"
+                      title={fastMode ? t("cargo.saveAndNext") : t("cargo.submit")}
+                    >
+                      <Send className="w-4 h-4 ml-0.5" />
+                    </button>
+                  </div>
                   {errors.weight_kg && (
                     <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
                       {errors.weight_kg}
