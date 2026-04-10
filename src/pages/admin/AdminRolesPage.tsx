@@ -103,7 +103,7 @@ const HOME_PAGE_RESOURCE_PACKS: Record<ValidHomePage, string[] | null> = {
   '/admin/audit':     ['audit_logs'],
   '/admin/profile':   null,
   '/admin/carousel':  ['carousel'],
-  '/pos':             ['pos', 'payments'],
+  '/pos':             ['pos', 'payments', 'cargo'],
   '/admin/flights':   ['flights', 'cargo'],
   '/admin/warehouse': ['warehouse'],
   '/admin/clients':   ['clients', 'carousel'],
