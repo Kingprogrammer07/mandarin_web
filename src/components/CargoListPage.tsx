@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getFlightPhotos, deleteCargo, getCargoImageMetadata, exportFlightCargoExcel, uploadPhoto, type CargoPhoto } from '@/api/services/cargo';
 import { getFlightByName, type Flight } from '@/api/services/flight';
 import { Button } from '@/components/ui/button';
@@ -338,6 +338,10 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
   const [photos, setPhotos] = useState<CargoPhoto[]>([]);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Separate flag for search/page re-fetches — avoids tearing down the DOM
+  // (and losing keyboard focus) every time the user types in the search box.
+  const [isFetching, setIsFetching] = useState(false);
+  const isFirstLoad = useRef(true);
   const [totalPhotos, setTotalPhotos] = useState(0);
   const [uniqueClients, setUniqueClients] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -372,8 +376,14 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
   }, []);
 
   const loadData = useCallback(async () => {
-    try {
+    // First load: full-screen spinner. Subsequent fetches (search/pagination):
+    // only a subtle indicator so the DOM stays mounted and focus is preserved.
+    if (isFirstLoad.current) {
       setIsLoading(true);
+    } else {
+      setIsFetching(true);
+    }
+    try {
       const [flightData, photosData] = await Promise.all([
         getFlightByName(flightName),
         getFlightPhotos(flightName, currentPage, 50, debouncedSearchTerm || undefined),
@@ -387,6 +397,8 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
       toast({ title: "❌ Ma'lumotlarni yuklashda xatolik", description: 'Qayta urinib ko\'ring', variant: 'error' });
     } finally {
       setIsLoading(false);
+      setIsFetching(false);
+      isFirstLoad.current = false;
     }
   }, [flightName, currentPage, debouncedSearchTerm, toast]);
 
@@ -606,12 +618,15 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
               <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Mijoz kodi bo'yicha qidirish..."
                 className="w-full h-11 pl-10 pr-9 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all" />
-              {searchTerm && (
+              {/* Subtle fetch spinner — keeps search input mounted so focus is never lost */}
+              {isFetching ? (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-orange-300 border-t-orange-500 rounded-full animate-spin" />
+              ) : searchTerm ? (
                 <button onClick={() => setSearchTerm('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
-              )}
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -656,6 +671,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
           </div>
 
           {/* Grid / Empty states */}
+          <div className={isFetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
           {photos.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24">
               <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-500/5 dark:to-amber-500/5 border border-orange-100 dark:border-orange-500/10 flex items-center justify-center mb-5">
@@ -719,6 +735,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
               )}
             </>
           )}
+          </div>
         </div>
       </div>
 

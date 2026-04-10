@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Camera, X, Upload, Plus } from 'lucide-react';
+import { Camera, X, Upload, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -53,6 +53,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
     const [isCameraVisible, setIsCameraVisible] = useState(false);
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [isCapturing, setIsCapturing] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
     // ─── Refs ──────────────────────────────────────────────────────────
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +72,24 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         mountedRef.current = false;
       };
     }, []);
+
+    // ─── Lightbox keyboard navigation ─────────────────────────────────
+    useEffect(() => {
+      if (lightboxIndex === null) return;
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setLightboxIndex(null);
+        } else if (e.key === 'ArrowRight') {
+          setLightboxIndex((prev) => (prev === null ? null : (prev + 1) % value.length));
+        } else if (e.key === 'ArrowLeft') {
+          setLightboxIndex((prev) => (prev === null ? null : (prev - 1 + value.length) % value.length));
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [lightboxIndex, value.length]);
 
     // ─── Preview URL management ────────────────────────────────────────
 
@@ -492,6 +511,59 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
           </div>
         )}
 
+        {/* Lightbox */}
+        {lightboxIndex !== null && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95"
+            onClick={() => setLightboxIndex(null)}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              className="absolute top-4 right-4 z-10 bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-full transition-colors"
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Photo counter */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-black/50 text-white text-sm font-semibold px-3 py-1 rounded-full">
+              {lightboxIndex + 1} / {value.length}
+            </div>
+
+            {/* Left nav */}
+            {value.length > 1 && (
+              <button
+                type="button"
+                className="absolute left-3 z-10 bg-white/10 hover:bg-white/25 text-white p-3 rounded-full transition-colors"
+                onClick={(e) => { e.stopPropagation(); setLightboxIndex((lightboxIndex - 1 + value.length) % value.length); }}
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Photo */}
+            <img
+              src={getPreviewUrl(value[lightboxIndex])}
+              alt={`Photo ${lightboxIndex + 1}`}
+              className="max-w-full max-h-full object-contain select-none"
+              style={{ maxHeight: '90dvh' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Right nav */}
+            {value.length > 1 && (
+              <button
+                type="button"
+                className="absolute right-3 z-10 bg-white/10 hover:bg-white/25 text-white p-3 rounded-full transition-colors"
+                onClick={(e) => { e.stopPropagation(); setLightboxIndex((lightboxIndex + 1) % value.length); }}
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Photo Grid */}
         <div className="grid grid-cols-3 gap-3">
           {value.map((file, index) => (
@@ -502,7 +574,8 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
               <img
                 src={getPreviewUrl(file)}
                 alt={`Photo ${index + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover cursor-zoom-in"
+                onClick={() => setLightboxIndex(index)}
               />
 
               <button

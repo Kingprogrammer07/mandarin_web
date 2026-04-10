@@ -1037,6 +1037,10 @@ export default function AddCargoForm({
                 <Input
                   ref={clientIdRef}
                   type="text"
+                  // When the region/district prefix is locked in, the admin only
+                  // types the numeric suffix → show a numpad for speed.
+                  // When the toggle is off they need to type letters too → normal keyboard.
+                  inputMode={keepClientRegion ? "numeric" : "text"}
                   value={clientId}
                   onChange={(e) => handleClientIdChange(e.target.value)}
                   placeholder={t("cargo.clientCodePlaceholder")}
