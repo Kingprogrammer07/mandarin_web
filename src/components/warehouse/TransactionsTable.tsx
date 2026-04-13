@@ -4,10 +4,8 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
-  ChevronRight as TapHint,
   Plane,
   User,
-  Phone,
   BellRing,
 } from "lucide-react";
 import type { WarehouseTransactionItem } from "../../api/services/warehouse";
@@ -48,7 +46,7 @@ function getPaymentStyle(status: string) {
   );
 }
 
-function getRowAccent(item: WarehouseTransactionItem): string {
+function getAccentColor(item: WarehouseTransactionItem): string {
   if (item.is_taken_away) return "border-l-emerald-400 dark:border-l-emerald-500";
   if (item.payment_status === "pending" || item.payment_status === "unpaid")
     return "border-l-red-400 dark:border-l-red-500";
@@ -68,7 +66,6 @@ interface TransactionsTableProps {
   onPageChange: (page: number) => void;
   onMarkTaken: (transactionId: number) => void;
   canMarkTaken: boolean;
-  /** Called when the warehouse worker taps "Kassirga xabar" on an unpaid row */
   onNotifyCashier?: (item: WarehouseTransactionItem) => void;
 }
 
@@ -88,11 +85,11 @@ export default function TransactionsTable({
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="space-y-2" aria-busy="true" aria-label="Yuklanmoqda">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
+      <div className="space-y-2" aria-busy="true">
+        {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="h-16 bg-white dark:bg-white/[0.03] rounded-xl animate-pulse border border-gray-200 dark:border-white/[0.05]"
+            className="h-20 bg-white dark:bg-white/[0.03] rounded-2xl animate-pulse border border-gray-100 dark:border-white/[0.05]"
           />
         ))}
       </div>
@@ -102,11 +99,10 @@ export default function TransactionsTable({
   // ── Empty state ───────────────────────────────────────────────────────────
   if (items.length === 0) {
     return (
-      <div className="py-16 text-center" role="status">
+      <div className="py-16 text-center">
         <Package
           className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600"
           strokeWidth={1.5}
-          aria-hidden="true"
         />
         <p className="text-[13px] font-semibold text-gray-400 dark:text-gray-500">
           Tranzaksiyalar topilmadi
@@ -121,7 +117,7 @@ export default function TransactionsTable({
   return (
     <div className="space-y-3">
       {/* Result count */}
-      <div className="flex items-center gap-2 px-1" aria-live="polite">
+      <div className="flex items-center gap-2 px-1">
         <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
           Natijalar
         </span>
@@ -130,11 +126,11 @@ export default function TransactionsTable({
         </span>
       </div>
 
-      {/* Transaction rows */}
-      <div className="space-y-2" role="list" aria-label="Tranzaksiyalar ro'yxati">
+      {/* Transaction cards */}
+      <div className="space-y-2">
         {items.map((item, idx) => {
           const paymentStyle = getPaymentStyle(item.payment_status);
-          const rowAccent = getRowAccent(item);
+          const accentColor = getAccentColor(item);
           const isClickable = canMarkTaken && !item.is_taken_away;
           const isUnpaid =
             item.payment_status === "unpaid" || item.payment_status === "pending";
@@ -142,139 +138,142 @@ export default function TransactionsTable({
           return (
             <motion.div
               key={item.id}
-              role={isClickable ? "button" : "listitem"}
-              tabIndex={isClickable ? 0 : undefined}
-              aria-label={
-                isClickable
-                  ? `${item.client_code} — ${item.reys} yukini berish`
-                  : undefined
-              }
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(idx * 0.03, 0.3) }}
-              onClick={isClickable ? () => onMarkTaken(item.id) : undefined}
-              onKeyDown={
-                isClickable
-                  ? (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onMarkTaken(item.id);
-                      }
-                    }
-                  : undefined
-              }
               className={[
-                "flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3.5",
-                "bg-white dark:bg-white/[0.03]",
-                "rounded-xl border border-gray-200 dark:border-white/[0.05] border-l-[3px]",
-                rowAccent,
-                "shadow-sm dark:shadow-none transition-all",
-                isClickable
-                  ? "cursor-pointer hover:shadow-md hover:border-orange-200 dark:hover:border-orange-500/20 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+                "bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-100 dark:border-white/[0.05] border-l-[3px]",
+                accentColor,
+                "shadow-sm dark:shadow-none overflow-hidden",
+              ].join(" ")}
             >
-              {/* Left: Client info */}
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[13px] font-bold text-gray-800 dark:text-white font-mono">
-                    {item.client_code}
+              {/* ── Card body (tappable area for marking taken) ─────────────── */}
+              <div
+                role={isClickable ? "button" : undefined}
+                tabIndex={isClickable ? 0 : undefined}
+                aria-label={
+                  isClickable
+                    ? `${item.client_code} — ${item.reys} yukini berish`
+                    : undefined
+                }
+                onClick={isClickable ? () => onMarkTaken(item.id) : undefined}
+                onKeyDown={
+                  isClickable
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onMarkTaken(item.id);
+                        }
+                      }
+                    : undefined
+                }
+                className={[
+                  "p-4",
+                  isClickable
+                    ? "cursor-pointer hover:bg-orange-50/50 dark:hover:bg-orange-500/[0.04] active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-inset"
+                    : "",
+                ].join(" ")}
+              >
+                {/* ── Row 1: client + payment badge ─────────────────────────── */}
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[15px] font-black text-gray-900 dark:text-white font-mono leading-tight">
+                        {item.client_code}
+                      </span>
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                        #{item.qator_raqami}
+                      </span>
+                    </div>
+                    {item.client_full_name && (
+                      <p className="flex items-center gap-1 text-[12px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                        <User className="w-3 h-3 shrink-0" strokeWidth={1.8} />
+                        {item.client_full_name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Payment badge — top-right corner */}
+                  <span
+                    className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl ${paymentStyle.bg} ${paymentStyle.text}`}
+                  >
+                    {paymentStyle.label}
                   </span>
-                  {item.client_full_name && (
-                    <span className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[180px]">
-                      <User className="w-3 h-3 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                      {item.client_full_name}
-                    </span>
-                  )}
-                  {item.client_phone && (
-                    <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
-                      <Phone className="w-3 h-3 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                      {item.client_phone}
-                    </span>
-                  )}
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap text-[11px]">
-                  <span className="flex items-center gap-1 text-gray-400 dark:text-gray-500">
-                    <Plane className="w-3 h-3" strokeWidth={1.8} aria-hidden="true" />
+                {/* ── Row 2: flight · weight · date ─────────────────────────── */}
+                <div className="flex items-center gap-2 flex-wrap text-[11px] text-gray-400 dark:text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <Plane className="w-3 h-3" strokeWidth={1.8} />
                     {item.reys}
                   </span>
-                  <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
-                  <span className="text-gray-500 dark:text-gray-400 font-medium">
-                    #{item.qator_raqami}
-                  </span>
-                  <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
-                  <span className="text-gray-400 dark:text-gray-500">
-                    {item.vazn} kg
-                  </span>
-                  <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
-                  <span className="text-gray-400 dark:text-gray-600 text-[10px]">
+                  <span className="text-gray-200 dark:text-gray-700">·</span>
+                  <span>{item.vazn} kg</span>
+                  <span className="text-gray-200 dark:text-gray-700">·</span>
+                  <span className="text-[10px]">
                     {formatTashkentDateTime(item.created_at)}
                   </span>
                 </div>
               </div>
 
-              {/* Right: Payment info + status */}
-              <div className="flex items-center gap-2.5 shrink-0">
-                {/* Payment amounts */}
-                <div className="text-right">
-                  <p className="text-[13px] font-bold text-gray-800 dark:text-white">
+              {/* ── Card footer: amount + action buttons ──────────────────────── */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-gray-50 dark:border-white/[0.04] bg-gray-50/50 dark:bg-white/[0.02]">
+                {/* Amount */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[14px] font-bold text-gray-800 dark:text-white">
                     {item.total_amount != null
                       ? formatCurrencySum(item.total_amount)
                       : "—"}
-                  </p>
+                  </span>
                   {item.remaining_amount > 0 && item.payment_status !== "paid" && (
-                    <p className="text-[10px] font-semibold text-red-500 dark:text-red-400">
+                    <span className="ml-2 text-[11px] font-semibold text-red-500 dark:text-red-400">
                       −{formatCurrencySum(item.remaining_amount)}
-                    </p>
+                    </span>
                   )}
                 </div>
 
-                {/* Payment status badge */}
-                <span
-                  className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${paymentStyle.bg} ${paymentStyle.text}`}
-                  aria-label={`To'lov holati: ${paymentStyle.label}`}
-                >
-                  {paymentStyle.label}
-                </span>
+                {/* Action buttons — right side, large touch targets */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Notify cashier */}
+                  {isUnpaid && onNotifyCashier && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNotifyCashier(item);
+                      }}
+                      title="Kassirga xabar yuborish"
+                      className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-500/20 active:scale-95 transition-all"
+                    >
+                      <BellRing className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Kassir</span>
+                    </button>
+                  )}
 
-                {/* Notify cashier button — only for unpaid/pending rows */}
-                {isUnpaid && onNotifyCashier && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      // Prevent the row's onMarkTaken click from firing
-                      e.stopPropagation();
-                      onNotifyCashier(item);
-                    }}
-                    title="Kassirga to'lov uchun xabar yuborish"
-                    className="shrink-0 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-500/20 active:scale-95 transition-all"
-                  >
-                    <BellRing className="w-3 h-3" aria-hidden="true" />
-                    Kassir
-                  </button>
-                )}
-
-                {/* Action indicator */}
-                {item.is_taken_away ? (
-                  <span className="shrink-0 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <CheckCheck className="w-3 h-3" aria-hidden="true" />
-                    Berilgan
-                  </span>
-                ) : canMarkTaken ? (
-                  /* Tap-hint badge — the whole card is the interactive target */
-                  <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400">
-                    <Package className="w-3 h-3" aria-hidden="true" strokeWidth={2} />
-                    Berish
-                    <TapHint className="w-3 h-3 opacity-60" aria-hidden="true" />
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-gray-100 dark:bg-white/[0.04] text-gray-400 dark:text-gray-500">
-                    Kutilmoqda
-                  </span>
-                )}
+                  {/* Status badge / action button */}
+                  {item.is_taken_away ? (
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      Berilgan
+                    </span>
+                  ) : canMarkTaken ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkTaken(item.id);
+                      }}
+                      className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white active:scale-95 transition-all shadow-sm shadow-orange-500/20"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      Berish
+                    </button>
+                  ) : (
+                    <span className="text-[11px] font-bold px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/[0.04] text-gray-400 dark:text-gray-500">
+                      Kutilmoqda
+                    </span>
+                  )}
+                </div>
               </div>
             </motion.div>
           );
@@ -283,36 +282,34 @@ export default function TransactionsTable({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <nav aria-label="Sahifalar" className="flex items-center justify-center gap-2 pt-2">
+        <nav aria-label="Sahifalar" className="flex items-center justify-center gap-1.5 pt-2 pb-4">
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
             aria-label="Oldingi sahifa"
-            aria-disabled={page <= 1}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm dark:shadow-none"
+            className="w-11 h-11 flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm"
           >
-            <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
-          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
             let pageNum: number;
-            if (totalPages <= 7) {
+            if (totalPages <= 5) {
               pageNum = i + 1;
-            } else if (page <= 4) {
+            } else if (page <= 3) {
               pageNum = i + 1;
-            } else if (page >= totalPages - 3) {
-              pageNum = totalPages - 6 + i;
+            } else if (page >= totalPages - 2) {
+              pageNum = totalPages - 4 + i;
             } else {
-              pageNum = page - 3 + i;
+              pageNum = page - 2 + i;
             }
             const isCurrent = pageNum === page;
             return (
               <button
                 key={pageNum}
                 onClick={() => onPageChange(pageNum)}
-                aria-label={`${pageNum}-sahifa`}
                 aria-current={isCurrent ? "page" : undefined}
-                className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[12px] font-bold transition-all shadow-sm dark:shadow-none ${
+                className={`w-11 h-11 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all shadow-sm ${
                   isCurrent
                     ? "bg-orange-500 text-white shadow-orange-500/20"
                     : "bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06]"
@@ -327,10 +324,9 @@ export default function TransactionsTable({
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
             aria-label="Keyingi sahifa"
-            aria-disabled={page >= totalPages}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm dark:shadow-none"
+            className="w-11 h-11 flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm"
           >
-            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </nav>
       )}

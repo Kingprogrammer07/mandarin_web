@@ -8,6 +8,7 @@ import {
   Plane,
   ClipboardList,
   Lock,
+  PackageSearch,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -61,7 +62,7 @@ function AccessDenied() {
   );
 }
 
-export default function WarehousePage({ onLogout }: WarehousePageProps) {
+export default function WarehousePage({ onNavigate, onLogout }: WarehousePageProps) {
   // Start background upload queue processor for this session
   useWarehouseQueueProcessor();
 
@@ -80,6 +81,7 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
 
   const canView = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('warehouse:read');
   const canMarkTaken = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('warehouse:mark_taken');
+  const canViewExpectedCargo = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('expected_cargo:manage');
   const [activeTab, setActiveTab] = useState<ActiveTab>("transactions");
   const [activityPage, setActivityPage] = useState(1);
 
@@ -191,11 +193,11 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
 
       {/* ── Sticky Header ──────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/[0.08]">
-        <div className="max-w-6xl mx-auto px-4 py-3">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
 
           {/* Title row */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => window.history.back()}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
@@ -204,16 +206,16 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
                 <ArrowLeft className="w-4 h-4" />
               </button>
 
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
-                  <Warehouse className="w-4 h-4 text-orange-500" />
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
+                  <Warehouse className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
                 </div>
                 <div>
-                  <h1 className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
+                  <h1 className="text-[14px] sm:text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
                     Ombor
                   </h1>
                   {activeTab === "transactions" && data && !isFlightEmpty && (
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight">
+                    <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 leading-tight">
                       {data.total_count} ta yuk
                     </p>
                   )}
@@ -221,10 +223,19 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1">
               <span className="hidden sm:inline text-[12px] text-gray-500 dark:text-gray-400 mr-1">
                 {jwtClaims.role_name}
               </span>
+              {canViewExpectedCargo && (
+                <button
+                  onClick={() => onNavigate('expected-cargo')}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
+                  title="Kutilayotgan yuklar"
+                >
+                  <PackageSearch className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={toggleTheme}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
@@ -246,11 +257,11 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
             </div>
           </div>
 
-          {/* Tab switcher */}
-          <div className="flex gap-1 bg-gray-100 dark:bg-white/[0.05] rounded-xl p-1 mb-3 w-fit">
+          {/* Tab switcher — full-width on mobile for larger tap targets */}
+          <div className="flex gap-1 bg-gray-100 dark:bg-white/[0.05] rounded-xl p-1 mb-2 sm:mb-3 w-full sm:w-fit">
             <button
               onClick={() => setActiveTab("transactions")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center sm:justify-start gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
                 activeTab === "transactions"
                   ? "bg-white dark:bg-white/[0.09] text-gray-900 dark:text-white shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -261,7 +272,7 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
             </button>
             <button
               onClick={() => setActiveTab("my-activity")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center sm:justify-start gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
                 activeTab === "my-activity"
                   ? "bg-white dark:bg-white/[0.09] text-gray-900 dark:text-white shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -278,7 +289,7 @@ export default function WarehousePage({ onLogout }: WarehousePageProps) {
       </div>
 
       {/* ── Main Content ───────────────────────────────────────────────────── */}
-      <div className="max-w-6xl mx-auto px-4 py-4">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
         {activeTab === "transactions" ? (
           isFlightEmpty ? (
             // Prompt to enter a flight name

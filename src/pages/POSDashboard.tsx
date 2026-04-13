@@ -34,7 +34,9 @@ import {
   Bell,
   BellOff,
   BellRing,
+  Calculator,
 } from "lucide-react";
+import CalculatorModal from "@/components/modals/CalculatorModal";
 
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
 import { refreshAdminToken } from "@/api/services/adminAuth";
@@ -517,8 +519,6 @@ function ClientProfileDrawer({
     queryKey: ["pos-txn", clientCode, txFilter],
     queryFn: () => getPOSClientTransactions(clientCode, txFilter, 20, 0),
   });
-
-  console.log(JSON.stringify(txData, null, 2));
 
   // Balance adjustment
   const adjustMut = useMutation({
@@ -1243,6 +1243,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   // Super-admins always have full access; others need at least one POS permission
   const hasPosAccess = jwtClaims.isSuperAdmin || canRead || canProcess || canAdjust;
 
+  // ── Calculator modal ──────────────────────────────────────────────────────
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
   // ── Sound preference (persisted in localStorage) ─────────────────────────
   const [soundEnabled, setSoundEnabled] = useState<boolean>(
     () => localStorage.getItem(SOUND_KEY) !== "off",
@@ -1641,6 +1644,15 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               </button>
             )}
+
+            {/* Calculator */}
+            <button
+              onClick={() => setIsCalculatorOpen(true)}
+              title="Kalkulyator"
+              className="p-2 rounded-xl text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/[0.08] transition-colors"
+            >
+              <Calculator className="w-4 h-4" />
+            </button>
 
             {/* Sound toggle */}
             <button
@@ -2224,6 +2236,12 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
           />
         )}
       </AnimatePresence>
+
+      <CalculatorModal
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        isAdminMode
+      />
     </>
   );
 }

@@ -28,17 +28,18 @@ import type { LightSelectOption } from '../../components/ui/LightSelect';
 // ─── Permission label translations ────────────────────────────────────────────
 
 const RESOURCE_MAP: Record<string, string> = {
-  admin_accounts: 'Adminlar',
-  roles:          'Rollar',
-  audit_logs:     'Audit Jurnali',
-  clients:        'Mijozlar',
-  cargo:          'Yuklar',
-  payments:       "To'lovlar",
-  flights:        'Reyslar',
-  stats:          'Statistika',
-  pos:            'Kassa (POS)',
-  carousel:       'Karusel',
-  warehouse:      'Omborxona',
+  admin_accounts:  'Adminlar',
+  roles:           'Rollar',
+  audit_logs:      'Audit Jurnali',
+  clients:         'Mijozlar',
+  cargo:           'Yuklar',
+  payments:        "To'lovlar",
+  flights:         'Reyslar',
+  stats:           'Statistika',
+  pos:             'Kassa (POS)',
+  carousel:        'Karusel',
+  warehouse:       'Omborxona',
+  expected_cargo:  'Kutilayotgan yuklar',
 };
 
 const ACTION_MAP: Record<string, string> = {
@@ -46,6 +47,7 @@ const ACTION_MAP: Record<string, string> = {
   create:  "Qo'shish",
   update:  'Tahrirlash',
   delete:  "O'chirish",
+  manage:  'Boshqarish',
   process: "To'lov qabul qilish",
   adjust:  'Balans tahriri',
   export:  'Eksport',
@@ -74,20 +76,22 @@ const VALID_HOME_PAGES = [
   '/admin/flights',
   '/admin/warehouse',
   '/admin/clients',
+  '/admin/expected-cargo',
 ] as const;
 
 type ValidHomePage = (typeof VALID_HOME_PAGES)[number];
 
 const HOME_PAGE_OPTIONS: LightSelectOption[] = [
-  // { value: '/admin/accounts',  label: 'Admin Hisoblar' },
-  { value: '/admin/flights',   label: 'Ishchi sahifasi (Reyslar)' },
-  { value: '/admin/warehouse', label: 'Omborxona' },
-  { value: '/admin/clients',   label: 'Menedjer Sahifasi' },
-  // { value: '/admin/carousel',  label: 'Karusel boshqaruvi' },
-  // { value: '/admin/roles',     label: 'Rollar va Huquqlar' },
-  // { value: '/admin/audit',     label: 'Audit Tarixi' },
-  // { value: '/admin/profile',   label: 'Profil' },
-  { value: '/pos',             label: 'Kassa (POS)' },
+  // { value: '/admin/accounts',       label: 'Admin Hisoblar' },
+  { value: '/admin/flights',          label: 'Ishchi sahifasi (Reyslar)' },
+  { value: '/admin/warehouse',        label: 'Omborxona' },
+  { value: '/admin/expected-cargo',   label: 'Kutilayotgan yuklar' },
+  { value: '/admin/clients',          label: 'Menedjer Sahifasi' },
+  // { value: '/admin/carousel',       label: 'Karusel boshqaruvi' },
+  // { value: '/admin/roles',          label: 'Rollar va Huquqlar' },
+  // { value: '/admin/audit',          label: 'Audit Tarixi' },
+  // { value: '/admin/profile',        label: 'Profil' },
+  { value: '/pos',                    label: 'Kassa (POS)' },
 ];
 
 /**
@@ -98,15 +102,16 @@ const HOME_PAGE_OPTIONS: LightSelectOption[] = [
  * `null` means "show everything" — used for fully privileged pages.
  */
 const HOME_PAGE_RESOURCE_PACKS: Record<ValidHomePage, string[] | null> = {
-  '/admin/accounts':  ['admin_accounts', 'roles', 'audit_logs', 'stats'],
-  '/admin/roles':     ['roles', 'audit_logs'],
-  '/admin/audit':     ['audit_logs'],
-  '/admin/profile':   null,
-  '/admin/carousel':  ['carousel'],
-  '/pos':             ['pos', 'payments', 'cargo'],
-  '/admin/flights':   ['flights', 'cargo'],
-  '/admin/warehouse': ['warehouse'],
-  '/admin/clients':   ['clients', 'carousel'],
+  '/admin/accounts':       ['admin_accounts', 'roles', 'audit_logs', 'stats'],
+  '/admin/roles':          ['roles', 'audit_logs'],
+  '/admin/audit':          ['audit_logs'],
+  '/admin/profile':        null,
+  '/admin/carousel':       ['carousel'],
+  '/pos':                  ['pos', 'payments', 'cargo'],
+  '/admin/flights':        ['flights', 'cargo', 'expected_cargo'],
+  '/admin/warehouse':      ['warehouse', 'expected_cargo'],
+  '/admin/clients':        ['clients', 'carousel'],
+  '/admin/expected-cargo': ['expected_cargo'],
 };
 
 // ─── Schema ────────────────────────────────────────────────────────────────────

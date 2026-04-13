@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from "react-dom";
 import { X, Scale, Box, Calculator, DollarSign, Info, Gift, MessageCircle } from "lucide-react";
 import { apiClient } from "@/api/client";
+import { API_BASE_URL } from "@/config/config";
 import { normalizeNumber } from "@/utils/numberFormat";
 
 interface CalculatorModalProps {
     isOpen: boolean;
     onClose: () => void;
+    /** When true, hides user-facing promotional content (Telegram CTA, discount info, footer note). */
+    isAdminMode?: boolean;
 }
 
 interface CalcResult {
@@ -26,7 +29,7 @@ interface CalculatorPayload {
     z?: number;
 }
 
-export default function CalculatorModal({ isOpen, onClose }: CalculatorModalProps) {
+export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }: CalculatorModalProps) {
     const { t } = useTranslation();
     const [mounted, setMounted] = useState(false);
     const [isGabarit, setIsGabarit] = useState(false);
@@ -104,11 +107,38 @@ export default function CalculatorModal({ isOpen, onClose }: CalculatorModalProp
 
             setIsLoading(true);
             try {
-                const response = await apiClient.post<CalcResult>(
-                    "/api/v1/client/calculator",
-                    payload
-                );
-                setResult(response.data);
+                let data: CalcResult;
+
+                if (isAdminMode) {
+                    // Admin context: use native fetch with the admin JWT so the axios
+                    // 401 interceptor (which clears the session and fires auth:logout)
+                    // is never triggered, even if the endpoint rejects the request.
+                    const adminToken = localStorage.getItem('access_token');
+                    const res = await fetch(
+                        `${API_BASE_URL}/api/v1/admin/calculator`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(adminToken ? { 'X-Admin-Authorization': `Bearer ${adminToken}` } : {}),
+                            },
+                            body: JSON.stringify(payload),
+                        },
+                    );
+                    if (!res.ok) {
+                        setResult(null);
+                        return;
+                    }
+                    data = await res.json() as CalcResult;
+                } else {
+                    const response = await apiClient.post<CalcResult>(
+                        "/api/v1/client/calculator",
+                        payload,
+                    );
+                    data = response.data;
+                }
+
+                setResult(data);
             } catch (error) {
                 console.error("Calculator API Error:", error);
                 setResult(null);
@@ -326,8 +356,8 @@ export default function CalculatorModal({ isOpen, onClose }: CalculatorModalProp
                         )}
                     </div>
 
-                    {/* Gabarit info & CTA — faqat gabarit natijasi bo'lganda */}
-                    {isGabarit && result && (
+                    {/* Gabarit info & CTA — faqat gabarit natijasi bo'lganda va user rejimida */}
+                    {isGabarit && result && !isAdminMode && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-300">
                             {/* Explanation container */}
                             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-2xl p-5">
@@ -367,9 +397,11 @@ export default function CalculatorModal({ isOpen, onClose }: CalculatorModalProp
                         </div>
                     )}
 
-                    <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 leading-tight pb-20">
-                        {t('calculator.footerNote')}
-                    </p>
+                    {!isAdminMode && (
+                        <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 leading-tight pb-20">
+                            {t('calculator.footerNote')}
+                        </p>
+                    )}
                 </div>
             </div>
         </div>,

@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getFlights, type Flight } from '@/api/services/flight';
+import { getFlightList, type FlightListItem } from '@/api/services/expectedCargo';
 import { useTranslation } from 'react-i18next';
 import { offlineStorage } from '@/utils/offlineStorage';
-import { Plane, ChevronDown, ChevronRight, RefreshCw, WifiOff, ArrowRight, Lock, LogOut } from 'lucide-react';
+import { Plane, ChevronDown, ChevronRight, RefreshCw, WifiOff, ArrowRight, Lock, LogOut, ClipboardList } from 'lucide-react';
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
+import { refreshAdminToken } from '@/api/services/adminAuth';
 
 interface FlightsPageProps {
   onSelectFlight: (flightName: string) => void;
   onLogout?: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 /** Split "M123-2025" → { code: "M123", year: "2025" } */
@@ -36,21 +39,48 @@ function AccessDenied() {
   );
 }
 
-export default function FlightsPage({ onSelectFlight, onLogout }: FlightsPageProps) {
+export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: FlightsPageProps) {
   const { t } = useTranslation();
-  const jwtClaims = getAdminJwtClaims();
+  // Track as state so a token refresh triggers a re-render with updated permissions
+  const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
   const canView = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('flights:read');
+  const canViewExpectedCargo = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('expected_cargo:manage');
   const [flights, setFlights] = useState<Flight[]>([]);
+  const [expectedFlights, setExpectedFlights] = useState<FlightListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [offlineCounts, setOfflineCounts] = useState<Record<string, number>>({});
 
+  // Silently refresh the JWT on mount so newly granted permissions take effect
+  // without requiring the worker to log out and back in.
+  useEffect(() => {
+    let cancelled = false;
+    refreshAdminToken()
+      .then(data => {
+        if (cancelled) return;
+        localStorage.setItem('access_token', data.access_token);
+        setJwtClaims(getAdminJwtClaims());
+      })
+      .catch(() => { /* Non-fatal — continue with existing token */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const loadFlights = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true); else setIsLoading(true);
+
+    // Re-derive permission inside callback so it always uses the latest token
+    const { isSuperAdmin, permissions } = getAdminJwtClaims();
+    const hasExpectedCargoAccess = isSuperAdmin || permissions.has('expected_cargo:manage');
+
     try {
-      const data = await getFlights(5);
-      const ordered = data.flights.reverse();
+      const [flightData] = await Promise.all([
+        getFlights(5),
+        hasExpectedCargoAccess
+          ? getFlightList().then(res => setExpectedFlights(res.items)).catch(() => {})
+          : Promise.resolve(),
+      ]);
+      const ordered = flightData.flights.reverse();
       setFlights(ordered);
       const counts: Record<string, number> = {};
       await Promise.all(
@@ -78,7 +108,7 @@ export default function FlightsPage({ onSelectFlight, onLogout }: FlightsPagePro
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-4">
-        <PageHeader t={t} count={0} isRefreshing={false} onRefresh={() => {}} onLogout={onLogout} loading />
+        <PageHeader t={t} count={0} isRefreshing={false} onRefresh={() => {}} onLogout={onLogout} onOpenExpectedCargo={canViewExpectedCargo && onNavigate ? () => onNavigate('expected-cargo') : undefined} loading />
         <div className="space-y-3">
           <div className="h-4 w-28 bg-gray-100 dark:bg-white/[0.05] rounded-lg mb-2" />
           <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden">
@@ -100,7 +130,7 @@ export default function FlightsPage({ onSelectFlight, onLogout }: FlightsPagePro
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4">
-      <PageHeader t={t} count={flights.length} isRefreshing={isRefreshing} onRefresh={() => loadFlights(true)} onLogout={onLogout} />
+      <PageHeader t={t} count={flights.length} isRefreshing={isRefreshing} onRefresh={() => loadFlights(true)} onLogout={onLogout} onOpenExpectedCargo={canViewExpectedCargo && onNavigate ? () => onNavigate('expected-cargo') : undefined} />
 
       {flights.length === 0 ? (
         <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-gray-100 dark:border-white/[0.06] flex flex-col items-center justify-center py-16">
@@ -111,6 +141,27 @@ export default function FlightsPage({ onSelectFlight, onLogout }: FlightsPagePro
         </div>
       ) : (
         <div className="space-y-4">
+
+          {/* Expected cargo flights — shown above recent flights, blue accent */}
+          {canViewExpectedCargo && expectedFlights.length > 0 && (
+            <section>
+              <p className="text-[11px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider mb-2 px-1">
+                Kutilayotgan reyslar
+              </p>
+              <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-blue-100/60 dark:border-blue-500/10 shadow-sm overflow-hidden">
+                <div className="h-[2px] bg-gradient-to-r from-transparent via-blue-400/40 dark:via-blue-500/25 to-transparent" />
+                <div className="divide-y divide-gray-50 dark:divide-white/[0.03]">
+                  {expectedFlights.map(f => (
+                    <ExpectedFlightRow
+                      key={f.flight_name}
+                      flight={f}
+                      onSelect={() => onSelectFlight(f.flight_name)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* Recent flights */}
           <section>
@@ -166,12 +217,13 @@ export default function FlightsPage({ onSelectFlight, onLogout }: FlightsPagePro
   );
 }
 
-function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, loading = false }: {
+function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, onOpenExpectedCargo, loading = false }: {
   t: (k: string) => string;
   count: number;
   isRefreshing: boolean;
   onRefresh: () => void;
   onLogout?: () => void;
+  onOpenExpectedCargo?: () => void;
   loading?: boolean;
 }) {
   return (
@@ -185,6 +237,16 @@ function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, loading = fal
         )}
       </div>
       <div className="flex items-center gap-2">
+        {onOpenExpectedCargo && (
+          <button
+            onClick={onOpenExpectedCargo}
+            title="Kutilayotgan yuklar"
+            className="flex items-center gap-1.5 h-8 px-3 text-[12px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+          >
+            <ClipboardList className="w-3 h-3" />
+            Kutilayotgan
+          </button>
+        )}
         <button
           onClick={onRefresh}
           disabled={isRefreshing || loading}
@@ -204,6 +266,44 @@ function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, loading = fal
         )}
       </div>
     </div>
+  );
+}
+
+function ExpectedFlightRow({ flight, onSelect }: {
+  flight: FlightListItem;
+  onSelect: () => void;
+}) {
+  const { code, year } = parseFlightName(flight.flight_name);
+
+  return (
+    <button
+      onClick={onSelect}
+      className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-blue-50/40 dark:hover:bg-blue-500/[0.05] text-left transition-colors active:scale-[0.99]"
+    >
+      {/* Icon */}
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-blue-100 dark:bg-blue-500/10 border border-blue-200/60 dark:border-blue-500/20">
+        <Plane className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+      </div>
+
+      {/* Name + counts */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[15px] font-black text-gray-900 dark:text-white">{code}</span>
+          {year && <span className="text-[12px] font-medium text-gray-400 dark:text-gray-500">{year}</span>}
+        </div>
+        <span className="text-[11px] text-blue-400 dark:text-blue-500">
+          {flight.client_count} mijoz · {flight.track_code_count} trek kodi
+        </span>
+      </div>
+
+      {/* Badge + arrow */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 border border-blue-200/60 dark:border-blue-500/20 px-2 py-0.5 rounded-full hidden sm:inline-flex">
+          Kutilmoqda
+        </span>
+        <ArrowRight className="w-4 h-4 text-gray-300 dark:text-gray-500" />
+      </div>
+    </button>
   );
 }
 

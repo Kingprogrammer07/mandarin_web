@@ -176,53 +176,54 @@ export default function WarehouseFilters() {
         </div>
       </div>
 
-      {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+      {/* Filter chips — horizontal scroll so they never wrap on small screens */}
+      <div
+        className="flex items-center gap-2 overflow-x-auto pb-0.5"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 shrink-0">
           <Filter className="w-3.5 h-3.5" strokeWidth={1.8} />
           <span className="text-[11px] font-bold uppercase tracking-wider">
-            Filtrlar
+            Filtr
           </span>
         </div>
 
-        {/* Payment status */}
-        <select
-          id="warehouse-payment-filter"
-          value={paymentStatus}
-          onChange={(e) =>
-            setPaymentStatus(
-              e.target.value as "all" | "paid" | "unpaid" | "partial",
-            )
-          }
-          className="px-3 py-1.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] font-semibold text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all cursor-pointer"
-        >
-          {PAYMENT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value} className="dark:bg-[#1a1a1a]">
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        {/* Payment status chips */}
+        {PAYMENT_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setPaymentStatus(opt.value as "all" | "paid" | "unpaid" | "partial")}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+              paymentStatus === opt.value
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-300 hover:border-orange-300 dark:hover:border-orange-500/30'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
 
-        {/* Taken status */}
-        <select
-          id="warehouse-taken-filter"
-          value={takenStatus}
-          onChange={(e) =>
-            setTakenStatus(e.target.value as "all" | "taken" | "not_taken")
-          }
-          className="px-3 py-1.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[12px] font-semibold text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all cursor-pointer"
-        >
-          {TAKEN_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value} className="dark:bg-[#1a1a1a]">
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <span className="shrink-0 w-px h-4 bg-gray-200 dark:bg-white/[0.08]" />
 
-        {/* Reset filters */}
+        {/* Taken status chips */}
+        {TAKEN_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setTakenStatus(opt.value as "all" | "taken" | "not_taken")}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+              takenStatus === opt.value
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-300 hover:border-orange-300 dark:hover:border-orange-500/30'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+
+        {/* Reset */}
         <button
           onClick={resetFilters}
-          className="ml-auto flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/[0.08] rounded-lg transition-colors"
+          className="shrink-0 ml-1 flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/[0.08] rounded-lg transition-colors"
         >
           <RotateCcw className="w-3 h-3" />
           Tozalash

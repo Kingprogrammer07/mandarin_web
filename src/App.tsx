@@ -40,6 +40,7 @@ import { getAdminJwtClaims } from "./api/services/adminManagement";
 import ManagerPage from "./pages/admin/ManagerPage";
 import PasskeyPage from "./pages/admin/PasskeyPage";
 import WarehousePage from "./pages/admin/WarehousePage";
+import ExpectedCargoPage from "./pages/admin/ExpectedCargoPage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,8 @@ type Page =
   | "pos-dashboard"
   | "manager-page"
   | "passkey-page"
-  | "warehouse-page";
+  | "warehouse-page"
+  | "expected-cargo";
 
 interface RouteInfo {
   page: Page;
@@ -88,7 +90,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   },
   worker: {
     default: "flights",
-    allowed: ["flights", "cargo-list", "cargo-add", "passkey-page"],
+    allowed: ["flights", "cargo-list", "cargo-add", "passkey-page", "expected-cargo"],
   },
   accountant: {
     default: "verification-search",
@@ -127,6 +129,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-carousel",
       "pos-dashboard",
       "warehouse-page",
+      "expected-cargo",
       "passkey-page",
     ],
   },
@@ -155,6 +158,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-carousel",
       "pos-dashboard",
       "warehouse-page",
+      "expected-cargo",
       "manager-page",
       "passkey-page",
     ],
@@ -167,11 +171,11 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   },
   warehouse_worker: {
     default: "warehouse-page",
-    allowed: ["warehouse-page", "admin-profile", "passkey-page"],
+    allowed: ["warehouse-page", "expected-cargo", "admin-profile", "passkey-page"],
   },
   warehouse: {
     default: "warehouse-page",
-    allowed: ["warehouse-page", "admin-profile", "passkey-page"],
+    allowed: ["warehouse-page", "expected-cargo", "admin-profile", "passkey-page"],
   },
 };
 
@@ -265,6 +269,7 @@ function getPathForPage(
   if (page === "passkey-page") return "/admin/passkey";
   if (page === "warehouse-page") return "/admin/warehouse";
   if (page === "pos-dashboard") return "/pos";
+  if (page === "expected-cargo") return "/admin/expected-cargo";
   return "/auth/login";
 }
 
@@ -336,6 +341,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/admin/clients") return { page: "manager-page" };
   if (path === "/admin/passkey") return { page: "passkey-page" };
   if (path === "/warehouse" || path === "/admin/warehouse") return { page: "warehouse-page" };
+  if (path === "/admin/expected-cargo") return { page: "expected-cargo" };
   if (path === "/pos") return { page: "pos-dashboard" };
 
   return { page: "login" };
@@ -624,16 +630,21 @@ function AppContent() {
   const isManagerPage = currentPage === "manager-page";
   const isPasskeyPage = currentPage === "passkey-page";
   const isWarehousePage = currentPage === "warehouse-page";
+  const isExpectedCargoPage = currentPage === "expected-cargo";
   const canAccessManagerPage =
     userRole !== null &&
     (ROLE_CONFIG[userRole]?.allowed ?? []).includes("manager-page");
   const canAccessWarehouse =
     userRole !== null &&
     (ROLE_CONFIG[userRole]?.allowed ?? []).includes("warehouse-page");
+  const canAccessExpectedCargo =
+    userRole !== null &&
+    (ROLE_CONFIG[userRole]?.allowed ?? []).includes("expected-cargo");
 
   const isAdminArea =
     isSuperAdminPages || isAdminLoginPage || isPOSPage ||
-    isManagerPage || isStandaloneAdminSubpage || isPasskeyPage || isWarehousePage;
+    isManagerPage || isStandaloneAdminSubpage || isPasskeyPage ||
+    isWarehousePage || isExpectedCargoPage;
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -735,6 +746,11 @@ function AppContent() {
           onNavigate={(page) => navigateToPage(page as Page)}
           onLogout={handleLogout}
         />
+      ) : isExpectedCargoPage && canAccessExpectedCargo ? (
+        <ExpectedCargoPage
+          onNavigate={(page) => navigateToPage(page as Page)}
+          onLogout={handleLogout}
+        />
       ) : (
         <main
           className={`relative ${
@@ -781,6 +797,7 @@ function AppContent() {
                 navigateToPage("cargo-list", flightName)
               }
               onLogout={handleLogout}
+              onNavigate={(page) => navigateToPage(page as Page)}
             />
           )}
 

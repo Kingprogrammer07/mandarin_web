@@ -1,38 +1,21 @@
-# TASK.md
+# TASK.md — FastEntryPanel edit + WarehousePage mobile redesign
 
 ## Objective
-POS Dashboard cashier log funksionalini yangilash:
-1. Backend `/payments/cashier-log` endi barcha kassirlar logini qaytaradi — frontend shunga moslashishi kerak.
-2. Har bir kassirning logini o'z rangida ko'rsatish (o'zini — orange, boshqalarni — har xil rangda).
-3. Real-time yangilanish: boshqa kassir yozuv qo'shganda avtomatik yangilansin (polling intervali qisqartirilsin).
-4. `cashier_id` ni TypeScript interfeyslarga qo'shish.
-5. `admin_id` ni JWT claims dan olish (`getAdminJwtClaims` yangilash).
+
+1. **FastEntryPanel** `QueueItemRow` da auto-resolve qilingan `client_code` ni bir bosish bilan tahrirlash imkoniyati. Agar `resolvedClientId` bor-u `full_name` null bo'lsa — "Bazada yo'q" warning ko'rsatish.
+2. **WarehousePage** ni mobile uchun chiroyli va qulay qilish (desktop sifatini saqlab).
+
+---
 
 ## Implementation Plan
 
-- [x] `AdminJwtClaims` ga `admin_id: number | null` qo'shish va JWT payload dan olish
-- [x] `CashierLogItem` ga `cashier_id: number | null` qo'shish
-- [x] `getCashierLog` — endpoint o'zgartirilmaydi, lekin endi all-cashier data qaytaradi
-- [x] `refetchInterval` ni 60s → 10s ga qisqartirish (real-time polling)
-- [x] `LogEntry` komponentini yangilash: rang kodlash va "Men" badge
-- [x] `POSDashboard` da `currentAdminId` ni aniqlash va log colorlashni qo'llash
+### Part 1 — FastEntryPanel (QueueItemRow)
+- [x] Resolved holatdagi client_code ni `<button>` ga aylantirib, bosish bilan edit mode ga o'tish
+- [x] Edit mode da `Pencil` hover hint ko'rsatish
+- [x] `resolvedClientId !== null && resolvedClientName === null` → amber "Bazada yo'q" warning badge
+- [x] `isEditingCode` + `tempCode` sync — resolved bo'lganda ham ishlaydi
 
-## Walkthrough / Architecture
-
-```
-JWT → getAdminJwtClaims() → admin_id (sub field)
-         ↓
-POSDashboard → jwtClaims.admin_id (currentAdminId)
-         ↓
-getCashierLog (polling 10s) → CashierLogItem[] (cashier_id populated)
-         ↓
-LogEntry:
-  cashier_id === currentAdminId → orange (own entry) + "Men" badge
-  cashier_id !== currentAdminId → deterministic color from palette + "#id" badge
-  cashier_id === null            → neutral gray
-```
-
-Color palette (boshqa kassirlar uchun, deterministic by cashier_id % palette.length):
-- blue, purple, teal, rose, indigo
-
-## Status: DONE ✓
+### Part 2 — WarehousePage mobile
+- [x] `WarehouseFilters` — filter chiplarini horizontal scroll ga o'tkazish
+- [x] `TransactionsTable` — mobile card layout yaxshilash (katta tap target, toza ierarxiya)
+- [x] `WarehousePage` header — mobile da kompakt, qulay
