@@ -6,7 +6,10 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Loader2, X, CheckCircle2, AlertCircle, User, Camera, ScanLine, Pencil, AlertTriangle } from 'lucide-react';
+import {
+  Loader2, X, CheckCircle2, AlertCircle, User, Camera, ScanLine,
+  Pencil, AlertTriangle, Info,
+} from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -27,6 +30,42 @@ interface FastEntryPanelProps {
 
 // Stable DOM id for the Html5Qrcode video container
 const SCANNER_CONTAINER_ID = 'ec-qr-video-container';
+
+// ── Duplicate-client detection ─────────────────────────────────────────────────
+//
+// Rule: warn ONLY when the same client reappears AFTER at least one track code
+// from a DIFFERENT client was scanned in between.
+//
+// Example that DOES trigger:  STCH3, STCH3, STCH3, OTHER, STCH3  ← warning on the last STCH3
+// Example that does NOT:      STCH3, STCH3, STCH3                ← no warning (consecutive)
+
+function detectContinuation(
+  queue: FastEntryQueueItem[],
+  resolvedClientCode: string,
+): { isContinuation: boolean; priorCount: number } {
+  // Only look at items that were already resolved with a known client code.
+  const resolvedQueue = queue.filter((item) => item.isResolved && item.clientCode);
+
+  // How many prior items share this client code?
+  const sameClientItems = resolvedQueue.filter((item) => item.clientCode === resolvedClientCode);
+  if (sameClientItems.length === 0) return { isContinuation: false, priorCount: 0 };
+
+  // Index of the LAST item in resolvedQueue that matches this client.
+  const lastSameIdx = resolvedQueue.reduce<number>(
+    (last, item, idx) => (item.clientCode === resolvedClientCode ? idx : last),
+    -1,
+  );
+
+  // Are there any DIFFERENT clients after that last-same-client item?
+  const hasInterleavedOtherClient = resolvedQueue
+    .slice(lastSameIdx + 1)
+    .some((item) => item.clientCode !== resolvedClientCode);
+
+  return {
+    isContinuation: hasInterleavedOtherClient,
+    priorCount: sameClientItems.length,
+  };
+}
 
 // ── Queue item row ─────────────────────────────────────────────────────────────
 
@@ -62,9 +101,35 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
     setIsEditingCode(true);
   };
 
-  // Client found in expected-cargo table (China DB) but not registered in our system yet.
+  // Three resolved states — all mean the API returned a client_code, but
+  // the amount of associated info differs:
+  //
+  //  1. Full match   — client_code + full_name + client_id  → green
+  //  2. Partial match — client_code only (name & id null)   → indigo/blue
+  //  3. Ghost client  — client_code + client_id, but no name (exists in China DB but not ours) → amber
+  const isPartialMatch =
+    item.isResolved &&
+    item.resolvedClientId === null &&
+    item.resolvedClientName === null &&
+    !!item.clientCode;
+
   const isGhostClient =
-    item.isResolved && item.resolvedClientId !== null && item.resolvedClientName === null;
+    item.isResolved &&
+    item.resolvedClientId !== null &&
+    item.resolvedClientName === null;
+
+  // Row background + border based on state (continuation takes highest priority)
+  const rowStyle = item.isContinuation
+    ? 'bg-amber-50 dark:bg-amber-950/25 border-amber-400 dark:border-amber-600 ring-1 ring-amber-300 dark:ring-amber-700/50'
+    : item.isResolved
+      ? isPartialMatch
+        ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800'
+        : isGhostClient
+          ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
+          : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+      : item.clientCode
+        ? 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
+        : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800';
 
   return (
     <div className="relative">
@@ -73,33 +138,24 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
         <div className="absolute -top-8 left-0 right-0 z-10 flex justify-center pointer-events-none">
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-600 text-white text-[10px] font-semibold rounded-full shadow-lg whitespace-nowrap animate-in fade-in slide-in-from-bottom-1 duration-200">
             <AlertTriangle className="size-3 flex-shrink-0" />
-            Bu avvalgi urilgan mijozning trek kodining davomi
+            Orada boshqa mijoz kiritilgan — bu avvalgining davomi
           </div>
         </div>
       )}
 
-      <div
-        className={cn(
-          'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-          item.isContinuation
-            // Continuation items: amber border + background to visually distinguish them
-            ? 'bg-amber-50 dark:bg-amber-950/25 border-amber-400 dark:border-amber-600 ring-1 ring-amber-300 dark:ring-amber-700/50'
-            : item.isResolved
-              ? isGhostClient
-                ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
-                : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
-              : item.clientCode
-                ? 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
-                : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800',
-        )}
-      >
+      <div className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors', rowStyle)}>
+        {/* Status icon */}
         <span className="flex-shrink-0">
           {item.isContinuation ? (
             <AlertTriangle className="size-4 text-amber-500" />
           ) : item.isResolved ? (
-            isGhostClient
-              ? <AlertCircle className="size-4 text-amber-500" />
-              : <CheckCircle2 className="size-4 text-green-500" />
+            isPartialMatch ? (
+              <Info className="size-4 text-indigo-500" />
+            ) : isGhostClient ? (
+              <AlertCircle className="size-4 text-amber-500" />
+            ) : (
+              <CheckCircle2 className="size-4 text-green-500" />
+            )
           ) : item.clientCode ? (
             <User className="size-4 text-zinc-400" />
           ) : (
@@ -107,10 +163,12 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
           )}
         </span>
 
+        {/* Track code */}
         <span className="font-mono text-xs text-zinc-700 dark:text-zinc-300 flex-shrink-0 max-w-[40%] truncate">
           {item.trackCode}
         </span>
 
+        {/* Client code / edit area */}
         <div className="flex-1 min-w-0">
           {isEditingCode ? (
             <Input
@@ -118,9 +176,7 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
               value={tempCode}
               onChange={(e) => setTempCode(e.target.value.toUpperCase())}
               onBlur={() => {
-                if (tempCode.trim()) {
-                  onSetClientCode(item.id, tempCode.trim());
-                }
+                if (tempCode.trim()) onSetClientCode(item.id, tempCode.trim());
                 setIsEditingCode(false);
               }}
               onKeyDown={(e) => {
@@ -137,7 +193,6 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
               placeholder="Mijoz kodini kiriting..."
             />
           ) : item.isResolved || item.isContinuation ? (
-            // Resolved / continuation state — clickable to override the auto-filled code.
             <button
               onClick={enterEditMode}
               title="Mijoz kodini tahrirlash"
@@ -145,16 +200,17 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
             >
               <span className={cn(
                 'font-semibold transition-colors shrink-0',
-                item.isContinuation
+                item.isContinuation || isGhostClient
                   ? 'text-amber-700 dark:text-amber-400 group-hover:text-orange-600'
-                  : isGhostClient
-                    ? 'text-amber-700 dark:text-amber-400 group-hover:text-orange-600'
+                  : isPartialMatch
+                    ? 'text-indigo-700 dark:text-indigo-400 group-hover:text-orange-600'
                     : 'text-green-700 dark:text-green-400 group-hover:text-orange-600 dark:group-hover:text-orange-400',
               )}>
                 {item.clientCode}
               </span>
+
+              {/* State-specific secondary label */}
               {item.isContinuation ? (
-                // Show prior count badge for continuation items
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 px-1.5 py-0.5 rounded-full shrink-0">
                   +{item.priorCountForClient} avval
                 </span>
@@ -162,12 +218,17 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
                 <span className="text-green-600/70 dark:text-green-500/70 truncate">
                   {item.resolvedClientName}
                 </span>
+              ) : isPartialMatch ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 rounded-full shrink-0">
+                  Faqat kod
+                </span>
               ) : isGhostClient ? (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 px-1.5 py-0.5 rounded-full shrink-0">
                   <AlertCircle className="size-3" />
                   Bazada yo'q
                 </span>
               ) : null}
+
               <Pencil className="size-3 text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-auto" />
             </button>
           ) : (
@@ -204,13 +265,10 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [suggestion, setSuggestion] = useState<ResolvedClientResponse | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  // True once the scanner has been started for the first time — keeps the container
-  // in the DOM so the camera stream stays alive between open/close cycles.
   const [scannerReady, setScannerReady] = useState(false);
 
   const trackInputRef = useRef<HTMLInputElement>(null);
   const clientInputRef = useRef<HTMLInputElement>(null);
-  // Html5Qrcode instance — kept between renders so camera stays warm
   const qrInstanceRef = useRef<Html5Qrcode | null>(null);
 
   // Ref to latest isAutoFill value — prevents stale closure in async mutation callbacks
@@ -227,6 +285,7 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
     removeFromQueue,
     setSearchQuery,
     setExpandedClient,
+    setFastEntryOpen,
     addNotification,
   } = useExpectedCargoStore();
 
@@ -324,13 +383,8 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
 
     onSuccess: (data, trackCode) => {
       if (isAutoFillRef.current) {
-        // Determine whether this client already has items in the current queue.
         const currentQueue = useExpectedCargoStore.getState().entryQueue;
-        const priorItems = currentQueue.filter(
-          (item) => item.clientCode === data.client_code && item.trackCode !== trackCode,
-        );
-        const isContinuation = priorItems.length > 0;
-        const priorCount = priorItems.length;
+        const { isContinuation, priorCount } = detectContinuation(currentQueue, data.client_code);
 
         resolveQueueItemClient(
           trackCode,
@@ -344,18 +398,20 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
         if (isContinuation) {
           playWarningSound();
 
-          const totalCount = priorCount + 1; // prior + this new one
+          const totalCount = priorCount + 1;
 
-          // Persistent toast that stays until the admin manually dismisses it.
+          // Persistent warning toast — stays until dismissed by the admin.
+          // Clicking "Ko'rish" navigates to the client in the list and closes
+          // the scanner panel so the user can see the full client row.
           toast.warning(
-            `Siz oxirgi urgan trek kod egasi — ${data.client_code} — avval ham urganfiz: ${priorCount} ta. Jami: ${totalCount} ta trek kodi.`,
+            `${data.client_code} — orada boshqa mijoz kiritilgan, keyin yana shu mijoz`,
             {
               duration: Infinity,
-              description: `Trek kod: ${trackCode}`,
+              description: `"${data.client_code}" uchun avval ${priorCount} ta trek kodi bor edi, yangi: ${trackCode}. Jami: ${totalCount} ta.`,
               action: {
                 label: 'Ko\'rish',
                 onClick: () => {
-                  // Focus the client in the summary list by setting search query.
+                  setFastEntryOpen(false);
                   setSearchQuery(data.client_code);
                   setExpandedClient(data.client_code);
                 },
@@ -366,7 +422,7 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
           addNotification({
             type: 'warning',
             title: `Takroriy mijoz: ${data.client_code}`,
-            description: `${trackCode} skanerlanganda aniqlandi. ${data.client_code} uchun allaqachon ${priorCount} ta trek kodi mavjud. Jami ${totalCount} ta.`,
+            description: `Orada boshqa mijoz kiritilganidan keyin "${data.client_code}" qayta topildi. Avvalgisi: ${priorCount} ta, jami: ${totalCount} ta trek kodi.`,
             navigateTo: { flightName: flightName ?? '', clientCode: data.client_code },
           });
         } else {
@@ -382,7 +438,6 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
     onError: (_err, trackCode) => {
       playErrorSound();
       if (isAutoFillRef.current) {
-        // Still enqueue with empty client code so the user can fill it manually.
         resolveQueueItemClient(trackCode, '', null, null, false, 0);
         toast.warning(`${trackCode} — mijoz topilmadi, qo'lda kiriting`, { duration: 2000 });
       } else {
@@ -527,7 +582,7 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
 
       {/* ── Input area ────────────────────────────────────────────────────────── */}
       <div className="px-3 py-2 space-y-2">
-        {/* Track code input — camera icon lives inside the input on the right */}
+        {/* Track code input — camera icon inside the input on the right */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Input
@@ -546,7 +601,6 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
               autoCorrect="off"
               spellCheck={false}
             />
-            {/* Right-side icon: spinner while resolving, camera button otherwise */}
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               {resolveMutation.isPending ? (
                 <Loader2 className="size-4 text-orange-400 animate-spin" />
@@ -580,7 +634,7 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
           )}
         </div>
 
-        {/* ── Camera viewfinder (html5-qrcode) ──────────────────────────────── */}
+        {/* ── Camera viewfinder ──────────────────────────────────────────────── */}
         {scannerReady && (
           <div
             className={isScanning
@@ -599,7 +653,6 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
             }}
           >
             <div id={SCANNER_CONTAINER_ID} className="w-full" />
-
             {isScanning && (
               <>
                 <div className="absolute bottom-0 left-0 right-0 py-2 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
