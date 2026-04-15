@@ -190,7 +190,7 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
               <button
                 key={item.id}
                 onClick={() => handleNav(item.id)}
-                className="flex flex-col items-center py-1.5 px-3 min-w-[60px] transition-transform active:scale-90 touch-manipulation relative"
+                className="flex flex-col items-center py-1.5 px-1 flex-1 min-w-0 transition-transform active:scale-90 touch-manipulation relative"
               >
                 {isActive && (
                   <motion.div
@@ -209,7 +209,7 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
                     strokeWidth={isActive ? 2.2 : 1.8}
                   />
                 </div>
-                <span className={`text-[10px] mt-0.5 font-semibold transition-colors duration-200 ${
+                <span className={`text-[9px] mt-0.5 font-semibold transition-colors duration-200 truncate w-full text-center ${
                   isActive ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-600'
                 }`}>
                   {item.label}
