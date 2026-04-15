@@ -758,8 +758,8 @@ function AppContent() {
               ? "pb-0 md:pb-0 pt-0"
               : isAdminLoginPage
                 ? "p-0"
-                : ["flights", "cargo-list", "cargo-add"].includes(currentPage)
-                  ? "pt-20 pb-6"   // NavigationBar clearance only — inner pages control their own spacing
+                : ["flights", "cargo-list", "cargo-add", "statistics"].includes(currentPage)
+                  ? "pt-20 pb-20"   // NavigationBar clearance only — inner pages control their own spacing
                   : "pb-12 pt-24"
           } transition-all duration-300 ${isVerificationPage ? "pt-24 md:pt-48" : ""}`}
         >

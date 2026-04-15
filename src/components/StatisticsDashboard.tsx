@@ -1,1386 +1,686 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import {
-  getRegistrationStatistics,
-  getClientActivityStatistics,
-  getCargoTrendStatistics,
-  getRevenueStatistics,
-  getBotLifecycleStatistics,
-  getCargoItemsStatistics,
-  getCargoItemsTrends,
-  getFotoHisobotStatistics,
-  getDeliveryRequestsStatistics,
-  getBroadcastStatistics,
-  getGlobalDashboardStatistics,
-  getPaymentSummary,
-  getPaymentsByClient,
-  getPaymentsByFlight,
-  exportClients,
-  exportFotoHisobot,
-  exportCargoItems,
-  exportRevenue,
-  exportApiLogs,
-  exportDeliveryRequests,
-  exportAllStats,
-  exportExcel,
-  exportCsv,
-  exportPaymentSummary,
-  type RegistrationStatsResponse,
-  type ClientActivityStatsResponse,
-  type CargoStatsResponse,
-  type RevenueStatsResponse,
-  type BotLifecycleStatsResponse,
-  type CargoItemsStatsResponse,
-  type CargoItemsTrendsResponse,
-  type FotoHisobotStatsResponse,
-  type DeliveryRequestsStatsResponse,
-  type BroadcastStatsResponse,
-  type GlobalDashboardStats,
-  type PaymentSummaryResponse,
-  type ClientPaymentStatsResponse,
-  type FlightPaymentStatsResponse
-} from '@/api/services/stats';
-import { Button } from '@/components/ui/button';
-import {
-  ArrowLeft, Users, Package, DollarSign, Calendar, Activity,
-  RefreshCw, Camera, Truck, Send, BarChart3, Download,
-  FileSpreadsheet, CreditCard
-} from 'lucide-react';
+import { ArrowLeft, Users, Package, DollarSign, Activity, PieChart, Zap, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { DateFilter } from './statistics/DateFilter';
+import { StatCard } from './statistics/StatCard';
+import { ModernAreaChart } from './statistics/ModernAreaChart';
+import { ModernBarChart } from './statistics/ModernBarChart';
 import { useToast } from '@/hooks/useToast';
-import { useTranslation } from 'react-i18next';
+import { groupRegionsByViloyat } from '@/utils/regionUtils';
 import {
-  formatCurrencySum,
-  formatNumberLocalized,
-  formatTashkentDate,
-  formatTashkentDateShort,
-  getTashkentDateIso
-} from '@/lib/format';
-
-// Chart components
-import TrendChart from './charts/TrendChart';
-import ComparisonBarChart from './charts/ComparisonBarChart';
-import PieDonutChart from './charts/PieDonutChart';
-import KPICard from './charts/KPICard';
-import PaymentProviderBreakdown from './charts/PaymentProviderBreakdown';
-import ClientPaymentStatsComponent from './charts/ClientPaymentStats';
-import FlightPaymentStatsComponent from './charts/FlightPaymentStats';
-import TodayYesterdayCard from './charts/TodayYesterdayCard';
+  getCargoStats,
+  getClientStats,
+  getFinancialStats,
+  getOperationalStats,
+  exportCargoStats,
+  exportClientStats,
+  exportFinancialStats,
+  exportOperationalStats,
+} from '@/api/services/stats';
+import type {
+  CargoStatsResponse,
+  ClientStatsResponse,
+  FinancialStatsResponse,
+  OperationalStatsResponse,
+} from '@/api/services/stats';
 
 interface StatisticsDashboardProps {
   onBack: () => void;
 }
 
-// Animation variants - defined once to avoid recreating
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
-
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { duration: 0.5, ease: "easeOut" as const }
-  }
-};
-
-// Section Header Component - Reusable
-interface SectionHeaderProps {
-  icon: React.ElementType;
-  title: string;
-  gradientFrom: string;
-  gradientTo: string;
-  actions?: React.ReactNode;
-}
-
-function SectionHeader({ icon: Icon, title, gradientFrom, gradientTo, actions }: SectionHeaderProps) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r ${gradientFrom} ${gradientTo} rounded-lg flex items-center justify-center text-white`}>
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-        </div>
-        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">{title}</h2>
-      </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-    </div>
-  );
-}
-
-// Card Container Component - Reusable
-interface CardContainerProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-function CardContainer({ children, className = '' }: CardContainerProps) {
-  return (
-    <div className={`bg-white/60 backdrop-blur-md rounded-xl shadow-lg p-4 sm:p-6 border border-white/20 ${className}`}>
-      {children}
-    </div>
-  );
-}
+type TabId = 'overview' | 'clients' | 'cargo' | 'finance' | 'operational';
 
 export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps) {
-  const { t, i18n } = useTranslation();
+
+  const getToday = () => new Date().toISOString().split('T')[0];
+  const getStartOfMonth = () => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  };
+
+  const [startDate, setStartDate] = useState(getStartOfMonth());
+  const [endDate, setEndDate] = useState(getToday());
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [cargoData, setCargoData] = useState<CargoStatsResponse | null>(null);
+  const [clientData, setClientData] = useState<ClientStatsResponse | null>(null);
+  const [financeData, setFinanceData] = useState<FinancialStatsResponse | null>(null);
+  const [opData, setOpData] = useState<OperationalStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [exportingTab, setExportingTab] = useState<string | null>(null);
+  // Tracks which viloyat groups are expanded in the regions list
+  const [expandedViloyatlar, setExpandedViloyatlar] = useState<Set<string>>(new Set());
+
   const { toast, ToastRenderer } = useToast();
 
-  // State management - grouped by category
-  const [isLoading, setIsLoading] = useState(true);
+  // ── Formatters ───────────────────────────────────────────────
 
-  // Core statistics
-  const [registrationStats, setRegistrationStats] = useState<RegistrationStatsResponse | null>(null);
-  const [activityStats, setActivityStats] = useState<ClientActivityStatsResponse | null>(null);
-  const [cargoStats, setCargoStats] = useState<CargoStatsResponse | null>(null);
-  const [revenueStats, setRevenueStats] = useState<RevenueStatsResponse | null>(null);
-  const [lifecycleStats, setLifecycleStats] = useState<BotLifecycleStatsResponse | null>(null);
+  const formatMoney = (val: string | number | undefined | null): string => {
+    if (val == null) return `0 so'm`;
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return `0 so'm`;
+    return `${num.toLocaleString('ru-RU')} so'm`;
+  };
 
-  // Domain statistics
-  const [cargoItemsStats, setCargoItemsStats] = useState<CargoItemsStatsResponse | null>(null);
-  const [cargoItemsTrends, setCargoItemsTrends] = useState<CargoItemsTrendsResponse | null>(null);
-  const [fotoHisobotStats, setFotoHisobotStats] = useState<FotoHisobotStatsResponse | null>(null);
-  const [deliveryStats, setDeliveryStats] = useState<DeliveryRequestsStatsResponse | null>(null);
-  const [broadcastStats, setBroadcastStats] = useState<BroadcastStatsResponse | null>(null);
-  const [globalStats, setGlobalStats] = useState<GlobalDashboardStats | null>(null);
+  /** Short money label for chart Y-axis (e.g. "1.2 mln", "450 ming") */
+  const formatMoneyShort = (val: string | number): string => {
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return '0';
+    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)} mlrd`;
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)} mln`;
+    if (num >= 1_000) return `${(num / 1_000).toFixed(0)} ming`;
+    return `${num}`;
+  };
 
-  // Payment statistics
-  const [paymentSummary, setPaymentSummary] = useState<PaymentSummaryResponse | null>(null);
-  const [paymentsByClient, setPaymentsByClient] = useState<ClientPaymentStatsResponse | null>(null);
-  const [paymentsByFlight, setPaymentsByFlight] = useState<FlightPaymentStatsResponse | null>(null);
+  /** Integer/large number with space as thousands separator (Russian locale) */
+  const formatNum = (val: string | number | undefined | null): string => {
+    if (val == null) return '0';
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return '0';
+    // Only use locale formatting for numbers >= 1 to avoid decimal confusion
+    if (Number.isInteger(num)) return num.toLocaleString('ru-RU');
+    return num.toLocaleString('ru-RU');
+  };
 
-  // Formatting helpers - memoized
-  const formatNumber = useCallback((num: number) => {
-    return formatNumberLocalized(num, i18n.language);
-  }, [i18n.language]);
+  /**
+   * Formats a decimal number (days, kg averages) using a period as the decimal
+   * separator so it cannot be confused with a thousands separator.
+   * e.g. 1.245 → "1.2", 12.7 → "12.7", 1245 → "1 245"
+   */
+  const formatDecimal = (val: string | number | undefined | null, decimals = 1): string => {
+    if (val == null) return '0';
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return '0';
+    if (num >= 1000) return num.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+    return num.toFixed(decimals);
+  };
 
-  const formatCurrency = useCallback((amount: number) => {
-    return formatCurrencySum(amount, i18n.language);
-  }, [i18n.language]);
-
-  const formatDate = useCallback((dateString: string) => {
-    return formatTashkentDate(dateString, i18n.language);
-  }, [i18n.language]);
-
-  const formatDateShort = useCallback((dateString: string) => {
-    return formatTashkentDateShort(dateString, i18n.language);
-  }, [i18n.language]);
-
-  // Error handler helper
-  const getErrorMessage = useCallback((error: unknown) => {
-    let errorMessage = t('stats.loadingErrorDesc');
-    let errorTitle = t('stats.loadingError');
-
-    const hasResponse = typeof error === 'object' && error !== null && 'response' in (error as object);
-    if (hasResponse && (error as { response?: { status?: number; data?: { detail?: string } } }).response?.status) {
-
-      const statusMessages: Record<number, { title: string; message: string }> = {
-        400: { title: '❌ Bad Request', message: 'Noto\'g\'ri parametrlar. Sanalarni tekshiring.' },
-        401: { title: '❌ Unauthorized', message: 'Tizimga kirish uchun avtorizatsiya talab qilinadi.' },
-        403: { title: '❌ Forbidden', message: 'Bu ma\'lumotlarga kirish uchun ruxsat yo\'q.' },
-        404: { title: '❌ Not Found', message: 'So\'ralan ma\'lumotlar topilmadi.' },
-        429: { title: '❌ Too Many Requests', message: 'Juda ko\'p so\'rovlar. Iltimos birozdan keyinroq urinib ko\'ring.' },
-        500: { title: '❌ Server Error', message: 'Serverda xatolik yuz berdi. Iltimos birozdan urinib ko\'ring.' },
-        502: { title: '❌ Gateway Error', message: 'Tashqi xizmatda xatolik. Iltimos birozdan urinib ko\'ring.' },
-        503: { title: '❌ Service Unavailable', message: 'Xizmat vaqtincha mavjud emas. Iltimos keyinroq urinib ko\'ring.' }
-      };
-
-      const statusError = statusMessages[(error as { response: { status: number } }).response.status];
-
-      if (statusError) {
-        errorTitle = statusError.title;
-        errorMessage = statusError.message;
-      } else {
-        errorTitle = `❌ ${t('stats.loadingError')}`;
-        const err = error as { message?: string; status?: number };
-        errorMessage = `HTTP ${err.status ?? ''}: ${err.message || ''}`;
-      }
-    } else if (typeof error === 'object' && error !== null && 'code' in (error as object) && (error as { code?: string }).code === 'NETWORK_ERROR') {
-      errorTitle = '❌ Network Error';
-      errorMessage = 'Tarmoq xatoligi. Internet ulanishini tekshiring.';
-    } else if (typeof error === 'object' && error !== null && 'code' in (error as object) && (error as { code?: string }).code === 'TIMEOUT') {
-
-      errorTitle = '❌ Timeout';
-      errorMessage = 'So\'rov muddati o\'tib ketdi. Iltimos yana urinib ko\'ring.';
-    }
-
-    return { errorTitle, errorMessage };
-  }, [t]);
-
-  // Load all statistics
-  const loadAllStatistics = useCallback(async () => {
-    try {
-      setIsLoading(true);
-
-      // Get current date in Tashkent timezone for date filters
-      const todayIso = getTashkentDateIso();
-
-      // Helper for partial failure handling
-      const safeRequest = async <T,>(promise: Promise<T>): Promise<T | null> => {
-        try {
-          return await promise;
-        } catch (error) {
-          console.warn('Partial statistics load failure:', error);
-          return null;
-        }
-      };
-
-      const [
-        registrationData,
-        activityData,
-        cargoData,
-        revenueData,
-        lifecycleData,
-        cargoItemsData,
-        cargoItemsTrendsData,
-        fotoHisobotData,
-        deliveryData,
-        broadcastData,
-        globalData,
-        paymentSummaryData,
-        paymentsByClientData,
-        paymentsByFlightData
-      ] = await Promise.all([
-        safeRequest(getRegistrationStatistics()),
-        safeRequest(getClientActivityStatistics()),
-        safeRequest(getCargoTrendStatistics()),
-        safeRequest(getRevenueStatistics()),
-        safeRequest(getBotLifecycleStatistics()),
-        safeRequest(getCargoItemsStatistics()),
-        safeRequest(getCargoItemsTrends()),
-        safeRequest(getFotoHisobotStatistics()),
-        safeRequest(getDeliveryRequestsStatistics()),
-        safeRequest(getBroadcastStatistics()),
-        safeRequest(getGlobalDashboardStatistics()),
-        safeRequest(getPaymentSummary()),
-        safeRequest(getPaymentsByClient(undefined, todayIso)),
-        safeRequest(getPaymentsByFlight(undefined, todayIso))
-      ]);
-
-      setRegistrationStats(registrationData);
-      setActivityStats(activityData);
-      setCargoStats(cargoData);
-      setRevenueStats(revenueData);
-      setLifecycleStats(lifecycleData);
-      setCargoItemsStats(cargoItemsData);
-      setCargoItemsTrends(cargoItemsTrendsData);
-      setFotoHisobotStats(fotoHisobotData);
-      setDeliveryStats(deliveryData);
-      setBroadcastStats(broadcastData);
-      setGlobalStats(globalData);
-      setPaymentSummary(paymentSummaryData);
-      setPaymentsByClient(paymentsByClientData);
-      setPaymentsByFlight(paymentsByFlightData);
-
-      // Check if EVERYTHING failed (edge case)
-      if (
-        !registrationData && !activityData && !cargoData && !revenueData && 
-        !lifecycleData && !cargoItemsData && !fotoHisobotData && !deliveryData && 
-        !broadcastData && !globalData && !paymentSummaryData
-      ) {
-         toast({ 
-           title: t('stats.loadingError'), 
-           description: t('stats.loadingErrorDesc'), 
-           variant: 'error' 
-         });
-      }
-
-    } catch (error: unknown) {
-
-      console.error('Critical failure in loadAllStatistics:', error);
-      const { errorTitle, errorMessage } = getErrorMessage(error);
-      toast({ title: errorTitle, description: errorMessage, variant: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getErrorMessage, toast, t]);
+  // ── Data loading ─────────────────────────────────────────────
 
   useEffect(() => {
-    loadAllStatistics();
-  }, [loadAllStatistics]);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [r0, r1, r2, r3] = await Promise.allSettled([
+          getCargoStats(startDate, endDate),
+          getClientStats(startDate, endDate),
+          getFinancialStats(startDate, endDate),
+          getOperationalStats(startDate, endDate),
+        ]);
+        setCargoData(r0.status === 'fulfilled' ? r0.value : null);
+        setClientData(r1.status === 'fulfilled' ? r1.value : null);
+        setFinanceData(r2.status === 'fulfilled' ? r2.value : null);
+        setOpData(r3.status === 'fulfilled' ? r3.value : null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [startDate, endDate]);
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-orange-50/30 to-gray-100">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">{t('stats.loading')}</p>
-        </motion.div>
-      </div>
-    );
-  }
+  // ── Export handler ───────────────────────────────────────────
 
-  // Transform data for charts
-  const registrationTrendData = registrationStats ? [
-    {
-      name: t('stats.periods.daily'),
-      current: registrationStats.daily.current_period.count,
-      previous: registrationStats.daily.previous_period.count
-    },
-    {
-      name: t('stats.periods.weekly'),
-      current: registrationStats.weekly.current_period.count,
-      previous: registrationStats.weekly.previous_period.count
-    },
-    {
-      name: t('stats.periods.monthly'),
-      current: registrationStats.monthly.current_period.count,
-      previous: registrationStats.monthly.previous_period.count
+  const handleExport = async (tab: 'cargo' | 'clients' | 'finance' | 'operational') => {
+    if (exportingTab) return;
+    setExportingTab(tab);
+    try {
+      if (tab === 'cargo') await exportCargoStats(startDate, endDate);
+      else if (tab === 'clients') await exportClientStats(startDate, endDate);
+      else if (tab === 'finance') await exportFinancialStats(startDate, endDate);
+      else await exportOperationalStats(startDate, endDate);
+      toast({ title: 'Fayl yuklab olindi', variant: 'success' });
+    } catch {
+      toast({ title: 'Export xatosi', description: 'Faylni yuklab olishda xatolik', variant: 'error' });
+    } finally {
+      setExportingTab(null);
     }
-  ] : [];
+  };
 
-  const activityPieData = activityStats ? [
-    { name: t('stats.activity.active'), value: activityStats.last_30_days.active_clients },
-    { name: t('stats.activity.passive'), value: activityStats.last_30_days.passive_clients }
-  ] : [];
+  const toggleViloyat = (viloyat: string) => {
+    setExpandedViloyatlar(prev => {
+      const next = new Set(prev);
+      if (next.has(viloyat)) next.delete(viloyat);
+      else next.add(viloyat);
+      return next;
+    });
+  };
 
-  const cargoComparisonData = cargoStats ? [
-    {
-      name: t('stats.periods.weekly'),
-      value: cargoStats.weekly_comparison.current_period.count,
-      comparison: cargoStats.weekly_comparison.previous_period.count
-    },
-    {
-      name: t('stats.periods.monthly'),
-      value: cargoStats.monthly_comparison.current_period.count,
-      comparison: cargoStats.monthly_comparison.previous_period.count
-    }
-  ] : [];
+  // ── Shared sub-components ────────────────────────────────────
 
-  const revenueComparisonData = revenueStats ? [
-    {
-      name: t('stats.periods.weekly'),
-      value: revenueStats.weekly.current_period.total_revenue,
-      comparison: revenueStats.weekly.previous_period.total_revenue
-    },
-    {
-      name: t('stats.periods.monthly'),
-      value: revenueStats.monthly.current_period.total_revenue,
-      comparison: revenueStats.monthly.previous_period.total_revenue
-    }
-  ] : [];
+  const ExportBtn = ({ tab }: { tab: 'cargo' | 'clients' | 'finance' | 'operational' }) => (
+    <button
+      onClick={() => handleExport(tab)}
+      disabled={!!exportingTab}
+      className="flex items-center gap-1.5 h-8 px-3 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/20 active:scale-[0.98] disabled:opacity-60 rounded-xl transition-all"
+    >
+      {exportingTab === tab
+        ? <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+        : <Download className="w-3.5 h-3.5" />}
+      {exportingTab === tab ? 'Yuklanmoqda...' : 'Excel'}
+    </button>
+  );
 
-  const paymentTypeData = revenueStats?.weekly.current_period ? [
-    { name: t('stats.revenue.fullPayments'), value: revenueStats.weekly.current_period.full_payments_count },
-    { name: t('stats.revenue.partialPayments'), value: revenueStats.weekly.current_period.partial_payments_count }
-  ] : [];
+  const SectionHeader = ({ title, tab }: { title: string; tab?: 'cargo' | 'clients' | 'finance' | 'operational' }) => (
+    <div className="flex items-center justify-between">
+      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">{title}</h2>
+      {tab && <ExportBtn tab={tab} />}
+    </div>
+  );
+
+  const TableBlock = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <h3 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300 uppercase tracking-wide">{title}</h3>
+      <div className="overflow-x-auto">{children}</div>
+    </div>
+  );
+
+  const th = 'pb-2 pr-4 font-semibold text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500 whitespace-nowrap';
+  const tr = 'border-b last:border-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors';
+
+  const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
+    { id: 'overview', label: 'Umumiy', icon: PieChart },
+    { id: 'clients', label: 'Mijozlar', icon: Users },
+    { id: 'cargo', label: 'Yuklar', icon: Package },
+    { id: 'finance', label: 'Moliya', icon: DollarSign },
+    { id: 'operational', label: 'Jarayon', icon: Activity },
+  ];
+
+  // ── Render ───────────────────────────────────────────────────
 
   return (
-    <>
+    <div className="min-h-screen text-gray-900 dark:text-gray-100 transition-colors">
       <ToastRenderer />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
-        className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-[1400px] bg-gradient-to-br from-gray-50 via-orange-50/30 to-gray-100 min-h-screen"
-      >
         {/* Header */}
-        <motion.div variants={itemVariants} className="mb-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-orange-600 transition-colors mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="font-medium text-sm sm:text-base">{t('stats.backToDashboard')}</span>
-          </button>
-
-          <div className="flex flex-col gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
-                {t('stats.title')}
-              </h1>
-              <p className="text-sm text-gray-600">{t('stats.subtitle')}</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={loadAllStatistics}
-                size="sm"
-                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold shadow-md"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {t('stats.refresh')}
-              </Button>
-              <Button
-                onClick={exportExcel}
-                size="sm"
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold shadow-md"
-              >
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                {t('stats.export.excel')}
-              </Button>
-              <Button
-                onClick={exportCsv}
-                size="sm"
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-md"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {t('stats.export.csv')}
-              </Button>
-            </div>
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
+          <div>
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 mb-2 font-medium bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full w-fit transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Orqaga
+            </button>
+            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
+              Statistika Paneli
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Barcha ko'rsatkichlar va tahlillar</p>
           </div>
-        </motion.div>
+          <DateFilter startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
+        </div>
 
-        {/* KPI Overview - Top Row */}
-        {lifecycleStats && (
-          <motion.div
-            variants={itemVariants}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6"
-          >
-            <KPICard
-              title={t('stats.kpi.totalUsers')}
-              value={formatNumber(lifecycleStats.total_users)}
-              subtitle={`${formatNumber(lifecycleStats.total_approved_clients)} ${t('stats.kpi.approvedClients')}`}
-              icon={Users}
-              trend={{
-                value: lifecycleStats.avg_users_per_day,
-                label: t('stats.kpi.avgPerDay')
-              }}
-              color="blue"
-            />
-            <KPICard
-              title={t('stats.kpi.totalCargo')}
-              value={formatNumber(lifecycleStats.total_cargo_uploads)}
-              subtitle={`${lifecycleStats.avg_cargo_per_day.toFixed(1)} ${t('stats.kpi.avgPerDay')}`}
-              icon={Package}
-              color="green"
-            />
-            <KPICard
-              title={t('stats.kpi.totalRevenue')}
-              value={formatCurrency(lifecycleStats.total_revenue)}
-              subtitle={`${formatNumber(lifecycleStats.total_payments)} ${t('stats.kpi.payments')}`}
-              icon={DollarSign}
-              color="purple"
-            />
-            <KPICard
-              title={t('stats.kpi.daysActive')}
-              value={formatNumber(lifecycleStats.days_since_launch)}
-              subtitle={`${t('stats.kpi.since')} ${formatDate(lifecycleStats.bot_launch_date)}`}
-              icon={Calendar}
-              color="orange"
-            />
-          </motion.div>
-        )}
+        {/* Tab bar */}
+        <div className="flex overflow-x-auto hide-scrollbar mb-6 bg-gray-100 dark:bg-gray-800/60 p-1 rounded-2xl w-full md:w-fit border border-gray-200/50 dark:border-gray-700/50">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap z-10 transition-colors ${
+                  isActive
+                    ? 'text-indigo-700 dark:text-white'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {tab.label}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTabBg"
+                    className="absolute inset-0 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 -z-10"
+                    transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-        {/* TODAY VS YESTERDAY COMPARISONS - NEW SECTION */}
-        {(registrationStats?.today_vs_yesterday || cargoStats?.today_vs_yesterday || revenueStats?.today_vs_yesterday) && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Calendar}
-              title={t('stats.periods.todayVsYesterday')}
-              gradientFrom="from-indigo-500"
-              gradientTo="to-indigo-600"
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {registrationStats?.today_vs_yesterday && (
-                <TodayYesterdayCard
-                  title={t('stats.registrations.title')}
-                  todayValue={registrationStats.today_vs_yesterday.today_count}
-                  yesterdayValue={registrationStats.today_vs_yesterday.yesterday_count}
-                  difference={registrationStats.today_vs_yesterday.difference}
-                  percentChange={registrationStats.today_vs_yesterday.percent_change}
-                  isGrowth={registrationStats.today_vs_yesterday.is_growth}
-                  todayDate={formatDateShort(registrationStats.today_vs_yesterday.today_date)}
-                  yesterdayDate={formatDateShort(registrationStats.today_vs_yesterday.yesterday_date)}
-                  icon={Users}
-                  compact
-                />
-              )}
-              {cargoStats?.today_vs_yesterday && (
-                <TodayYesterdayCard
-                  title={t('stats.cargo.title')}
-                  todayValue={cargoStats.today_vs_yesterday.today_count}
-                  yesterdayValue={cargoStats.today_vs_yesterday.yesterday_count}
-                  difference={cargoStats.today_vs_yesterday.difference}
-                  percentChange={cargoStats.today_vs_yesterday.percent_change}
-                  isGrowth={cargoStats.today_vs_yesterday.is_growth}
-                  todayDate={formatDateShort(cargoStats.today_vs_yesterday.today_date)}
-                  yesterdayDate={formatDateShort(cargoStats.today_vs_yesterday.yesterday_date)}
-                  icon={Package}
-                  compact
-                  colorScheme="activity"
-                />
-              )}
-              {revenueStats?.today_vs_yesterday && (
-                <TodayYesterdayCard
-                  title={t('stats.revenue.title')}
-                  todayValue={revenueStats.today_vs_yesterday.today_revenue}
-                  yesterdayValue={revenueStats.today_vs_yesterday.yesterday_revenue}
-                  difference={revenueStats.today_vs_yesterday.difference}
-                  percentChange={revenueStats.today_vs_yesterday.percent_change}
-                  isGrowth={revenueStats.today_vs_yesterday.is_growth}
-                  todayDate={formatDateShort(revenueStats.today_vs_yesterday.today_date)}
-                  yesterdayDate={formatDateShort(revenueStats.today_vs_yesterday.yesterday_date)}
-                  icon={DollarSign}
-                  valueFormatter={(v) => formatCurrency(Number(v))}
-                  compact
-                  colorScheme="revenue"
-                />
-              )}
-            </div>
-          </motion.div>
-        )}
+        {/* Content — no AnimatePresence exit animation to avoid blank-screen flicker */}
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div>
+            {/* Each tab is conditionally mounted; motion.div fades in on mount */}
 
-        {/* PAYMENT STATISTICS - GROUPED TOGETHER */}
-        {paymentSummary && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <CardContainer>
-              <SectionHeader
-                icon={CreditCard}
-                title={t('stats.paymentProviders.title')}
-                gradientFrom="from-violet-500"
-                gradientTo="to-violet-600"
-                actions={
-                  <>
-                    <Button
-                      onClick={() => exportPaymentSummary()}
-                      size="sm"
-                      className="bg-violet-500 hover:bg-violet-600 text-white"
-                    >
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      {t('stats.export.paymentSummary')}
-                    </Button>
-                  </>
-                }
-              />
-
-              {/* Today vs Yesterday Payment Comparison */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                <PaymentProviderBreakdown
-                  title={t('stats.paymentProviders.today')}
-                  providers={paymentSummary.today.providers}
-                  sharePercentages={paymentSummary.today.share_percentages}
-                  growth={paymentSummary.growth.daily.total}
-                  compact
-                />
-                <PaymentProviderBreakdown
-                  title={t('stats.paymentProviders.yesterday')}
-                  providers={paymentSummary.yesterday.providers}
-                  sharePercentages={paymentSummary.yesterday.share_percentages}
-                  compact
-                />
-              </div>
-
-              {/* All Time Summary */}
-              <PaymentProviderBreakdown
-                title={t('stats.paymentProviders.allTime')}
-                providers={paymentSummary.providers}
-                sharePercentages={paymentSummary.share_percentages}
-                compact={false}
-              />
-
-              {/* Weekly and Monthly */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-                <PaymentProviderBreakdown
-                  title={t('stats.paymentProviders.thisWeek')}
-                  providers={paymentSummary.this_week.providers}
-                  sharePercentages={paymentSummary.this_week.share_percentages}
-                  growth={paymentSummary.growth.weekly.total}
-                  showDetails={false}
-                />
-                <PaymentProviderBreakdown
-                  title={t('stats.paymentProviders.thisMonth')}
-                  providers={paymentSummary.this_month.providers}
-                  sharePercentages={paymentSummary.this_month.share_percentages}
-                  growth={paymentSummary.growth.monthly.total}
-                  showDetails={false}
-                />
-              </div>
-
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6">
-                <KPICard
-                  title={t('stats.paymentProviders.last7Days')}
-                  value={formatCurrency(paymentSummary.last_7_days.providers.total)}
-                  subtitle={`${formatNumber(paymentSummary.last_7_days.providers.total_count)} ${t('stats.revenue.payments')}`}
-                  icon={DollarSign}
-                  trend={{
-                    value: paymentSummary.growth.weekly.total.percent || 0,
-                    label: t('stats.periods.vsLastWeek')
-                  }}
-                  color="green"
-                />
-                <KPICard
-                  title={t('stats.paymentProviders.last60Days')}
-                  value={formatCurrency(paymentSummary.last_60_days.providers.total)}
-                  subtitle={`${formatNumber(paymentSummary.last_60_days.providers.total_count)} ${t('stats.revenue.payments')}`}
-                  icon={DollarSign}
-                  color="blue"
-                />
-                <KPICard
-                  title={t('stats.paymentProviders.accountTotal')}
-                  value={formatCurrency(paymentSummary.providers.account)}
-                  subtitle={`${formatNumber(paymentSummary.providers.account_count)} ${t('stats.revenue.payments')}`}
-                  icon={CreditCard}
-                  color="purple"
-                />
-                <KPICard
-                  title={t('stats.paymentProviders.totalTransactions')}
-                  value={formatNumber(paymentSummary.providers.total_count)}
-                  subtitle={t('stats.paymentProviders.allTime')}
-                  icon={DollarSign}
-                  color="orange"
-                />
-              </div>
-            </CardContainer>
-
-            {/* Client and Flight Payment Stats */}
-            <div className="grid grid-cols-1 gap-4 mt-4">
-              {paymentsByClient && (
-                <ClientPaymentStatsComponent data={paymentsByClient} />
-              )}
-              {paymentsByFlight && (
-                <FlightPaymentStatsComponent data={paymentsByFlight} />
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Registration Trends */}
-        {registrationStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Users}
-              title={t('stats.registrations.title')}
-              gradientFrom="from-blue-500"
-              gradientTo="to-blue-600"
-              actions={
-                <Button onClick={exportClients} size="sm" className="bg-blue-500 hover:bg-blue-600 text-white">
-                  <Download className="w-4 h-4 mr-2" />
-                  {t('stats.export.clients')}
-                </Button>
-              }
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <TrendChart
-                  data={registrationTrendData}
-                  title={t('stats.registrations.chartTitle')}
-                  currentLabel={t('stats.registrations.currentPeriod')}
-                  previousLabel={t('stats.registrations.previousPeriod')}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <KPICard
-                  title={t('stats.registrations.thisWeek')}
-                  value={formatNumber(registrationStats.weekly.current_period.count)}
-                  trend={{
-                    value: registrationStats.weekly.delta_percent,
-                    label: t('stats.periods.vsLastWeek')
-                  }}
-                  color="blue"
-                />
-                <KPICard
-                  title={t('stats.registrations.thisMonth')}
-                  value={formatNumber(registrationStats.monthly.current_period.count)}
-                  trend={{
-                    value: registrationStats.monthly.delta_percent,
-                    label: t('stats.periods.vsLastMonth')
-                  }}
-                  color="blue"
-                />
-                <KPICard
-                  title={t('stats.registrations.lifetimeTotal')}
-                  value={formatNumber(registrationStats.total_lifetime)}
-                  subtitle={t('stats.registrations.allTimeRegistrations')}
-                  color="blue"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Client Activity */}
-        {activityStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Activity}
-              title={t('stats.activity.titleWithPeriod')}
-              gradientFrom="from-green-500"
-              gradientTo="to-green-600"
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <PieDonutChart
-                data={activityPieData}
-                title={t('stats.activity.chartTitle')}
-                colors={['#10b981', '#94a3b8']}
-                valueFormatter={(value) => formatNumber(value)}
-              />
-
-              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  { period: 'last_7_days', label: t('stats.periods.last7Days') },
-                  { period: 'last_30_days', label: t('stats.periods.last30Days') },
-                  { period: 'last_60_days', label: t('stats.periods.last60Days') }
-                ].map(({ period, label }) => {
-                  const metrics = activityStats[period as keyof typeof activityStats];
-                  if (typeof metrics === 'object' && 'active_clients' in metrics) {
-                    return (
-                      <CardContainer key={period}>
-                        <h4 className="text-xs sm:text-sm font-medium text-gray-600 mb-3">{label}</h4>
-                        <div className="space-y-3">
-                          <div>
-                            <div className="flex justify-between mb-1">
-                              <span className="text-xs text-gray-500">{t('stats.activity.active')}</span>
-                              <span className="text-xs font-medium text-green-600">
-                                {formatNumber(metrics.active_clients)}
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2">
-                              <div
-                                className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${metrics.total_registered > 0 ? (metrics.active_clients / metrics.total_registered) * 100 : 0}%`
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex justify-between mb-1">
-                              <span className="text-xs text-gray-500">{t('stats.activity.passive')}</span>
-                              <span className="text-xs font-medium text-gray-600">
-                                {formatNumber(metrics.passive_clients)}
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2">
-                              <div
-                                className="bg-gray-400 h-2 rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${metrics.total_registered > 0 ? (metrics.passive_clients / metrics.total_registered) * 100 : 0}%`
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <div className="pt-2 border-t border-gray-100">
-                            <div className="flex justify-between">
-                              <span className="text-xs text-gray-600">{t('stats.activity.rate')}</span>
-                              <span className="text-sm font-bold text-blue-600">
-                                {metrics.activity_rate}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContainer>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Cargo Statistics */}
-        {cargoStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Package}
-              title={t('stats.cargo.title')}
-              gradientFrom="from-amber-500"
-              gradientTo="to-amber-600"
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <ComparisonBarChart
-                  data={cargoComparisonData}
-                  title={t('stats.cargo.chartTitle')}
-                  valueLabel={t('stats.cargo.currentPeriod')}
-                  comparisonLabel={t('stats.cargo.previousPeriod')}
-                  color="#f59e0b"
-                  comparisonColor="#94a3b8"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <CardContainer>
-                  <h4 className="text-xs sm:text-sm font-medium text-gray-600 mb-3">{t('stats.cargo.monthlyDetails')}</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-xs sm:text-sm text-gray-600">{t('stats.cargo.count')}</span>
-                      <span className="text-sm font-semibold text-gray-800">
-                        {formatNumber(cargoStats.monthly_details.cargo_count)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-xs sm:text-sm text-gray-600">{t('stats.cargo.clients')}</span>
-                      <span className="text-sm font-semibold text-blue-600">
-                        {formatNumber(cargoStats.monthly_details.unique_clients)}
-                      </span>
-                    </div>
-                    {cargoStats.monthly_details.total_weight_kg && (
-                      <div className="flex justify-between">
-                        <span className="text-xs sm:text-sm text-gray-600">{t('stats.cargo.totalWeight')}</span>
-                        <span className="text-sm font-semibold text-green-600">
-                          {cargoStats.monthly_details.total_weight_kg.toFixed(1)} kg
-                        </span>
-                      </div>
-                    )}
-                    {cargoStats.monthly_details.avg_weight_kg && (
-                      <div className="flex justify-between">
-                        <span className="text-xs sm:text-sm text-gray-600">{t('stats.cargo.avgWeight')}</span>
-                        <span className="text-sm font-semibold text-orange-600">
-                          {cargoStats.monthly_details.avg_weight_kg.toFixed(1)} kg
-                        </span>
-                      </div>
-                    )}
+            {/* ── OVERVIEW ─────────────────────────────────── */}
+            {activeTab === 'overview' && (
+              <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <StatCard title="Yangi Mijozlar" value={formatNum(clientData?.overview.new_clients)} subtitle="Tanlangan davr uchun yangi ro'yxatdan o'tganlar" icon={Users} color="blue" delay={0.04} />
+                    <StatCard title="Kelgan Yuklar" value={formatNum(cargoData?.volume.total_cargos)} subtitle={`Jami ${formatDecimal(cargoData?.volume.total_weight_kg, 0)} kg yuk`} icon={Package} color="indigo" delay={0.06} />
+                    <StatCard title="Jami Tushum" value={formatMoney(financeData?.total_revenue)} subtitle="Barcha hisoblangan summa" icon={DollarSign} color="green" delay={0.08} />
+                    <StatCard title="Jami Qarz" value={formatMoney(financeData?.total_debt)} subtitle="Hali to'lanmagan umumiy summa" icon={DollarSign} color="red" delay={0.10} />
+                    <StatCard title="Omborda kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_paid_not_taken)} subtitle="To'langan, lekin ombordan hali olinmagan" icon={Package} color="orange" delay={0.12} />
+                    <StatCard title="Mijozga topshirilgan" value={formatNum(cargoData?.bottlenecks.uz_taken_away)} subtitle="Mijoz o'zi kelib olib ketgan yuklar" icon={Activity} color="cyan" delay={0.14} />
+                    <StatCard title="Dostavka / Pochta" value={formatNum(cargoData?.bottlenecks.post_approved)} subtitle="Kuryer yoki pochtaga topshirilgan yuklar" icon={Package} color="purple" delay={0.16} />
+                    <StatCard title="Xitoyda hisobsiz" value={formatNum(cargoData?.bottlenecks.china_unaccounted)} subtitle="Xitoyda mavjud, lekin tizimga kiritilmagan" icon={Package} color="red" delay={0.18} />
+                    <StatCard title="To'lov kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_pending_payment)} subtitle="UZda bor, hisobot yuborilgan, to'lov kutilmoqda" icon={DollarSign} color="orange" delay={0.20} />
                   </div>
-                </CardContainer>
-
-                <KPICard
-                  title={t('stats.cargo.lifetimeCargo')}
-                  value={formatNumber(cargoStats.total_lifetime)}
-                  subtitle={t('stats.cargo.allTimeUploads')}
-                  color="orange"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Revenue Statistics */}
-        {revenueStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={DollarSign}
-              title={t('stats.revenue.title')}
-              gradientFrom="from-purple-500"
-              gradientTo="to-purple-600"
-              actions={
-                <Button onClick={() => exportRevenue()} size="sm" className="bg-purple-500 hover:bg-purple-600 text-white">
-                  <Download className="w-4 h-4 mr-2" />
-                  {t('stats.export.revenue')}
-                </Button>
-              }
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              <div className="lg:col-span-2">
-                <ComparisonBarChart
-                  data={revenueComparisonData}
-                  title={t('stats.revenue.chartTitle')}
-                  valueLabel={t('stats.revenue.currentPeriod')}
-                  comparisonLabel={t('stats.revenue.previousPeriod')}
-                  valueFormatter={(value) => formatCurrency(value)}
-                  color="#8b5cf6"
-                  comparisonColor="#94a3b8"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <KPICard
-                  title={t('stats.revenue.weeklyRevenue')}
-                  value={formatCurrency(revenueStats.weekly.current_period.total_revenue)}
-                  subtitle={`${formatNumber(revenueStats.weekly.current_period.payment_count)} ${t('stats.revenue.payments')}`}
-                  trend={{
-                    value: revenueStats.weekly.delta_percent,
-                    label: t('stats.periods.vsLastWeek')
-                  }}
-                  color="purple"
-                />
-                <KPICard
-                  title={t('stats.revenue.avgPayment')}
-                  value={formatCurrency(revenueStats.avg_lifetime_payment)}
-                  subtitle={t('stats.revenue.lifetimeAverage')}
-                  color="purple"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {paymentTypeData.length > 0 && (
-                <PieDonutChart
-                  data={paymentTypeData}
-                  title={t('stats.revenue.paymentTypes')}
-                  valueFormatter={(value) => formatNumber(value)}
-                />
-              )}
-
-              <CardContainer className="lg:col-span-2">
-                <h3 className="text-base font-semibold text-gray-800 mb-4">{t('stats.revenue.summary')}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600 mb-1">{t('stats.revenue.totalLifetime')}</p>
-                    <p className="text-lg sm:text-xl font-bold text-gray-900">
-                      {formatCurrency(revenueStats.total_lifetime_revenue)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600 mb-1">{t('stats.revenue.totalPayments')}</p>
-                    <p className="text-lg sm:text-xl font-bold text-gray-900">
-                      {formatNumber(revenueStats.total_lifetime_payments)}
-                    </p>
-                  </div>
-                  <div className="col-span-2 md:col-span-1">
-                    <p className="text-xs sm:text-sm text-gray-600 mb-1">{t('stats.revenue.avgPayment')}</p>
-                    <p className="text-lg sm:text-xl font-bold text-gray-900">
-                      {formatCurrency(revenueStats.avg_lifetime_payment)}
-                    </p>
-                  </div>
-                </div>
-              </CardContainer>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Cargo Items Statistics - Xitoy/UZB Warehouse Split */}
-        {cargoItemsStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Package}
-              title={t('stats.cargoItems.title')}
-              gradientFrom="from-indigo-500"
-              gradientTo="to-indigo-600"
-              actions={
-                <>
-                  <Button onClick={() => exportCargoItems('xitoy')} size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white">
-                    <Download className="w-4 h-4 mr-2" />
-                    🇨🇳 {t('stats.export.cargoXitoy')}
-                  </Button>
-                  <Button onClick={() => exportCargoItems('uzbek')} size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white">
-                    <Download className="w-4 h-4 mr-2" />
-                    🇺🇿 {t('stats.export.cargoUzbek')}
-                  </Button>
-                </>
-              }
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <CardContainer>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">🇨🇳 Xitoy baza</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.total')}</p>
-                    <p className="text-xl font-bold text-indigo-600">
-                      {formatNumber(cargoItemsStats.xitoy_baza.total_items)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.used')}</p>
-                    <p className="text-xl font-bold text-green-600">
-                      {formatNumber(cargoItemsStats.xitoy_baza.used_items)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.unused')}</p>
-                    <p className="text-xl font-bold text-orange-600">
-                      {formatNumber(cargoItemsStats.xitoy_baza.unused_items)}
-                    </p>
-                  </div>
-                  {cargoItemsStats.xitoy_baza.total_weight_kg && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.weight')}</p>
-                      <p className="text-xl font-bold text-blue-600">
-                        {cargoItemsStats.xitoy_baza.total_weight_kg.toFixed(1)} kg
-                      </p>
-                    </div>
+                  {cargoData?.period_trends && cargoData.period_trends.length > 0 && (
+                    <ModernAreaChart
+                      data={cargoData.period_trends}
+                      title="Yuk kelish dinamikasi"
+                      description="Tanlangan davr ichida har bir vaqt kesimiga kelgan yuklar (trek/paket) soni. O'sish tendensiyasi kuzatilib, reyslar bo'yicha yuk hajmining qanday o'zgarganini ko'rsatadi."
+                      dataKey="cargo_count"
+                      xAxisKey="period_name"
+                      color="indigo"
+                    />
                   )}
                 </div>
-              </CardContainer>
-
-              <CardContainer>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">🇺🇿 O'zbek baza</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.total')}</p>
-                    <p className="text-xl font-bold text-indigo-600">
-                      {formatNumber(cargoItemsStats.uzbek_baza.total_items)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.used')}</p>
-                    <p className="text-xl font-bold text-green-600">
-                      {formatNumber(cargoItemsStats.uzbek_baza.used_items)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.unused')}</p>
-                    <p className="text-xl font-bold text-orange-600">
-                      {formatNumber(cargoItemsStats.uzbek_baza.unused_items)}
-                    </p>
-                  </div>
-                  {cargoItemsStats.uzbek_baza.total_weight_kg && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">{t('stats.cargoItems.weight')}</p>
-                      <p className="text-xl font-bold text-blue-600">
-                        {cargoItemsStats.uzbek_baza.total_weight_kg.toFixed(1)} kg
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContainer>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <KPICard
-                title={t('stats.cargoItems.combined')}
-                value={formatNumber(cargoItemsStats.combined_total)}
-                subtitle={t('stats.cargoItems.totalItems')}
-                icon={Package}
-                color="indigo"
-              />
-              {cargoItemsTrends && (
-                <>
-                  <KPICard
-                    title={t('stats.cargoItems.weeklyChange')}
-                    value={`${cargoItemsTrends.weekly_delta_percent > 0 ? '+' : ''}${cargoItemsTrends.weekly_delta_percent}%`}
-                    trend={{
-                      value: cargoItemsTrends.weekly_delta_percent,
-                      label: t('stats.periods.vsLastWeek')
-                    }}
-                    color={cargoItemsTrends.weekly_delta_percent >= 0 ? 'green' : 'red'}
-                  />
-                  <KPICard
-                    title={t('stats.cargoItems.monthlyChange')}
-                    value={`${cargoItemsTrends.monthly_delta_percent > 0 ? '+' : ''}${cargoItemsTrends.monthly_delta_percent}%`}
-                    trend={{
-                      value: cargoItemsTrends.monthly_delta_percent,
-                      label: t('stats.periods.vsLastMonth')
-                    }}
-                    color={cargoItemsTrends.monthly_delta_percent >= 0 ? 'green' : 'red'}
-                  />
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Foto Hisobot Statistics */}
-        {fotoHisobotStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Camera}
-              title={t('stats.fotoHisobot.title')}
-              gradientFrom="from-emerald-500"
-              gradientTo="to-emerald-600"
-              actions={
-                <Button onClick={() => exportFotoHisobot()} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                  <Download className="w-4 h-4 mr-2" />
-                  {t('stats.export.fotoHisobot')}
-                </Button>
-              }
-            />
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              <KPICard
-                title={t('stats.fotoHisobot.totalUploads')}
-                value={formatNumber(fotoHisobotStats.total_uploads)}
-                subtitle={`${formatNumber(fotoHisobotStats.unique_clients)} ${t('stats.fotoHisobot.clients')}`}
-                icon={Camera}
-                color="emerald"
-              />
-              <KPICard
-                title={t('stats.fotoHisobot.totalPhotos')}
-                value={formatNumber(fotoHisobotStats.total_photos)}
-                subtitle={`${formatNumber(fotoHisobotStats.unique_flights)} ${t('stats.fotoHisobot.flights')}`}
-                icon={Camera}
-                color="blue"
-              />
-              <KPICard
-                title={t('stats.fotoHisobot.sent')}
-                value={formatNumber(fotoHisobotStats.sent_count)}
-                subtitle={t('stats.fotoHisobot.reports')}
-                icon={Send}
-                color="green"
-              />
-              <KPICard
-                title={t('stats.fotoHisobot.unsent')}
-                value={formatNumber(fotoHisobotStats.unsent_count)}
-                subtitle={t('stats.fotoHisobot.pending')}
-                icon={Send}
-                color="orange"
-              />
-            </div>
-
-            {fotoHisobotStats.top_flights.length > 0 && (
-              <CardContainer>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('stats.fotoHisobot.topFlights')}</h3>
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <table className="w-full text-sm min-w-[500px]">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-medium text-gray-700">{t('stats.fotoHisobot.flight')}</th>
-                        <th className="text-center py-2 px-3 font-medium text-gray-700">{t('stats.fotoHisobot.uploads')}</th>
-                        <th className="text-center py-2 px-3 font-medium text-gray-700">{t('stats.fotoHisobot.clients')}</th>
-                        <th className="text-center py-2 px-3 font-medium text-gray-700">{t('stats.fotoHisobot.photos')}</th>
-                        <th className="text-center py-2 px-3 font-medium text-gray-700">{t('stats.fotoHisobot.sent')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fotoHisobotStats.top_flights.map((flight, index) => (
-                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-2 px-3 font-medium text-gray-900">{flight.flight_name}</td>
-                          <td className="text-center py-2 px-3 text-gray-700">{formatNumber(flight.total_uploads)}</td>
-                          <td className="text-center py-2 px-3 text-gray-700">{formatNumber(flight.unique_clients)}</td>
-                          <td className="text-center py-2 px-3 text-gray-700">{formatNumber(flight.total_photos)}</td>
-                          <td className="text-center py-2 px-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${flight.sent_count > 0 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
-                              {flight.sent_count}/{flight.total_uploads}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContainer>
+              </motion.div>
             )}
-          </motion.div>
-        )}
 
-        {/* Delivery Requests Statistics */}
-        {deliveryStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Truck}
-              title={t('stats.delivery.title')}
-              gradientFrom="from-cyan-500"
-              gradientTo="to-cyan-600"
-              actions={
-                <Button onClick={() => exportDeliveryRequests()} size="sm" className="bg-cyan-500 hover:bg-cyan-600 text-white">
-                  <Download className="w-4 h-4 mr-2" />
-                  {t('stats.export.deliveryRequests')}
-                </Button>
-              }
-            />
+            {/* ── CLIENTS ──────────────────────────────────── */}
+            {activeTab === 'clients' && (
+              <motion.div key="clients" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                <div className="space-y-6">
+                  <SectionHeader title="Mijozlar statistikasi" tab="clients" />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-              <KPICard
-                title={t('stats.delivery.totalRequests')}
-                value={formatNumber(deliveryStats.total_requests)}
-                subtitle={`${deliveryStats.overall_approval_rate.toFixed(1)}% ${t('stats.delivery.approvalRate')}`}
-                icon={Truck}
-                color="cyan"
-              />
-              <KPICard
-                title={t('stats.delivery.approved')}
-                value={formatNumber(deliveryStats.by_service.reduce((sum, service) => sum + service.approved, 0))}
-                subtitle={t('stats.delivery.totalApproved')}
-                icon={Truck}
-                color="green"
-              />
-              <KPICard
-                title={t('stats.delivery.pending')}
-                value={formatNumber(deliveryStats.by_service.reduce((sum, service) => sum + service.pending, 0))}
-                subtitle={t('stats.delivery.totalPending')}
-                icon={Truck}
-                color="orange"
-              />
-            </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <StatCard title="Jami Mijozlar" value={formatNum(clientData?.overview.total_clients)} subtitle="Tizimda ro'yxatdan o'tgan barcha mijozlar" icon={Users} color="blue" />
+                    <StatCard title="Aktiv Mijozlar" value={formatNum(clientData?.overview.active_clients)} subtitle="So'nggi 45 kun ichida yuk olgan" icon={Activity} color="green" />
+                    <StatCard title="Passiv Mijozlar" value={formatNum(clientData?.overview.passive_clients)} subtitle="60 kundan beri hech qanday harakat yo'q" icon={Users} color="gray" />
+                    <StatCard title="Zombie Mijozlar" value={formatNum(clientData?.overview.zombie_clients)} subtitle="Ro'yxatdan o'tgan, lekin hech qachon yuk buyurtma qilmagan" icon={Users} color="gray" />
+                    <StatCard title="Qayta kelgan" value={formatNum(clientData?.retention.repeat_clients)} subtitle="Bir nechta marta yuk buyurtma qilgan sodiq mijozlar" icon={Users} color="green" />
+                    <StatCard title="Bir martalik" value={formatNum(clientData?.retention.one_time_clients)} subtitle="Faqat bir marta buyurtma berib, qaytmagan mijozlar" icon={Users} color="orange" />
+                    <StatCard title="Eng faol (5+ reys)" value={formatNum(clientData?.retention.most_frequent_clients)} subtitle="5 va undan ko'p reys buyurtma qilganlar" icon={Activity} color="purple" />
+                  </div>
 
-            <CardContainer>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('stats.delivery.byService')}</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {deliveryStats.by_service.map((service, index) => (
-                  <div key={index} className="text-center p-3 bg-white/40 backdrop-blur-sm rounded-lg border border-white/20">
-                    <h4 className="font-medium text-gray-900 mb-2 text-sm">{service.delivery_type}</h4>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">{t('stats.delivery.total')}</span>
-                        <span className="font-medium">{formatNumber(service.total_requests)}</span>
+                  {/* Regions — grouped by viloyat, collapsible */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                      <h3 className="text-sm font-bold mb-1 text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        Hududlar bo'yicha mijozlar
+                      </h3>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                        Viloyatni bosing — tumanlari ko'rsatiladi
+                      </p>
+                      <div className="max-h-96 overflow-y-auto space-y-1 pr-1">
+                        {groupRegionsByViloyat(clientData?.regions ?? []).map((group) => {
+                          const isOpen = expandedViloyatlar.has(group.viloyat);
+                          return (
+                            <div key={group.viloyat}>
+                              <button
+                                onClick={() => toggleViloyat(group.viloyat)}
+                                className="w-full flex items-center justify-between px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {isOpen
+                                    ? <ChevronDown className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                    : <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-400 shrink-0" />
+                                  }
+                                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{group.viloyat}</span>
+                                </div>
+                                <span className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 px-2.5 py-0.5 rounded-lg text-xs font-bold shrink-0 ml-2">
+                                  {group.total} ta
+                                </span>
+                              </button>
+                              {isOpen && (
+                                <div className="ml-6 mt-0.5 space-y-0.5">
+                                  {group.districts.map((d) => (
+                                    <div key={d.name} className="flex justify-between items-center px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                                      <span className="text-sm text-gray-600 dark:text-gray-400">{d.name}</span>
+                                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 ml-2">{d.count} ta</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {!clientData?.regions.length && (
+                          <p className="text-gray-400 text-sm py-6 text-center">Ma'lumot yo'q</p>
+                        )}
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-green-600">{t('stats.delivery.approved')}</span>
-                        <span className="font-medium text-green-600">{formatNumber(service.approved)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-orange-600">{t('stats.delivery.pending')}</span>
-                        <span className="font-medium text-orange-600">{formatNumber(service.pending)}</span>
-                      </div>
-                      <div className="pt-2 border-t border-gray-200">
-                        <span className="text-xs font-medium text-blue-600">
-                          {service.approval_rate.toFixed(1)}% {t('stats.delivery.rate')}
-                        </span>
+                    </div>
+
+                    <div className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                      <h3 className="text-sm font-bold mb-1 text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        Yetkazib berish usullari
+                      </h3>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                        Mijozlar qaysi usulda yuk olayotgani
+                      </p>
+                      <div className="space-y-4">
+                        {clientData?.delivery_methods.map((d) => {
+                          const total = (clientData.delivery_methods).reduce((s, x) => s + x.count, 0);
+                          const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
+                          return (
+                            <div key={d.method} className="space-y-1.5">
+                              <div className="flex justify-between text-sm font-medium">
+                                <span className="text-gray-700 dark:text-gray-300">{d.method}</span>
+                                <span className="text-gray-500 dark:text-gray-400 tabular-nums">{d.count} ta ({pct}%)</span>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {!clientData?.delivery_methods.length && (
+                          <p className="text-gray-400 text-sm py-6 text-center">Ma'lumot yo'q</p>
+                        )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContainer>
-          </motion.div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── CARGO ────────────────────────────────────── */}
+            {activeTab === 'cargo' && (
+              <motion.div key="cargo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                <div className="space-y-6">
+                  <SectionHeader title="Yuklar statistikasi" tab="cargo" />
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <StatCard title="Jami KG" value={`${formatDecimal(cargoData?.volume.total_weight_kg, 0)} kg`} subtitle="Tanlangan davrda kelgan barcha yuklar umumiy vazni" icon={Package} color="indigo" />
+                    <StatCard title="Trek soni" value={formatNum(cargoData?.volume.total_cargos)} subtitle="Alohida trek kodlari (paketlar/buyurtmalar) soni" icon={Package} color="blue" />
+                    <StatCard
+                      title="O'rtacha 1 mijoz"
+                      value={`${formatDecimal(cargoData?.volume.avg_weight_per_client)} kg`}
+                      subtitle="Bir mijozga to'g'ri keladigan o'rtacha yuk vazni"
+                      icon={Users} color="gray"
+                    />
+                    <StatCard
+                      title="O'rtacha 1 trek"
+                      value={`${formatDecimal(cargoData?.volume.avg_weight_per_track)} kg`}
+                      subtitle="Bitta trek (paket) uchun o'rtacha vazn"
+                      icon={Package} color="gray"
+                    />
+                    <StatCard title="Omborda qolgan" value={formatNum(cargoData?.bottlenecks.uz_paid_not_taken)} subtitle="To'langan, lekin ombordan hali olinmagan" icon={Activity} color="orange" />
+                    <StatCard title="Mijozga topshirilgan" value={formatNum(cargoData?.bottlenecks.uz_taken_away)} subtitle="Mijoz o'zi kelib olib ketgan" icon={Users} color="green" />
+                    <StatCard title="Xitoyda hisobsiz" value={formatNum(cargoData?.bottlenecks.china_unaccounted)} subtitle="Xitoyda mavjud, lekin tizimga kiritilmagan" icon={Package} color="red" />
+                    <StatCard title="To'lov kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_pending_payment)} subtitle="UZda bor, hisobot yuborilgan, to'lov kutilmoqda" icon={DollarSign} color="orange" />
+                  </div>
+
+                  {/* Speed — uses formatDecimal to avoid decimal/thousand confusion */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
+                      Yuk aylanma tezligi — har bir bosqich uchun o'rtacha kun soni
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <StatCard
+                        title="Xitoy → O'zbekiston"
+                        value={`${formatDecimal(cargoData?.speed.china_to_uz_days)} kun`}
+                        subtitle="Xitoy omboridan O'zbekiston omboriga yetib kelish"
+                        icon={Activity} color="blue"
+                      />
+                      <StatCard
+                        title="Omborxonada turish"
+                        value={`${formatDecimal(cargoData?.speed.uz_warehouse_days)} kun`}
+                        subtitle="O'zbekiston omborida mijoz olgungacha kutish vaqti"
+                        icon={Activity} color="orange"
+                      />
+                      <StatCard
+                        title="To'liq tsikl"
+                        value={`${formatDecimal(cargoData?.speed.full_cycle_days)} kun`}
+                        subtitle="Xitoydan to mijoz qo'liga tekkuncha umumiy vaqt"
+                        icon={Zap} color="purple"
+                      />
+                    </div>
+                  </div>
+
+                  {cargoData?.top_flights && cargoData.top_flights.length > 0 && (
+                    <TableBlock title="Eng katta hajmli reyslar (top 10)">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Reys nomi</th>
+                            <th className={`${th} text-right`}>Yuklar soni</th>
+                            <th className={`${th} text-right`}>Jami vazn</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cargoData.top_flights.map((f, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{f.flight_name}</td>
+                              <td className="py-2.5 pr-4 text-right font-semibold text-sm text-indigo-600 dark:text-indigo-400">{formatNum(f.cargo_count)} ta</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-medium">{formatDecimal(f.total_weight_kg, 0)} kg</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+
+                  {cargoData?.period_trends && cargoData.period_trends.length > 0 && (
+                    <ModernAreaChart
+                      data={cargoData.period_trends}
+                      title="Yuk kelish dinamikasi"
+                      description="Tanlangan davr ichida har bir vaqt kesimiga kelgan yuklar (trek) soni. Grafik vaqt o'tishi bilan yuk oqimining qanday o'zgarganini ko'rsatadi."
+                      dataKey="cargo_count"
+                      xAxisKey="period_name"
+                      color="indigo"
+                    />
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── FINANCE ──────────────────────────────────── */}
+            {activeTab === 'finance' && (
+              <motion.div key="finance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                <div className="space-y-6">
+                  <SectionHeader title="Moliyaviy statistika" tab="finance" />
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <StatCard title="Jami Tushum" value={formatMoney(financeData?.total_revenue)} subtitle="Barcha mijozlarga hisoblab chiqilgan umumiy summa" icon={DollarSign} color="green" />
+                    <StatCard title="To'langan" value={formatMoney(financeData?.total_paid)} subtitle="Mijozlar tomonidan haqiqatda to'langan summa" icon={DollarSign} color="blue" />
+                    <StatCard title="Qarz (umumiy)" value={formatMoney(financeData?.total_debt)} subtitle="Hozirgi kungacha yig'ilgan umumiy qarzdorlik" icon={DollarSign} color="red" />
+                    <StatCard title="Muddati o'tgan qarz" value={formatMoney(financeData?.overdue_debt)} subtitle="15 kundan ortiq vaqt o'tgan to'lanmagan qarzlar" icon={DollarSign} color="red" />
+                    <StatCard title="O'rtacha Chek" value={formatMoney(financeData?.average_payment)} subtitle="Bitta to'lov operatsiyasining o'rtacha summasi" icon={Activity} color="purple" />
+                    <StatCard title="Sof Foyda" value={formatMoney(financeData?.total_profitability)} subtitle="To'langan − (Jami KG × $8 × kurs) taxminiy foyda" icon={DollarSign} color="green" />
+                  </div>
+
+                  {financeData?.top_clients && financeData.top_clients.length > 0 && (
+                    <TableBlock title="Top mijozlar — to'lov va qarz holati">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Mijoz kodi</th>
+                            <th className={`${th} text-right`}>Hisoblangan</th>
+                            <th className={`${th} text-right`}>To'langan</th>
+                            <th className={`${th} text-right`}>Qarz</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeData.top_clients.map((c) => (
+                            <tr key={c.client_code} className={tr}>
+                              <td className="py-2.5 pr-4 font-bold text-sm">{c.client_code}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm">{formatMoney(c.revenue)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-green-600 dark:text-green-400">{formatMoney(c.paid)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-red-500 dark:text-red-400">{formatMoney(c.debt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+
+                  {financeData?.periodic_revenue && financeData.periodic_revenue.length > 0 && (
+                    <ModernBarChart
+                      data={financeData.periodic_revenue}
+                      title="Davriy tushum dinamikasi"
+                      description="Har bir davr (oy/hafta) uchun hisoblab chiqilgan umumiy tushum. Yon tarafdagi raqamlar qisqartirilgan ko'rinishda (ming, mln). Aniq qiymat uchun ustun ustiga bosing."
+                      dataKey="revenue"
+                      xAxisKey="period"
+                      color="green"
+                      valueFormatter={formatMoney}
+                      axisFormatter={formatMoneyShort}
+                    />
+                  )}
+
+                  {financeData?.payment_methods && financeData.payment_methods.length > 0 ? (
+                    <TableBlock title="To'lov usullari bo'yicha taqsimot">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>To'lov usuli</th>
+                            <th className={`${th} text-right`}>Jami summa</th>
+                            <th className={`${th} text-right`}>Operatsiyalar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeData.payment_methods.map((m, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{m.method}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-green-600 dark:text-green-400">{formatMoney(m.total_amount)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm">{formatNum(m.count)} ta</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  ) : (
+                    <div className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm text-center text-sm text-gray-400 py-8">
+                      To'lov usullari bo'yicha ma'lumot mavjud emas
+                    </div>
+                  )}
+
+                  {financeData?.flight_collections && financeData.flight_collections.length > 0 && (
+                    <TableBlock title="Reyslar bo'yicha pul yig'ish holati">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Reys nomi</th>
+                            <th className={`${th} text-right`}>Hisoblangan</th>
+                            <th className={`${th} text-right`}>To'langan</th>
+                            <th className={`${th} text-right`}>Undirilish %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeData.flight_collections.map((f, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{f.flight_name}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm">{formatMoney(f.revenue)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-green-600 dark:text-green-400">{formatMoney(f.paid)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-indigo-600 dark:text-indigo-400">{formatDecimal(f.collection_rate)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+
+                  {financeData?.regions && financeData.regions.length > 0 && (
+                    <TableBlock title="Hududlar bo'yicha moliyaviy ko'rsatkichlar">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Hudud kodi</th>
+                            <th className={`${th} text-right`}>Hisoblangan</th>
+                            <th className={`${th} text-right`}>To'langan</th>
+                            <th className={`${th} text-right`}>Qarz</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeData.regions.map((r, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{r.region_code}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm">{formatMoney(r.revenue)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-green-600 dark:text-green-400">{formatMoney(r.paid)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-red-500 dark:text-red-400">{formatMoney(r.debt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── OPERATIONAL ──────────────────────────────── */}
+            {activeTab === 'operational' && (
+              <motion.div key="operational" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                <div className="space-y-6">
+                  <SectionHeader title="Jarayon statistikasi" tab="operational" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <StatCard title="Tahlil qilingan yuklar" value={formatNum(opData?.total_cargos_analyzed)} subtitle="Bu statistika uchun ko'rib chiqilgan umumiy yuklar soni" icon={Package} color="blue" />
+                    <StatCard title="Eng sekin bosqich" value={opData?.bottlenecks[0]?.stage_name || "Ma'lumot yo'q"} subtitle={opData?.bottlenecks[0] ? `O'rtacha ${formatDecimal(opData.bottlenecks[0].avg_days)} kun kechikmoqda` : undefined} icon={Activity} color="red" />
+                    <StatCard title="Keng tarqalgan yetkazish" value={`${formatDecimal(opData?.delivery_types[0]?.percentage)}%`} subtitle={opData?.delivery_types[0]?.delivery_type ?? "Ma'lumot yo'q"} icon={Zap} color="green" />
+                  </div>
+
+                  {opData?.stages && opData.stages.length > 0 && (
+                    <TableBlock title="Har bir bosqich uchun o'rtacha vaqt (kunlarda)">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Bosqich nomi</th>
+                            <th className={`${th} text-right`}>O'rtacha vaqt</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {opData.stages.map((s, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{s.stage_name}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-indigo-600 dark:text-indigo-400">{formatDecimal(s.avg_days)} kun</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+
+                  {opData?.delivery_types && opData.delivery_types.length > 0 && (
+                    <TableBlock title="Yetkazib berish turlari taqsimoti">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Yetkazish turi</th>
+                            <th className={`${th} text-right`}>Buyurtmalar soni</th>
+                            <th className={`${th} text-right`}>Ulushi (%)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {opData.delivery_types.map((d, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{d.delivery_type}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold">{formatNum(d.count)} ta</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-semibold text-indigo-600 dark:text-indigo-400">{formatDecimal(d.percentage)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+
+                  {opData?.bottlenecks && opData.bottlenecks.length > 0 && (
+                    <TableBlock title="Kechikayotgan bosqichlar (muammo nuqtalari)">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Kechikayotgan bosqich</th>
+                            <th className={`${th} text-right`}>O'rtacha kechikish</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {opData.bottlenecks.map((b, i) => (
+                            <tr key={i} className={tr}>
+                              <td className="py-2.5 pr-4 font-medium text-sm">{b.stage_name}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-bold text-rose-600 dark:text-rose-400">{formatDecimal(b.avg_days)} kun</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+          </div>
         )}
 
-        {/* Broadcast Statistics */}
-        {broadcastStats && (
-          <motion.div variants={itemVariants} className="mb-6">
-            <SectionHeader
-              icon={Send}
-              title={t('stats.broadcast.title')}
-              gradientFrom="from-pink-500"
-              gradientTo="to-pink-600"
-            />
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              <KPICard
-                title={t('stats.broadcast.totalCampaigns')}
-                value={formatNumber(broadcastStats.total_broadcasts)}
-                subtitle={`${formatNumber(broadcastStats.completed_broadcasts)} ${t('stats.broadcast.completed')}`}
-                icon={Send}
-                color="pink"
-              />
-              <KPICard
-                title={t('stats.broadcast.messagesSent')}
-                value={formatNumber(broadcastStats.total_messages_sent)}
-                subtitle={`${broadcastStats.success_rate.toFixed(1)}% ${t('stats.broadcast.successRate')}`}
-                icon={Send}
-                color="green"
-              />
-              <KPICard
-                title={t('stats.broadcast.failed')}
-                value={formatNumber(broadcastStats.total_failed)}
-                subtitle={t('stats.delivery.totalFailed')}
-                icon={Send}
-                color="red"
-              />
-              <KPICard
-                title={t('stats.broadcast.blocked')}
-                value={formatNumber(broadcastStats.total_blocked)}
-                subtitle={t('stats.broadcast.usersBlocked')}
-                icon={Send}
-                color="orange"
-              />
-            </div>
-
-            <CardContainer>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('stats.broadcast.summary')}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">{t('stats.broadcast.deliveryRate')}</p>
-                  <p className="text-xl font-bold text-green-600">
-                    {broadcastStats.success_rate.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatNumber(broadcastStats.total_messages_sent)} / {formatNumber(broadcastStats.total_messages_sent + broadcastStats.total_failed)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">{t('stats.broadcast.completionRate')}</p>
-                  <p className="text-xl font-bold text-blue-600">
-                    {broadcastStats.total_broadcasts > 0 ? ((broadcastStats.completed_broadcasts / broadcastStats.total_broadcasts) * 100).toFixed(1) : '0'}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatNumber(broadcastStats.completed_broadcasts)} / {formatNumber(broadcastStats.total_broadcasts)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">{t('stats.broadcast.blockRate')}</p>
-                  <p className="text-xl font-bold text-orange-600">
-                    {broadcastStats.total_messages_sent > 0 ? ((broadcastStats.total_blocked / broadcastStats.total_messages_sent) * 100).toFixed(2) : '0'}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatNumber(broadcastStats.total_blocked)} {t('stats.broadcast.users')}
-                  </p>
-                </div>
-              </div>
-            </CardContainer>
-          </motion.div>
-        )}
-
-        {/* Global Dashboard Summary */}
-        {globalStats && (
-          <motion.div variants={itemVariants} className="mb-4">
-            <SectionHeader
-              icon={BarChart3}
-              title={t('stats.global.title')}
-              gradientFrom="from-purple-500"
-              gradientTo="to-purple-600"
-              actions={
-                <>
-                  <Button onClick={exportAllStats} size="sm" className="bg-purple-500 hover:bg-purple-600 text-white">
-                    <Download className="w-4 h-4 mr-2" />
-                    {t('stats.export.all')}
-                  </Button>
-                  <Button onClick={() => exportApiLogs()} size="sm" className="bg-gray-500 hover:bg-gray-600 text-white">
-                    <Download className="w-4 h-4 mr-2" />
-                    {t('stats.export.apiLogs')}
-                  </Button>
-                </>
-              }
-            />
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              <KPICard
-                title={t('stats.global.totalClients')}
-                value={formatNumber(globalStats.total_registered_clients)}
-                subtitle={`${formatNumber(globalStats.total_approved_clients)} ${t('stats.global.approved')}`}
-                icon={Users}
-                color="purple"
-              />
-              <KPICard
-                title={t('stats.global.activeClients')}
-                value={formatNumber(globalStats.active_clients_30_days)}
-                subtitle={t('stats.global.last30Days')}
-                icon={Activity}
-                color="green"
-              />
-              <KPICard
-                title={t('stats.global.totalCargoItems')}
-                value={formatNumber(globalStats.total_cargo_items)}
-                subtitle={`🇨🇳 ${formatNumber(globalStats.cargo_items_xitoy)} | 🇺🇿 ${formatNumber(globalStats.cargo_items_uzbek)}`}
-                icon={Package}
-                color="orange"
-              />
-              <KPICard
-                title={t('stats.global.totalRevenue')}
-                value={formatCurrency(globalStats.total_lifetime_revenue)}
-                subtitle={`${globalStats.revenue_growth_percent > 0 ? '+' : ''}${globalStats.revenue_growth_percent.toFixed(1)}% ${t('stats.global.growth')}`}
-                icon={DollarSign}
-                color="purple"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <CardContainer>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('stats.global.fotoHisobotSummary')}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.global.totalUploads')}</p>
-                    <p className="text-xl font-bold text-emerald-600">
-                      {formatNumber(globalStats.total_foto_hisobot_uploads)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.global.thisMonth')}</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      {formatNumber(globalStats.foto_hisobot_this_month)}
-                    </p>
-                  </div>
-                </div>
-              </CardContainer>
-
-              <CardContainer>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('stats.global.systemStats')}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.global.apiRequests')}</p>
-                    <p className="text-xl font-bold text-cyan-600">
-                      {formatNumber(globalStats.total_api_requests)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{t('stats.global.errorRate')}</p>
-                    <p className="text-xl font-bold text-red-600">
-                      {globalStats.api_error_rate.toFixed(2)}%
-                    </p>
-                  </div>
-                </div>
-              </CardContainer>
-            </div>
-          </motion.div>
-        )}
-      </motion.div>
-    </>
+      </div>
+    </div>
   );
 }

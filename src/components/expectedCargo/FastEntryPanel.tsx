@@ -173,6 +173,9 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [suggestion, setSuggestion] = useState<ResolvedClientResponse | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  // True once the scanner has been started for the first time — keeps the container
+  // in the DOM so the camera stream stays alive between open/close cycles.
+  const [scannerReady, setScannerReady] = useState(false);
 
   const trackInputRef = useRef<HTMLInputElement>(null);
   const clientInputRef = useRef<HTMLInputElement>(null);
@@ -199,32 +202,21 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
   }, []);
 
   // ── Camera lifecycle ────────────────────────────────────────────────────────
-  // Uses Html5Qrcode (low-level API) instead of Html5QrcodeScanner so we control
-  // all UI text — no English-language permission dialogs from the library.
+  // Uses Html5Qrcode (low-level API) so we fully control the UI.
+  //
+  // Key design: the scanner is NEVER stopped between open/close cycles.
+  // Telegram WebApp shows a native permission dialog on every getUserMedia()
+  // call. By keeping the stream alive and only toggling visibility, the
+  // permission dialog appears exactly once per panel session.
 
-  const stopCamera = useCallback(async () => {
-    if (qrInstanceRef.current) {
-      try {
-        await qrInstanceRef.current.stop();
-        qrInstanceRef.current.clear();
-      } catch {
-        // Ignore stop errors (e.g. camera was never fully started)
-      }
-      qrInstanceRef.current = null;
-    }
+  /** Hide the scanner viewfinder — camera stream stays alive. */
+  const stopCamera = useCallback(() => {
     setIsScanning(false);
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (qrInstanceRef.current) {
-        qrInstanceRef.current.stop().catch(() => {});
-        qrInstanceRef.current = null;
-      }
-    };
-  }, []);
-
+  // Declared before Phase 2 useEffect to avoid Temporal Dead Zone —
+  // the dep array is evaluated when useEffect() is called (synchronously),
+  // so processScannedText must exist at that point.
   const processScannedText = useCallback(
     (text: string) => {
       const raw = text.trim();
@@ -254,73 +246,63 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
     [entryQueue, enqueueEntry],
   );
 
-  // Start camera after the container div is rendered (isScanning → true)
+  // Phase 1: when the user opens the scanner for the first time, put the
+  // container into the DOM by setting scannerReady (already in DOM on
+  // subsequent opens — qrInstanceRef.current guards against double-start).
   useEffect(() => {
     if (!isScanning) return;
+    if (!scannerReady) setScannerReady(true);
+  }, [isScanning, scannerReady]);
 
-    const container = document.getElementById(SCANNER_CONTAINER_ID);
-    if (!container) return;
+  // Phase 2: start Html5Qrcode once the container div is in the DOM.
+  // This effect only runs on the very first scan (qrInstanceRef guards re-entry).
+  useEffect(() => {
+    if (!scannerReady || qrInstanceRef.current) return;
 
-    const qr = new Html5Qrcode(SCANNER_CONTAINER_ID);
+    const qr = new Html5Qrcode(SCANNER_CONTAINER_ID, {
+      // Use the native BarcodeDetector API (Chrome/Android) when available —
+      // faster and more reliable for Code 128 / EAN barcodes than pure JS.
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      verbose: false,
+    });
     qrInstanceRef.current = qr;
 
     qr.start(
       { facingMode: 'environment' },
-      { fps: 15, qrbox: { width: 260, height: 110 } },
+      // Wide, shallow box — optimised for horizontal barcodes (Code 128 etc.)
+      // while still detecting square QR codes in the same frame.
+      { fps: 15, qrbox: { width: 300, height: 120 } },
       (decodedText) => {
         playSuccessSound?.();
         processScannedText(decodedText);
-        // Keep camera open for continuous scanning; just vibrate/sound for feedback
-        // Uncomment below to auto-close after each scan:
-        // stopCamera();
       },
       () => {
-        // Per-frame decode errors are expected (e.g. no barcode in frame) — ignore
+        // Per-frame decode errors are expected (no barcode in frame) — ignore
       },
     ).catch((err: unknown) => {
       console.error('Camera start error:', err);
       toast.error("Kamera ochilmadi. Brauzer sozlamalarida kameraga ruxsat bering.");
       qrInstanceRef.current = null;
+      setScannerReady(false);
       setIsScanning(false);
     });
 
+    // No cleanup return — stream intentionally persists across open/close cycles.
+  }, [scannerReady, processScannedText]);
+
+  // True stop: only on panel unmount.
+  useEffect(() => {
     return () => {
-      // This cleanup runs when isScanning flips to false (stopCamera called)
-      // The qr.stop() is already awaited in stopCamera; here we just null the ref.
-      if (qrInstanceRef.current === qr) {
-        qr.stop().catch(() => {});
+      if (qrInstanceRef.current) {
+        qrInstanceRef.current.stop().catch(() => {});
         qrInstanceRef.current = null;
       }
     };
-  }, [isScanning, processScannedText, stopCamera]);
+  }, []);
 
   const handleCameraScan = useCallback(() => {
-    if (isScanning) {
-      stopCamera();
-      return;
-    }
-
-    // Try Telegram native QR popup first (faster UX on supported clients)
-    const tg = (window as unknown as { Telegram?: { WebApp?: { showScanQrPopup?: unknown; closeScanQrPopup?: () => void } } }).Telegram?.WebApp;
-    if (tg?.showScanQrPopup) {
-      try {
-        (tg.showScanQrPopup as (opts: object, cb: (text: string) => boolean) => void)(
-          { text: "Barkodni kamera oldiga olib keling" },
-          (text: string) => {
-            processScannedText(text);
-            tg.closeScanQrPopup?.();
-            return true;
-          },
-        );
-        return;
-      } catch {
-        // WebAppMethodUnsupported — fall through to html5-qrcode
-      }
-    }
-
-    // Universal fallback: html5-qrcode (works in browser and Telegram WebView)
-    setIsScanning(true);
-  }, [isScanning, processScannedText, stopCamera]);
+    setIsScanning((prev) => !prev);
+  }, []);
 
   // ── Resolve mutation ────────────────────────────────────────────────────────
 
@@ -534,27 +516,48 @@ export function FastEntryPanel({ flightName, onClose }: FastEntryPanelProps) {
         </div>
 
         {/* ── Camera viewfinder (html5-qrcode) ──────────────────────────────── */}
-        {isScanning && (
-          <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-black">
+        {/* Container stays in DOM after first start so the stream never drops.
+            When not visible it is shifted off-screen (not display:none) — display:none
+            can freeze the video element in some WebViews and would stop barcode detection.
+            Height is capped so the camera view doesn't dominate the panel on small screens. */}
+        {scannerReady && (
+          <div
+            className={isScanning
+              ? "relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700"
+              : ""}
+            style={!isScanning ? {
+              position: 'fixed',
+              left: '-9999px',
+              top: '-9999px',
+              width: '320px',
+              height: '160px',
+              overflow: 'hidden',
+            } : {
+              maxHeight: '160px',
+              overflow: 'hidden',
+            }}
+          >
             {/* Html5Qrcode renders <video> + scan overlay into this div */}
             <div id={SCANNER_CONTAINER_ID} className="w-full" />
 
-            {/* Uzbek hint overlay at the bottom */}
-            <div className="absolute bottom-0 left-0 right-0 py-2 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
-              <span className="text-[11px] text-white/90 font-medium">
-                Barkodni kamera oldiga olib keling
-              </span>
-            </div>
-
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={stopCamera}
-              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 text-white transition-colors"
-              title="Kamerani yopish"
-            >
-              <X className="size-4" />
-            </button>
+            {/* Hint overlay and close button — only relevant when visible */}
+            {isScanning && (
+              <>
+                <div className="absolute bottom-0 left-0 right-0 py-2 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
+                  <span className="text-[11px] text-white/90 font-medium">
+                    Barkodni kamera oldiga olib keling
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 text-white transition-colors"
+                  title="Kamerani yopish"
+                >
+                  <X className="size-4" />
+                </button>
+              </>
+            )}
           </div>
         )}
 

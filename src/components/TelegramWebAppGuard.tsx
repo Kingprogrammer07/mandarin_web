@@ -285,7 +285,8 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
   const isBrowserRoute =
     window.location.pathname.startsWith('/admin') ||
     window.location.pathname === '/pos' ||
-    window.location.pathname.startsWith('/flights');
+    window.location.pathname.startsWith('/flights') ||
+    window.location.pathname.startsWith('/statistics');
 
   const [isValidating, setIsValidating] = useState(!isBrowserRoute);
   const [isValid, setIsValid] = useState(isBrowserRoute);
