@@ -78,7 +78,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
       const response = await loginApi({
         client_code: data.clientCode,
         phone_number: `+998${data.phoneNumber}`,
-        telegram_id: telegramData.user.id,
+        telegram_id: telegramData?.user?.id,
       });
 
       if (response.access_token) {

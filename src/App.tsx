@@ -819,7 +819,7 @@ function AppContent() {
           )}
 
           {currentPage === "statistics" && (
-            <StatisticsDashboard onBack={() => navigateToPage("flights")} />
+            <StatisticsDashboard onBack={() => window.history.back()} />
           )}
 
           {currentPage === "verification-search" && (

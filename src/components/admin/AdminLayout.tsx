@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Shield, Clock, LogOut, Sun, Moon, User, Layers } from 'lucide-react';
+import { Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3 } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -10,11 +10,12 @@ interface AdminLayoutProps {
 }
 
 const navItems = [
-  { id: 'admin-accounts', label: 'Adminlar',  icon: Users,   description: 'Hisoblar boshqaruvi' },
-  { id: 'admin-roles',    label: 'Rollar',    icon: Shield,  description: 'Huquqlar tizimi' },
-  { id: 'admin-carousel', label: 'Karusel',   icon: Layers,  description: 'Banner & reklama' },
-  { id: 'admin-audit',    label: 'Audit',     icon: Clock,   description: 'Faoliyat tarixi' },
-  { id: 'admin-profile',  label: 'Profil',    icon: User,    description: 'Shaxsiy sozlamalar' },
+  { id: 'admin-accounts', label: 'Adminlar',   icon: Users,    description: 'Hisoblar boshqaruvi' },
+  { id: 'admin-roles',    label: 'Rollar',     icon: Shield,   description: 'Huquqlar tizimi' },
+  { id: 'admin-carousel', label: 'Karusel',    icon: Layers,   description: 'Banner & reklama' },
+  { id: 'admin-audit',    label: 'Audit',      icon: Clock,    description: 'Faoliyat tarixi' },
+  { id: 'statistics',     label: 'Statistika', icon: BarChart3, description: "Ko'rsatkichlar tahlili" },
+  { id: 'admin-profile',  label: 'Profil',     icon: User,     description: 'Shaxsiy sozlamalar' },
 ];
 
 function getInitialTheme() {

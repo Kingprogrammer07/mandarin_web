@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart3, UserCheck,
   Sun, Moon, Monitor, LayoutDashboard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,6 +10,8 @@ interface NavigationBarProps {
   onVerificationClick?: () => void;
   currentPage?: string;
 }
+// onStatisticsClick and onVerificationClick are kept for backwards-compatible prop passing
+// but the buttons are no longer rendered — statistics moved to AdminLayout sidebar
 
 
 // ─── LANGUAGE TOGGLE ────────────────────────────────────────────────────────
@@ -185,8 +186,9 @@ const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
 };
 
 // ─── MAIN NAVBAR ────────────────────────────────────────────────────────────
-export default function NavigationBar({ onStatisticsClick, onVerificationClick, currentPage }: NavigationBarProps) {
-  const { t } = useTranslation();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function NavigationBar(_props: NavigationBarProps) {
+  useTranslation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isDark, setIsDark] = useState(false);
 
@@ -209,8 +211,6 @@ export default function NavigationBar({ onStatisticsClick, onVerificationClick, 
   }, []);
 
   const forceLight = !isScrolled && (isProfilePage || isDark);
-  const HIDDEN_PAGES = ['login', 'register', 'user-profile', 'user-home', 'user-home', 'user-reports', 'user-history'];
-  const is_show_statistics = !HIDDEN_PAGES.includes(currentPage ?? '');
 
   // ─── Inline style for scrolled dark bg ──────────────────────────────────
   // rgba(13,10,4,0.78) — Dashboard #0d0a04 bilan bir xil tona, biroz transparent
@@ -269,42 +269,6 @@ export default function NavigationBar({ onStatisticsClick, onVerificationClick, 
 
           {/* ── RIGHT SIDE ── */}
           <div className="flex items-center gap-2 sm:gap-3">
-
-            {/* Stats/Verification — faqat desktop */}
-            {is_show_statistics && (
-              <div className="hidden md:flex items-center gap-2">
-                {onVerificationClick && (
-                  <button
-                    onClick={onVerificationClick}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-all cursor-pointer",
-                      "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-orange-600",
-                      "dark:border-amber-900/30 dark:text-white/70 dark:hover:text-amber-300 dark:hover:border-amber-500/40",
-                    )}
-                    style={isDark ? { backgroundColor: "rgba(22,15,5,0.70)" } : {}}
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    <span>{t('navigation.verification', 'Tekshirish')}</span>
-                  </button>
-                )}
-                {onStatisticsClick && (
-                  <button
-                    onClick={onStatisticsClick}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-all cursor-pointer",
-                      "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-orange-600",
-                      "dark:border-amber-900/30 dark:text-white/70 dark:hover:text-amber-300 dark:hover:border-amber-500/40",
-                    )}
-                    style={isDark ? { backgroundColor: "rgba(22,15,5,0.70)" } : {}}
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    <span>{t('navigation.statistics', 'Statistika')}</span>
-                  </button>
-                )}
-                <div className="h-8 w-px bg-gray-200 dark:bg-amber-900/40 mx-1" />
-              </div>
-            )}
-
 
             {/* Togglelar — isDark prop to'g'ridan-to'g'ri uzatiladi */}
             <NavbarThemeToggle isDark={isDark} />
