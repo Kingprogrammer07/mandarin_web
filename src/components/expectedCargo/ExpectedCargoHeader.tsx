@@ -1,8 +1,16 @@
-import { Search, Pencil, X, FileDown, ScanBarcode, ChevronLeft, Moon, Sun, Trash2, DatabaseBackup } from 'lucide-react';
+import { Search, Pencil, X, FileDown, ScanBarcode, ChevronLeft, Moon, Sun, Trash2, DatabaseBackup, MoreVertical } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { NotificationBell } from '@/components/expectedCargo/NotificationPanel';
 
 interface ExpectedCargoHeaderProps {
   activeFlightName: string | null;
@@ -17,6 +25,7 @@ interface ExpectedCargoHeaderProps {
   onExportAll: () => void;
   onDeleteFlight: () => void;
   onBack: () => void;
+  onOpenNotifications: () => void;
 }
 
 export function ExpectedCargoHeader({
@@ -32,6 +41,7 @@ export function ExpectedCargoHeader({
   onExportAll,
   onDeleteFlight,
   onBack,
+  onOpenNotifications,
 }: ExpectedCargoHeaderProps) {
   const { theme, setTheme } = useTheme();
 
@@ -50,7 +60,6 @@ export function ExpectedCargoHeader({
           </Button>
 
           <div className="min-w-0">
-            {/* Current flight name is the main title */}
             <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
               {activeFlightName ?? '—'}
             </h1>
@@ -70,6 +79,9 @@ export function ExpectedCargoHeader({
           >
             {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </Button>
+
+          {/* Notification bell */}
+          <NotificationBell onClick={onOpenNotifications} />
 
           {/* Fast entry / scanner toggle */}
           <Button
@@ -91,41 +103,6 @@ export function ExpectedCargoHeader({
             )}
           </Button>
 
-          {/* Export current flight as Excel */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onExport}
-            title="Bu reysni eksport qilish"
-            className="text-zinc-500 dark:text-zinc-400"
-          >
-            <FileDown className="size-5" />
-          </Button>
-
-          {/* Export entire database as Excel */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onExportAll}
-            title="Barcha reyslarni eksport qilish"
-            className="text-zinc-500 dark:text-zinc-400"
-          >
-            <DatabaseBackup className="size-5" />
-          </Button>
-
-          {/* Delete entire active flight */}
-          {activeFlightName && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onDeleteFlight}
-              title="Bu reysni to'liq o'chirish"
-              className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-            >
-              <Trash2 className="size-5" />
-            </Button>
-          )}
-
           {/* Edit mode toggle */}
           <Button
             variant="ghost"
@@ -139,6 +116,47 @@ export function ExpectedCargoHeader({
           >
             {isEditMode ? <X className="size-5" /> : <Pencil className="size-4" />}
           </Button>
+
+          {/* Overflow menu — houses dangerous/secondary actions to keep the toolbar tidy */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-zinc-500 dark:text-zinc-400"
+                title="Ko'proq"
+              >
+                <MoreVertical className="size-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[180px]">
+              {/* Export current flight */}
+              <DropdownMenuItem onClick={onExport}>
+                <FileDown className="size-4" />
+                Bu reysni eksport
+              </DropdownMenuItem>
+
+              {/* Export all flights */}
+              <DropdownMenuItem onClick={onExportAll}>
+                <DatabaseBackup className="size-4" />
+                Barchasini eksport
+              </DropdownMenuItem>
+
+              {/* Delete flight — only shown when a flight is active */}
+              {activeFlightName && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={onDeleteFlight}
+                  >
+                    <Trash2 className="size-4" />
+                    Reysni o'chirish
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

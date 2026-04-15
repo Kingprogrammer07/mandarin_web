@@ -2,8 +2,7 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ModernBarChartProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: any[];
+  data: object[];
   title: string;
   /** Short description shown below the title */
   description?: string;
@@ -74,7 +73,7 @@ export const ModernBarChart: React.FC<ModernBarChartProps> = ({
                 boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
               }}
               cursor={{ fill: '#f3f4f6' }}
-              formatter={(value: string | number) => [valueFormatter(value), 'Qiymat']}
+              formatter={(value) => [value != null ? valueFormatter(value as string | number) : '', 'Qiymat']}
               labelStyle={{ color: '#374151', fontWeight: 'bold', marginBottom: '4px' }}
             />
             <Bar

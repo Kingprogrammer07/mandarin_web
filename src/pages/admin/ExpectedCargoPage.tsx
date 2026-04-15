@@ -23,6 +23,7 @@ import { BulkSaveFAB } from '@/components/expectedCargo/BulkSaveFAB';
 import { RenameFlightModal } from '@/components/expectedCargo/RenameFlightModal';
 import { DeleteConfirmModal } from '@/components/expectedCargo/DeleteConfirmModal';
 import { ReplaceTrackCodesModal } from '@/components/expectedCargo/ReplaceTrackCodesModal';
+import { NotificationPanel } from '@/components/expectedCargo/NotificationPanel';
 
 interface ExpectedCargoPageProps {
   onNavigate: (page: string) => void;
@@ -91,6 +92,7 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
     flightName: string;
     clientCode: string;
   } | null>(null);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -140,7 +142,6 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         return await deleteExpectedCargo({ flight_name: flightName });
       } catch (err: unknown) {
         // 404 means the flight existed only in local UI state (never saved to DB).
-        // Nothing to delete on the server — treat as a successful removal.
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 404) return { deleted_count: 0 };
         throw err;
@@ -149,7 +150,6 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
     onSuccess: (_data, flightName) => {
       toast.success(`"${flightName}" reysi o'chirildi`);
       setDeleteFlightTarget(null);
-      // Remove from local tab order so the tab disappears immediately
       setFlightTabOrder(flightTabOrder.filter((n) => n !== flightName));
       if (activeFlightName === flightName) setActiveFlight(null);
       queryClient.invalidateQueries({ queryKey: ['expectedCargo', 'flights'] });
@@ -239,9 +239,19 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
     }
   }, [flightTabOrder, setActiveFlight, setFlightTabOrder]);
 
+  /** Navigate to a specific client from the notification panel. */
+  const handleNavigateToClient = useCallback((flightName: string, clientCode: string) => {
+    // Switch to the relevant flight if needed.
+    if (flightName && flightName !== activeFlightName) {
+      setActiveFlight(flightName);
+    }
+    // Highlight the client in the list.
+    setSearchQuery(clientCode);
+    setExpandedClient(clientCode);
+  }, [activeFlightName, setActiveFlight, setSearchQuery, setExpandedClient]);
+
   const handleBack = () => onNavigate('admin-login');
 
-  // True when the server has responded with zero flights AND no local tabs were added
   const hasNoFlights =
     !flightsQuery.isLoading && flightTabOrder.length === 0 &&
     (flightsQuery.data?.items ?? []).length === 0;
@@ -266,6 +276,7 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         onExportAll={handleExportAll}
         onDeleteFlight={() => activeFlightName && setDeleteFlightTarget(activeFlightName)}
         onBack={handleBack}
+        onOpenNotifications={() => setIsNotificationPanelOpen(true)}
       />
 
       {/* ── Main scrollable content ─────────────────────────────────────────── */}
@@ -274,7 +285,6 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         style={{
           marginTop: headerHeight,
           marginBottom: bottomTabsHeight,
-          // Stretch to fill the viewport between header and tabs
           minHeight: `calc(100dvh - ${headerHeight}px - ${bottomTabsHeight}px)`,
         }}
       >
@@ -296,7 +306,6 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         >
           {!activeFlightName ? (
             hasNoFlights ? (
-              /* ── No flights at all — guide user to create the first one ── */
               <div className="flex flex-col items-center justify-center h-full gap-5 px-8 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-500/[0.08] border border-orange-100 dark:border-orange-500/15 flex items-center justify-center">
                   <Plane className="w-8 h-8 text-orange-400 dark:text-orange-500" strokeWidth={1.5} />
@@ -352,6 +361,13 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         onAddFlight={handleAddFlight}
       />
 
+      {/* ── Notification panel (slide-in) ────────────────────────────────────── */}
+      <NotificationPanel
+        isOpen={isNotificationPanelOpen}
+        onClose={() => setIsNotificationPanelOpen(false)}
+        onNavigateToClient={handleNavigateToClient}
+      />
+
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       <RenameFlightModal
         flightName={renameTarget}
@@ -372,7 +388,6 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {/* Delete entire flight confirmation */}
       <DeleteConfirmModal
         isOpen={deleteFlightTarget !== null}
         isPending={deleteFlightMutation.isPending}
@@ -387,7 +402,6 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
       />
 
       {replaceTarget && (
-        // key forces a full remount (and local state reset) when the target changes
         <ReplaceTrackCodesModal
           key={`${replaceTarget.flightName}::${replaceTarget.clientCode}`}
           flightName={replaceTarget.flightName}

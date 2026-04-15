@@ -2,8 +2,7 @@ import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ModernAreaChartProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: any[];
+  data: object[];
   title: string;
   /** Short description shown below the title */
   description?: string;
@@ -91,7 +90,7 @@ export const ModernAreaChart: React.FC<ModernAreaChartProps> = ({
                 border: 'none',
                 boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
               }}
-              formatter={(value: string | number) => [valueFormatter(value), 'Qiymat']}
+              formatter={(value) => [value != null ? valueFormatter(value as string | number) : '', 'Qiymat']}
               labelStyle={{ color: '#374151', fontWeight: 'bold', marginBottom: '4px' }}
             />
             <Area
