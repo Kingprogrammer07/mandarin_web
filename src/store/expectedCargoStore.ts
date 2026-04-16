@@ -14,14 +14,16 @@ export interface FastEntryQueueItem {
   /** True when resolve-client returned a match; false when manual or still loading. */
   isResolved: boolean;
   /**
+   * True when resolve-client returned 404 — no client found for this track code.
+   * The admin must fill in the client code manually.
+   */
+  notFound: boolean;
+  /**
    * True when this track code belongs to a client that already has entries in the
-   * current session queue — signals a "continuation" scan pattern worth flagging.
+   * current session queue AND at least one different client was scanned in between.
    */
   isContinuation: boolean;
-  /**
-   * How many prior queue items share this same clientCode at the time of scan.
-   * Stored so the warning toast and tooltip can show the exact count.
-   */
+  /** How many prior queue items share this same clientCode at the time of scan. */
   priorCountForClient: number;
 }
 
@@ -34,14 +36,8 @@ export interface NotificationItem {
   type: NotificationType;
   title: string;
   description: string;
-  /** ISO timestamp of when the notification was created. */
   createdAt: string;
-  /** Whether the user has viewed this notification in the panel. */
   isRead: boolean;
-  /**
-   * Optional payload to navigate to a specific client when the user taps the
-   * notification. Both fields must be present together.
-   */
   navigateTo?: {
     flightName: string;
     clientCode: string;
@@ -51,36 +47,34 @@ export interface NotificationItem {
 // ── Store Interface ────────────────────────────────────────────────────────────
 
 interface ExpectedCargoState {
-  // ── Navigation & View State ─────────────────────────────────────────────────
   activeFlightName: string | null;
   expandedClientCode: string | null;
   isEditMode: boolean;
   searchQuery: string;
   isFastEntryOpen: boolean;
+  /**
+   * When true the VirtualizedClientList is hidden and the FastEntryPanel queue
+   * list expands to fill the freed space — useful when reviewing duplicate clients.
+   * Not persisted (resets on page reload).
+   */
+  isClientListHidden: boolean;
 
-  // ── Persisted Tab Ordering ──────────────────────────────────────────────────
   flightTabOrder: string[];
-
-  // ── Fast Entry Queue ────────────────────────────────────────────────────────
-  /** Persisted to localStorage so a page reload doesn't lose unsubmitted items. */
   entryQueue: FastEntryQueueItem[];
-
-  // ── Notification History ────────────────────────────────────────────────────
-  /** Persisted log of in-session notifications. Capped to last 100 entries. */
   notifications: NotificationItem[];
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
   setActiveFlight: (name: string | null) => void;
   setExpandedClient: (code: string | null) => void;
   toggleEditMode: () => void;
   setEditMode: (value: boolean) => void;
   setSearchQuery: (query: string) => void;
   setFastEntryOpen: (open: boolean) => void;
+  setClientListHidden: (hidden: boolean) => void;
 
   syncFlightTabOrder: (apiFlightNames: string[]) => void;
   setFlightTabOrder: (orderedNames: string[]) => void;
 
-  enqueueEntry: (item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient'>) => void;
+  enqueueEntry: (item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound'>) => void;
   resolveQueueItemClient: (
     trackCode: string,
     clientCode: string,
@@ -89,6 +83,8 @@ interface ExpectedCargoState {
     isContinuation: boolean,
     priorCountForClient: number,
   ) => void;
+  /** Mark an item as not-found (404) — leaves isResolved false, flags for red UI. */
+  markQueueItemNotFound: (trackCode: string) => void;
   setQueueItemClientCode: (id: string, clientCode: string) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
@@ -104,17 +100,15 @@ interface ExpectedCargoState {
 export const useExpectedCargoStore = create<ExpectedCargoState>()(
   persist(
     (set, get) => ({
-      // ── Initial state ─────────────────────────────────────────────────────
       activeFlightName: null,
       expandedClientCode: null,
       isEditMode: false,
       searchQuery: '',
       isFastEntryOpen: false,
+      isClientListHidden: false,
       flightTabOrder: [],
       entryQueue: [],
       notifications: [],
-
-      // ── View actions ──────────────────────────────────────────────────────
 
       setActiveFlight: (name) =>
         set({
@@ -135,12 +129,9 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
         })),
 
       setEditMode: (value) => set({ isEditMode: value }),
-
       setSearchQuery: (query) => set({ searchQuery: query }),
-
       setFastEntryOpen: (open) => set({ isFastEntryOpen: open }),
-
-      // ── Tab ordering ──────────────────────────────────────────────────────
+      setClientListHidden: (hidden) => set({ isClientListHidden: hidden }),
 
       syncFlightTabOrder: (apiFlightNames) => {
         const currentOrder = get().flightTabOrder;
@@ -153,14 +144,12 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
 
       setFlightTabOrder: (orderedNames) => set({ flightTabOrder: orderedNames }),
 
-      // ── Queue actions ─────────────────────────────────────────────────────
-
       enqueueEntry: (item) => {
         const id = crypto.randomUUID();
         set((state) => ({
           entryQueue: [
             ...state.entryQueue,
-            { ...item, id, isContinuation: false, priorCountForClient: 0 },
+            { ...item, id, isContinuation: false, priorCountForClient: 0, notFound: false },
           ],
         }));
       },
@@ -175,6 +164,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
                   resolvedClientName: clientName,
                   resolvedClientId: clientId,
                   isResolved: true,
+                  notFound: false,
                   isContinuation,
                   priorCountForClient,
                 }
@@ -182,10 +172,19 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
           ),
         })),
 
+      markQueueItemNotFound: (trackCode) =>
+        set((state) => ({
+          entryQueue: state.entryQueue.map((item) =>
+            item.trackCode === trackCode
+              ? { ...item, notFound: true, isResolved: false, clientCode: '' }
+              : item,
+          ),
+        })),
+
       setQueueItemClientCode: (id, clientCode) =>
         set((state) => ({
           entryQueue: state.entryQueue.map((item) =>
-            item.id === id ? { ...item, clientCode } : item,
+            item.id === id ? { ...item, clientCode, notFound: false } : item,
           ),
         })),
 
@@ -196,19 +195,13 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
 
       clearQueue: () => set({ entryQueue: [] }),
 
-      // ── Notification actions ──────────────────────────────────────────────
-
       addNotification: (notification) => {
         const id = crypto.randomUUID();
-        const newItem: NotificationItem = {
-          ...notification,
-          id,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-        };
         set((state) => ({
-          // Keep most recent 100 notifications
-          notifications: [newItem, ...state.notifications].slice(0, 100),
+          notifications: [
+            { ...notification, id, createdAt: new Date().toISOString(), isRead: false },
+            ...state.notifications,
+          ].slice(0, 100),
         }));
       },
 
@@ -228,7 +221,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
     {
       name: 'expected-cargo-store',
       storage: createJSONStorage(() => localStorage),
-      // Persist tab ordering, the unsaved entry queue, and notification history
+      // isClientListHidden intentionally excluded — ephemeral UI state
       partialize: (state) => ({
         flightTabOrder: state.flightTabOrder,
         entryQueue: state.entryQueue,

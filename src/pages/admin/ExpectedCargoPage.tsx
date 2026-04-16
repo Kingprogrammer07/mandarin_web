@@ -72,6 +72,7 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
     expandedClientCode,
     isEditMode,
     isFastEntryOpen,
+    isClientListHidden,
     searchQuery,
     flightTabOrder,
     entryQueue,
@@ -285,23 +286,29 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
         style={{
           marginTop: headerHeight,
           marginBottom: bottomTabsHeight,
-          minHeight: `calc(100dvh - ${headerHeight}px - ${bottomTabsHeight}px)`,
+          // Use exact height so flex children can fill it properly
+          height: `calc(100dvh - ${headerHeight}px - ${bottomTabsHeight}px)`,
         }}
       >
-        {/* Fast entry panel (collapsible) */}
+        {/* Fast entry panel — when client list is hidden it fills the remaining space */}
         {isFastEntryOpen && (
           <FastEntryPanel
             flightName={activeFlightName}
             onClose={() => setFastEntryOpen(false)}
+            isQueueExpanded={isClientListHidden}
           />
         )}
 
-        {/* Client summary list */}
+        {/* Client summary list — hidden when the user toggled it off */}
         <div
           className="flex-1"
           style={{
-            height: `calc(100dvh - ${headerHeight}px - ${bottomTabsHeight}px${isFastEntryOpen ? ' - 240px' : ''})`,
+            // Height zero when hidden so it takes no space; flex-1 fills otherwise
+            height: isClientListHidden
+              ? 0
+              : `calc(100dvh - ${headerHeight}px - ${bottomTabsHeight}px${isFastEntryOpen ? ' - 240px' : ''})`,
             overflow: 'hidden',
+            display: isClientListHidden ? 'none' : undefined,
           }}
         >
           {!activeFlightName ? (

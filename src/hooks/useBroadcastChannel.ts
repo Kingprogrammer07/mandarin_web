@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
 
 export interface PosNotificationPayload {
@@ -79,8 +79,11 @@ export function useBroadcastChannel(
   const bcRef = useRef<BroadcastChannel | null>(null);
 
   // Always points to the latest callback without causing the effect to re-run.
+  // Synced in useLayoutEffect (not during render) to satisfy the react-hooks/refs rule.
   const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
+  useLayoutEffect(() => {
+    onMessageRef.current = onMessage;
+  });
 
   // Tracks processed IDs to prevent duplicate delivery across channels.
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -96,7 +99,7 @@ export function useBroadcastChannel(
     }
 
     // Strip internal transport field before handing to the consumer.
-    const { _id: _ignored, ...msg } = wire;
+    const { _id: _, ...msg } = wire;
     onMessageRef.current?.(msg as BroadcastMessage);
   }, []);
 

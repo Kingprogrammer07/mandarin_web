@@ -79,8 +79,7 @@ export function FlightBottomTabs({
   activeFlightName,
   onSelectFlight,
   onLongPressTab,
-  // @ts-ignore: onReorder is currently not used due to dnd removal but kept in signature
-  onReorder,
+  onReorder: _onReorder,
   onAddFlight,
 }: FlightBottomTabsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);

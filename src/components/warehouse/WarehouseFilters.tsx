@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Search, Plane, Filter, RotateCcw, ChevronDown } from "lucide-react";
 import { useWarehouseStore } from "../../store/useWarehouseStore";
 import { useWarehouseFlights } from "../../api/hooks/useWarehouse";
@@ -35,10 +35,13 @@ export default function WarehouseFilters() {
 
   const { data: flightsData } = useWarehouseFlights();
 
-  // Sync local input when store resets searchQuery to ""
-  useEffect(() => {
+  // Sync local input when store resets searchQuery to "" — uses React's render-time
+  // state update pattern instead of useEffect to avoid cascading re-renders.
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
+  if (searchQuery !== prevSearchQuery) {
+    setPrevSearchQuery(searchQuery);
     if (searchQuery === "") setLocalSearch("");
-  }, [searchQuery]);
+  }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
