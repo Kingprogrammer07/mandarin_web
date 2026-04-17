@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3 } from 'lucide-react';
+import { Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3, CalendarDays } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -10,12 +10,13 @@ interface AdminLayoutProps {
 }
 
 const navItems = [
-  { id: 'admin-accounts', label: 'Adminlar',   icon: Users,    description: 'Hisoblar boshqaruvi' },
-  { id: 'admin-roles',    label: 'Rollar',     icon: Shield,   description: 'Huquqlar tizimi' },
-  { id: 'admin-carousel', label: 'Karusel',    icon: Layers,   description: 'Banner & reklama' },
-  { id: 'admin-audit',    label: 'Audit',      icon: Clock,    description: 'Faoliyat tarixi' },
-  { id: 'statistics',     label: 'Statistika', icon: BarChart3, description: "Ko'rsatkichlar tahlili" },
-  { id: 'admin-profile',  label: 'Profil',     icon: User,     description: 'Shaxsiy sozlamalar' },
+  { id: 'admin-accounts',      label: 'Adminlar',    icon: Users,         description: 'Hisoblar boshqaruvi' },
+  { id: 'admin-roles',         label: 'Rollar',      icon: Shield,        description: 'Huquqlar tizimi' },
+  { id: 'admin-carousel',      label: 'Karusel',     icon: Layers,        description: 'Banner & reklama' },
+  { id: 'admin-audit',         label: 'Audit',       icon: Clock,         description: 'Faoliyat tarixi' },
+  { id: 'statistics',          label: 'Statistika',  icon: BarChart3,     description: "Ko'rsatkichlar tahlili" },
+  { id: 'flight-schedule-admin', label: 'Jadval',    icon: CalendarDays,  description: 'Reys jadvali' },
+  { id: 'admin-profile',       label: 'Profil',      icon: User,          description: 'Shaxsiy sozlamalar' },
 ];
 
 function getInitialTheme() {
@@ -181,8 +182,12 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
       </main>
 
       {/* ── Mobile Bottom Navigation ── */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0f0f0f]/95 backdrop-blur-2xl border-t border-black/[0.05] dark:border-white/[0.06] z-30 px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]">
-        <div className="flex justify-around">
+      {/* Scrollable so any number of items can be added without squishing. */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0f0f0f]/95 backdrop-blur-2xl border-t border-black/[0.05] dark:border-white/[0.06] z-30 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom)]">
+        <div
+          className="flex overflow-x-auto px-1"
+          style={{ scrollbarWidth: 'none' }}
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
@@ -190,7 +195,7 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
               <button
                 key={item.id}
                 onClick={() => handleNav(item.id)}
-                className="flex flex-col items-center py-1.5 px-1 flex-1 min-w-0 transition-transform active:scale-90 touch-manipulation relative"
+                className="flex flex-col items-center py-1.5 px-2 flex-shrink-0 w-[60px] transition-transform active:scale-90 touch-manipulation relative"
               >
                 {isActive && (
                   <motion.div

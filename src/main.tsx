@@ -16,6 +16,16 @@ const queryClient = new QueryClient({
   },
 })
 
+// Register service worker in production only — enables PWA install prompt
+// and offline shell caching without disrupting the Vite dev HMR workflow.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Non-fatal — app works fine without the service worker
+    });
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

@@ -16,6 +16,7 @@ import AdminRolesPage from "./pages/admin/AdminRolesPage";
 import AdminProfilePage from "./pages/admin/AdminProfilePage";
 import AdminAuditLogsPage from "./pages/admin/AdminAuditLogsPage";
 import AdminCarouselPage from "./pages/admin/AdminCarouselPage";
+import FlightScheduleAdminPage from "./pages/admin/FlightScheduleAdminPage";
 import POSDashboard from "./pages/POSDashboard";
 import ImportPage from "./components/ImportPage";
 import ClientForm from "./components/ClientForm";
@@ -72,7 +73,8 @@ type Page =
   | "manager-page"
   | "passkey-page"
   | "warehouse-page"
-  | "expected-cargo";
+  | "expected-cargo"
+  | "flight-schedule-admin";
 
 interface RouteInfo {
   page: Page;
@@ -131,6 +133,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "warehouse-page",
       "expected-cargo",
       "passkey-page",
+      "flight-schedule-admin",
     ],
   },
   "super-admin": {
@@ -161,13 +164,15 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "expected-cargo",
       "manager-page",
       "passkey-page",
+      "flight-schedule-admin",
     ],
   },
   manager: {
     default: "manager-page",
     // admin-carousel is gated by JWT permission (carousel:read) checked in ManagerPage UI;
-    // adding it here only unlocks the route — the backend enforces actual authorization.
-    allowed: ["manager-page", "admin-carousel", "admin-profile", "passkey-page"],
+    // flight-schedule-admin is gated by JWT permission (flight_schedule:manage) in the page UI;
+    // adding them here only unlocks the route — the backend enforces actual authorization.
+    allowed: ["manager-page", "admin-carousel", "admin-profile", "passkey-page", "flight-schedule-admin"],
   },
   warehouse_worker: {
     default: "warehouse-page",
@@ -270,6 +275,7 @@ function getPathForPage(
   if (page === "warehouse-page") return "/admin/warehouse";
   if (page === "pos-dashboard") return "/pos";
   if (page === "expected-cargo") return "/admin/expected-cargo";
+  if (page === "flight-schedule-admin") return "/admin/flight-schedule";
   return "/auth/login";
 }
 
@@ -342,6 +348,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/admin/passkey") return { page: "passkey-page" };
   if (path === "/warehouse" || path === "/admin/warehouse") return { page: "warehouse-page" };
   if (path === "/admin/expected-cargo") return { page: "expected-cargo" };
+  if (path === "/admin/flight-schedule") return { page: "flight-schedule-admin" };
   if (path === "/pos") return { page: "pos-dashboard" };
 
   return { page: "login" };
@@ -611,6 +618,7 @@ function AppContent() {
     "admin-audit",
     "admin-profile",
     "admin-carousel",
+    "flight-schedule-admin",
   ].includes(currentPage);
 
   // Only roles with admin-accounts (admin, super-admin) get the full AdminLayout shell.
@@ -710,6 +718,7 @@ function AppContent() {
           {currentPage === "admin-audit" && <AdminAuditLogsPage />}
           {currentPage === "admin-profile" && <AdminProfilePage />}
           {currentPage === "admin-carousel" && <AdminCarouselPage />}
+          {currentPage === "flight-schedule-admin" && <FlightScheduleAdminPage />}
         </AdminLayout>
       ) : isPOSPage ? (
         <POSDashboard
@@ -727,6 +736,11 @@ function AppContent() {
           )}
           {currentPage === "admin-profile" && (
             <AdminProfilePage
+              onBack={() => navigateToPage(getDefaultPageForRole(userRole!) as Page)}
+            />
+          )}
+          {currentPage === "flight-schedule-admin" && (
+            <FlightScheduleAdminPage
               onBack={() => navigateToPage(getDefaultPageForRole(userRole!) as Page)}
             />
           )}
@@ -909,7 +923,9 @@ function AppContent() {
             />
           )}
 
-          {currentPage === "user-reports" && <UserReportsPage />}
+          {currentPage === "user-reports" && (
+            <UserReportsPage onBack={() => navigateToPage("user-home")} />
+          )}
 
           {currentPage === "user-history" && (
             <UserHistoryPage onBack={() => navigateToPage("user-home")} />
@@ -917,7 +933,7 @@ function AppContent() {
         </main>
       )}
 
-      <Toaster />
+      <Toaster position="top-center" richColors />
 
       <PassportImagesModal
         isOpen={passportModalOpen}

@@ -21,9 +21,12 @@ import {
     ReceiptText,
     MessageSquare,
     ListOrdered,
-    Calculator, // Calculator bu yerda import qilingan
-    Search
+    Calculator,
+    Search,
+    Smartphone,
+    Plus,
 } from "lucide-react";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import TrackCodeTab from "./dashboard/TrackCodeTab";
 import {
     getActiveCarouselItems,
@@ -130,16 +133,16 @@ const MAIN_ACTIONS: (Omit<ActionItemData, 'label' | 'desc' | 'badge' | 'actionLa
         actionLabelKey: "dashboard.actions.china.action",
         theme: "amber",
     },
-    // {
-    //     id: "schedule",
-    //     icon: <Calendar className="w-5 h-5" />,
-    //     bgIcon: <Calendar style={{ width: 80, height: 80 }} />,
-    //     labelKey: "dashboard.actions.schedule.label",
-    //     descKey: "dashboard.actions.schedule.desc",
-    //     badgeKey: "dashboard.actions.schedule.badge",
-    //     actionLabelKey: "dashboard.actions.schedule.action",
-    //     theme: "sky",
-    // },
+    {
+        id: "schedule",
+        icon: <Calendar className="w-5 h-5" />,
+        bgIcon: <Calendar style={{ width: 80, height: 80 }} />,
+        labelKey: "dashboard.actions.schedule.label",
+        descKey: "dashboard.actions.schedule.desc",
+        badgeKey: "dashboard.actions.schedule.badge",
+        actionLabelKey: "dashboard.actions.schedule.action",
+        theme: "sky",
+    },
     {
         id: "request",
         icon: <Edit3 className="w-5 h-5" />,
@@ -689,6 +692,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     const [mediaModalItem, setMediaModalItem] = useState<CarouselItemData | null>(null);
 
     const { t } = useTranslation();
+    const { canInstall, handleInstall } = useInstallPrompt();
 
     const { data: apiCarouselItems } = useQuery({
         queryKey: ['carousel-items'],
@@ -1018,6 +1022,33 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                         </section>
 
                         <section className="pb-8 px-1">
+                            {canInstall && (
+                                <button
+                                    onClick={handleInstall}
+                                    className="
+                                        w-full relative overflow-hidden rounded-2xl p-4 flex items-center justify-between mb-3
+                                        bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/5
+                                        border border-amber-200 dark:border-amber-500/20
+                                        active:scale-[0.98] transition-all duration-200 group shadow-sm hover:shadow-md
+                                    "
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform text-amber-600 dark:text-amber-400">
+                                            <Smartphone className="w-5 h-5" />
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                                {t('dashboard.installApp.title', 'Ekranga qo\'shish')}
+                                            </h3>
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                                                {t('dashboard.installApp.desc', 'Tez kirish uchun bosh ekranga qo\'shing')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Plus className="w-5 h-5 text-amber-500 dark:text-amber-400 group-hover:rotate-90 transition-transform duration-200 shrink-0" />
+                                </button>
+                            )}
+
                             <button
                                 className="
                                     w-full relative overflow-hidden rounded-2xl p-4 flex items-center justify-between

@@ -72,7 +72,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
         
         {(subtitle || (trend && trend.label)) && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium truncate w-full" title={subtitle}>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium line-clamp-2 md:line-clamp-1" title={subtitle}>
             {subtitle} {trend && trend.label && <span className="ml-1 opacity-70">({trend.label})</span>}
           </p>
         )}

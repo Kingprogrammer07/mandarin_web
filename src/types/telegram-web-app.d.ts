@@ -79,6 +79,24 @@ interface TelegramWebApp {
   requestWriteAccess(callback?: (granted: boolean) => void): void;
   requestContact(callback?: (granted: boolean) => void): void;
 
+  // Version check (Bot API 6.0+)
+  isVersionAtLeast(version: string): boolean;
+
+  // Home screen integration (Bot API 8.0+)
+  /** Prompts the user to add the Mini App to the device home screen. */
+  addToHomeScreen(): void;
+  /**
+   * Checks whether the Mini App has already been added to the home screen.
+   * status values:
+   *  'unsupported' — feature not supported on this platform/version
+   *  'unknown'     — status cannot be determined
+   *  'added'       — already on home screen
+   *  'missed'      — not yet added
+   */
+  checkHomeScreenStatus(
+    callback: (status: 'unsupported' | 'unknown' | 'added' | 'missed') => void
+  ): void;
+
   // Main button
   MainButton: {
     text: string;

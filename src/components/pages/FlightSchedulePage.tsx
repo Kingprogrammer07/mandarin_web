@@ -1,15 +1,17 @@
 import React, { useState, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { parseISO } from 'date-fns';
 import {
     ChevronLeft,
     ChevronRight,
     Plane,
     Gift,
-
     Calendar as CalendarIcon,
     ArrowRight,
     Bell,
-    AlertCircle
+    AlertCircle,
+    Loader2,
 } from 'lucide-react';
 import {
     format,
@@ -26,8 +28,10 @@ import {
     endOfWeek,
     isBefore,
     startOfDay,
-    getDate
+    getDate,
+    getYear,
 } from 'date-fns';
+import { getFlightSchedule, type FlightScheduleItem } from '@/api/services/flightSchedule';
 
 // --- Helpers ---
 const formatDateUzWithMonths = (date: Date, type: 'monthYear' | 'dayMonth' | 'full', months: string[]) => {
@@ -44,6 +48,25 @@ const formatDateUzWithMonths = (date: Date, type: 'monthYear' | 'dayMonth' | 'fu
     }
 };
 
+/** Runtime representation with a proper Date object for calendar/date-fns operations. */
+interface Flight {
+    id: number;
+    date: Date;
+    flightName: string;
+    type: 'avia' | 'aksiya';
+    status: 'arrived' | 'scheduled' | 'delayed';
+    notes: string | null;
+}
+
+const mapApiItem = (item: FlightScheduleItem): Flight => ({
+    id: item.id,
+    date: parseISO(item.flight_date),
+    flightName: item.flight_name,
+    type: item.type,
+    status: item.status,
+    notes: item.notes,
+});
+
 // Google Calendar URL Generator
 const generateGoogleCalendarUrl = (flight: Flight, t: (key: string, opts?: Record<string, string>) => string, months: string[]) => {
     const title = t('flightSchedule.googleCalendar.title', { name: flight.flightName });
@@ -53,39 +76,6 @@ const generateGoogleCalendarUrl = (flight: Flight, t: (key: string, opts?: Recor
 
     return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}`;
 };
-
-// --- Mock Data ---
-interface Flight {
-    id: string;
-    date: Date;
-    flightName: string;
-    type: 'avia' | 'aksiya';
-    status: 'arrived' | 'scheduled' | 'delayed';
-}
-
-const TODAY = new Date();
-const CURRENT_MONTH_START = startOfMonth(TODAY);
-const PREV_MONTH_START = subMonths(CURRENT_MONTH_START, 1);
-const NEXT_MONTH_START = addMonths(CURRENT_MONTH_START, 1);
-
-const MOCK_FLIGHTS: Flight[] = [
-    // O'tgan reyslar
-    { id: '1', date: addDays(PREV_MONTH_START, 15), flightName: 'MC-1044', type: 'avia', status: 'arrived' },
-    { id: '2', date: addDays(CURRENT_MONTH_START, 2), flightName: 'MC-1045', type: 'avia', status: 'arrived' },
-    { id: '3', date: addDays(CURRENT_MONTH_START, 9), flightName: 'MC-1046', type: 'avia', status: 'arrived' },
-    { id: '4', date: addDays(CURRENT_MONTH_START, 16), flightName: 'MC-1047', type: 'avia', status: 'arrived' },
-
-    // Hozirgi/Kutilayotgan reyslar (Kechikkan va Rejalashtirilgan)
-    { id: '5', date: addDays(CURRENT_MONTH_START, 23), flightName: 'MC-1048', type: 'avia', status: 'delayed' },
-    { id: '6', date: addDays(CURRENT_MONTH_START, 28), flightName: 'Baho Kuni (Maxsus aksiya)', type: 'aksiya', status: 'scheduled' },
-
-    // Keyingi oy reyslari
-    { id: '7', date: addDays(NEXT_MONTH_START, 4), flightName: 'MC-1049', type: 'avia', status: 'scheduled' },
-    { id: '8', date: addDays(NEXT_MONTH_START, 8), flightName: 'Xalqaro Xotin-qizlar kuni 🌸', type: 'aksiya', status: 'scheduled' },
-    { id: '9', date: addDays(NEXT_MONTH_START, 11), flightName: 'MC-1050', type: 'avia', status: 'scheduled' },
-    { id: '10', date: addDays(NEXT_MONTH_START, 18), flightName: 'MC-1051', type: 'avia', status: 'scheduled' },
-    { id: '11', date: addDays(NEXT_MONTH_START, 20), flightName: 'Navro\'z bayrami (Katta Aksiya) 🌿', type: 'aksiya', status: 'scheduled' },
-];
 
 // --- Sub-components ---
 
@@ -139,6 +129,9 @@ const FlightCard = memo(({ flight, simple = false }: { flight: Flight, simple?: 
                         {statusText}
                     </span>
                 </div>
+                {flight.notes && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{flight.notes}</p>
+                )}
             </div>
 
             <div className="shrink-0 ml-1">
@@ -166,6 +159,19 @@ const FlightSchedulePage: React.FC<FlightSchedulePageProps> = ({ onBack, onNavig
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
+    // Fetch the full year; re-fetch when the user navigates to a different year.
+    const year = getYear(currentMonth);
+    const { data, isLoading, isError } = useQuery({
+        queryKey: ['flightSchedule', year],
+        queryFn: () => getFlightSchedule(year),
+        staleTime: 5 * 60_000,
+    });
+
+    const flights: Flight[] = useMemo(
+        () => (data?.items ?? []).map(mapApiItem),
+        [data],
+    );
+
     const { calendarDays, monthLabel } = useMemo(() => {
         const monthStart = startOfMonth(currentMonth);
         const monthEnd = endOfMonth(monthStart);
@@ -180,20 +186,21 @@ const FlightSchedulePage: React.FC<FlightSchedulePageProps> = ({ onBack, onNavig
 
     const { selectedFlights, upcomingFlights, flightsMap } = useMemo(() => {
         const map = new Map<string, Flight[]>();
-        MOCK_FLIGHTS.forEach(f => {
+        flights.forEach(f => {
             const key = format(f.date, 'yyyy-MM-dd');
             if (!map.has(key)) map.set(key, []);
             map.get(key)?.push(f);
         });
 
         return {
-            selectedFlights: MOCK_FLIGHTS.filter(f => isSameDay(f.date, selectedDate)),
-            upcomingFlights: MOCK_FLIGHTS.filter(f => isBefore(startOfDay(new Date()), f.date))
+            selectedFlights: flights.filter(f => isSameDay(f.date, selectedDate)),
+            upcomingFlights: flights
+                .filter(f => isBefore(startOfDay(new Date()), f.date))
                 .sort((a, b) => a.date.getTime() - b.date.getTime())
                 .slice(0, 3),
             flightsMap: map
         };
-    }, [selectedDate]);
+    }, [flights, selectedDate]);
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
     const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
@@ -217,151 +224,169 @@ const FlightSchedulePage: React.FC<FlightSchedulePageProps> = ({ onBack, onNavig
             </header>
 
             <main className="relative z-10 max-w-5xl mx-auto px-4 py-6">
-                <div className="grid grid-cols-1">
-
-                    {/* Left Column: Calendar */}
-                    <div className="lg:col-span-7 xl:col-span-8 mb-6">
-                        <div className="bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-white/5 rounded-xl p-5 shadow-sm dark:shadow-none backdrop-blur-sm">
-
-                            {/* Month Nav */}
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white capitalize">
-                                    {monthLabel}
-                                </h2>
-                                <div className="flex gap-1 bg-gray-100 dark:bg-white/5 rounded-xl p-1">
-                                    <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-white dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
-                                    <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-white dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 shadow-sm transition-all"><ChevronRight className="w-5 h-5" /></button>
-                                </div>
-                            </div>
-
-                            {/* Weekday Header */}
-                            <div className="grid grid-cols-7 mb-2">
-                                {weekdays.map(day => (
-                                    <div key={day} className="text-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider py-2">
-                                        {day}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Grid */}
-                            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                                {calendarDays.map((day, idx) => {
-                                    const dayKey = format(day, 'yyyy-MM-dd');
-                                    const dayFlights = flightsMap.get(dayKey) || [];
-                                    const hasFlight = dayFlights.length > 0;
-                                    const hasAksiya = dayFlights.some(f => f.type === 'aksiya');
-                                    const isSelected = isSameDay(day, selectedDate);
-                                    const isCurrentMonth = isSameMonth(day, currentMonth);
-                                    const isTodayDate = isToday(day);
-
-                                    const selectedClass = hasAksiya
-                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 scale-105 z-10 border-purple-500'
-                                        : 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105 z-10 border-blue-500';
-
-                                    const todayClass = hasAksiya
-                                        ? 'ring-1 ring-purple-500 text-purple-600 font-bold bg-purple-50/50 dark:bg-purple-500/10'
-                                        : 'ring-1 ring-blue-500 text-blue-500 font-bold bg-blue-50/50 dark:bg-blue-500/10';
-
-                                    const defaultClass = hasAksiya
-                                        ? 'hover:bg-purple-50 dark:hover:bg-purple-500/10 text-purple-700 dark:text-purple-300 bg-purple-50/30 dark:bg-purple-500/5'
-                                        : 'hover:bg-gray-50 dark:hover:bg-white/5';
-
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() => setSelectedDate(day)}
-                                            className={`
-                                                relative aspect-[1/1] sm:aspect-auto sm:py-3 lg:aspect-[4/3] rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-all duration-200 border
-                                                ${!isCurrentMonth ? 'text-gray-300 dark:text-white/5 border-transparent' : 'text-gray-700 dark:text-gray-300 border-transparent'}
-                                                ${isSelected ? selectedClass : defaultClass}
-                                                ${isTodayDate && !isSelected ? todayClass : ''}
-                                            `}
-                                        >
-                                            <span className="z-10">{getDate(day)}</span>
-
-                                            {/* Flight Dots */}
-                                            {hasFlight && (
-                                                <div className="flex gap-0.5 mt-1 z-10">
-                                                    {dayFlights.map((f, i) => (
-                                                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' :
-                                                                f.type === 'aksiya' ? 'bg-purple-500' :
-                                                                    f.status === 'arrived' ? 'bg-emerald-500' :
-                                                                        f.status === 'delayed' ? 'bg-rose-500' : 'bg-blue-400'
-                                                            }`} />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                {/* Loading state */}
+                {isLoading && (
+                    <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm">Reyslar yuklanmoqda...</span>
                     </div>
+                )}
 
-                    {/* Right Column: Details */}
-                    <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+                {/* Error state */}
+                {isError && !isLoading && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-3 text-rose-500">
+                        <AlertCircle className="w-8 h-8 opacity-70" />
+                        <p className="text-sm font-medium">Reyslarni yuklashda xatolik yuz berdi</p>
+                    </div>
+                )}
 
-                        {/* Selected Day Info */}
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider flex items-center justify-between px-1">
-                                <span>{formatDateUzWithMonths(selectedDate, 'dayMonth', months)}</span>
-                                {isToday(selectedDate) && <span className="text-blue-500 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md">{t('flightSchedule.today')}</span>}
-                            </h3>
+                {!isLoading && !isError && (
+                    <div className="grid grid-cols-1">
 
-                            {selectedFlights.length > 0 ? (
-                                <div className="space-y-3">
-                                    {selectedFlights.map(flight => (
-                                        <FlightCard key={flight.id} flight={flight} />
+                        {/* Left Column: Calendar */}
+                        <div className="lg:col-span-7 xl:col-span-8 mb-6">
+                            <div className="bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-white/5 rounded-xl p-5 shadow-sm dark:shadow-none backdrop-blur-sm">
+
+                                {/* Month Nav */}
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white capitalize">
+                                        {monthLabel}
+                                    </h2>
+                                    <div className="flex gap-1 bg-gray-100 dark:bg-white/5 rounded-xl p-1">
+                                        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-white dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
+                                        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-white dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 shadow-sm transition-all"><ChevronRight className="w-5 h-5" /></button>
+                                    </div>
+                                </div>
+
+                                {/* Weekday Header */}
+                                <div className="grid grid-cols-7 mb-2">
+                                    {weekdays.map(day => (
+                                        <div key={day} className="text-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider py-2">
+                                            {day}
+                                        </div>
                                     ))}
                                 </div>
-                            ) : (
-                                <div className="text-center py-12 bg-white dark:bg-white/5 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
-                                    <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <Plane className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+
+                                {/* Grid */}
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                                    {calendarDays.map((day, idx) => {
+                                        const dayKey = format(day, 'yyyy-MM-dd');
+                                        const dayFlights = flightsMap.get(dayKey) || [];
+                                        const hasFlight = dayFlights.length > 0;
+                                        const hasAksiya = dayFlights.some(f => f.type === 'aksiya');
+                                        const isSelected = isSameDay(day, selectedDate);
+                                        const isCurrentMonth = isSameMonth(day, currentMonth);
+                                        const isTodayDate = isToday(day);
+
+                                        const selectedClass = hasAksiya
+                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 scale-105 z-10 border-purple-500'
+                                            : 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105 z-10 border-blue-500';
+
+                                        const todayClass = hasAksiya
+                                            ? 'ring-1 ring-purple-500 text-purple-600 font-bold bg-purple-50/50 dark:bg-purple-500/10'
+                                            : 'ring-1 ring-blue-500 text-blue-500 font-bold bg-blue-50/50 dark:bg-blue-500/10';
+
+                                        const defaultClass = hasAksiya
+                                            ? 'hover:bg-purple-50 dark:hover:bg-purple-500/10 text-purple-700 dark:text-purple-300 bg-purple-50/30 dark:bg-purple-500/5'
+                                            : 'hover:bg-gray-50 dark:hover:bg-white/5';
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => setSelectedDate(day)}
+                                                className={`
+                                                    relative aspect-[1/1] sm:aspect-auto sm:py-3 lg:aspect-[4/3] rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-all duration-200 border
+                                                    ${!isCurrentMonth ? 'text-gray-300 dark:text-white/5 border-transparent' : 'text-gray-700 dark:text-gray-300 border-transparent'}
+                                                    ${isSelected ? selectedClass : defaultClass}
+                                                    ${isTodayDate && !isSelected ? todayClass : ''}
+                                                `}
+                                            >
+                                                <span className="z-10">{getDate(day)}</span>
+
+                                                {/* Flight Dots */}
+                                                {hasFlight && (
+                                                    <div className="flex gap-0.5 mt-1 z-10">
+                                                        {dayFlights.map((f, i) => (
+                                                            <div key={i} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' :
+                                                                    f.type === 'aksiya' ? 'bg-purple-500' :
+                                                                        f.status === 'arrived' ? 'bg-emerald-500' :
+                                                                            f.status === 'delayed' ? 'bg-rose-500' : 'bg-blue-400'
+                                                                }`} />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Details */}
+                        <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+
+                            {/* Selected Day Info */}
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider flex items-center justify-between px-1">
+                                    <span>{formatDateUzWithMonths(selectedDate, 'dayMonth', months)}</span>
+                                    {isToday(selectedDate) && <span className="text-blue-500 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md">{t('flightSchedule.today')}</span>}
+                                </h3>
+
+                                {selectedFlights.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {selectedFlights.map(flight => (
+                                            <FlightCard key={flight.id} flight={flight} />
+                                        ))}
                                     </div>
-                                    <p className="text-gray-400 dark:text-gray-500 text-sm">{t('flightSchedule.noFlights')}</p>
+                                ) : (
+                                    <div className="text-center py-12 bg-white dark:bg-white/5 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
+                                        <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <Plane className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+                                        </div>
+                                        <p className="text-gray-400 dark:text-gray-500 text-sm">{t('flightSchedule.noFlights')}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* CTA Card */}
+                            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl p-5 shadow-xl text-white">
+                                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                                            <AlertCircle className="w-5 h-5 text-white" />
+                                        </div>
+                                        <h4 className="font-bold text-base">{t('flightSchedule.cta.title')}</h4>
+                                    </div>
+                                    <p className="text-indigo-100 text-sm mb-4 leading-relaxed opacity-90">
+                                        {t('flightSchedule.cta.desc')}
+                                    </p>
+                                    <button
+                                        onClick={onNavigateToTrack}
+                                        className="w-full bg-white/20 hover:bg-white/30 active:scale-95 transition-all text-white font-semibold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 backdrop-blur-sm border border-white/10"
+                                    >
+                                        {t('flightSchedule.cta.button')} <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Upcoming Flights (Simple List) */}
+                            {upcomingFlights.length > 0 && (
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider px-1">
+                                        {t('flightSchedule.upcoming')}
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {upcomingFlights.map(flight => (
+                                            <FlightCard key={flight.id} flight={flight} simple />
+                                        ))}
+                                    </div>
                                 </div>
                             )}
+
                         </div>
-
-                        {/* CTA Card */}
-                        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl p-5 shadow-xl text-white">
-                            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                                        <AlertCircle className="w-5 h-5 text-white" />
-                                    </div>
-                                    <h4 className="font-bold text-base">{t('flightSchedule.cta.title')}</h4>
-                                </div>
-                                <p className="text-indigo-100 text-sm mb-4 leading-relaxed opacity-90">
-                                    {t('flightSchedule.cta.desc')}
-                                </p>
-                                <button
-                                    onClick={onNavigateToTrack}
-                                    className="w-full bg-white/20 hover:bg-white/30 active:scale-95 transition-all text-white font-semibold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 backdrop-blur-sm border border-white/10"
-                                >
-                                    {t('flightSchedule.cta.button')} <ArrowRight className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Upcoming Flights (Simple List) */}
-                        {upcomingFlights.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider px-1">
-                                    {t('flightSchedule.upcoming')}
-                                </h3>
-                                <div className="space-y-2">
-                                    {upcomingFlights.map(flight => (
-                                        <FlightCard key={flight.id} flight={flight} simple />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
                     </div>
-                </div>
+                )}
             </main>
         </div>
     );

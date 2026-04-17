@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Users, LogOut, Sun, Moon, Layers } from 'lucide-react';
+import { ArrowLeft, Users, LogOut, Sun, Moon, Layers, CalendarDays } from 'lucide-react';
 import SearchAndFilterBar from '../../components/manager/SearchAndFilterBar';
 import type { SearchType } from '../../components/manager/SearchAndFilterBar';
 import ClientsDataTable from '../../components/manager/ClientsDataTable';
@@ -144,6 +144,17 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
                   title="Karusel boshqaruvi"
                 >
                   <Layers className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Flight schedule management — only visible when the JWT contains flight_schedule:manage */}
+              {jwtClaims.permissions.has('flight_schedule:manage') && (
+                <button
+                  onClick={() => onNavigate('flight-schedule-admin')}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+                  title="Reys jadvali boshqaruvi"
+                >
+                  <CalendarDays className="w-4 h-4" />
                 </button>
               )}
 

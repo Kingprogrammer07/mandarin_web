@@ -78,7 +78,13 @@ apiClient.interceptors.response.use(
 
       if (status === 401) {
         const requestUrl: string = error.config?.url ?? '';
-        if (!requestUrl.includes('/admin/auth/refresh')) {
+        const requestMethod: string = error.config?.method ?? '';
+        // Public-read endpoints that should never trigger logout on 401 —
+        // the backend permission gate is stricter than needed for read access.
+        const isSilent401 =
+          requestUrl.includes('/admin/auth/refresh') ||
+          (requestUrl.includes('/flight-schedule') && requestMethod === 'get');
+        if (!isSilent401) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('admin_role');
           sessionStorage.removeItem('access_token');
@@ -147,7 +153,11 @@ apiClientFormData.interceptors.response.use(
 
       if (status === 401) {
         const requestUrl: string = error.config?.url ?? '';
-        if (!requestUrl.includes('/admin/auth/refresh')) {
+        const requestMethod: string = error.config?.method ?? '';
+        const isSilent401 =
+          requestUrl.includes('/admin/auth/refresh') ||
+          (requestUrl.includes('/flight-schedule') && requestMethod === 'get');
+        if (!isSilent401) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('admin_role');
           sessionStorage.removeItem('access_token');

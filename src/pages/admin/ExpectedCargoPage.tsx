@@ -63,7 +63,7 @@ export default function ExpectedCargoPage({ onNavigate }: ExpectedCargoPageProps
 }
 
 // Separate inner component so hooks are only called when the user has access.
-function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) => void }) {
+function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (page: string) => void }) {
   const queryClient = useQueryClient();
 
   // ── Store state ─────────────────────────────────────────────────────────────
@@ -154,6 +154,14 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
       setFlightTabOrder(flightTabOrder.filter((n) => n !== flightName));
       if (activeFlightName === flightName) setActiveFlight(null);
       queryClient.invalidateQueries({ queryKey: ['expectedCargo', 'flights'] });
+      // Remove stale per-flight caches so deleted data never resurfaces on re-select.
+      queryClient.removeQueries({ queryKey: ['expectedCargo', 'summary', flightName] });
+      queryClient.removeQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'expectedCargo' &&
+          query.queryKey[1] === 'trackCodes' &&
+          query.queryKey[2] === flightName,
+      });
     },
     onError: () => {
       toast.error("Reysni o'chirishda xatolik yuz berdi");
@@ -251,7 +259,7 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
     setExpandedClient(clientCode);
   }, [activeFlightName, setActiveFlight, setSearchQuery, setExpandedClient]);
 
-  const handleBack = () => onNavigate('admin-login');
+  const handleBack = () => window.history.back();
 
   const hasNoFlights =
     !flightsQuery.isLoading && flightTabOrder.length === 0 &&
@@ -262,7 +270,7 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
   const bottomTabsHeight = 64;
 
   return (
-    <div className="min-h-screen bg-[#ffffff] dark:bg-[#09090b] flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-[#070F2B] flex flex-col">
       {/* ── Fixed header ────────────────────────────────────────────────────── */}
       <ExpectedCargoHeader
         activeFlightName={activeFlightName}
@@ -282,7 +290,7 @@ function ExpectedCargoPageContent({ onNavigate }: { onNavigate: (page: string) =
 
       {/* ── Main scrollable content ─────────────────────────────────────────── */}
       <div
-        className="flex flex-col bg-[#ffffff] dark:bg-zinc-900/80"
+        className="flex flex-col bg-white dark:bg-[#070F2B]"
         style={{
           marginTop: headerHeight,
           marginBottom: bottomTabsHeight,

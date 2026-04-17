@@ -1,0 +1,24 @@
+{
+  "name": "Mandarin Cargo",
+  "short_name": "Mandarin",
+  "description": "Kargo kuzatuv va boshqaruv tizimi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0a04",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/mandarin_cargo_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/mandarin_cargo_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

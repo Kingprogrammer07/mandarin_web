@@ -291,7 +291,11 @@ const BottomDrawer = ({ open, onClose, children }: BottomDrawerProps) => (
     </AnimatePresence>
 );
 
-export default function UserReportsPage() {
+interface UserReportsPageProps {
+    onBack?: () => void;
+}
+
+export default function UserReportsPage({ onBack }: UserReportsPageProps) {
     const { data: user, isLoading: isUserLoading, isError: isUserError } = useProfile();
     const { t } = useTranslation();
 
@@ -431,13 +435,23 @@ export default function UserReportsPage() {
                             <span className="font-bold text-lg">{t('reports.back')}</span>
                         </button>
                     ) : (
-                        <div>
-                            <h1 className="text-3xl font-black bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
-                                {t('reports.title')}
-                            </h1>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                {t('reports.subtitle')}
-                            </p>
+                        <div className="flex items-center gap-3 min-w-0">
+                            {onBack && (
+                                <button
+                                    onClick={onBack}
+                                    className="flex-shrink-0 p-2 rounded-full bg-white/50 dark:bg-white/5 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors text-gray-500 dark:text-gray-400 hover:text-orange-500"
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                </button>
+                            )}
+                            <div className="min-w-0">
+                                <h1 className="text-3xl font-black bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
+                                    {t('reports.title')}
+                                </h1>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                                    {t('reports.subtitle')}
+                                </p>
+                            </div>
                         </div>
                     )}
 

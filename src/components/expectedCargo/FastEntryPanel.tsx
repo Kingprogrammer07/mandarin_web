@@ -167,7 +167,6 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
         <div className="flex-1 min-w-0">
           {isEditingCode ? (
             <Input
-              autoFocus
               value={tempCode}
               onChange={(e) => setTempCode(e.target.value.toUpperCase())}
               onBlur={() => {
@@ -285,6 +284,12 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     isAutoFillRef.current = isAutoFill;
   }, [isAutoFill]);
 
+  // Kept in sync via effect so callbacks that close over this ref always see current value.
+  const isScanningRef = useRef(isScanning);
+  useEffect(() => {
+    isScanningRef.current = isScanning;
+  }, [isScanning]);
+
   const {
     entryQueue,
     enqueueEntry,
@@ -354,7 +359,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
 
     qr.start(
       { facingMode: 'environment' },
-      { fps: 15, qrbox: { width: 300, height: 120 } },
+      { fps: 15, qrbox: { width: 280, height: 150 } },
       (decodedText) => { playSuccessSound?.(); processScannedText(decodedText); },
       () => {},
     ).catch((err: unknown) => {
@@ -375,7 +380,13 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     };
   }, []);
 
-  const handleCameraScan = useCallback(() => setIsScanning((prev) => !prev), []);
+  const handleCameraScan = useCallback(() => {
+    setIsScanning((prev) => {
+      // Blur the active input when opening the camera so the mobile keyboard dismisses.
+      if (!prev) (document.activeElement as HTMLElement)?.blur();
+      return !prev;
+    });
+  }, []);
 
   // ── Resolve mutation ────────────────────────────────────────────────────────
 
@@ -437,6 +448,10 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       if (isAutoFillRef.current) {
         // Mark as not-found so the row shows red and prompts manual entry.
         markQueueItemNotFound(trackCode);
+        // Keep focus on the barcode input — do NOT let the queue row's edit field steal it.
+        if (!isScanningRef.current) {
+          requestAnimationFrame(() => trackInputRef.current?.focus());
+        }
         toast.error(`${trackCode} — mijoz topilmadi`, {
           duration: 3000,
           description: 'Mijoz kodini qo\'lda kiriting (qizil qatorda)',
@@ -455,7 +470,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     setSuggestion(null);
     setClientCodeInput('');
     setTrackCodeInput('');
-    requestAnimationFrame(() => trackInputRef.current?.focus());
+    if (!isScanningRef.current) {
+      requestAnimationFrame(() => trackInputRef.current?.focus());
+    }
   };
 
   const handleAutoFillScan = useCallback(() => {
@@ -474,7 +491,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     });
     resolveMutation.mutate(trackCode);
     setTrackCodeInput('');
-    requestAnimationFrame(() => trackInputRef.current?.focus());
+    if (!isScanningRef.current) {
+      requestAnimationFrame(() => trackInputRef.current?.focus());
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackCodeInput, entryQueue, enqueueEntry]);
 
@@ -496,7 +515,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       setTrackCodeInput('');
       setClientCodeInput('');
       setSuggestion(null);
-      requestAnimationFrame(() => trackInputRef.current?.focus());
+      if (!isScanningRef.current) {
+        requestAnimationFrame(() => trackInputRef.current?.focus());
+      }
       return;
     }
 
@@ -509,7 +530,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     setTrackCodeInput('');
     setClientCodeInput('');
     setSuggestion(null);
-    requestAnimationFrame(() => trackInputRef.current?.focus());
+    if (!isScanningRef.current) {
+      requestAnimationFrame(() => trackInputRef.current?.focus());
+    }
   }, [trackCodeInput, clientCodeInput, entryQueue, enqueueEntry, suggestion]);
 
   const handleAcceptSuggestion = () => {
@@ -652,33 +675,41 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
 
         {/* Camera viewfinder */}
         {scannerReady && (
-          <div
-            className={isScanning
-              ? "relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700"
-              : ""}
-            style={!isScanning ? {
-              position: 'fixed', left: '-9999px', top: '-9999px',
-              width: '320px', height: '160px', overflow: 'hidden',
-            } : { maxHeight: '160px', overflow: 'hidden' }}
-          >
-            <div id={SCANNER_CONTAINER_ID} className="w-full" />
-            {isScanning && (
-              <>
-                <div className="absolute bottom-0 left-0 right-0 py-2 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
-                  <span className="text-[11px] text-white/90 font-medium">
-                    Barkodni kamera oldiga olib keling
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 text-white transition-colors"
-                >
-                  <X className="size-4" />
-                </button>
-              </>
-            )}
-          </div>
+          <>
+            {/* Override Html5Qrcode's built-in shadow overlay and dashboard controls */}
+            <style>{`
+              #${SCANNER_CONTAINER_ID}__scan_region > img { display: none !important; }
+              #${SCANNER_CONTAINER_ID}__scan_region video { width: 100% !important; height: auto !important; border-radius: 0.75rem; }
+              #${SCANNER_CONTAINER_ID}__dashboard { display: none !important; }
+            `}</style>
+            <div
+              className={isScanning
+                ? "relative rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
+                : ""}
+              style={!isScanning ? {
+                position: 'fixed', left: '-9999px', top: '-9999px',
+                width: '320px', height: '240px',
+              } : undefined}
+            >
+              <div id={SCANNER_CONTAINER_ID} className="w-full" />
+              {isScanning && (
+                <>
+                  <div className="absolute bottom-0 left-0 right-0 py-2 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
+                    <span className="text-[11px] text-white/90 font-medium">
+                      Barkodni kamera oldiga olib keling
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 text-white transition-colors"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          </>
         )}
 
         {/* Manual mode: suggestion + client code input */}
