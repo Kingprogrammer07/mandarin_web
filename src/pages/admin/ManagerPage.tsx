@@ -147,12 +147,12 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
                 </button>
               )}
 
-              {/* Flight schedule management — only visible when the JWT contains flight_schedule:manage */}
-              {jwtClaims.permissions.has('flight_schedule:manage') && (
+              {/* Flight schedule — visible for both read-only and manage roles */}
+              {(jwtClaims.isSuperAdmin || jwtClaims.permissions.has('flight_schedule:manage') || jwtClaims.permissions.has('flight_schedule:read')) && (
                 <button
                   onClick={() => onNavigate('flight-schedule-admin')}
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
-                  title="Reys jadvali boshqaruvi"
+                  title="Reys jadvali"
                 >
                   <CalendarDays className="w-4 h-4" />
                 </button>

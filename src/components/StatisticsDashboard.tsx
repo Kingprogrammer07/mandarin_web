@@ -6,7 +6,6 @@ import { StatCard } from './statistics/StatCard';
 import { ModernAreaChart } from './statistics/ModernAreaChart';
 import { ModernBarChart } from './statistics/ModernBarChart';
 import { useToast } from '@/hooks/useToast';
-import { groupRegionsByViloyat } from '@/utils/regionUtils';
 import {
   getCargoStats,
   getClientStats,
@@ -302,12 +301,12 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                         Viloyatni bosing — tumanlari ko'rsatiladi
                       </p>
                       <div className="max-h-96 overflow-y-auto space-y-1 pr-1">
-                        {groupRegionsByViloyat(clientData?.regions ?? []).map((group) => {
-                          const isOpen = expandedViloyatlar.has(group.viloyat);
+                        {Object.entries(clientData?.regions ?? {}).map(([viloyatName, regionDetail]) => {
+                          const isOpen = expandedViloyatlar.has(viloyatName);
                           return (
-                            <div key={group.viloyat}>
+                            <div key={viloyatName}>
                               <button
-                                onClick={() => toggleViloyat(group.viloyat)}
+                                onClick={() => toggleViloyat(viloyatName)}
                                 className="w-full flex items-center justify-between px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
                               >
                                 <div className="flex items-center gap-2">
@@ -315,18 +314,28 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                                     ? <ChevronDown className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                     : <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-400 shrink-0" />
                                   }
-                                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{group.viloyat}</span>
+                                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{viloyatName}</span>
                                 </div>
                                 <span className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 px-2.5 py-0.5 rounded-lg text-xs font-bold shrink-0 ml-2">
-                                  {group.total} ta
+                                  {regionDetail.count} ta
                                 </span>
                               </button>
                               {isOpen && (
                                 <div className="ml-6 mt-0.5 space-y-0.5">
-                                  {group.districts.map((d) => (
-                                    <div key={d.name} className="flex justify-between items-center px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                                      <span className="text-sm text-gray-600 dark:text-gray-400">{d.name}</span>
-                                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 ml-2">{d.count} ta</span>
+                                  {Object.entries(regionDetail.districts).map(([districtName, district]) => (
+                                    <div key={districtName} className="px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">{districtName}</span>
+                                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 ml-2">{district.count} ta</span>
+                                      </div>
+                                      {(district.revenue > 0 || district.debt > 0) && (
+                                        <div className="flex gap-3 mt-0.5">
+                                          <span className="text-[11px] text-green-600 dark:text-green-400">{formatMoney(district.paid)}</span>
+                                          {district.debt > 0 && (
+                                            <span className="text-[11px] text-red-500 dark:text-red-400">Qarz: {formatMoney(district.debt)}</span>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -334,7 +343,7 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                             </div>
                           );
                         })}
-                        {!clientData?.regions.length && (
+                        {!Object.keys(clientData?.regions ?? {}).length && (
                           <p className="text-gray-400 text-sm py-6 text-center">Ma'lumot yo'q</p>
                         )}
                       </div>
@@ -574,7 +583,7 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="border-b border-gray-100 dark:border-gray-800">
-                            <th className={th}>Hudud kodi</th>
+                            <th className={th}>Hudud</th>
                             <th className={`${th} text-right`}>Hisoblangan</th>
                             <th className={`${th} text-right`}>To'langan</th>
                             <th className={`${th} text-right`}>Qarz</th>
@@ -583,7 +592,10 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                         <tbody>
                           {financeData.regions.map((r, i) => (
                             <tr key={i} className={tr}>
-                              <td className="py-2.5 pr-4 font-medium text-sm">{r.region_code}</td>
+                              <td className="py-2.5 pr-4 text-sm">
+                                <span className="font-semibold">{r.region_name || r.region_code}</span>
+                                <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({r.region_code})</span>
+                              </td>
                               <td className="py-2.5 pr-4 text-right text-sm">{formatMoney(r.revenue)}</td>
                               <td className="py-2.5 pr-4 text-right text-sm font-semibold text-green-600 dark:text-green-400">{formatMoney(r.paid)}</td>
                               <td className="py-2.5 pr-4 text-right text-sm font-semibold text-red-500 dark:text-red-400">{formatMoney(r.debt)}</td>

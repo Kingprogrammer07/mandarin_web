@@ -70,9 +70,20 @@ export interface RetentionStats {
   one_time_clients: number;
   most_frequent_clients: number;
 }
-export interface RegionStatItem {
-  name: string;
+export interface DistrictDetail {
+  code: string;
   count: number;
+  revenue: number;
+  paid: number;
+  debt: number;
+}
+export interface RegionDetail {
+  code: string;
+  count: number;
+  revenue: number;
+  paid: number;
+  debt: number;
+  districts: Record<string, DistrictDetail>;
 }
 export interface DeliveryStatItem {
   method: string;
@@ -81,7 +92,7 @@ export interface DeliveryStatItem {
 export interface ClientStatsResponse {
   overview: OverviewStats;
   retention: RetentionStats;
-  regions: RegionStatItem[];
+  regions: Record<string, RegionDetail>;
   delivery_methods: DeliveryStatItem[];
 }
 
@@ -112,6 +123,7 @@ export interface PaymentMethodStat {
 }
 export interface RegionStat {
   region_code: string;
+  region_name: string;
   revenue: number;
   paid: number;
   debt: number;

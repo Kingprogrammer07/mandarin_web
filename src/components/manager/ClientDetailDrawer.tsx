@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useManagerStore } from "../../store/useManagerStore";
+import { getAdminJwtClaims } from "../../api/services/adminManagement";
 import {
   useClientDetail,
   useClientFinances,
@@ -179,6 +180,11 @@ function TransactionCard({
 export function ClientDetailDrawer() {
   const { t } = useTranslation();
   const { selectedClientId, setSelectedClientId } = useManagerStore();
+
+  const { isSuperAdmin, permissions } = getAdminJwtClaims();
+  const canReadFinances  = isSuperAdmin || permissions.has('finance_read') || permissions.has('finance_update');
+  const canWriteFinances = isSuperAdmin || permissions.has('finance_update');
+
   const [activeTab, setActiveTab] = useState<"profile" | "finances">("profile");
 
   // Finances filter state
@@ -313,10 +319,10 @@ export function ClientDetailDrawer() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-100 dark:border-white/[0.06] flex-shrink-0 bg-white dark:bg-[#111]">
-          {[
-            { key: "profile" as const, Icon: User, label: "Shaxsiy ma'lumotlar" },
-            { key: "finances" as const, Icon: Wallet, label: "Moliya holati" },
-          ].map(({ key, Icon, label }) => (
+          {([
+            { key: "profile" as const, Icon: User, label: "Shaxsiy ma'lumotlar", visible: true },
+            { key: "finances" as const, Icon: Wallet, label: "Moliya holati", visible: canReadFinances },
+          ] as const).filter(tab => tab.visible).map(({ key, Icon, label }) => (
             <button
               key={key}
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-[13px] font-medium transition-colors relative ${

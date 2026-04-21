@@ -13,6 +13,16 @@ const getAdminHeaders = () => {
 
 export type PaymentProvider = 'cash' | 'click' | 'payme' | 'card';
 
+/** Card with collected balance — returned by GET /payments/cards. */
+export interface CardWithBalance {
+  id: number;
+  card_number: string;
+  full_name: string;
+  is_active: boolean;
+  total_collected: number;
+  payment_count: number;
+}
+
 /** A single cargo payment within an atomic bulk request. */
 export interface BulkPaymentItem {
   cargo_id: number;
@@ -23,6 +33,8 @@ export interface BulkPaymentItem {
   payment_type: PaymentProvider;
   /** If true, deduct from client wallet balance before the payment_type amount. */
   use_balance: boolean;
+  /** Required when payment_type === "card". The ID from GET /payments/cards. */
+  card_id?: number | null;
 }
 
 /** Atomic bulk payment request — all items succeed or the entire batch is rejected. */
@@ -153,6 +165,20 @@ export async function adjustBalance(data: AdjustBalanceRequest): Promise<AdjustB
   const res = await apiClient.post<AdjustBalanceResponse>(
     '/api/v1/payments/adjust-balance',
     data,
+    { headers: getAdminHeaders() },
+  );
+  return res.data;
+}
+
+/**
+ * GET /api/v1/payments/cards
+ *
+ * Returns all company payment cards (active + inactive) with collected balance.
+ * Requires `pos:read` permission.
+ */
+export async function getPaymentCards(): Promise<CardWithBalance[]> {
+  const res = await apiClient.get<CardWithBalance[]>(
+    '/api/v1/payments/cards',
     { headers: getAdminHeaders() },
   );
   return res.data;

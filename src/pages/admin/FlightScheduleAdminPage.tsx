@@ -322,9 +322,10 @@ interface EntryCardProps {
   item: FlightScheduleItem;
   onEdit: () => void;
   onDelete: () => void;
+  canManage: boolean;
 }
 
-function EntryCard({ item, onEdit, onDelete }: EntryCardProps) {
+function EntryCard({ item, onEdit, onDelete, canManage }: EntryCardProps) {
   const typeCfg = TYPE_CONFIG[item.type];
   const statusCfg = STATUS_CONFIG[item.status];
   const TypeIcon = typeCfg.icon;
@@ -371,23 +372,25 @@ function EntryCard({ item, onEdit, onDelete }: EntryCardProps) {
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
-        <button
-          onClick={onEdit}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
-          title="Tahrirlash"
-        >
-          <Pencil className="size-3.5" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
-          title="O'chirish"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-      </div>
+      {/* Actions — only visible to users with manage permission */}
+      {canManage && (
+        <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
+          <button
+            onClick={onEdit}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+            title="Tahrirlash"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+            title="O'chirish"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -401,7 +404,9 @@ interface FlightScheduleAdminPageProps {
 export default function FlightScheduleAdminPage({ onBack }: FlightScheduleAdminPageProps) {
   const queryClient = useQueryClient();
   const jwtClaims = getAdminJwtClaims();
-  const hasAccess = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('flight_schedule:manage');
+  // canManage → full CRUD; canView → read-only (includes canManage users)
+  const canManage = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('flight_schedule:manage');
+  const canView   = canManage || jwtClaims.permissions.has('flight_schedule:read');
 
   const [year, setYear] = useState(new Date().getFullYear());
   const [formOpen, setFormOpen] = useState(false);
@@ -480,7 +485,7 @@ export default function FlightScheduleAdminPage({ onBack }: FlightScheduleAdminP
     }
   };
 
-  if (!hasAccess) {
+  if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-zinc-500 text-center px-8">
         <AlertCircle className="size-12 opacity-40" />
@@ -537,14 +542,16 @@ export default function FlightScheduleAdminPage({ onBack }: FlightScheduleAdminP
             </button>
           </div>
 
-          {/* Add button */}
-          <button
-            onClick={() => { setEditTarget(null); setFormOpen(true); }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors shadow-sm shadow-orange-500/20"
-          >
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">Qo'shish</span>
-          </button>
+          {/* Add button — only for manage permission */}
+          {canManage && (
+            <button
+              onClick={() => { setEditTarget(null); setFormOpen(true); }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors shadow-sm shadow-orange-500/20"
+            >
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Qo'shish</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -573,16 +580,18 @@ export default function FlightScheduleAdminPage({ onBack }: FlightScheduleAdminP
               {year} yil uchun reyslar yo'q
             </p>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-              Birinchi reysni qo'shing
+              {canManage ? 'Birinchi reysni qo\'shing' : 'Hozircha ma\'lumot yo\'q'}
             </p>
           </div>
-          <button
-            onClick={() => { setEditTarget(null); setFormOpen(true); }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors"
-          >
-            <Plus className="size-4" />
-            Reys qo'shish
-          </button>
+          {canManage && (
+            <button
+              onClick={() => { setEditTarget(null); setFormOpen(true); }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition-colors"
+            >
+              <Plus className="size-4" />
+              Reys qo'shish
+            </button>
+          )}
         </div>
       )}
 
@@ -609,6 +618,7 @@ export default function FlightScheduleAdminPage({ onBack }: FlightScheduleAdminP
                   <EntryCard
                     key={item.id}
                     item={item}
+                    canManage={canManage}
                     onEdit={() => { setEditTarget(item); setFormOpen(true); }}
                     onDelete={() => setDeleteTarget(item)}
                   />

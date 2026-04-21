@@ -358,6 +358,8 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [statisitcs, setStatistics] = useState({sent_count: 0, unsent_count: 0});
+
   const { toast, ToastRenderer } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -388,11 +390,13 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
         getFlightByName(flightName),
         getFlightPhotos(flightName, currentPage, 50, debouncedSearchTerm || undefined),
       ]);
+      setStatistics({sent_count: photosData.sent_count, unsent_count: photosData.unsent_count});
       setFlight(flightData);
       setPhotos(photosData.photos);
       setTotalPhotos(photosData.total);
       setUniqueClients(photosData.unique_clients);
       setTotalPages(photosData.total_pages ?? 1);
+
     } catch {
       toast({ title: "❌ Ma'lumotlarni yuklashda xatolik", description: 'Qayta urinib ko\'ring', variant: 'error' });
     } finally {
@@ -436,10 +440,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
   // Search is now server-side; only apply client-side status filter and sort
   const filteredPhotos = useMemo(() => {
     return photos
-      .filter(item => {
-        const matchesStatus = filterStatus === 'all' ? true : filterStatus === 'sent' ? item.is_sent : !item.is_sent;
-        return matchesStatus;
-      })
+      .filter(item => filterStatus === 'all' ? true : filterStatus === 'sent' ? item.is_sent : !item.is_sent)
       .sort((a, b) => {
         const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         return sortOrder === 'newest' ? diff : -diff;
@@ -585,8 +586,8 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
                 {/* Stats pills */}
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <StatPill label={`${totalPhotos} ta yuk`} color="gray" />
-                  <StatPill label={`${photos.filter(p => p.is_sent).length} yuborilgan`} color="green" />
-                  <StatPill label={`${photos.filter(p => !p.is_sent).length} kutilmoqda`} color="amber" />
+                  <StatPill label={`${statisitcs.sent_count} yuborilgan`} color="green" />
+                  <StatPill label={`${statisitcs.unsent_count} kutilmoqda`} color="amber" />
                   <StatPill label={`${uniqueClients} ta mijoz`} color="blue" />
                 </div>
               </div>

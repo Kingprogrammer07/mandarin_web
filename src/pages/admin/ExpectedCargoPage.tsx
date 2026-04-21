@@ -63,6 +63,7 @@ export default function ExpectedCargoPage({ onNavigate }: ExpectedCargoPageProps
 }
 
 // Separate inner component so hooks are only called when the user has access.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (page: string) => void }) {
   const queryClient = useQueryClient();
 
@@ -270,7 +271,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
   const bottomTabsHeight = 64;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#070F2B] flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-[#000] flex flex-col">
       {/* ── Fixed header ────────────────────────────────────────────────────── */}
       <ExpectedCargoHeader
         activeFlightName={activeFlightName}

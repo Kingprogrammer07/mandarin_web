@@ -67,15 +67,133 @@ const mapApiItem = (item: FlightScheduleItem): Flight => ({
     notes: item.notes,
 });
 
-// Google Calendar URL Generator
-const generateGoogleCalendarUrl = (flight: Flight, t: (key: string, opts?: Record<string, string>) => string, months: string[]) => {
-    const title = t('flightSchedule.googleCalendar.title', { name: flight.flightName });
-    const start = format(flight.date, 'yyyyMMdd');
-    const end = format(addDays(flight.date, 1), 'yyyyMMdd');
-    const details = t('flightSchedule.googleCalendar.details', { name: flight.flightName, date: formatDateUzWithMonths(flight.date, 'full', months) });
+// ── Calendar integration helpers ──────────────────────────────────────────────
 
-    return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}`;
-};
+/** Builds URL/download helpers for all supported calendar platforms. */
+function buildCalendarLinks(flight: Flight, title: string, details: string) {
+    const startDate = format(flight.date, 'yyyyMMdd');
+    const endDate   = format(addDays(flight.date, 1), 'yyyyMMdd');
+    const startISO  = format(flight.date, 'yyyy-MM-dd');
+    const endISO    = format(addDays(flight.date, 1), 'yyyy-MM-dd');
+
+    const googleUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDate}/${endDate}&details=${encodeURIComponent(details)}`;
+
+    const outlookUrl = `https://outlook.live.com/calendar/0/action/compose?subject=${encodeURIComponent(title)}&startdt=${startISO}&enddt=${endISO}&body=${encodeURIComponent(details)}&allday=true`;
+
+    const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Mandarin Cargo//Flight Schedule//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `DTSTART;VALUE=DATE:${startDate}`,
+        `DTEND;VALUE=DATE:${endDate}`,
+        `SUMMARY:${title}`,
+        `DESCRIPTION:${details.replace(/[\\;,]/g, '\\$&').replace(/\n/g, '\\n')}`,
+        'STATUS:CONFIRMED',
+        `UID:mandarin-cargo-flight-${flight.id}-${startDate}@mandarin-cargo.uz`,
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ].join('\r\n');
+
+    const downloadICS = () => {
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `${flight.flightName.replace(/[^a-zA-Z0-9-]/g, '_')}-${startISO}.ics`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    return { googleUrl, outlookUrl, downloadICS };
+}
+
+// ── Calendar picker bottom-sheet ──────────────────────────────────────────────
+
+interface CalendarPickerSheetProps {
+    flight: Flight;
+    title: string;
+    details: string;
+    onClose: () => void;
+}
+
+const CalendarPickerSheet = memo(({ flight, title, details, onClose }: CalendarPickerSheetProps) => {
+    const { googleUrl, outlookUrl, downloadICS } = buildCalendarLinks(flight, title, details);
+
+    const openUrl = (url: string) => { window.open(url, '_blank'); onClose(); };
+    const download = () => { downloadICS(); onClose(); };
+
+    const options: { label: string; desc?: string; dot: string; onClick: () => void }[] = [
+        {
+            label: 'Google Calendar',
+            dot: 'bg-blue-500',
+            onClick: () => openUrl(googleUrl),
+        },
+        {
+            label: 'Apple Calendar (iOS / macOS)',
+            desc: '.ics fayl yuklanadi',
+            dot: 'bg-gray-700 dark:bg-gray-300',
+            onClick: download,
+        },
+        {
+            label: 'Outlook Calendar',
+            dot: 'bg-indigo-500',
+            onClick: () => openUrl(outlookUrl),
+        },
+        {
+            label: 'Samsung / Boshqa kalendarlar',
+            desc: '.ics fayl yuklanadi',
+            dot: 'bg-orange-500',
+            onClick: download,
+        },
+    ];
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+
+            {/* Sheet */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t border-gray-100 dark:border-white/10 animate-in slide-in-from-bottom duration-200">
+                {/* Handle */}
+                <div className="w-10 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mt-3 mb-1" />
+
+                <div className="px-4 pt-3 pb-8">
+                    <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 px-1">
+                        Kalendarni tanlang
+                    </p>
+
+                    <div className="space-y-1">
+                        {options.map((opt) => (
+                            <button
+                                key={opt.label}
+                                onClick={opt.onClick}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 active:scale-[0.98] transition-all text-left"
+                            >
+                                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.dot}`} />
+                                <div className="min-w-0">
+                                    <span className="block text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                        {opt.label}
+                                    </span>
+                                    {opt.desc && (
+                                        <span className="block text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                            {opt.desc}
+                                        </span>
+                                    )}
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto flex-shrink-0" />
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+});
 
 // --- Sub-components ---
 
@@ -94,6 +212,8 @@ const BackgroundGlow = memo(() => (
 const FlightCard = memo(({ flight, simple = false }: { flight: Flight, simple?: boolean }) => {
     const { t } = useTranslation();
     const months: string[] = t('flightSchedule.calendar.months', { returnObjects: true }) as unknown as string[];
+    const [pickerOpen, setPickerOpen] = useState(false);
+
     const isArrived = flight.status === 'arrived';
     const isDelayed = flight.status === 'delayed';
     const isAksiya = flight.type === 'aksiya';
@@ -107,6 +227,9 @@ const FlightCard = memo(({ flight, simple = false }: { flight: Flight, simple?: 
     const iconBoxClass = isAksiya
         ? 'bg-purple-50 border-purple-100 text-purple-600 dark:bg-purple-500/10 dark:border-purple-500/20 dark:text-purple-400'
         : 'bg-sky-50 border-sky-100 text-sky-600 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400';
+
+    const calTitle   = t('flightSchedule.googleCalendar.title', { name: flight.flightName });
+    const calDetails = t('flightSchedule.googleCalendar.details', { name: flight.flightName, date: formatDateUzWithMonths(flight.date, 'full', months) });
 
     return (
         <div className={`flex items-center gap-4 p-4 rounded-xl border transition-all relative overflow-hidden group shadow-sm dark:shadow-none ${simple ? 'bg-white dark:bg-transparent border-gray-200 dark:border-white/5' : 'bg-white dark:bg-gray-900/40 border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/20'}`}>
@@ -136,11 +259,24 @@ const FlightCard = memo(({ flight, simple = false }: { flight: Flight, simple?: 
 
             <div className="shrink-0 ml-1">
                 {!isArrived && (
-                    <button onClick={() => window.open(generateGoogleCalendarUrl(flight, t, months), '_blank')} className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/20 dark:hover:text-blue-400 transition-colors" title={t('flightSchedule.googleCalendar.tooltip')}>
+                    <button
+                        onClick={() => setPickerOpen(true)}
+                        className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/20 dark:hover:text-blue-400 transition-colors"
+                        title={t('flightSchedule.googleCalendar.tooltip')}
+                    >
                         <Bell className="w-5 h-5" />
                     </button>
                 )}
             </div>
+
+            {pickerOpen && (
+                <CalendarPickerSheet
+                    flight={flight}
+                    title={calTitle}
+                    details={calDetails}
+                    onClose={() => setPickerOpen(false)}
+                />
+            )}
         </div>
     );
 });
@@ -296,7 +432,7 @@ const FlightSchedulePage: React.FC<FlightSchedulePageProps> = ({ onBack, onNavig
                                                 onClick={() => setSelectedDate(day)}
                                                 className={`
                                                     relative aspect-[1/1] sm:aspect-auto sm:py-3 lg:aspect-[4/3] rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-all duration-200 border
-                                                    ${!isCurrentMonth ? 'text-gray-300 dark:text-white/5 border-transparent' : 'text-gray-700 dark:text-gray-300 border-transparent'}
+                                                    ${isCurrentMonth ? 'text-gray-700 dark:text-gray-300 border-transparent' : 'text-gray-300 dark:text-white/5 border-transparent'}
                                                     ${isSelected ? selectedClass : defaultClass}
                                                     ${isTodayDate && !isSelected ? todayClass : ''}
                                                 `}

@@ -290,6 +290,13 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     isScanningRef.current = isScanning;
   }, [isScanning]);
 
+  // Prevents the camera from firing the same barcode multiple times in 1 second.
+  // Html5Qrcode calls the success callback on every frame that contains the code
+  // (up to 15 fps), so without this guard the same track code gets queued/toasted
+  // repeatedly while the barcode stays in view.
+  const lastScanRef = useRef<{ code: string; time: number } | null>(null);
+  const SCAN_COOLDOWN_MS = 2000;
+
   const {
     entryQueue,
     enqueueEntry,
@@ -319,6 +326,15 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       const raw = text.trim();
       if (!raw) return;
       const trackCode = raw.toUpperCase();
+
+      // Silently ignore if the same barcode was scanned within the cooldown window.
+      // This prevents Html5Qrcode's per-frame callbacks from flooding the queue
+      // and the toast stack while the camera stays pointed at the same code.
+      const now = Date.now();
+      if (lastScanRef.current?.code === trackCode && now - lastScanRef.current.time < SCAN_COOLDOWN_MS) {
+        return;
+      }
+      lastScanRef.current = { code: trackCode, time: now };
 
       if (isAutoFillRef.current) {
         if (entryQueue.some((i) => i.trackCode === trackCode)) {
@@ -686,10 +702,10 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
               className={isScanning
                 ? "relative rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
                 : ""}
-              style={!isScanning ? {
+              style={isScanning ? undefined : {
                 position: 'fixed', left: '-9999px', top: '-9999px',
                 width: '320px', height: '240px',
-              } : undefined}
+              }}
             >
               <div id={SCANNER_CONTAINER_ID} className="w-full" />
               {isScanning && (

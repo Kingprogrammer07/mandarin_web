@@ -29,6 +29,7 @@ import {
   type FlightItem,
   type CalculateUzpostResponse,
 } from '@/api/services/deliveryService';
+import { useProfile } from '@/hooks/useProfile';
 
 // ============================================
 // TYPES
@@ -836,6 +837,8 @@ const ProfileIncompleteAlert = memo(
 
 export default function DeliveryRequestPage({ onBack, onNavigateToProfile, onNavigateToHistory }: Props) {
   const { t } = useTranslation();
+  const { data: userProfile, isLoading: profileLoading } = useProfile();
+
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1);
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(null);
@@ -946,7 +949,28 @@ export default function DeliveryRequestPage({ onBack, onNavigateToProfile, onNav
 
   // ---- Render ----
 
-  // Profile incomplete overlay
+  const isAddressIncomplete =
+    !profileLoading && !!userProfile && (!userProfile.region || !userProfile.district);
+
+  // Show address incomplete screen before wizard even starts
+  if (isAddressIncomplete) {
+    return (
+      <div className="pb-8">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={onBack}
+            className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-white/5 active:scale-90 transition-transform"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-lg font-bold">{t('deliveryRequest.headerTitleShort')}</h1>
+        </div>
+        <ProfileIncompleteAlert onGoProfile={onNavigateToProfile} onBack={onBack} />
+      </div>
+    );
+  }
+
+  // Profile incomplete overlay (from backend error during submission)
   if (profileIncomplete) {
     return (
       <div className="pb-8">

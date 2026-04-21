@@ -79,7 +79,7 @@ export function FlightBottomTabs({
   activeFlightName,
   onSelectFlight,
   onLongPressTab,
-  onReorder: _onReorder,
+  onReorder: _onReorder,  // eslint-disable-line @typescript-eslint/no-unused-vars
   onAddFlight,
 }: FlightBottomTabsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);

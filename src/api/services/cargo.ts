@@ -19,6 +19,8 @@ export interface FlightPhotosResponse {
   photos: CargoPhoto[];
   total: number;
   unique_clients: number;
+  unsent_count: number;
+  sent_count: number;
   page: number;
   size: number;
   total_pages: number;

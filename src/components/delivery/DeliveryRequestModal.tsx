@@ -27,7 +27,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, AlertCircle, PackageOpen, Upload, MapPin, Phone, User, Globe, X, Package, Car, Truck, Store } from 'lucide-react';
+import { Loader2, AlertCircle, PackageOpen, Upload, MapPin, Phone, User, Globe, X, Package, Car, Truck, Store, TriangleAlert } from 'lucide-react';
 
 import { regions, DISTRICTS } from '@/lib/validation';
 import { submitAdminDeliveryRequest } from '@/api/delivery';
@@ -106,7 +106,9 @@ export function DeliveryRequestModal({
                 address: clientProfile.address || '',
             });
             setDeliveryType('uzpost');
-            setIsEditingClient(false);
+            // Auto-open edit mode when address is incomplete so the worker fills it before submitting
+            const hasIncompleteAddress = !clientProfile.region || !clientProfile.district;
+            setIsEditingClient(hasIncompleteAddress);
             setUseWallet(false);
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             setPreviewUrl(null);
@@ -316,24 +318,39 @@ export function DeliveryRequestModal({
                                     </div>
 
                                     {!isEditingClient ? (
-                                        <div className="bg-gray-50 p-4 rounded-lg border text-sm space-y-2">
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-500">Mijoz kodi:</span>
-                                                <span className="font-medium">{clientProfile.client_code}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-500">Ism:</span>
-                                                <span className="font-medium">{form.getValues('full_name')}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-500">Tel:</span>
-                                                <span className="font-medium">+998 {form.getValues('phone')}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-500">Manzil:</span>
-                                                <span className="font-medium text-right max-w-[200px] truncate">
-                                                    {form.getValues('region')}, {form.getValues('district')} {form.getValues('address') ? `, ${form.getValues('address')}` : ''}
-                                                </span>
+                                        <div className="space-y-2">
+                                            {(!clientProfile.region || !clientProfile.district) && (
+                                                <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                                                    <TriangleAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="font-semibold text-amber-800">Manzil to'liq emas</p>
+                                                        <p className="text-amber-700 text-xs mt-0.5">
+                                                            Yetkazib berish uchun viloyat va tuman kiritilishi shart. "Tahrirlash" tugmasini bosib to'ldiring.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="bg-gray-50 p-4 rounded-lg border text-sm space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Mijoz kodi:</span>
+                                                    <span className="font-medium">{clientProfile.client_code}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Ism:</span>
+                                                    <span className="font-medium">{form.getValues('full_name')}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Tel:</span>
+                                                    <span className="font-medium">+998 {form.getValues('phone')}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Manzil:</span>
+                                                    <span className={`font-medium text-right max-w-[200px] truncate ${!clientProfile.region || !clientProfile.district ? 'text-amber-600' : ''}`}>
+                                                        {form.getValues('region') && form.getValues('district')
+                                                            ? `${form.getValues('region')}, ${form.getValues('district')}${form.getValues('address') ? `, ${form.getValues('address')}` : ''}`
+                                                            : 'Kiritilmagan'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     ) : (

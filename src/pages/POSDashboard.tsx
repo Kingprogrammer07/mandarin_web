@@ -44,7 +44,7 @@ import {
   getCashierLog,
   processBulkPayment,
   adjustBalance,
-  getRandomActiveCard,
+  getPaymentCards,
   getPOSClientTransactions,
   posMarkAsTaken,
 } from "@/api/pos";
@@ -55,7 +55,7 @@ import {
 import type {
   PaymentProvider,
   CashierLogItem,
-  ActiveCardResponse,
+  CardWithBalance,
   AdjustBalanceRequest,
 } from "@/api/pos";
 import type { Transaction, FilterType } from "@/api/transactions";
@@ -305,6 +305,12 @@ function formatCard(raw: string): string {
     .replace(/\s/g, "")
     .replace(/(.{4})/g, "$1 ")
     .trim();
+}
+
+/** 8600123456789012 → 8600 **** **** 9012 */
+function maskCard(raw: string): string {
+  const d = raw.replace(/\s/g, "");
+  return `${d.slice(0, 4)} **** **** ${d.slice(-4)}`;
 }
 
 // ─── TodayTotal ───────────────────────────────────────────────────────────────
@@ -1051,7 +1057,7 @@ interface ConfirmPayload {
   useWallet: boolean;
   received: number;
   walletDeduction: number;
-  cardInfo: ActiveCardResponse | null;
+  selectedCard: CardWithBalance | null;
   clientCode: string;
 }
 
@@ -1140,17 +1146,17 @@ function ConfirmModal({
             </div>
           </div>
 
-          {/* Card info */}
-          {payload.paymentType === "card" && payload.cardInfo && (
+          {/* Selected card */}
+          {payload.paymentType === "card" && payload.selectedCard && (
             <div className="bg-blue-50 dark:bg-blue-500/[0.08] border border-blue-200/60 dark:border-blue-500/20 rounded-2xl p-3">
               <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">
-                {payload.cardInfo.bank_name ?? "Bank kartasi"}
+                Bank kartasi
               </p>
               <p className="text-[15px] font-black text-blue-700 dark:text-blue-300 font-mono tracking-widest">
-                {formatCard(payload.cardInfo.card_number)}
+                {formatCard(payload.selectedCard.card_number)}
               </p>
               <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-0.5">
-                {payload.cardInfo.holder_name}
+                {payload.selectedCard.full_name}
               </p>
             </div>
           )}
@@ -1373,6 +1379,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   // ── Selection & payment ───────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [paymentType, setPaymentType] = useState<PaymentProvider>("cash");
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [receivedInput, setReceivedInput] = useState("");
 
@@ -1415,12 +1422,14 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     enabled: canProcess && !!clientInfo,
   });
 
-  const { data: activeCard } = useQuery({
-    queryKey: ["active-card"],
-    queryFn: getRandomActiveCard,
-    enabled: canProcess && paymentType === "card",
-    staleTime: 5 * 60_000,
+  const { data: cardsData } = useQuery({
+    queryKey: ["payment-cards"],
+    queryFn: getPaymentCards,
+    enabled: canProcess,
+    staleTime: 2 * 60_000,
   });
+  const activeCards = (cardsData ?? []).filter((c) => c.is_active);
+  const selectedCard = activeCards.find((c) => c.id === selectedCardId) ?? null;
 
   const cargos: UnpaidCargoItem[] = useMemo(
     () => cargoData?.items ?? [],
@@ -1567,6 +1576,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   // ── Confirmation flow ─────────────────────────────────────────────────────
   const handleOpenConfirm = () => {
     if (!clientInfo || selectedCargos.length === 0 || payMut.isPending) return;
+    if (paymentType === "card" && !selectedCardId) {
+      toast.error("Karta tanlanmadi. Iltimos, bitta kartani tanlang.");
+      return;
+    }
     setConfirmPayload({
       cargos: selectedCargos,
       amounts: waterfallDistribute(selectedCargos, receivedAmount),
@@ -1574,7 +1587,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       useWallet,
       received: receivedAmount,
       walletDeduction,
-      cardInfo: paymentType === "card" ? (activeCard ?? null) : null,
+      selectedCard: paymentType === "card" ? selectedCard : null,
       clientCode: clientInfo.client_code,
     });
   };
@@ -1589,6 +1602,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         paid_amount: Number((confirmPayload.amounts[i] ?? 0.01).toFixed(2)),
         payment_type: confirmPayload.paymentType,
         use_balance: confirmPayload.useWallet,
+        card_id: confirmPayload.selectedCard?.id ?? null,
       })),
       cashier_note: null,
     });
@@ -2064,27 +2078,60 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                       </div>
                     </div>
 
-                    {/* Card info banner */}
+                    {/* Card selector — shown when paymentType === "card" */}
                     <AnimatePresence>
-                      {paymentType === "card" && activeCard && (
+                      {paymentType === "card" && (
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="bg-blue-50 dark:bg-blue-500/[0.08] border border-blue-200/60 dark:border-blue-500/20 rounded-xl px-3 py-2 flex items-center justify-between"
+                          className="overflow-hidden"
                         >
-                          <div>
-                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
-                              {activeCard.bank_name ?? "Bank kartasi"}
-                            </p>
-                            <p className="text-[14px] font-black text-blue-700 dark:text-blue-300 font-mono tracking-widest">
-                              {formatCard(activeCard.card_number)}
-                            </p>
-                            <p className="text-[10px] text-blue-500 dark:text-blue-400">
-                              {activeCard.holder_name}
-                            </p>
+                          <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                            Kartani tanlang
+                          </p>
+                          <div className="space-y-1.5">
+                            {activeCards.length === 0 ? (
+                              <p className="text-[12px] text-gray-400 dark:text-gray-500 text-center py-2">
+                                Faol kartalar yo'q
+                              </p>
+                            ) : (
+                              activeCards.map((card) => {
+                                const isSelected = selectedCardId === card.id;
+                                return (
+                                  <button
+                                    key={card.id}
+                                    type="button"
+                                    onClick={() => setSelectedCardId(card.id)}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 text-left transition-all ${
+                                      isSelected
+                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-500/[0.1]"
+                                        : "border-gray-200 dark:border-white/[0.08] hover:border-blue-300 dark:hover:border-blue-500/40 bg-gray-50 dark:bg-white/[0.03]"
+                                    }`}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="text-[13px] font-black text-gray-900 dark:text-white font-mono tracking-wider leading-tight">
+                                        {maskCard(card.card_number)}
+                                      </p>
+                                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                        {card.full_name}
+                                        <span className="ml-1.5 text-gray-400 dark:text-gray-500">
+                                          · {formatCurrencySum(card.total_collected)}
+                                        </span>
+                                      </p>
+                                    </div>
+                                    <div
+                                      className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ml-3 transition-colors ${
+                                        isSelected
+                                          ? "border-blue-500 bg-blue-500"
+                                          : "border-gray-300 dark:border-gray-600"
+                                      }`}
+                                    />
+                                  </button>
+                                );
+                              })
+                            )}
                           </div>
-                          <CreditCard className="w-6 h-6 text-blue-400" />
                         </motion.div>
                       )}
                     </AnimatePresence>
