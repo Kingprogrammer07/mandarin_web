@@ -337,9 +337,11 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       lastScanRef.current = { code: trackCode, time: now };
 
       if (isAutoFillRef.current) {
-        if (entryQueue.some((i) => i.trackCode === trackCode)) {
-          toast.warning(`${trackCode} allaqachon qo'shilgan`, { duration: 1500 });
-          return;
+        // Read live queue from store — avoids stale-closure bug where the scanner's
+        // one-time callback would see the queue frozen at the moment of camera start.
+        const liveQueue = useExpectedCargoStore.getState().entryQueue;
+        if (liveQueue.some((i) => i.trackCode === trackCode)) {
+          return; // Already queued — silently ignore, no toast spam
         }
         enqueueEntry({
           trackCode,
@@ -356,7 +358,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entryQueue, enqueueEntry],
+    [enqueueEntry],
   );
 
   useEffect(() => {

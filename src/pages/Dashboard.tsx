@@ -773,20 +773,18 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
 
     const handleCarouselItemClick = useCallback((item: CarouselItemData) => {
         if (item.fromApi) {
-            const hasGallery = (item.mediaItems?.length ?? 0) > 1;
-            if (hasGallery) {
-                // CASE B — open fullscreen media gallery modal;
-                // click is tracked only when the CTA inside the modal is tapped
-                setMediaModalItem(item);
-            } else if (item.actionUrl) {
-                // CASE A — single/no gallery: open action URL directly
-                trackCarouselClick(item.id);
-                window.open(item.actionUrl, "_blank");
-            }
-        } else {
-            // Static item special actions
-            if (item.id === 1) setIsProhibitedModalOpen(true);
-        }
+                    const hasGallery = (item.mediaItems?.length ?? 0) > 1;
+                    if (hasGallery) {
+                        // CASE B — open fullscreen media gallery modal;
+                        // click is tracked only when the CTA inside the modal is tapped
+                        setMediaModalItem(item);
+                    } else if (item.actionUrl) {
+                        // CASE A — single/no gallery: open action URL directly
+                        trackCarouselClick(item.id);
+                        window.open(item.actionUrl, "_blank");
+                    }
+                }
+        else if (item.id === 1) setIsProhibitedModalOpen(true);
     }, []);
 
     const onTouchStart = (e: React.TouchEvent) => {

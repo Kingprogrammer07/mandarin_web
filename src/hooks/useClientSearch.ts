@@ -29,10 +29,10 @@ function normalizeError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     if (!err.response) return 'Tarmoq xatosi';
 
-    const status = err.response.status;
+    const {status} = err.response;
     if (status === 404) return 'Mijoz topilmadi';
 
-    const data = err.response.data;
+    const {data} = err.response;
 
     // FastAPI validation error
     if (Array.isArray(data?.detail) && data.detail.length > 0) {
@@ -91,7 +91,7 @@ export function useClientSearch(): UseClientSearchReturn {
         }
       );
 
-      const data = response.data;
+      const {data} = response;
 
       // FIX: Backend returns single client object in wrapper, NOT array
       if (data && data.client) {

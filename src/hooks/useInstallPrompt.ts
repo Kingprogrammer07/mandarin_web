@@ -53,8 +53,9 @@ export function useInstallPrompt(): UseInstallPromptResult {
           }
         });
       } else {
-        // Older 8.x builds that lack checkHomeScreenStatus — show anyway
-        setInstallMethod('telegram');
+        // Older 8.x builds that lack checkHomeScreenStatus — defer to avoid
+        // synchronous setState inside an effect body (cascading render warning)
+        setTimeout(() => setInstallMethod('telegram'), 0);
       }
       return;
     }

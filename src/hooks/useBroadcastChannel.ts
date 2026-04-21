@@ -99,7 +99,8 @@ export function useBroadcastChannel(
     }
 
     // Strip internal transport field before handing to the consumer.
-    const { _id: _, ...msg } = wire;
+    const { _id, ...msg } = wire;
+    void _id;
     onMessageRef.current?.(msg as BroadcastMessage);
   }, []);
 

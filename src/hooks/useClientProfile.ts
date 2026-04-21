@@ -14,7 +14,7 @@ function normalizeError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     if (!err.response) return 'Tarmoq xatosi';
 
-    const data = err.response.data;
+    const {data} = err.response;
 
     if (Array.isArray(data?.detail) && data.detail.length > 0) {
       return String(data.detail[0].msg);
@@ -24,7 +24,7 @@ function normalizeError(err: unknown): string {
       return data.message;
     }
 
-    const status = err.response.status;
+    const {status} = err.response;
     if (status === 404) return 'Mijoz topilmadi';
     if (status >= 500) return 'Server xatosi';
 
