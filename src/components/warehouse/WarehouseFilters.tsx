@@ -173,7 +173,7 @@ export default function WarehouseFilters() {
             type="text"
             value={localSearch}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Mijoz kodi bo'yicha qidirish"
+            placeholder={flightName ? "Mijoz kodi bo'yicha qidirish" : "Mijoz kodi — reyzsiz ham qidiradi"}
             className="w-full pl-9 pr-3.5 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
           />
         </div>

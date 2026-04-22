@@ -5,8 +5,9 @@ import {
   getFlightTransactions,
   markTransactionTaken,
   getMyActivity,
+  searchTransactions,
 } from "../services/warehouse";
-import type { GetFlightTransactionsParams } from "../services/warehouse";
+import type { GetFlightTransactionsParams, SearchTransactionsParams } from "../services/warehouse";
 
 /** Query key factory for warehouse queries. */
 export const warehouseKeys = {
@@ -14,6 +15,8 @@ export const warehouseKeys = {
   transactions: (flightName: string, params: GetFlightTransactionsParams) =>
     ["warehouse_transactions", flightName, params] as const,
   allTransactions: () => ["warehouse_transactions"] as const,
+  transactionSearch: (params: SearchTransactionsParams) =>
+    ["warehouse_transaction_search", params] as const,
   myActivity: (page: number, size: number) =>
     ["warehouse_my_activity", page, size] as const,
 };
@@ -39,6 +42,22 @@ export const useWarehouseTransactions = (
     queryKey: warehouseKeys.transactions(flightName, params),
     queryFn: () => getFlightTransactions(flightName, params),
     enabled: flightName.trim().length > 0,
+    placeholderData: (previousData) => previousData,
+  });
+};
+
+/**
+ * Searches transactions across all flights (no flight required).
+ * Enabled only when at least one search term exists and no flight is selected.
+ */
+export const useWarehouseTransactionSearch = (
+  params: SearchTransactionsParams,
+  enabled: boolean,
+) => {
+  return useQuery({
+    queryKey: warehouseKeys.transactionSearch(params),
+    queryFn: () => searchTransactions(params),
+    enabled,
     placeholderData: (previousData) => previousData,
   });
 };

@@ -15,7 +15,7 @@ import { motion } from "framer-motion";
 import { getAdminJwtClaims } from "../../api/services/adminManagement";
 import { refreshAdminToken } from "../../api/services/adminAuth";
 import { useWarehouseStore } from "../../store/useWarehouseStore";
-import { useWarehouseTransactions } from "../../api/hooks/useWarehouse";
+import { useWarehouseTransactions, useWarehouseTransactionSearch } from "../../api/hooks/useWarehouse";
 import { useWarehouseQueueProcessor } from "../../api/hooks/useWarehouseQueueProcessor";
 import WarehouseFilters from "../../components/warehouse/WarehouseFilters";
 import TransactionsTable from "../../components/warehouse/TransactionsTable";
@@ -121,18 +121,39 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     };
   }, []);
 
-  // Fetch transactions for the selected flight
-  const { data, isLoading } = useWarehouseTransactions(flightName, {
-    payment_status: paymentStatus,
-    taken_status: takenStatus,
-    code: searchQuery || undefined,
-    page,
-    size,
-  });
+  const isFlightMode = flightName.trim().length > 0;
+  const isSearchMode = !isFlightMode && searchQuery.trim().length > 0;
+
+  // Flight-specific query: active only when a flight is selected
+  const { data: flightData, isLoading: flightLoading } = useWarehouseTransactions(
+    flightName,
+    {
+      payment_status: paymentStatus,
+      taken_status: takenStatus,
+      code: searchQuery || undefined,
+      page,
+      size,
+    },
+  );
+
+  // Global search query: active only when no flight is selected but a search term exists
+  const { data: searchData, isLoading: searchLoading } = useWarehouseTransactionSearch(
+    {
+      code: searchQuery || undefined,
+      payment_status: paymentStatus,
+      taken_status: takenStatus,
+      page,
+      size,
+    },
+    isSearchMode,
+  );
+
+  const activeData = isFlightMode ? flightData : isSearchMode ? searchData : undefined;
+  const isLoading = isFlightMode ? flightLoading : searchLoading;
 
   const handleMarkTaken = useCallback(
     (transactionId: number) => {
-      const tx = data?.items.find(
+      const tx = activeData?.items.find(
         (item: WarehouseTransactionItem) => item.id === transactionId,
       );
       if (tx) {
@@ -141,7 +162,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
         setModalFlightName(tx.reys);
       }
     },
-    [data],
+    [activeData],
   );
 
   const handlePageChange = useCallback(
@@ -184,8 +205,6 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     [],
   );
 
-  const isFlightEmpty = flightName.trim().length === 0;
-
   if (!canView) return <AccessDenied />;
 
   return (
@@ -214,9 +233,9 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                   <h1 className="text-[14px] sm:text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
                     Ombor
                   </h1>
-                  {activeTab === "transactions" && data && !isFlightEmpty && (
+                  {activeTab === "transactions" && activeData && (isFlightMode || isSearchMode) && (
                     <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 leading-tight">
-                      {data.total_count} ta yuk
+                      {activeData.total_count} ta yuk
                     </p>
                   )}
                 </div>
@@ -291,8 +310,8 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
       {/* ── Main Content ───────────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
         {activeTab === "transactions" ? (
-          isFlightEmpty ? (
-            // Prompt to enter a flight name
+          !isFlightMode && !isSearchMode ? (
+            // Prompt: neither flight nor search term provided
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -305,19 +324,19 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                 />
               </div>
               <h2 className="text-[16px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Reys nomini kiriting
+                Reys yoki mijoz kodini kiriting
               </h2>
               <p className="text-[13px] text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
-                Yuklarni ko'rish uchun yuqoridagi maydoniga reys nomini kiriting
+                Reys tanlang yoki mijoz kodini yozing — reyzsiz ham barcha yuklar bo'yicha qidiradi
               </p>
             </motion.div>
           ) : (
             <TransactionsTable
-              items={data?.items ?? []}
+              items={activeData?.items ?? []}
               isLoading={isLoading}
               page={page}
-              totalPages={data?.total_pages ?? 0}
-              totalCount={data?.total_count ?? 0}
+              totalPages={activeData?.total_pages ?? 0}
+              totalCount={activeData?.total_count ?? 0}
               onPageChange={handlePageChange}
               onMarkTaken={handleMarkTaken}
               canMarkTaken={canMarkTaken}

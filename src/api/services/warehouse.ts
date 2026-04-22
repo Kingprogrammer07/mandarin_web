@@ -129,6 +129,27 @@ export interface GetFlightTransactionsParams {
   size?: number;
 }
 
+export interface SearchTransactionsParams {
+  code?: string;
+  phone?: string;
+  name?: string;
+  q?: string;
+  flight?: string;
+  payment_status?: string;
+  taken_status?: string;
+  sort_order?: 'asc' | 'desc';
+  page?: number;
+  size?: number;
+}
+
+export interface WarehouseTransactionsSearchResponse {
+  items: WarehouseTransactionItem[];
+  total_count: number;
+  total_pages: number;
+  page: number;
+  size: number;
+}
+
 // ── API Functions ──────────────────────────────────────────────────────────
 
 export async function getWarehouseFlights(
@@ -180,6 +201,29 @@ export async function markTransactionTaken(
   const response = await apiClientFormData.post<MarkTakenResponse>(
     `/api/v1/warehouse/transactions/${transactionId}/mark-taken`,
     data,
+  );
+  return response.data;
+}
+
+export async function searchTransactions(
+  params: SearchTransactionsParams,
+): Promise<WarehouseTransactionsSearchResponse> {
+  const response = await apiClient.get<WarehouseTransactionsSearchResponse>(
+    '/api/v1/warehouse/transactions/search',
+    {
+      params: {
+        ...(params.code ? { code: params.code } : {}),
+        ...(params.phone ? { phone: params.phone } : {}),
+        ...(params.name ? { name: params.name } : {}),
+        ...(params.q ? { q: params.q } : {}),
+        ...(params.flight ? { flight: params.flight } : {}),
+        payment_status: params.payment_status ?? 'all',
+        taken_status: params.taken_status ?? 'all',
+        sort_order: params.sort_order ?? 'desc',
+        page: params.page ?? 1,
+        size: params.size ?? 50,
+      },
+    },
   );
   return response.data;
 }
