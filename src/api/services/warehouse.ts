@@ -46,6 +46,7 @@ export interface WarehouseTransactionItem {
   payment_status: string;
   is_taken_away: boolean;
   taken_away_date: string | null;
+  has_proof: boolean;
   created_at: string;
 }
 

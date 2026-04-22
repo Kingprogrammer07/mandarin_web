@@ -12,6 +12,7 @@ export interface WarehouseQueueItem {
   clientCode: string;
   flightName: string;
   deliveryMethod: string;
+  comment?: string;
   photos: File[];
   status: QueueItemStatus;
   error?: string;

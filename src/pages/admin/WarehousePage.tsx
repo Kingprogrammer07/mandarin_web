@@ -89,6 +89,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   const [modalTxId, setModalTxId] = useState<number | null>(null);
   const [modalClientCode, setModalClientCode] = useState("");
   const [modalFlightName, setModalFlightName] = useState("");
+  const [modalIsTakenAway, setModalIsTakenAway] = useState(false);
 
   // Apply theme immediately on mount and on every toggle
   useEffect(() => {
@@ -160,6 +161,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
         setModalTxId(transactionId);
         setModalClientCode(tx.client_code);
         setModalFlightName(tx.reys);
+        setModalIsTakenAway(tx.is_taken_away);
       }
     },
     [activeData],
@@ -357,6 +359,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
           transactionId={modalTxId}
           clientCode={modalClientCode}
           flightName={modalFlightName}
+          isTakenAway={modalIsTakenAway}
           isOpen={modalTxId !== null}
           onClose={() => setModalTxId(null)}
         />

@@ -38,6 +38,9 @@ export function useWarehouseQueueProcessor() {
 
     const formData = new FormData();
     formData.append('delivery_method', pendingItem.deliveryMethod);
+    if (pendingItem.comment) {
+      formData.append('comment', pendingItem.comment);
+    }
     pendingItem.photos.forEach((photo) => formData.append('photos', photo));
 
     // Capture stable values before async operations

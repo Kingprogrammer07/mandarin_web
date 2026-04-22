@@ -131,7 +131,7 @@ export default function TransactionsTable({
         {items.map((item, idx) => {
           const paymentStyle = getPaymentStyle(item.payment_status);
           const accentColor = getAccentColor(item);
-          const isClickable = canMarkTaken && !item.is_taken_away;
+          const isClickable = canMarkTaken && !item.has_proof;
           const isUnpaid =
             item.payment_status === "unpaid" || item.payment_status === "pending";
 
@@ -251,11 +251,30 @@ export default function TransactionsTable({
                   )}
 
                   {/* Status badge / action button */}
-                  {item.is_taken_away ? (
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  {item.has_proof ? (
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
                       <CheckCheck className="w-3.5 h-3.5" />
-                      Berilgan
+                      Isbot yuklangan
                     </span>
+                  ) : item.is_taken_away ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <CheckCheck className="w-3.5 h-3.5" />
+                        Berilgan
+                      </span>
+                      {canMarkTaken && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMarkTaken(item.id);
+                          }}
+                          className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 active:scale-95 transition-all shadow-sm"
+                        >
+                          Isbot
+                        </button>
+                      )}
+                    </div>
                   ) : canMarkTaken ? (
                     <button
                       type="button"

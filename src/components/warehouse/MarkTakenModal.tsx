@@ -78,6 +78,7 @@ interface MarkTakenModalProps {
   transactionId: number;
   clientCode: string;
   flightName: string;
+  isTakenAway?: boolean;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -88,6 +89,7 @@ export default function MarkTakenModal({
   transactionId,
   clientCode,
   flightName,
+  isTakenAway,
   isOpen,
   onClose,
 }: MarkTakenModalProps) {
@@ -108,7 +110,7 @@ export default function MarkTakenModal({
     formState: { errors },
   } = useForm<MarkTakenFormValues>({
     resolver: zodResolver(markTakenSchema),
-    defaultValues: { delivery_method: undefined, photos: [] },
+    defaultValues: { delivery_method: undefined, photos: [], comment: "" },
   });
 
   const photos = watch("photos") ?? [];
@@ -161,6 +163,7 @@ export default function MarkTakenModal({
         clientCode,
         flightName,
         deliveryMethod: data.delivery_method,
+        comment: data.comment,
         photos: data.photos,
       });
 
@@ -234,6 +237,20 @@ export default function MarkTakenModal({
               className="flex-1 overflow-y-auto overscroll-contain"
             >
               <div className="px-5 pt-5 pb-4 space-y-6">
+
+                {isTakenAway && (
+                  <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-500 shrink-0" />
+                    <div>
+                      <h4 className="text-[12px] font-bold text-amber-800 dark:text-amber-500">
+                        Bu yuk avval berilgan
+                      </h4>
+                      <p className="text-[11px] text-amber-700/80 dark:text-amber-500/80 mt-0.5 leading-relaxed">
+                        Yuk bazada "Berilgan" deb belgilangan. Hozirgi yuklanayotgan isbot (rasmlar va izoh) to'g'ridan-to'g'ri hisobot guruhiga yuboriladi.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Delivery method ────────────────────────────────────── */}
                 <div>
@@ -383,6 +400,31 @@ export default function MarkTakenModal({
                   {errors.photos && (
                     <p className="mt-2 text-[12px] text-red-500 font-medium">
                       {errors.photos.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* ── Comment (Izoh) ─────────────────────────────────────── */}
+                <div>
+                  <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
+                    Izoh (ixtiyoriy)
+                  </p>
+                  <Controller
+                    name="comment"
+                    control={control}
+                    render={({ field }) => (
+                      <textarea
+                        {...field}
+                        value={field.value ?? ""}
+                        rows={3}
+                        placeholder="Masalan: Telegram guruhi uchun isbot yuklandi..."
+                        className="w-full p-3.5 rounded-2xl border-2 text-[13px] bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.07] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-orange-400 dark:focus:border-orange-500/50 outline-none resize-none transition-all"
+                      />
+                    )}
+                  />
+                  {errors.comment && (
+                    <p className="mt-2 text-[12px] text-red-500 font-medium">
+                      {errors.comment.message}
                     </p>
                   )}
                 </div>

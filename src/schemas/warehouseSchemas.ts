@@ -20,6 +20,7 @@ export const markTakenSchema = z.object({
     })
     .min(1, "Kamida bitta rasm yuklang")
     .max(10, "Maksimal 10 ta rasm yuklash mumkin"),
+  comment: z.string().optional(),
 });
 
 export type MarkTakenFormValues = z.infer<typeof markTakenSchema>;
