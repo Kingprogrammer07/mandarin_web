@@ -893,13 +893,13 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                         <section>
-                            <div className="flex items-center justify-between mb-4 ml-1">
-                                <h2 className="text-lg font-bold flex items-center gap-2">
+                            <div className="flex items-center mb-4 ml-1">
+                                <h2 className="flex-1 text-lg font-bold flex items-center gap-2">
                                     <span className="w-1 h-5 bg-blue-500 rounded-full inline-block"></span>
                                     {t('dashboard.sections.important')}
                                 </h2>
-                                <NotificationCenter />
-
+                                <div className="flex items-center gap-2">
+                                    <NotificationCenter />
                                 <div className="hidden md:flex items-center gap-2">
                                     <button
                                         onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })}
@@ -913,6 +913,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                                     >
                                         <ChevronRight className="w-5 h-5" />
                                     </button>
+                                </div>
                                 </div>
                             </div>
 
