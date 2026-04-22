@@ -33,8 +33,7 @@ export interface FlightVolumeItem {
 }
 export interface PeriodVolumeItem {
   period_name: string;
-  cargo_count: number;
-  total_weight_kg: string | number;
+  search_count: number;
 }
 export interface CargoStatsResponse {
   volume: CargoVolumeStats;
@@ -64,6 +63,7 @@ export interface OverviewStats {
   active_clients: number;
   passive_clients: number;
   zombie_clients: number;
+  logged_in_clients: number;
 }
 export interface RetentionStats {
   repeat_clients: number;
@@ -203,6 +203,80 @@ export const getOperationalStats = async (startDate?: string, endDate?: string):
 };
 
 // -------------------------------------------------------------
+// 5. ANALYTICS STATS
+// -------------------------------------------------------------
+export interface AnalyticsEventItem {
+  id: number;
+  event_type: string;
+  user_id: number | null;
+  event_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AnalyticsEventPage {
+  items: AnalyticsEventItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AnalyticsDailyTrendItem {
+  date: string;
+  count: number;
+}
+
+export interface AnalyticsEventTypeSummary {
+  event_type: string;
+  total_count: number;
+  unique_users: number;
+  last_occurrence: string | null;
+}
+
+export interface AnalyticsStatsResponse {
+  summary: AnalyticsEventTypeSummary[];
+  daily_trends: AnalyticsDailyTrendItem[];
+}
+
+export const getAnalyticsStats = async (
+  startDate?: string,
+  endDate?: string,
+  eventType?: string,
+): Promise<AnalyticsStatsResponse> => {
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+  if (eventType) params.append('event_type', eventType);
+
+  const res = await apiClient.get<AnalyticsStatsResponse>(
+    `/api/v1/statistics/analytics?${params.toString()}`,
+    { headers: getAdminHeaders() },
+  );
+  return res.data;
+};
+
+export const getAnalyticsEvents = async (
+  startDate?: string,
+  endDate?: string,
+  eventType?: string,
+  page = 1,
+  pageSize = 50,
+): Promise<AnalyticsEventPage> => {
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+  if (eventType) params.append('event_type', eventType);
+  params.append('page', page.toString());
+  params.append('page_size', pageSize.toString());
+
+  const res = await apiClient.get<AnalyticsEventPage>(
+    `/api/v1/statistics/analytics/events?${params.toString()}`,
+    { headers: getAdminHeaders() },
+  );
+  return res.data;
+};
+
+// -------------------------------------------------------------
 // EXPORTS — triggers .xlsx file download via blob
 // -------------------------------------------------------------
 
@@ -245,6 +319,45 @@ export const exportClientStats = async (startDate?: string, endDate?: string): P
   const sd = startDate ?? 'boshidan';
   const ed = endDate ?? 'hozirgacha';
   triggerBlobDownload(res.data as Blob, `mijozlar_statistikasi_${sd}_${ed}.xlsx`);
+};
+
+export const exportZombieClients = async (startDate?: string, endDate?: string): Promise<void> => {
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  const res = await apiClient.get(`/api/v1/statistics/clients/export/zombie?${params.toString()}`, {
+    headers: getAdminHeaders(),
+    responseType: 'blob',
+  });
+  const sd = startDate ?? 'boshidan';
+  const ed = endDate ?? 'hozirgacha';
+  triggerBlobDownload(res.data as Blob, `zombie_mijozlar_${sd}_${ed}.xlsx`);
+};
+
+export const exportPassiveClients = async (startDate?: string, endDate?: string): Promise<void> => {
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  const res = await apiClient.get(`/api/v1/statistics/clients/export/passive?${params.toString()}`, {
+    headers: getAdminHeaders(),
+    responseType: 'blob',
+  });
+  const sd = startDate ?? 'boshidan';
+  const ed = endDate ?? 'hozirgacha';
+  triggerBlobDownload(res.data as Blob, `passiv_mijozlar_${sd}_${ed}.xlsx`);
+};
+
+export const exportFrequentClients = async (minFlights = 5): Promise<void> => {
+  const params = new URLSearchParams();
+  params.append('min_flights', minFlights.toString());
+
+  const res = await apiClient.get(`/api/v1/statistics/clients/export/frequent?${params.toString()}`, {
+    headers: getAdminHeaders(),
+    responseType: 'blob',
+  });
+  triggerBlobDownload(res.data as Blob, `faol_mijozlar_${minFlights}plus_reys.xlsx`);
 };
 
 export const exportFinancialStats = async (startDate?: string, endDate?: string, baseCostUsd = 8.0): Promise<void> => {

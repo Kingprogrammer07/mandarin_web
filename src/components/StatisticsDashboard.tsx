@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Users, Package, DollarSign, Activity, PieChart, Zap, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Users, Package, DollarSign, Activity, PieChart, Zap, Download, ChevronDown, ChevronRight, BarChart2 } from 'lucide-react';
 import { DateFilter } from './statistics/DateFilter';
 import { StatCard } from './statistics/StatCard';
 import { ModernAreaChart } from './statistics/ModernAreaChart';
@@ -11,8 +11,13 @@ import {
   getClientStats,
   getFinancialStats,
   getOperationalStats,
+  getAnalyticsStats,
+  getAnalyticsEvents,
   exportCargoStats,
   exportClientStats,
+  exportZombieClients,
+  exportPassiveClients,
+  exportFrequentClients,
   exportFinancialStats,
   exportOperationalStats,
 } from '@/api/services/stats';
@@ -21,13 +26,77 @@ import type {
   ClientStatsResponse,
   FinancialStatsResponse,
   OperationalStatsResponse,
+  AnalyticsStatsResponse,
+  AnalyticsEventPage,
 } from '@/api/services/stats';
 
 interface StatisticsDashboardProps {
   onBack: () => void;
 }
 
-type TabId = 'overview' | 'clients' | 'cargo' | 'finance' | 'operational';
+// ── Specialized client export panel ──────────────────────────────────────────
+
+type ClientExportKey = 'zombie' | 'passive' | 'frequent';
+
+interface ClientExportPanelProps {
+  startDate: string;
+  endDate: string;
+  exporting: string | null;
+  onExport: (key: string | null) => void;
+}
+
+function ClientExportPanel({ startDate, endDate, exporting, onExport }: ClientExportPanelProps) {
+  const exports: { key: ClientExportKey; label: string; desc: string }[] = [
+    { key: 'zombie',   label: 'Zombi mijozlar',  desc: 'Hech qachon yuk buyurtma qilmaganlar' },
+    { key: 'passive',  label: 'Passiv mijozlar',  desc: '60+ kun ichida yuk olmagan (lekin avval olgan)' },
+    { key: 'frequent', label: 'Faol mijozlar',    desc: '5+ reysda yuklari bo\'lganlar' },
+  ];
+
+  const run = async (key: ClientExportKey) => {
+    if (exporting) return;
+    onExport(key);
+    try {
+      if (key === 'zombie')   await exportZombieClients(startDate, endDate);
+      if (key === 'passive')  await exportPassiveClients(startDate, endDate);
+      if (key === 'frequent') await exportFrequentClients(5);
+    } finally {
+      onExport(null);
+    }
+  };
+
+  return (
+    <div className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <h3 className="text-sm font-bold mb-1 text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+        Mijozlar ro'yxatlarini yuklab olish
+      </h3>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+        Har bir kategoriya bo'yicha alohida Excel fayli
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {exports.map(({ key, label, desc }) => (
+          <button
+            key={key}
+            onClick={() => run(key)}
+            disabled={!!exporting}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60 transition-all text-left group"
+          >
+            <span className="shrink-0">
+              {exporting === key
+                ? <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                : <Download className="w-4 h-4 text-indigo-500 group-hover:text-indigo-600" />}
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">{label}</span>
+              <span className="block text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{desc}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type TabId = 'overview' | 'clients' | 'cargo' | 'finance' | 'operational' | 'analytics';
 
 export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps) {
 
@@ -44,6 +113,14 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
   const [clientData, setClientData] = useState<ClientStatsResponse | null>(null);
   const [financeData, setFinanceData] = useState<FinancialStatsResponse | null>(null);
   const [opData, setOpData] = useState<OperationalStatsResponse | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsStatsResponse | null>(null);
+  // Unfiltered analytics stats for overview/cargo trend charts — loaded by main effect.
+  // Kept separate so the analytics tab's event-type filter doesn't corrupt these charts.
+  const [rawAnalyticsData, setRawAnalyticsData] = useState<AnalyticsStatsResponse | null>(null);
+  const [analyticsEventsData, setAnalyticsEventsData] = useState<AnalyticsEventPage | null>(null);
+  const [analyticsEventType, setAnalyticsEventType] = useState('');
+  const [analyticsPage, setAnalyticsPage] = useState(1);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exportingTab, setExportingTab] = useState<string | null>(null);
   // Tracks which viloyat groups are expanded in the regions list
@@ -99,22 +176,44 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
     const load = async () => {
       setLoading(true);
       try {
-        const [r0, r1, r2, r3] = await Promise.allSettled([
+        const [r0, r1, r2, r3, r4] = await Promise.allSettled([
           getCargoStats(startDate, endDate),
           getClientStats(startDate, endDate),
           getFinancialStats(startDate, endDate),
           getOperationalStats(startDate, endDate),
+          getAnalyticsStats(startDate, endDate, 'track_code_search'),
         ]);
         setCargoData(r0.status === 'fulfilled' ? r0.value : null);
         setClientData(r1.status === 'fulfilled' ? r1.value : null);
         setFinanceData(r2.status === 'fulfilled' ? r2.value : null);
         setOpData(r3.status === 'fulfilled' ? r3.value : null);
+        setRawAnalyticsData(r4.status === 'fulfilled' ? r4.value : null);
       } finally {
         setLoading(false);
       }
     };
     load();
   }, [startDate, endDate]);
+
+  // ── Analytics — lazy load, re-fetches on filter or date change ──
+  useEffect(() => {
+    if (activeTab !== 'analytics') return;
+    const load = async () => {
+      setAnalyticsLoading(true);
+      try {
+        const eventTypeParam = analyticsEventType || undefined;
+        const [r0, r1] = await Promise.allSettled([
+          getAnalyticsStats(startDate, endDate, eventTypeParam),
+          getAnalyticsEvents(startDate, endDate, eventTypeParam, analyticsPage, 50),
+        ]);
+        setAnalyticsData(r0.status === 'fulfilled' ? r0.value : null);
+        setAnalyticsEventsData(r1.status === 'fulfilled' ? r1.value : null);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+    load();
+  }, [activeTab, startDate, endDate, analyticsEventType, analyticsPage]);
 
   // ── Export handler ───────────────────────────────────────────
 
@@ -181,6 +280,7 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
     { id: 'cargo', label: 'Yuklar', icon: Package },
     { id: 'finance', label: 'Moliya', icon: DollarSign },
     { id: 'operational', label: 'Jarayon', icon: Activity },
+    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
   ];
 
   // ── Render ───────────────────────────────────────────────────
@@ -261,13 +361,13 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                     <StatCard title="Xitoyda hisobsiz" value={formatNum(cargoData?.bottlenecks.china_unaccounted)} subtitle="Xitoyda mavjud, lekin tizimga kiritilmagan" icon={Package} color="red" delay={0.18} />
                     <StatCard title="To'lov kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_pending_payment)} subtitle="UZda bor, hisobot yuborilgan, to'lov kutilmoqda" icon={DollarSign} color="orange" delay={0.20} />
                   </div>
-                  {cargoData?.period_trends && cargoData.period_trends.length > 0 && (
+                  {rawAnalyticsData?.daily_trends && (
                     <ModernAreaChart
-                      data={cargoData.period_trends}
-                      title="Yuk kelish dinamikasi"
-                      description="Tanlangan davr ichida har bir vaqt kesimiga kelgan yuklar (trek/paket) soni. O'sish tendensiyasi kuzatilib, reyslar bo'yicha yuk hajmining qanday o'zgarganini ko'rsatadi."
-                      dataKey="cargo_count"
-                      xAxisKey="period_name"
+                      data={rawAnalyticsData.daily_trends}
+                      title="Trek kod qidiruvlar dinamikasi"
+                      description="Tanlangan davr ichida har kuni mijozlar tomonidan qilingan trek kod qidiruvlar soni. O'sish tendensiyasi yuklar kelishiga qiziqishni ko'rsatadi."
+                      dataKey="count"
+                      xAxisKey="date"
                       color="indigo"
                     />
                   )}
@@ -289,7 +389,16 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                     <StatCard title="Qayta kelgan" value={formatNum(clientData?.retention.repeat_clients)} subtitle="Bir nechta marta yuk buyurtma qilgan sodiq mijozlar" icon={Users} color="green" />
                     <StatCard title="Bir martalik" value={formatNum(clientData?.retention.one_time_clients)} subtitle="Faqat bir marta buyurtma berib, qaytmagan mijozlar" icon={Users} color="orange" />
                     <StatCard title="Eng faol (5+ reys)" value={formatNum(clientData?.retention.most_frequent_clients)} subtitle="5 va undan ko'p reys buyurtma qilganlar" icon={Activity} color="purple" />
+                    <StatCard title="Hozir tizimda" value={formatNum(clientData?.overview.logged_in_clients)} subtitle="Telegram botga hozirda kirgan (is_logged_in=true) mijozlar" icon={Zap} color="cyan" />
                   </div>
+
+                  {/* Specialized exports */}
+                  <ClientExportPanel
+                    startDate={startDate}
+                    endDate={endDate}
+                    exporting={exportingTab}
+                    onExport={setExportingTab}
+                  />
 
                   {/* Regions — grouped by viloyat, collapsible */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -459,13 +568,13 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                     </TableBlock>
                   )}
 
-                  {cargoData?.period_trends && cargoData.period_trends.length > 0 && (
+                  {rawAnalyticsData?.daily_trends && (
                     <ModernAreaChart
-                      data={cargoData.period_trends}
-                      title="Yuk kelish dinamikasi"
-                      description="Tanlangan davr ichida har bir vaqt kesimiga kelgan yuklar (trek) soni. Grafik vaqt o'tishi bilan yuk oqimining qanday o'zgarganini ko'rsatadi."
-                      dataKey="cargo_count"
-                      xAxisKey="period_name"
+                      data={rawAnalyticsData.daily_trends}
+                      title="Trek kod qidiruvlar dinamikasi"
+                      description="Tanlangan davr ichida har kuni mijozlar tomonidan qilingan trek kod qidiruvlar soni."
+                      dataKey="count"
+                      xAxisKey="date"
                       color="indigo"
                     />
                   )}
@@ -683,6 +792,152 @@ export default function StatisticsDashboard({ onBack }: StatisticsDashboardProps
                           ))}
                         </tbody>
                       </table>
+                    </TableBlock>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── ANALYTICS ────────────────────────────────── */}
+            {activeTab === 'analytics' && (
+              <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Analytics statistikasi</h2>
+                    {/* Event type filter */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={analyticsEventType}
+                        onChange={(e) => { setAnalyticsEventType(e.target.value); setAnalyticsPage(1); }}
+                        className="h-9 px-3 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">Barcha event turlari</option>
+                        {analyticsData?.summary.map((s) => (
+                          <option key={s.event_type} value={s.event_type}>{s.event_type}</option>
+                        ))}
+                      </select>
+                      {analyticsEventType && (
+                        <button
+                          onClick={() => { setAnalyticsEventType(''); setAnalyticsPage(1); }}
+                          className="h-9 px-3 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500 transition-colors"
+                        >
+                          Tozalash
+                        </button>
+                      )}
+                      {analyticsLoading && (
+                        <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary table — per event_type */}
+                  {analyticsData?.summary && analyticsData.summary.length > 0 ? (
+                    <TableBlock title="Event turlari bo'yicha umumiy statistika">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>Event turi</th>
+                            <th className={`${th} text-right`}>Jami</th>
+                            <th className={`${th} text-right`}>Unique foydalanuvchilar</th>
+                            <th className={`${th} text-right`}>Oxirgi marta</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analyticsData.summary.map((row) => (
+                            <tr
+                              key={row.event_type}
+                              className={`${tr} cursor-pointer`}
+                              onClick={() => { setAnalyticsEventType(row.event_type); setAnalyticsPage(1); }}
+                            >
+                              <td className="py-2.5 pr-4 font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                {row.event_type}
+                              </td>
+                              <td className="py-2.5 pr-4 text-right text-sm font-bold">{formatNum(row.total_count)}</td>
+                              <td className="py-2.5 pr-4 text-right text-sm text-gray-600 dark:text-gray-400">{formatNum(row.unique_users)}</td>
+                              <td className="py-2.5 pr-4 text-right text-xs text-gray-400 dark:text-gray-500 tabular-nums">
+                                {row.last_occurrence
+                                  ? new Date(row.last_occurrence).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
+                                  : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableBlock>
+                  ) : !analyticsLoading && (
+                    <div className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm text-center text-sm text-gray-400 py-10">
+                      Analytics ma'lumotlari mavjud emas
+                    </div>
+                  )}
+
+                  {/* Daily trend chart */}
+                  {analyticsData?.daily_trends && (
+                    <ModernAreaChart
+                      data={analyticsData.daily_trends}
+                      title={analyticsEventType ? `"${analyticsEventType}" kunlik dinamikasi` : 'Kunlik eventlar dinamikasi'}
+                      description="Tanlangan davr ichida har kuni qayd etilgan analytics eventlar soni."
+                      dataKey="count"
+                      xAxisKey="date"
+                      color="purple"
+                    />
+                  )}
+
+                  {/* Events list with pagination */}
+                  {analyticsEventsData && (
+                    <TableBlock title={`So'nggi eventlar${analyticsEventType ? ` — ${analyticsEventType}` : ''} (jami: ${formatNum(analyticsEventsData.total)})`}>
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-800">
+                            <th className={th}>#</th>
+                            <th className={th}>Event turi</th>
+                            <th className={`${th} text-right`}>User ID</th>
+                            <th className={th}>Ma'lumot</th>
+                            <th className={`${th} text-right`}>Vaqt</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analyticsEventsData.items.map((ev) => (
+                            <tr key={ev.id} className={tr}>
+                              <td className="py-2 pr-3 text-xs text-gray-400 tabular-nums">{ev.id}</td>
+                              <td className="py-2 pr-4 font-mono text-xs font-semibold text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                                {ev.event_type}
+                              </td>
+                              <td className="py-2 pr-4 text-right text-xs text-gray-500">{ev.user_id ?? '—'}</td>
+                              <td className="py-2 pr-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                                {ev.event_data ? JSON.stringify(ev.event_data) : '—'}
+                              </td>
+                              <td className="py-2 pr-4 text-right text-xs text-gray-400 tabular-nums whitespace-nowrap">
+                                {new Date(ev.created_at).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* Pagination */}
+                      {analyticsEventsData.total_pages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                          <span className="text-xs text-gray-400">
+                            {analyticsPage} / {analyticsEventsData.total_pages} sahifa
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setAnalyticsPage((p) => Math.max(1, p - 1))}
+                              disabled={analyticsPage <= 1 || analyticsLoading}
+                              className="h-8 px-3 text-xs rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                              ← Oldingi
+                            </button>
+                            <button
+                              onClick={() => setAnalyticsPage((p) => Math.min(analyticsEventsData.total_pages, p + 1))}
+                              disabled={analyticsPage >= analyticsEventsData.total_pages || analyticsLoading}
+                              className="h-8 px-3 text-xs rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                              Keyingi →
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </TableBlock>
                   )}
                 </div>

@@ -19,6 +19,13 @@ export interface FastEntryQueueItem {
    */
   notFound: boolean;
   /**
+   * True when resolve-client returned 409 — this track code already exists in the
+   * expected cargo table (was sent in a previous session).
+   */
+  isAlreadySent: boolean;
+  /** Flight name from the 409 response body — which flight already has this code. */
+  alreadySentFlight: string | null;
+  /**
    * True when this track code belongs to a client that already has entries in the
    * current session queue AND at least one different client was scanned in between.
    */
@@ -74,7 +81,7 @@ interface ExpectedCargoState {
   syncFlightTabOrder: (apiFlightNames: string[]) => void;
   setFlightTabOrder: (orderedNames: string[]) => void;
 
-  enqueueEntry: (item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound'>) => void;
+  enqueueEntry: (item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentFlight'>) => void;
   resolveQueueItemClient: (
     trackCode: string,
     clientCode: string,
@@ -85,6 +92,8 @@ interface ExpectedCargoState {
   ) => void;
   /** Mark an item as not-found (404) — leaves isResolved false, flags for red UI. */
   markQueueItemNotFound: (trackCode: string) => void;
+  /** Mark an item as already-sent (409) — the track code is already in the expected cargo table. */
+  markQueueItemAlreadySent: (trackCode: string, flight: string | null) => void;
   setQueueItemClientCode: (id: string, clientCode: string) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
@@ -148,8 +157,8 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
         const id = crypto.randomUUID();
         set((state) => ({
           entryQueue: [
+            { ...item, id, isContinuation: false, priorCountForClient: 0, notFound: false, isAlreadySent: false, alreadySentFlight: null },
             ...state.entryQueue,
-            { ...item, id, isContinuation: false, priorCountForClient: 0, notFound: false },
           ],
         }));
       },
@@ -177,6 +186,15 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
           entryQueue: state.entryQueue.map((item) =>
             item.trackCode === trackCode
               ? { ...item, notFound: true, isResolved: false, clientCode: '' }
+              : item,
+          ),
+        })),
+
+      markQueueItemAlreadySent: (trackCode, flight) =>
+        set((state) => ({
+          entryQueue: state.entryQueue.map((item) =>
+            item.trackCode === trackCode
+              ? { ...item, isAlreadySent: true, isResolved: false, notFound: false, alreadySentFlight: flight }
               : item,
           ),
         })),

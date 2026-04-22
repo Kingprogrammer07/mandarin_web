@@ -8,7 +8,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import {
   Loader2, X, CheckCircle2, AlertCircle, User, Camera, ScanLine,
-  Pencil, AlertTriangle, Info, XCircle, PanelBottomClose, PanelBottomOpen,
+  Pencil, AlertTriangle, Info, XCircle, PanelBottomClose, PanelBottomOpen, Ban,
 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -19,7 +19,9 @@ import { Switch } from '@/components/ui/switch';
 import {
   resolveClientByTrackCode,
   type ResolvedClientResponse,
+  type AlreadySentErrorBody,
 } from '@/api/services/expectedCargo';
+import { isAxiosError } from 'axios';
 import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expectedCargoStore';
 import { playSuccessSound, playErrorSound, playWarningSound } from '@/utils/audioUtils';
 
@@ -111,7 +113,9 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
   const isGhostClient =
     item.isResolved && item.resolvedClientId !== null && item.resolvedClientName === null;
 
-  const rowStyle = item.isContinuation
+  const rowStyle = item.isAlreadySent
+    ? 'bg-orange-50 dark:bg-orange-950/25 border-orange-400 dark:border-orange-600'
+    : item.isContinuation
     ? 'bg-amber-50 dark:bg-amber-950/25 border-amber-400 dark:border-amber-600 ring-1 ring-amber-300 dark:ring-amber-700/50'
     : item.notFound
       ? 'bg-red-50 dark:bg-red-950/25 border-red-400 dark:border-red-700'
@@ -140,7 +144,9 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
       <div className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors', rowStyle)}>
         {/* Status icon */}
         <span className="flex-shrink-0">
-          {item.notFound ? (
+          {item.isAlreadySent ? (
+            <Ban className="size-4 text-orange-500" />
+          ) : item.notFound ? (
             <XCircle className="size-4 text-red-500" />
           ) : item.isContinuation ? (
             <AlertTriangle className="size-4 text-amber-500" />
@@ -158,14 +164,29 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
         {/* Track code */}
         <span className={cn(
           'font-mono text-xs flex-shrink-0 max-w-[40%] truncate',
-          item.notFound ? 'text-red-700 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300',
+          item.isAlreadySent
+            ? 'text-orange-700 dark:text-orange-400'
+            : item.notFound
+              ? 'text-red-700 dark:text-red-400'
+              : 'text-zinc-700 dark:text-zinc-300',
         )}>
           {item.trackCode}
         </span>
 
         {/* Client code / edit area */}
         <div className="flex-1 min-w-0">
-          {isEditingCode ? (
+          {item.isAlreadySent ? (
+            <span className="flex items-center gap-1.5 text-xs">
+              <span className="text-orange-700 dark:text-orange-400 font-semibold">
+                Allaqachon yuborilgan
+              </span>
+              {item.alreadySentFlight && (
+                <span className="text-[10px] text-orange-500 dark:text-orange-500 truncate">
+                  ({item.alreadySentFlight})
+                </span>
+              )}
+            </span>
+          ) : isEditingCode ? (
             <Input
               value={tempCode}
               onChange={(e) => setTempCode(e.target.value.toUpperCase())}
@@ -302,6 +323,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     enqueueEntry,
     resolveQueueItemClient,
     markQueueItemNotFound,
+    markQueueItemAlreadySent,
     setQueueItemClientCode,
     removeFromQueue,
     setSearchQuery,
@@ -461,7 +483,22 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       }
     },
 
-    onError: (_err, trackCode) => {
+    onError: (err, trackCode) => {
+      if (isAxiosError(err) && err.response?.status === 409) {
+        const body = err.response.data as AlreadySentErrorBody;
+        playWarningSound();
+        if (isAutoFillRef.current) {
+          markQueueItemAlreadySent(trackCode, body.flight_name ?? null);
+        }
+        toast.warning(`${trackCode} — allaqachon yuborilgan`, {
+          duration: 4000,
+          description: body.flight_name
+            ? `"${body.flight_name}" reysida mavjud`
+            : 'Bu trek kodi kutilayotgan yuklarga kiritilgan',
+        });
+        return;
+      }
+
       playErrorSound();
       if (isAutoFillRef.current) {
         // Mark as not-found so the row shows red and prompts manual entry.

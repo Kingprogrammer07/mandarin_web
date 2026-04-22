@@ -126,8 +126,7 @@ export function DeliveryRequestModal({
     }, [selectedRegion, clientProfile]);
 
     // Identify special regions (example array based on backend or standard logic)
-    // Note: Assuming "xorazm", "qoraqalpogiston" equivalents in existing region map
-    const specialRegions = ['khorezm', 'karakalpakstan'];
+    const specialRegions = ['khorezm', 'karakalpakstan', 'surkhandarya'];
     const isSpecialRegion = selectedRegion ? specialRegions.includes(selectedRegion) : false;
     const basePricePerKg = isSpecialRegion ? 18000 : 15000;
 
@@ -203,9 +202,13 @@ export function DeliveryRequestModal({
 
         try {
             const formData = new FormData();
-            formData.append('client_id', String(clientProfile.id || transaction.id)); // Adjusting fallback ID
-            // Telegram ID of admin. Assuming WebApp is present, else 0 fallback.
-            const adminId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 0;
+            if (!clientProfile.id) {
+                throw new Error("Mijoz ID si topilmadi. Mijozni tekshiring.");
+            }
+            formData.append('client_id', String(clientProfile.id)); 
+            
+            // Telegram ID of admin.
+            const adminId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id || 0;
             formData.append('admin_telegram_id', String(adminId));
             formData.append('delivery_type', deliveryType);
 
@@ -231,7 +234,13 @@ export function DeliveryRequestModal({
             onClose();
         } catch (err: unknown) {
             console.error('Failed to submit delivery request', err);
-            const errorMessage = err instanceof Error ? err.message : 'Xatolik yuz berdi. Iltimos qayta urinib ko\'ring.';
+            const e = err as { status?: number; message?: string; data?: { detail?: string } };
+            let errorMessage = e?.message || 'Xatolik yuz berdi. Iltimos qayta urinib ko\'ring.';
+            
+            if (e?.status === 429 && e?.data?.detail) {
+                errorMessage = e.data.detail;
+            }
+            
             setErrorStatus(errorMessage);
         } finally {
             setIsSubmitting(false);

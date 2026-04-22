@@ -15,10 +15,7 @@ import {
     Plane,
     // HelpCircle,
     ShieldAlert,
-    // Newspaper,
-    FileText,
     Wallet,
-    ReceiptText,
     MessageSquare,
     ListOrdered,
     Calculator,
@@ -144,16 +141,6 @@ const MAIN_ACTIONS: (Omit<ActionItemData, 'label' | 'desc' | 'badge' | 'actionLa
         theme: "sky",
     },
     {
-        id: "request",
-        icon: <Edit3 className="w-5 h-5" />,
-        bgIcon: <Edit3 style={{ width: 80, height: 80 }} />,
-        labelKey: "dashboard.actions.request.label",
-        descKey: "dashboard.actions.request.desc",
-        badgeKey: "dashboard.actions.request.badge",
-        actionLabelKey: "dashboard.actions.request.action",
-        theme: "emerald",
-    },
-    {
         id: "delivery_history",
         icon: <ListOrdered className="w-5 h-5" />,
         bgIcon: <ListOrdered style={{ width: 80, height: 80 }} />,
@@ -162,16 +149,6 @@ const MAIN_ACTIONS: (Omit<ActionItemData, 'label' | 'desc' | 'badge' | 'actionLa
         badgeKey: "dashboard.actions.history.badge",
         actionLabelKey: "dashboard.actions.history.action",
         theme: "violet",
-    },
-    {
-        id: "payment",
-        icon: <Wallet className="w-5 h-5" />,
-        bgIcon: <Wallet style={{ width: 80, height: 80 }} />,
-        labelKey: "dashboard.actions.payment.label",
-        descKey: "dashboard.actions.payment.desc",
-        badgeKey: "dashboard.actions.payment.badge",
-        actionLabelKey: "dashboard.actions.payment.action",
-        theme: "rose",
     },
 ];
 
@@ -785,7 +762,8 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                     }
                 }
         else if (item.id === 1) setIsProhibitedModalOpen(true);
-    }, []);
+        else if (item.id === 3) handleSetActiveTab("request");
+    }, [handleSetActiveTab]);
 
     const onTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.targetTouches[0].clientX;
@@ -861,6 +839,25 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                 {/* Yopiladigan Beta Badge Shu Yerga Qo'yildi */}
                 
                 <BetaBadge />
+                {/* <style>{`
+                    @keyframes beta-marquee {
+                        0% { transform: translateX(0); }
+                        100% { transform: translateX(-50%); }
+                    }
+                `}</style>
+                <div className="overflow-hidden whitespace-nowrap mt-4 bg-red-900 dark:border-red-700/40 py-2 absolute">
+                    <div
+                        className="flex w-max items-center"
+                        style={{ animation: 'beta-marquee 18s linear infinite' }}
+                    >
+                        <p className="text-sm text-muted-foreground pr-10">
+                            {t('beta.desc', 'Platforma hozirda sinov (beta) rejimida ishlamoqda. Ayrim xatoliklar yoki kamchiliklar kuzatilishi mumkin. Agar biron muammoga duch kelsangiz, iltimos bizga xabar bering.')}
+                        </p>
+                        <p className="text-sm text-muted-foreground pr-10" aria-hidden="true">
+                            {t('beta.desc', 'Platforma hozirda sinov (beta) rejimida ishlamoqda. Ayrim xatoliklar yoki kamchiliklar kuzatilishi mumkin. Agar biron muammoga duch kelsangiz, iltimos bizga xabar bering.')}
+                        </p>
+                    </div>
+                </div> */}
 
                 <HeaderTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
 
@@ -881,7 +878,6 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                     <Suspense fallback={<PageLoadingFallback />}>
                         <DeliveryRequestPage
                             onBack={() => handleSetActiveTab('home')}
-                            onNavigateToProfile={() => {/* Handle profile navigation if needed */}}
                             onNavigateToHistory={() => handleSetActiveTab('delivery_history')}
                         />
                     </Suspense>
@@ -902,6 +898,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                                     <span className="w-1 h-5 bg-blue-500 rounded-full inline-block"></span>
                                     {t('dashboard.sections.important')}
                                 </h2>
+                                <NotificationCenter />
 
                                 <div className="hidden md:flex items-center gap-2">
                                     <button
@@ -955,38 +952,52 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                {/* To'lov tugmasi (Mobile-Optimized Premium) */}
                                 <button
-                                    onClick={onNavigateToReports}
-                                    className="relative overflow-hidden rounded-3xl p-3 sm:p-4 text-left border border-white/15 bg-white/80 dark:bg-white/5 backdrop-blur-xl shadow-lg transition hover:-translate-y-[2px] active:scale-[0.99]"
+                                    onClick={() => setIsPaymentModalOpen(true)}
+                                    className="relative overflow-hidden rounded-[1.75rem] p-4 sm:p-5 flex flex-col items-center text-center border border-white/60 border-b-white/20 dark:border-white/10 dark:border-t-white/20 bg-gradient-to-b from-white/90 to-white/50 dark:from-[#2a2218]/80 dark:to-[#1a150e]/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] active:scale-[0.95] active:shadow-inner transition-all duration-200 select-none"
                                 >
-                                    <div className="absolute inset-0 bg-gradient-to-br from-amber-400/30 via-orange-400/10 to-transparent dark:from-amber-500/30 dark:via-orange-500/10" />
-                                    <div className="absolute inset-0 pointer-events-none opacity-25 blur-3xl bg-amber-200/60 dark:bg-amber-500/30" />
+                                    {/* Ambient Orbs (Always visible, subtly pulsing for mobile) */}
+                                    <div className="absolute -top-8 -right-8 w-28 h-28 bg-rose-400/40 dark:bg-rose-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '3s' }} />
+                                    <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-pink-400/30 dark:bg-pink-600/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '4s' }} />
+                                    
+                                    {/* Inner Shine Overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/50 to-white/0 dark:via-white/5 opacity-40 pointer-events-none" />
 
-                                    <div className="relative flex flex-col items-center text-center gap-2 sm:gap-3">
-                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center bg-white/70 dark:bg-white/10 text-amber-600 dark:text-amber-300 shadow-inner shrink-0">
-                                            <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <div className="relative z-10 flex flex-col items-center gap-2.5">
+                                        <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center bg-white dark:bg-white/10 text-rose-500 dark:text-rose-400 shadow-md ring-1 ring-rose-100 dark:ring-white/10">
+                                            <Wallet className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-sm" />
+                                            {/* Glowing ring - continuously pulsing */}
+                                            <div className="absolute inset-0 rounded-2xl ring-2 ring-rose-500/30 animate-pulse" style={{ animationDuration: '2.5s' }} />
                                         </div>
-                                        <div className="space-y-0.5 min-w-0 w-full">
-                                            <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">{t('dashboard.sections.myCargo')}</h3>
-                                            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300/70 leading-snug line-clamp-2">{t('dashboard.sections.cargoReport')}</p>
+                                        <div className="space-y-0.5">
+                                            <h3 className="text-[14px] sm:text-[16px] font-extrabold text-gray-900 dark:text-white tracking-tight drop-shadow-sm">{t('dashboard.actions.payment.label')}</h3>
+                                            <p className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-gray-400/80 leading-snug line-clamp-2 px-1">{t('dashboard.actions.payment.desc')}</p>
                                         </div>
                                     </div>
                                 </button>
 
+                                {/* Zayavka tugmasi (Mobile-Optimized Premium) */}
                                 <button
-                                    onClick={onNavigateToHistory}
-                                    className="relative overflow-hidden rounded-3xl p-3 sm:p-4 text-left border border-white/15 bg-white/80 dark:bg-white/5 backdrop-blur-xl shadow-lg transition hover:-translate-y-[2px] active:scale-[0.99]"
+                                    onClick={() => handleSetActiveTab('request')}
+                                    className="relative overflow-hidden rounded-[1.75rem] p-4 sm:p-5 flex flex-col items-center text-center border border-white/60 border-b-white/20 dark:border-white/10 dark:border-t-white/20 bg-gradient-to-b from-white/90 to-white/50 dark:from-[#2a2218]/80 dark:to-[#1a150e]/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] active:scale-[0.95] active:shadow-inner transition-all duration-200 select-none"
                                 >
-                                    <div className="absolute inset-0 bg-gradient-to-br from-sky-500/25 via-indigo-500/15 to-transparent dark:from-sky-500/25 dark:via-indigo-500/20" />
-                                    <div className="absolute inset-0 pointer-events-none opacity-25 blur-3xl bg-sky-200/50 dark:bg-indigo-600/25" />
+                                    {/* Ambient Orbs (Always visible, subtly pulsing for mobile) */}
+                                    <div className="absolute -top-8 -left-8 w-28 h-28 bg-emerald-400/40 dark:bg-emerald-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '3.5s' }} />
+                                    <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-teal-400/30 dark:bg-teal-600/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '4.5s' }} />
+                                    
+                                    {/* Inner Shine Overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/50 to-white/0 dark:via-white/5 opacity-40 pointer-events-none" />
 
-                                    <div className="relative flex flex-col items-center text-center gap-2 sm:gap-3">
-                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center bg-white/70 dark:bg-white/10 text-sky-600 dark:text-indigo-200 shadow-inner shrink-0">
-                                            <ReceiptText className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <div className="relative z-10 flex flex-col items-center gap-2.5">
+                                        <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center bg-white dark:bg-white/10 text-emerald-500 dark:text-emerald-400 shadow-md ring-1 ring-emerald-100 dark:ring-white/10">
+                                            <Edit3 className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-sm" />
+                                            {/* Glowing ring - continuously pulsing */}
+                                            <div className="absolute inset-0 rounded-2xl ring-2 ring-emerald-500/30 animate-pulse" style={{ animationDuration: '2s' }} />
                                         </div>
-                                        <div className="space-y-0.5 min-w-0 w-full">
-                                            <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">{t('dashboard.sections.paymentHistory')}</h3>
-                                            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300/70 leading-snug line-clamp-2">{t('dashboard.sections.receipts')}</p>
+                                        <div className="space-y-0.5">
+                                            <h3 className="text-[14px] sm:text-[16px] font-extrabold text-gray-900 dark:text-white tracking-tight drop-shadow-sm">{t('dashboard.actions.request.label')}</h3>
+                                            <p className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-gray-400/80 leading-snug line-clamp-2 px-1">{t('dashboard.actions.request.desc')}</p>
                                         </div>
                                     </div>
                                 </button>
@@ -999,7 +1010,6 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                                     <span className="w-1 h-5 bg-amber-500 rounded-full inline-block"></span>
                                     {t('dashboard.sections.services')}
                                 </h2>
-                                <NotificationCenter />
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

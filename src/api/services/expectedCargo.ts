@@ -78,6 +78,13 @@ export interface DeleteExpectedCargoResponse {
 
 // ── API 7 — Resolve client ─────────────────────────────────────────────────────
 
+/** 409 error body returned when a track code is already in the expected cargo table. */
+export interface AlreadySentErrorBody {
+  detail: string;
+  track_code: string;
+  flight_name: string | null;
+}
+
 export interface ResolvedClientResponse {
   client_id: number;
   client_code: string;
