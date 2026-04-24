@@ -171,7 +171,7 @@ export default function GroupedTransactionsList({
                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(249,115,22,0.3)] active:scale-95 transition-all"
                   >
                     <CheckSquare className="w-4 h-4" />
-                    <span>
+                    <span className="text-xs">
                       {selectedPendingFlights.length === pendingFlights.length 
                         ? "Barcha yuklarni berish" 
                         : "Tanlanganlarni berish"
