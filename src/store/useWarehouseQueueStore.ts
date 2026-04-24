@@ -8,7 +8,7 @@ export type QueueItemStatus = 'pending' | 'uploading' | 'error';
 
 export interface WarehouseQueueItem {
   id: string;
-  transactionId: number;
+  transactionIds: number[];
   clientCode: string;
   flightName: string;
   deliveryMethod: string;

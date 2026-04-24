@@ -1,5 +1,10 @@
 import { apiClient } from './client';
-import type { FilterType, MarkTakenResponse, TransactionsApiResponse } from './transactions';
+import type {
+  DeliveryProofMethod,
+  DeliveryRequestType,
+  FilterType,
+  TransactionsApiResponse,
+} from './transactions';
 
 // ─── Admin header helper ───────────────────────────────────────────────────────
 // POS endpoints are protected by require_permission("pos", "process|read"),
@@ -124,6 +129,12 @@ export interface ActiveCardResponse {
   bank_name: string | null;
 }
 
+export interface PosTransactionUpdateResponse {
+  success: boolean;
+  transaction_id: number;
+  message: string;
+}
+
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 /**
@@ -228,10 +239,40 @@ export async function getPOSClientTransactions(
  * Marks a cargo transaction as taken away by the client.
  * Uses admin authentication (X-Admin-Authorization header).
  */
-export async function posMarkAsTaken(transactionId: number): Promise<MarkTakenResponse> {
-  const res = await apiClient.patch<MarkTakenResponse>(
-    `/api/v1/transactions/${transactionId}/status`,
-    { is_taken_away: true },
+export async function posUpdateTakenStatus(
+  transactionId: number,
+  isTakenAway: boolean,
+  reason: string,
+): Promise<PosTransactionUpdateResponse> {
+  const res = await apiClient.patch<PosTransactionUpdateResponse>(
+    `/api/v1/payments/transactions/${transactionId}/taken-status`,
+    { is_taken_away: isTakenAway, reason },
+    { headers: getAdminHeaders() },
+  );
+  return res.data;
+}
+
+export async function posUpdateDeliveryRequestType(
+  transactionId: number,
+  deliveryRequestType: DeliveryRequestType,
+  reason: string,
+): Promise<PosTransactionUpdateResponse> {
+  const res = await apiClient.patch<PosTransactionUpdateResponse>(
+    `/api/v1/payments/transactions/${transactionId}/delivery-request-type`,
+    { delivery_request_type: deliveryRequestType, reason },
+    { headers: getAdminHeaders() },
+  );
+  return res.data;
+}
+
+export async function posUpdateDeliveryProofMethod(
+  transactionId: number,
+  deliveryProofMethod: DeliveryProofMethod,
+  reason: string,
+): Promise<PosTransactionUpdateResponse> {
+  const res = await apiClient.patch<PosTransactionUpdateResponse>(
+    `/api/v1/payments/transactions/${transactionId}/proof-delivery-method`,
+    { delivery_proof_method: deliveryProofMethod, reason },
     { headers: getAdminHeaders() },
   );
   return res.data;

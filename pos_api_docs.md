@@ -114,7 +114,7 @@ Returns a random active card for display during card-payment flows (`ActiveCardR
 | Param | Type | Default | Description |
 |---|---|---|---|
 | `client_code` | string | required | Target client |
-| `filter_type` | `all \| taken \| not_taken \| partial` | `all` | Transaction filter |
+| `filter_type` | `all \| taken \| not_taken \| partial \| pending` | `all` | Transaction filter |
 | `sort_order` | `asc \| desc` | `desc` | Sort direction |
 | `limit` | integer | 20 | Page size |
 | `offset` | integer | 0 | Pagination offset |
@@ -123,22 +123,52 @@ Returns a random active card for display during card-payment flows (`ActiveCardR
 
 ---
 
-### Mark Transaction as Taken Away
+### Update Transaction Taken Status
 | Field | Value |
 |---|---|
 | **Method** | `PATCH` |
-| **Path** | `/api/v1/transactions/{transaction_id}/status` |
+| **Path** | `/api/v1/payments/pos/transactions/{transaction_id}/taken-status` |
 | **Auth** | `X-Admin-Authorization` |
-| **Source** | `src/api/pos.ts` → `posMarkAsTaken()` |
+| **Source** | `src/api/pos.ts` → `posUpdateTakenStatus()` |
 
 **Path param**: `transaction_id` — integer transaction ID.
 
 **Request body**:
 ```json
-{ "is_taken_away": true }
+{ "is_taken_away": true, "reason": "manual handover confirmed" }
 ```
 
-**Response** (`MarkTakenResponse`): confirms the updated status.
+**Response** (`PosTransactionUpdateResponse`): `{ success, transaction_id, message }`.
+
+---
+
+### Update Delivery Request Type
+| Field | Value |
+|---|---|
+| **Method** | `PATCH` |
+| **Path** | `/api/v1/payments/pos/transactions/{transaction_id}/delivery-request-type` |
+| **Auth** | `X-Admin-Authorization` (`pos:update_status`) |
+| **Source** | `src/api/pos.ts` → `posUpdateDeliveryRequestType()` |
+
+**Request body**:
+```json
+{ "delivery_request_type": "uzpost|bts|mandarin|yandex", "reason": "operator correction" }
+```
+
+---
+
+### Update Delivery Proof Method
+| Field | Value |
+|---|---|
+| **Method** | `PATCH` |
+| **Path** | `/api/v1/payments/pos/transactions/{transaction_id}/delivery-proof-method` |
+| **Auth** | `X-Admin-Authorization` (`pos:update_status`) |
+| **Source** | `src/api/pos.ts` → `posUpdateDeliveryProofMethod()` |
+
+**Request body**:
+```json
+{ "delivery_proof_method": "uzpost|bts|mandarin|yandex|self_pickup", "reason": "operator correction" }
+```
 
 ---
 

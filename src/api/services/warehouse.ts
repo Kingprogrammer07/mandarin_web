@@ -151,7 +151,59 @@ export interface WarehouseTransactionsSearchResponse {
   size: number;
 }
 
-// ── API Functions ──────────────────────────────────────────────────────────
+// 📦 Grouped Search Types
+export interface GroupedTransactionItem {
+  id: number;
+  qator_raqami: number;
+  vazn: string;
+  summa: number;
+  payment_status: string;
+  remaining_amount: number;
+  is_taken_away: boolean;
+  taken_away_date: string | null;
+  comment: string | null;
+  has_proof: boolean;
+}
+
+export interface FlightGroup {
+  flight_name: string;
+  total_weight_kg: number;
+  total_amount: number;
+  total_remaining_amount: number;
+  flight_cargo_photos: string[];
+  transactions: GroupedTransactionItem[];
+}
+
+export interface ClientGroup {
+  client_code: string;
+  full_name: string | null;
+  phone: string | null;
+  wallet_balance: number;
+  debt: number;
+  total_unpaid_amount: number;
+  flights: FlightGroup[];
+}
+
+export interface WarehouseGroupedSearchResponse {
+  items: ClientGroup[];
+  total_count: number;
+  page: number;
+  size: number;
+}
+
+// 📦 Bulk Mark Taken
+export interface BulkMarkTakenResponse {
+  transaction_ids: number[];
+  client_code: string;
+  delivery_method: string;
+  delivery_method_label: string;
+  photo_count: number;
+  proofs_created: number;
+  telegram_notified: boolean;
+  message: string;
+}
+
+// API Functions
 
 export async function getWarehouseFlights(
   limit = 10,
@@ -237,5 +289,27 @@ export async function getMyActivity(
     '/api/v1/warehouse/my-activity',
     { params: { page, size } },
   );
+  return response.data;
+}
+export async function searchTransactionsGrouped(params: SearchTransactionsParams): Promise<WarehouseGroupedSearchResponse> {
+  const response = await apiClient.get<WarehouseGroupedSearchResponse>('/api/v1/warehouse/transactions/search-grouped', {
+    params: {
+      ...(params.code ? { code: params.code } : {}),
+      ...(params.phone ? { phone: params.phone } : {}),
+      ...(params.name ? { name: params.name } : {}),
+      ...(params.q ? { q: params.q } : {}),
+      ...(params.flight ? { flight: params.flight } : {}),
+      payment_status: params.payment_status ?? 'all',
+      taken_status: params.taken_status ?? 'all',
+      sort_order: params.sort_order ?? 'desc',
+      page: params.page ?? 1,
+      size: params.size ?? 50,
+    },
+  });
+  return response.data;
+}
+
+export async function bulkMarkTransactionTaken(data: FormData): Promise<BulkMarkTakenResponse> {
+  const response = await apiClientFormData.post<BulkMarkTakenResponse>('/api/v1/warehouse/transactions/bulk-mark-taken', data);
   return response.data;
 }

@@ -87,6 +87,9 @@ function getActionBadgeClass(action: string): string {
 const ACTION_TRANSLATIONS: Record<string, string> = {
   'POS_BULK_PAYMENT':         "Kassa: Yuk to'lovi",
   'POS_ADJUST_BALANCE':       'Kassa: Balans tahriri',
+  'POS_UPDATE_TAKEN_STATUS':  'Kassa: Olib ketish holati yangilandi',
+  'POS_UPDATE_DELIVERY_REQUEST_TYPE': 'Kassa: Delivery request type yangilandi',
+  'POS_UPDATE_DELIVERY_PROOF_METHOD': 'Kassa: Delivery proof method yangilandi',
   'LOGIN_SUCCESS':             'Tizimga muvaffaqiyatli kirildi',
   'PASSKEY_LOGIN_SUCCESS':    'Tizimga kirildi (Passkey)',
   'LOGIN_FAILED':             'Tizimga kirish xatosi',

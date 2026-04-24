@@ -5,10 +5,17 @@ import { apiClient } from './client';
 // ============================================
 
 // Backend FilterType enum
-export type FilterType = 'all' | 'taken' | 'not_taken' | 'partial';
+export type FilterType = 'all' | 'taken' | 'not_taken' | 'partial' | 'pending';
 export type SortOrder = 'asc' | 'desc';
 export type PaymentStatus = 'pending' | 'partial' | 'paid';
 export type PaymentType = 'online' | 'cash' | 'card';
+export type DeliveryRequestType = 'uzpost' | 'bts' | 'mandarin' | 'yandex';
+export type DeliveryProofMethod =
+  | 'uzpost'
+  | 'bts'
+  | 'mandarin'
+  | 'yandex'
+  | 'self_pickup';
 
 // Transaction item matching backend TransactionSummary schema exactly
 export interface Transaction {
@@ -28,6 +35,8 @@ export interface Transaction {
   total_amount: number | null;
   remaining_amount: number;
   payment_balance_difference: number;
+  delivery_request_type?: DeliveryRequestType | null;
+  delivery_proof_method?: DeliveryProofMethod | null;
   // Wallet usage fields (populated when wallet was used for this transaction)
   wallet_deducted?: number;
   wallet_balance_before?: number;

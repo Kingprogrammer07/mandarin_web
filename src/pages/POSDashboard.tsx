@@ -46,7 +46,9 @@ import {
   adjustBalance,
   getPaymentCards,
   getPOSClientTransactions,
-  posMarkAsTaken,
+  posUpdateDeliveryProofMethod,
+  posUpdateDeliveryRequestType,
+  posUpdateTakenStatus,
 } from "@/api/pos";
 import {
   useBroadcastChannel,
@@ -58,7 +60,12 @@ import type {
   CardWithBalance,
   AdjustBalanceRequest,
 } from "@/api/pos";
-import type { Transaction, FilterType } from "@/api/transactions";
+import type {
+  DeliveryProofMethod,
+  DeliveryRequestType,
+  Transaction,
+  FilterType,
+} from "@/api/transactions";
 import {
   searchClients,
   getUnpaidCargo,
@@ -178,6 +185,30 @@ const PAYMENT_LABEL: Record<string, string> = {
   wallet: "Hamyon",
   online: "Online",
 };
+
+const DELIVERY_REQUEST_OPTIONS: DeliveryRequestType[] = [
+  "uzpost",
+  "bts",
+  "mandarin",
+  "yandex",
+];
+
+const DELIVERY_PROOF_OPTIONS: DeliveryProofMethod[] = [
+  "uzpost",
+  "bts",
+  "mandarin",
+  "yandex",
+  "self_pickup",
+];
+
+const DELIVERY_METHOD_LABELS: Record<string, string> = {
+  uzpost: "UzPost",
+  bts: "BTS",
+  mandarin: "Mandarin",
+  yandex: "Yandex",
+  self_pickup: "O'zi olib ketish",
+};
+
 
 /** Translates raw backend payment_provider / payment_type strings to Uzbek. */
 function translatePayment(raw: string): string {
@@ -487,6 +518,7 @@ function ClientProfileDrawer({
   onBalanceUpdate,
   onRefreshClient,
   canAdjust,
+  canUpdateStatus,
 }: {
   clientCode: string;
   clientName: string;
@@ -497,6 +529,8 @@ function ClientProfileDrawer({
   onRefreshClient?: () => void;
   /** Whether the current admin has pos:adjust permission. */
   canAdjust: boolean;
+  /** Whether the current admin has pos:update_status permission. */
+  canUpdateStatus: boolean;
 }) {
   const queryClient = useQueryClient();
 
@@ -550,11 +584,19 @@ function ClientProfileDrawer({
     },
   });
 
-  // Mark cargo as taken
+  // POS status updates (taken status + delivery fields)
   const markTakenMut = useMutation({
-    mutationFn: (txId: number) => posMarkAsTaken(txId),
+    mutationFn: ({
+      transactionId,
+      isTakenAway,
+      reason,
+    }: {
+      transactionId: number;
+      isTakenAway: boolean;
+      reason: string;
+    }) => posUpdateTakenStatus(transactionId, isTakenAway, reason),
     onSuccess: () => {
-      toast.success("Olib ketildi deb belgilandi");
+      toast.success("Olib ketish holati yangilandi");
       queryClient.invalidateQueries({ queryKey: ["pos-txn", clientCode] });
     },
     onError: (err: unknown) => {
@@ -562,6 +604,55 @@ function ClientProfileDrawer({
       toast.error(e.message ?? "Belgilashda xatolik yuz berdi");
     },
   });
+
+  const updateRequestTypeMut = useMutation({
+    mutationFn: ({
+      transactionId,
+      requestType,
+      reason,
+    }: {
+      transactionId: number;
+      requestType: DeliveryRequestType;
+      reason: string;
+    }) => posUpdateDeliveryRequestType(transactionId, requestType, reason),
+    onSuccess: () => {
+      toast.success("Delivery request type yangilandi");
+      queryClient.invalidateQueries({ queryKey: ["pos-txn", clientCode] });
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string };
+      toast.error(e.message ?? "Yangilashda xatolik yuz berdi");
+    },
+  });
+
+  const updateProofMethodMut = useMutation({
+    mutationFn: ({
+      transactionId,
+      proofMethod,
+      reason,
+    }: {
+      transactionId: number;
+      proofMethod: DeliveryProofMethod;
+      reason: string;
+    }) => posUpdateDeliveryProofMethod(transactionId, proofMethod, reason),
+    onSuccess: () => {
+      toast.success("Delivery proof method yangilandi");
+      queryClient.invalidateQueries({ queryKey: ["pos-txn", clientCode] });
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string };
+      toast.error(e.message ?? "Yangilashda xatolik yuz berdi");
+    },
+  });
+
+  const askReason = (): string | null => {
+    const reason = window.prompt("Sabab kiriting (majburiy):");
+    if (!reason || !reason.trim()) {
+      toast.error("Sabab kiritish majburiy");
+      return null;
+    }
+    return reason.trim();
+  };
 
   const handleAdjust = () => {
     const parsed = Number(
@@ -857,80 +948,153 @@ function ClientProfileDrawer({
                 txData.transactions.map((tx: Transaction) => {
                   const style = statusOf(tx.payment_status);
                   const isAdjust = tx.reys.startsWith("SYS_ADJ");
-                  // Identifies if THIS specific transaction is being processed
                   const isTakingThis =
-                    markTakenMut.isPending && markTakenMut.variables === tx.id;
+                    markTakenMut.isPending &&
+                    markTakenMut.variables?.transactionId === tx.id;
                   return (
                     <div
                       key={tx.id}
-                      className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05]"
+                      className="flex flex-col gap-2.5 px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05]"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Plane className="w-3 h-3 text-gray-400 shrink-0" />
-                          <span className="text-[12px] font-bold text-gray-800 dark:text-white truncate">
-                            {tx.reys}
-                          </span>
-                          <span
-                            className={`shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md ${style.bg} ${style.text}`}
-                          >
-                            {style.label}
-                          </span>
-                          {tx.is_taken_away && (
-                            <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400">
-                              Berilgan
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Plane className="w-3 h-3 text-gray-400 shrink-0" />
+                            <span className="text-[12px] font-bold text-gray-800 dark:text-white truncate">
+                              {tx.reys}
                             </span>
+                            <span
+                              className={`shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md ${style.bg} ${style.text}`}
+                            >
+                              {style.label}
+                            </span>
+                            {tx.is_taken_away && (
+                              <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                                Berilgan
+                              </span>
+                            )}
+                            {tx.delivery_request_type && (
+                              <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                User tashlagan so'rovi: {DELIVERY_METHOD_LABELS[tx.delivery_request_type] ?? tx.delivery_request_type}
+                              </span>
+                            )}
+                            {tx.delivery_proof_method && (
+                              <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                Ombordan berilgan metodi: {DELIVERY_METHOD_LABELS[tx.delivery_proof_method] ?? tx.delivery_proof_method}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">
+                            {formatTashkentDateTime(tx.created_at)}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          {isAdjust ? (
+                            // Wallet adjustments: show signed payment_balance_difference, hide summa/remaining
+                            <p
+                              className={`text-[13px] font-bold ${
+                                tx.payment_balance_difference >= 0
+                                  ? "text-green-600 dark:text-green-400"
+                                  : "text-red-500 dark:text-red-400"
+                              }`}
+                            >
+                              {tx.payment_balance_difference >= 0 ? "+" : "−"}
+                              {formatCurrencySum(
+                                Math.abs(tx.payment_balance_difference),
+                              )}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-[13px] font-bold text-gray-800 dark:text-white">
+                                {formatCurrencySum(tx.summa)}
+                              </p>
+                              {tx.payment_status !== "paid" &&
+                                tx.remaining_amount > 0 && (
+                                  <p className="text-[10px] text-red-500 font-semibold">
+                                    −{formatCurrencySum(tx.remaining_amount)}
+                                  </p>
+                                )}
+                            </>
                           )}
                         </div>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">
-                          {formatTashkentDateTime(tx.created_at)}
-                        </p>
                       </div>
 
-                      <div className="shrink-0 text-right">
-                        {isAdjust ? (
-                          // Wallet adjustments: show signed payment_balance_difference, hide summa/remaining
-                          <p
-                            className={`text-[13px] font-bold ${
-                              tx.payment_balance_difference >= 0
-                                ? "text-green-600 dark:text-green-400"
-                                : "text-red-500 dark:text-red-400"
-                            }`}
+                      {/* Single-cargo edit actions (requires pos:update_status) */}
+                      {!isAdjust && canUpdateStatus && (
+                        <div className="flex items-center flex-wrap gap-2 pt-2 border-t border-gray-200/50 dark:border-white/[0.05]">
+                          <button
+                            onClick={() => {
+                              const reason = askReason();
+                              if (!reason) return;
+                              markTakenMut.mutate({
+                                transactionId: tx.id,
+                                isTakenAway: !tx.is_taken_away,
+                                reason,
+                              });
+                            }}
+                            disabled={isTakingThis}
+                            className="flex items-center justify-center gap-1 px-3 py-1.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-500/20 transition-colors disabled:opacity-50 flex-1 sm:flex-none"
+                            title="Taken status yangilash"
                           >
-                            {tx.payment_balance_difference >= 0 ? "+" : "−"}
-                            {formatCurrencySum(
-                              Math.abs(tx.payment_balance_difference),
-                            )}
-                          </p>
-                        ) : (
-                          <>
-                            <p className="text-[13px] font-bold text-gray-800 dark:text-white">
-                              {formatCurrencySum(tx.summa)}
-                            </p>
-                            {tx.payment_status !== "paid" &&
-                              tx.remaining_amount > 0 && (
-                                <p className="text-[10px] text-red-500 font-semibold">
-                                  −{formatCurrencySum(tx.remaining_amount)}
-                                </p>
-                              )}
-                          </>
-                        )}
-                      </div>
-
-                      {/* Mark as taken — only shown for real cargo, not wallet adjustments */}
-                      {!isAdjust && !tx.is_taken_away && (
-                        <button
-                          onClick={() => markTakenMut.mutate(tx.id)}
-                          disabled={isTakingThis}
-                          className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-500/20 transition-colors disabled:opacity-50"
-                        >
-                          {isTakingThis ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <CheckCheck className="w-3 h-3" />
-                          )}
-                          Berildi
-                        </button>
+                            {isTakingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCheck className="w-3.5 h-3.5" />}
+                            {tx.is_taken_away ? "Qaytarish" : "Berildi"}
+                          </button>
+                          <select
+                            value={tx.delivery_request_type ?? ""}
+                            onChange={(e) => {
+                              const selected = e.target.value as DeliveryRequestType;
+                              if (!selected) return;
+                              const reason = askReason();
+                              if (!reason) {
+                                e.target.value = tx.delivery_request_type ?? "";
+                                return;
+                              }
+                              updateRequestTypeMut.mutate({
+                                transactionId: tx.id,
+                                requestType: selected,
+                                reason,
+                              });
+                            }}
+                            disabled={updateRequestTypeMut.isPending}
+                            className="flex-1 sm:flex-none px-2 py-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg outline-none cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+                            title="User tashlagan so'rovini yangilash"
+                          >
+                            <option value="" disabled>User tashlagan so'rovi</option>
+                            {DELIVERY_REQUEST_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {DELIVERY_METHOD_LABELS[opt] ?? opt}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={tx.delivery_proof_method ?? ""}
+                            onChange={(e) => {
+                              const selected = e.target.value as DeliveryProofMethod;
+                              if (!selected) return;
+                              const reason = askReason();
+                              if (!reason) {
+                                e.target.value = tx.delivery_proof_method ?? "";
+                                return;
+                              }
+                              updateProofMethodMut.mutate({
+                                transactionId: tx.id,
+                                proofMethod: selected,
+                                reason,
+                              });
+                            }}
+                            disabled={updateProofMethodMut.isPending}
+                            className="flex-1 sm:flex-none px-2 py-1.5 text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 rounded-lg outline-none cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors disabled:opacity-50"
+                            title="Ombordan berilgan metodini yangilash"
+                          >
+                            <option value="" disabled>Ombordan berilgan metodi</option>
+                            {DELIVERY_PROOF_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {DELIVERY_METHOD_LABELS[opt] ?? opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
                     </div>
                   );
@@ -1246,8 +1410,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const canRead    = hasPerm("pos:read");
   const canProcess = hasPerm("pos:process");
   const canAdjust  = hasPerm("pos:adjust");
+  const canUpdateStatus = hasPerm("pos:update_status");
   // Super-admins always have full access; others need at least one POS permission
-  const hasPosAccess = jwtClaims.isSuperAdmin || canRead || canProcess || canAdjust;
+  const hasPosAccess =
+    jwtClaims.isSuperAdmin || canRead || canProcess || canAdjust || canUpdateStatus;
 
   // ── Calculator modal ──────────────────────────────────────────────────────
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -2269,6 +2435,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
             onBalanceUpdate={(newBalance) => setLiveBalance(newBalance)}
             onRefreshClient={() => handleSearch(clientInfo.client_code)}
             canAdjust={canAdjust}
+            canUpdateStatus={canUpdateStatus}
           />
         )}
       </AnimatePresence>

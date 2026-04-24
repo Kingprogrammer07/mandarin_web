@@ -49,7 +49,8 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
   const [expectedFlights, setExpectedFlights] = useState<FlightListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showOld, setShowOld] = useState(false);
+  const [showRegularFlights, setShowRegularFlights] = useState(true);
+  const [showOstatkaFlights, setShowOstatkaFlights] = useState(false);
   const [offlineCounts, setOfflineCounts] = useState<Record<string, number>>({});
 
   // Silently refresh the JWT on mount so newly granted permissions take effect
@@ -102,8 +103,8 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
 
   if (!canView) return <AccessDenied />;
 
-  const recent = flights.slice(0, 3);
-  const old = flights.slice(3);
+  const regularFlights = flights.filter((f) => !f.name.toUpperCase().startsWith('A-'));
+  const ostatkaFlights = flights.filter((f) => f.name.toUpperCase().startsWith('A-'));
 
   if (isLoading) {
     return (
@@ -163,41 +164,50 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
             </section>
           )}
 
-          {/* Recent flights */}
-          <section>
-            <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-1">
-              So'nggi reyslar
-            </p>
-            <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-orange-100/60 dark:border-orange-500/10 shadow-sm overflow-hidden">
-              <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/40 dark:via-orange-500/25 to-transparent" />
-              <div className="divide-y divide-gray-50 dark:divide-white/[0.03]">
-                {recent.map(f => (
-                  <FlightRow
-                    key={f.name}
-                    flight={f}
-                    offlineCount={offlineCounts[f.name] ?? 0}
-                    isRecent
-                    onSelect={() => onSelectFlight(f.name)}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Older flights */}
-          {old.length > 0 && (
+          {/* Regular flights (M...) */}
+          {regularFlights.length > 0 && (
             <section>
               <button
-                onClick={() => setShowOld(v => !v)}
+                onClick={() => setShowRegularFlights((v) => !v)}
                 className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
-                {showOld ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                {t('flights.oldFlights')} ({old.length})
+                {showRegularFlights ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                Asosiy reyslar ({regularFlights.length})
               </button>
-              {showOld && (
-                <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-gray-100 dark:border-white/[0.06] shadow-sm overflow-hidden">
+              {showRegularFlights && (
+                <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-orange-100/60 dark:border-orange-500/10 shadow-sm overflow-hidden">
+                  <div className="h-[2px] bg-gradient-to-r from-transparent via-orange-400/40 dark:via-orange-500/25 to-transparent" />
                   <div className="divide-y divide-gray-50 dark:divide-white/[0.03]">
-                    {old.map(f => (
+                    {regularFlights.map((f, idx) => (
+                      <FlightRow
+                        key={f.name}
+                        flight={f}
+                        offlineCount={offlineCounts[f.name] ?? 0}
+                        isRecent={idx < 3}
+                        onSelect={() => onSelectFlight(f.name)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Ostatka flights (A-...) */}
+          {ostatkaFlights.length > 0 && (
+            <section>
+              <button
+                onClick={() => setShowOstatkaFlights((v) => !v)}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 px-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                {showOstatkaFlights ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                Ostatka reyslar ({ostatkaFlights.length})
+              </button>
+              {showOstatkaFlights && (
+                <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-violet-100/60 dark:border-violet-500/10 shadow-sm overflow-hidden">
+                  <div className="h-[2px] bg-gradient-to-r from-transparent via-violet-400/40 dark:via-violet-500/25 to-transparent" />
+                  <div className="divide-y divide-gray-50 dark:divide-white/[0.03]">
+                    {ostatkaFlights.map((f) => (
                       <FlightRow
                         key={f.name}
                         flight={f}

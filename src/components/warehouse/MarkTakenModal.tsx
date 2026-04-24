@@ -35,6 +35,7 @@ async function compressImage(file: File): Promise<File> {
       URL.revokeObjectURL(objectUrl);
 
       if (img.width <= MAX_WIDTH) {
+        img.src = ""; // Free memory
         resolve(file);
         return;
       }
@@ -45,11 +46,20 @@ async function compressImage(file: File): Promise<File> {
       canvas.height = Math.round(img.height * scale);
 
       const ctx = canvas.getContext("2d");
-      if (!ctx) { resolve(file); return; }
+      if (!ctx) { 
+        img.src = ""; 
+        resolve(file); 
+        return; 
+      }
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(
         (blob) => {
+          // Agressiv xotira tozalash (RAM ni bo'shatish)
+          canvas.width = 0;
+          canvas.height = 0;
+          img.src = "";
+
           if (!blob) { resolve(file); return; }
           resolve(
             new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
@@ -65,6 +75,7 @@ async function compressImage(file: File): Promise<File> {
 
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
+      img.src = "";
       resolve(file);
     };
 
@@ -75,7 +86,7 @@ async function compressImage(file: File): Promise<File> {
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface MarkTakenModalProps {
-  transactionId: number;
+  transactionIds: number[];
   clientCode: string;
   flightName: string;
   isTakenAway?: boolean;
@@ -86,7 +97,7 @@ interface MarkTakenModalProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function MarkTakenModal({
-  transactionId,
+  transactionIds,
   clientCode,
   flightName,
   isTakenAway,
@@ -129,7 +140,14 @@ export default function MarkTakenModal({
       try {
         const remaining = 10 - photos.length;
         const toProcess = Array.from(files).slice(0, remaining);
-        const compressed = await Promise.all(toProcess.map(compressImage));
+        
+        // Dastur qotib qolmasligi va memory crash (OOM) bo'lmasligi uchun 
+        // rasmlarni parallel emas, ketma-ket siqamiz (sequential processing)
+        const compressed: File[] = [];
+        for (const file of toProcess) {
+          compressed.push(await compressImage(file));
+        }
+
         const combined = [...photos, ...compressed];
         setValue("photos", combined, { shouldValidate: true });
         previews.forEach((url) => URL.revokeObjectURL(url));
@@ -159,7 +177,7 @@ export default function MarkTakenModal({
       onClose();
 
       await enqueue({
-        transactionId,
+        transactionIds,
         clientCode,
         flightName,
         deliveryMethod: data.delivery_method,
@@ -167,12 +185,12 @@ export default function MarkTakenModal({
         photos: data.photos,
       });
 
-      toast.success(`${clientCode} — navbatga qo'shildi`, {
-        description: "Yuk orqa fonda yuborilmoqda",
+      toast.success(`${clientCode} - navbatga qo'shildi`, {
+        description: `${transactionIds.length} ta yuk orqa fonda yuborilmoqda`,
         duration: 3000,
       });
     },
-    [previews, reset, onClose, enqueue, transactionId, clientCode, flightName],
+    [previews, reset, onClose, enqueue, transactionIds, clientCode, flightName],
   );
 
   const canAddMore = photos.length < 10;

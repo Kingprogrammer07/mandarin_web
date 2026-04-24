@@ -10,6 +10,7 @@ import {
   deleteExpectedCargo,
   renameClientCode,
   exportExpectedCargoExcel,
+  createEmptyFlight,
   type ClientSummaryItem,
   type DeleteExpectedCargoResponse,
 } from '@/api/services/expectedCargo';
@@ -203,6 +204,23 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     },
   });
 
+  const createEmptyFlightMutation = useMutation({
+    mutationFn: (flightName: string) =>
+      createEmptyFlight({ flight_name: flightName }),
+    onSuccess: (data) => {
+      setActiveFlight(data.flight_name);
+      queryClient.invalidateQueries({ queryKey: ['expectedCargo', 'flights'] });
+      if (data.created) {
+        toast.success(`"${data.flight_name}" reysi qo'shildi`);
+      } else {
+        toast.info(`"${data.flight_name}" reysi allaqachon mavjud`);
+      }
+    },
+    onError: () => {
+      toast.error("Reys qo'shishda xatolik yuz berdi");
+    },
+  });
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
   const handleExport = () => {
@@ -242,12 +260,9 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     const name = prompt("Yangi reys nomini kiriting:");
     if (name && name.trim()) {
       const clean = name.trim().toUpperCase();
-      setActiveFlight(clean);
-      if (!flightTabOrder.includes(clean)) {
-        setFlightTabOrder([...flightTabOrder, clean]);
-      }
+      createEmptyFlightMutation.mutate(clean);
     }
-  }, [flightTabOrder, setActiveFlight, setFlightTabOrder]);
+  }, [createEmptyFlightMutation]);
 
   /** Navigate to a specific client from the notification panel. */
   const handleNavigateToClient = useCallback((flightName: string, clientCode: string) => {

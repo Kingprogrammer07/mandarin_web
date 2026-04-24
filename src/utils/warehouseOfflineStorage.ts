@@ -9,7 +9,7 @@ interface WarehouseOfflineDB extends DBSchema {
 
 export interface WarehousePendingItem {
   id: string;
-  transactionId: number;
+  transactionIds: number[];
   clientCode: string;
   flightName: string;
   deliveryMethod: string;

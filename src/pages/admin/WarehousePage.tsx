@@ -15,14 +15,13 @@ import { motion } from "framer-motion";
 import { getAdminJwtClaims } from "../../api/services/adminManagement";
 import { refreshAdminToken } from "../../api/services/adminAuth";
 import { useWarehouseStore } from "../../store/useWarehouseStore";
-import { useWarehouseTransactions, useWarehouseTransactionSearch } from "../../api/hooks/useWarehouse";
+import { useGroupedWarehouseSearch } from "../../api/hooks/useWarehouse";
 import { useWarehouseQueueProcessor } from "../../api/hooks/useWarehouseQueueProcessor";
 import WarehouseFilters from "../../components/warehouse/WarehouseFilters";
-import TransactionsTable from "../../components/warehouse/TransactionsTable";
+import GroupedTransactionsList from "../../components/warehouse/GroupedTransactionsList";
 import MyActivityList from "../../components/warehouse/MyActivityList";
 import MarkTakenModal from "../../components/warehouse/MarkTakenModal";
 import WarehouseOfflineManager from "../../components/warehouse/WarehouseOfflineManager";
-import type { WarehouseTransactionItem } from "../../api/services/warehouse";
 import { useBroadcastChannel, type BroadcastMessage } from "../../hooks/useBroadcastChannel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -86,7 +85,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   const [activityPage, setActivityPage] = useState(1);
 
   // Mark-taken modal state
-  const [modalTxId, setModalTxId] = useState<number | null>(null);
+  const [modalTxIds, setModalTxIds] = useState<number[]>([]);
   const [modalClientCode, setModalClientCode] = useState("");
   const [modalFlightName, setModalFlightName] = useState("");
   const [modalIsTakenAway, setModalIsTakenAway] = useState(false);
@@ -124,47 +123,28 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
 
   const isFlightMode = flightName.trim().length > 0;
   const isSearchMode = !isFlightMode && searchQuery.trim().length > 0;
+  const isEnabled = isFlightMode || isSearchMode;
 
-  // Flight-specific query: active only when a flight is selected
-  const { data: flightData, isLoading: flightLoading } = useWarehouseTransactions(
-    flightName,
+  const { data: activeData, isLoading } = useGroupedWarehouseSearch(
     {
-      payment_status: paymentStatus,
-      taken_status: takenStatus,
-      code: searchQuery || undefined,
-      page,
-      size,
-    },
-  );
-
-  // Global search query: active only when no flight is selected but a search term exists
-  const { data: searchData, isLoading: searchLoading } = useWarehouseTransactionSearch(
-    {
-      code: searchQuery || undefined,
+      flight: isFlightMode ? flightName : undefined,
+      code: isSearchMode ? searchQuery : undefined,
       payment_status: paymentStatus,
       taken_status: takenStatus,
       page,
       size,
     },
-    isSearchMode,
+    isEnabled,
   );
-
-  const activeData = isFlightMode ? flightData : isSearchMode ? searchData : undefined;
-  const isLoading = isFlightMode ? flightLoading : searchLoading;
 
   const handleMarkTaken = useCallback(
-    (transactionId: number) => {
-      const tx = activeData?.items.find(
-        (item: WarehouseTransactionItem) => item.id === transactionId,
-      );
-      if (tx) {
-        setModalTxId(transactionId);
-        setModalClientCode(tx.client_code);
-        setModalFlightName(tx.reys);
-        setModalIsTakenAway(tx.is_taken_away);
-      }
+    (transactionIds: number[], clientCode: string, txFlightName: string, isTakenAway: boolean) => {
+      setModalTxIds(transactionIds);
+      setModalClientCode(clientCode);
+      setModalFlightName(txFlightName);
+      setModalIsTakenAway(isTakenAway);
     },
-    [activeData],
+    [],
   );
 
   const handlePageChange = useCallback(
@@ -184,18 +164,18 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   );
 
   const handleNotifyCashier = useCallback(
-    (item: WarehouseTransactionItem) => {
+    (clientCode: string, flightName: string, amount: number) => {
       sendMessage({
         type: "POS_NOTIFY",
         payload: {
-          flightName: item.reys,
-          clientCode: item.client_code,
-          amount: item.remaining_amount > 0 ? item.remaining_amount : item.total_amount ?? undefined,
+          flightName,
+          clientCode,
+          amount,
           currency: "UZS",
         },
       });
-      toast.success(`Kassirga xabar yuborildi: ${item.client_code}`, {
-        description: `Reys: ${item.reys}`,
+      toast.success(`Kassirga xabar yuborildi: ${clientCode}`, {
+        description: `Reys: ${flightName}`,
         duration: 3000,
       });
     },
@@ -333,17 +313,40 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
               </p>
             </motion.div>
           ) : (
-            <TransactionsTable
-              items={activeData?.items ?? []}
-              isLoading={isLoading}
-              page={page}
-              totalPages={activeData?.total_pages ?? 0}
-              totalCount={activeData?.total_count ?? 0}
-              onPageChange={handlePageChange}
-              onMarkTaken={handleMarkTaken}
-              canMarkTaken={canMarkTaken}
-              onNotifyCashier={handleNotifyCashier}
-            />
+            <div className="space-y-4">
+              <GroupedTransactionsList
+                items={activeData?.items ?? []}
+                isLoading={isLoading}
+                onMarkTaken={handleMarkTaken}
+                canMarkTaken={canMarkTaken}
+                onNotifyCashier={handleNotifyCashier}
+              />
+              
+              {/* Basic Pagination - if activeData is paginated. Note Grouped doesn't give total_pages yet, but we calculate it */}
+              {activeData && activeData.total_count > size && (
+                <nav aria-label="Sahifalar" className="flex items-center justify-center gap-1.5 pt-2 pb-4">
+                  <button
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page <= 1}
+                    aria-label="Oldingi sahifa"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm"
+                  >
+                    O'tgan
+                  </button>
+                  <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 font-bold">
+                    Sahifa {page}
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page * size >= activeData.total_count}
+                    aria-label="Keyingi sahifa"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm"
+                  >
+                    Keyingi
+                  </button>
+                </nav>
+              )}
+            </div>
           )
         ) : (
           <MyActivityList
@@ -354,14 +357,14 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
       </div>
 
       {/* ── Mark Taken Modal ──────────────────────────────────────────────── */}
-      {modalTxId !== null && (
+      {modalTxIds.length > 0 && (
         <MarkTakenModal
-          transactionId={modalTxId}
+          transactionIds={modalTxIds}
           clientCode={modalClientCode}
           flightName={modalFlightName}
           isTakenAway={modalIsTakenAway}
-          isOpen={modalTxId !== null}
-          onClose={() => setModalTxId(null)}
+          isOpen={modalTxIds.length > 0}
+          onClose={() => setModalTxIds([])}
         />
       )}
 

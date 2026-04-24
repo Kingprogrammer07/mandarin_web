@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWarehouseQueueStore } from '../../store/useWarehouseQueueStore';
-import { markTransactionTaken } from '../services/warehouse';
+import { bulkMarkTransactionTaken } from '../services/warehouse';
 import { warehouseKeys } from './useWarehouse';
 
 /**
  * Initializes the warehouse upload queue and runs a background sequential processor.
- * Call once at the top of WarehousePage — idempotent.
+ * Call once at the top of WarehousePage ✅ idempotent.
  *
  * Uses toast.promise so the loading → success/error toast transition is handled
  * natively by Sonner (avoids the ID-based update race condition).
@@ -37,6 +37,7 @@ export function useWarehouseQueueProcessor() {
     markUploading(pendingItem.id);
 
     const formData = new FormData();
+    formData.append('transaction_ids', pendingItem.transactionIds.join(','));
     formData.append('delivery_method', pendingItem.deliveryMethod);
     if (pendingItem.comment) {
       formData.append('comment', pendingItem.comment);
@@ -44,14 +45,14 @@ export function useWarehouseQueueProcessor() {
     pendingItem.photos.forEach((photo) => formData.append('photos', photo));
 
     // Capture stable values before async operations
-    const { id, clientCode, transactionId } = pendingItem;
-    const uploadPromise = markTransactionTaken(transactionId, formData);
+    const { id, clientCode } = pendingItem;
+    const uploadPromise = bulkMarkTransactionTaken(formData);
 
-    // toast.promise handles loading → success/error transition atomically —
+    // toast.promise handles loading → success/error transition atomically ✨
     // more reliable than the manual toast.loading + toast.success(id) pattern.
     toast.promise(uploadPromise, {
-      loading: `${clientCode} — yuklanmoqda...`,
-      success: `${clientCode} — muvaffaqiyatli belgilandi`,
+      loading: `${clientCode} (${pendingItem.transactionIds.length} ta) → yuklanmoqda...`,
+      success: `${clientCode} → muvaffaqiyatli ommaviy tasdiqlandi`,
       error: (err: unknown) =>
         (err as { message?: string }).message ?? 'Serverga ulanishda xatolik',
     });

@@ -163,6 +163,17 @@ export interface FlightListResponse {
   total: number;
 }
 
+// ── API 13 — Empty flight registration ───────────────────────────────────────
+
+export interface CreateEmptyFlightRequest {
+  flight_name: string;
+}
+
+export interface CreateEmptyFlightResponse {
+  flight_name: string;
+  created: boolean;
+}
+
 // ── Search params ──────────────────────────────────────────────────────────────
 
 export interface SearchExpectedCargoParams {
@@ -350,5 +361,13 @@ export async function getClientSummaryByFlight(
 /** API 12 — Return all distinct flight names together with their aggregate counts. */
 export async function getFlightList(): Promise<FlightListResponse> {
   const response = await apiClient.get<FlightListResponse>(`${BASE}/flights`);
+  return response.data;
+}
+
+/** API 13 — Register an empty flight (no cargo yet). */
+export async function createEmptyFlight(
+  payload: CreateEmptyFlightRequest,
+): Promise<CreateEmptyFlightResponse> {
+  const response = await apiClient.post<CreateEmptyFlightResponse>(`${BASE}/flights`, payload);
   return response.data;
 }

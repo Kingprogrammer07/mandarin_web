@@ -14,7 +14,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     allowedHosts: [
-      "b117-45-150-26-184.ngrok-free.app"
+      "landscape-slam-boneless.ngrok-free.dev"
     ],
   },
 })

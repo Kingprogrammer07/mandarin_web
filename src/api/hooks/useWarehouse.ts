@@ -6,6 +6,7 @@ import {
   markTransactionTaken,
   getMyActivity,
   searchTransactions,
+  searchTransactionsGrouped,
 } from "../services/warehouse";
 import type { GetFlightTransactionsParams, SearchTransactionsParams } from "../services/warehouse";
 
@@ -17,6 +18,8 @@ export const warehouseKeys = {
   allTransactions: () => ["warehouse_transactions"] as const,
   transactionSearch: (params: SearchTransactionsParams) =>
     ["warehouse_transaction_search", params] as const,
+  groupedTransactionSearch: (params: SearchTransactionsParams) =>
+    ["warehouse_grouped_transaction_search", params] as const,
   myActivity: (page: number, size: number) =>
     ["warehouse_my_activity", page, size] as const,
 };
@@ -57,6 +60,21 @@ export const useWarehouseTransactionSearch = (
   return useQuery({
     queryKey: warehouseKeys.transactionSearch(params),
     queryFn: () => searchTransactions(params),
+    enabled,
+    placeholderData: (previousData) => previousData,
+  });
+};
+
+/**
+ * Searches transactions grouped by client and flight.
+ */
+export const useGroupedWarehouseSearch = (
+  params: SearchTransactionsParams,
+  enabled: boolean,
+) => {
+  return useQuery({
+    queryKey: warehouseKeys.groupedTransactionSearch(params),
+    queryFn: () => searchTransactionsGrouped(params),
     enabled,
     placeholderData: (previousData) => previousData,
   });
