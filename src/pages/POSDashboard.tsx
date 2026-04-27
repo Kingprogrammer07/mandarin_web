@@ -1579,7 +1579,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     queryFn: () =>
       getUnpaidCargo({
         clientCode: clientInfo!.client_code,
-        filterType: "pending",
+        filterType: "all",
         sortOrder: "asc",
         limit: 100,
         offset: 0,
