@@ -1653,6 +1653,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     (s, c) => s + (c.total_payment ?? 0),
     0,
   );
+  const totalSelectedWeight = selectedCargos.reduce(
+    (s, c) => s + (c.weight ?? 0),
+    0,
+  );
   const walletDeduction = useWallet ? Math.min(displayBalance, totalOwed) : 0;
   const netAfterWallet = totalOwed - walletDeduction;
 
@@ -2383,6 +2387,17 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                         </span>
                         <span className="font-semibold text-gray-800 dark:text-gray-200">
                           {formatCurrencySum(totalOwed)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[12px]">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Umumiy hajm:
+                        </span>
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">
+                          {totalSelectedWeight % 1 === 0
+                            ? totalSelectedWeight
+                            : totalSelectedWeight.toFixed(2)}{" "}
+                          kg
                         </span>
                       </div>
                       {walletDeduction > 0 && (
