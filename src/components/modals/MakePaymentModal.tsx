@@ -965,14 +965,17 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => handleChooseMethod('cash')}
-            className="h-14 rounded-2xl font-bold text-base
-              bg-gradient-to-r from-gray-700 to-gray-900
-              dark:from-white/10 dark:to-white/5
-              hover:from-gray-800 hover:to-gray-950
-              dark:hover:from-white/15 dark:hover:to-white/10
-              text-white shadow-lg
-              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
+            onClick={() => { if (!isPartial) handleChooseMethod('cash'); }}
+            disabled={isPartial}
+            aria-disabled={isPartial}
+            className={
+              `h-14 rounded-lg font-bold text-base
+              bg-white
+              hover:bg-[#eef6ff]
+              text-[#07182f] border border-[#dbe8f4] shadow-sm
+              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
+              disabled:opacity-60 disabled:cursor-not-allowed`
+            }
           >
             <Banknote className="w-5 h-5" />
             {t('makePayment.payCash')}
