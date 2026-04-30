@@ -1,17 +1,18 @@
 # Objective
 
-Apply the backend POS cashier-log filtering changes to the frontend POS dashboard so cashiers can filter log rows by date range and payment provider.
+Apply the backend POS cashier-log filtering changes to the frontend POS dashboard so cashiers can filter log rows by date range and payment provider, with the displayed filtered total matching the selected provider.
 
 # Implementation Plan
 
 - [x] Update POS API types to include `payment_provider` request filtering and the new `summary` response payload.
 - [x] Add POS dashboard state for cashier-log date/provider filters and wire those values into the TanStack Query key/request.
 - [x] Add a compact cashier-log filter UI in the POS dashboard sidebar with clear/reset behavior.
+- [x] Display provider-specific summary totals when a provider filter is selected.
 - [x] Validate the change with the repository build/lint commands where feasible.
 
 # Walkthrough/Architecture
 
-`POSDashboard` owns the visible cashier-log filters because they are UI-only controls for the sidebar log. The component passes normalized query params to `getCashierLog`, which forwards them to `GET /api/v1/payments/cashier-log`. The query key includes the active filter values so TanStack Query caches and refetches each filtered view correctly. The API layer stays as the typed boundary for provider names and the backend summary response shape.
+`POSDashboard` owns the visible cashier-log filters because they are UI-only controls for the sidebar log. The component passes normalized query params to `getCashierLog`, which forwards them to `GET /api/v1/payments/cashier-log`. The query key includes the active filter values so TanStack Query caches and refetches each filtered view correctly. The API layer stays as the typed boundary for provider names and the backend summary response shape. The sidebar total uses `summary.total` only for the "all providers" view; provider-specific filters use their matching `summary.cash`, `summary.card`, `summary.click`, `summary.payme`, or `summary.wallet` value.
 
 # Verification
 

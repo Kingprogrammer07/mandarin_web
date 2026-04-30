@@ -58,6 +58,7 @@ import type {
   PaymentProvider,
   CashierLogProvider,
   CashierLogItem,
+  CashierLogSummary,
   CardWithBalance,
   AdjustBalanceRequest,
 } from "@/api/pos";
@@ -365,6 +366,13 @@ function toIsoDateBound(date: string, boundary: "start" | "end"): string | undef
       ? new Date(year, month - 1, day, 0, 0, 0, 0)
       : new Date(year, month - 1, day, 23, 59, 59, 999);
   return localDate.toISOString();
+}
+
+function getSelectedProviderTotal(
+  summary: CashierLogSummary,
+  provider: CashierLogProvider | "all",
+): number {
+  return provider === "all" ? summary.total : summary[provider];
 }
 
 // ─── TodayTotal ───────────────────────────────────────────────────────────────
@@ -2001,7 +2009,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                           Filter jami
                         </span>
                         <span className="font-black text-gray-700 dark:text-gray-200">
-                          {formatCurrencySum(logData.summary.total)}
+                          {formatCurrencySum(
+                            getSelectedProviderTotal(logData.summary, logProvider),
+                          )}
                         </span>
                       </div>
                     )}
