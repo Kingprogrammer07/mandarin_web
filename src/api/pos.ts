@@ -17,6 +17,7 @@ const getAdminHeaders = () => {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type PaymentProvider = 'cash' | 'click' | 'payme' | 'card';
+export type CashierLogProvider = PaymentProvider | 'wallet';
 
 /** Card with collected balance — returned by GET /payments/cards. */
 export interface CardWithBalance {
@@ -95,6 +96,18 @@ export interface CashierLogResponse {
   total_pages: number;
   /** Sum of all amounts processed today (UTC calendar day). */
   today_total: number;
+  summary: CashierLogSummary;
+}
+
+/** Provider totals for the active cashier-log filters. */
+export interface CashierLogSummary {
+  cash: number;
+  card: number;
+  click: number;
+  payme: number;
+  wallet: number;
+  /** Cash/card/click/payme total. Excludes wallet adjustments. */
+  total: number;
 }
 
 export interface CashierLogParams {
@@ -102,6 +115,7 @@ export interface CashierLogParams {
   size?: number;
   date_from?: string;
   date_to?: string;
+  payment_provider?: CashierLogProvider;
 }
 
 /** Manual cashier balance correction request. */

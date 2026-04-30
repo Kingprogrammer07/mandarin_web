@@ -56,6 +56,7 @@ import {
 } from "@/hooks/useBroadcastChannel";
 import type {
   PaymentProvider,
+  CashierLogProvider,
   CashierLogItem,
   CardWithBalance,
   AdjustBalanceRequest,
@@ -92,6 +93,8 @@ const PROVIDER_CHIP: Record<string, string> = {
     "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400",
   payme:
     "bg-cyan-50   dark:bg-cyan-500/10   text-cyan-600   dark:text-cyan-400",
+  wallet:
+    "bg-amber-50  dark:bg-amber-500/10  text-amber-600  dark:text-amber-400",
 };
 
 /**
@@ -185,6 +188,15 @@ const PAYMENT_LABEL: Record<string, string> = {
   wallet: "Hamyon",
   online: "Online",
 };
+
+const LOG_PROVIDER_FILTERS: { value: CashierLogProvider | "all"; label: string }[] = [
+  { value: "all", label: "Barchasi" },
+  { value: "cash", label: "Naqd" },
+  { value: "card", label: "Karta" },
+  { value: "click", label: "Click" },
+  { value: "payme", label: "Payme" },
+  { value: "wallet", label: "Hamyon" },
+];
 
 const DELIVERY_REQUEST_OPTIONS: DeliveryRequestType[] = [
   "uzpost",
@@ -342,6 +354,17 @@ function formatCard(raw: string): string {
 function maskCard(raw: string): string {
   const d = raw.replace(/\s/g, "");
   return `${d.slice(0, 4)} **** **** ${d.slice(-4)}`;
+}
+
+function toIsoDateBound(date: string, boundary: "start" | "end"): string | undefined {
+  if (!date) return undefined;
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  const localDate =
+    boundary === "start"
+      ? new Date(year, month - 1, day, 0, 0, 0, 0)
+      : new Date(year, month - 1, day, 23, 59, 59, 999);
+  return localDate.toISOString();
 }
 
 // ─── TodayTotal ───────────────────────────────────────────────────────────────
@@ -1537,6 +1560,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [recentCodes, setRecentCodes] = useState<string[]>(getRecentSearches);
+  const [logDateFrom, setLogDateFrom] = useState("");
+  const [logDateTo, setLogDateTo] = useState("");
+  const [logProvider, setLogProvider] = useState<CashierLogProvider | "all">("all");
 
   // Live balance updated after successful balance adjustments without re-fetching client
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
@@ -1559,14 +1585,30 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     searchRef.current?.focus();
   }, []);
 
+  const cashierLogParams = useMemo(
+    () => ({
+      page: 1,
+      size: 30,
+      date_from: toIsoDateBound(logDateFrom, "start"),
+      date_to: toIsoDateBound(logDateTo, "end"),
+      payment_provider: logProvider === "all" ? undefined : logProvider,
+    }),
+    [logDateFrom, logDateTo, logProvider],
+  );
+  const hasLogFilters = Boolean(
+    cashierLogParams.date_from ||
+      cashierLogParams.date_to ||
+      cashierLogParams.payment_provider,
+  );
+
   // ── Queries ───────────────────────────────────────────────────────────────
   const {
     data: logData,
     isLoading: logLoading,
     refetch: refetchLog,
   } = useQuery({
-    queryKey: ["cashier-log"],
-    queryFn: () => getCashierLog({ page: 1, size: 30 }),
+    queryKey: ["cashier-log", cashierLogParams],
+    queryFn: () => getCashierLog(cashierLogParams),
     // Poll every 10 s so all cashiers see each other's entries in near-real-time
     // without requiring a manual refresh.
     refetchInterval: 10_000,
@@ -1901,6 +1943,68 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                     >
                       <RefreshCw className="w-3 h-3" />
                     </button>
+                  </div>
+                  <div className="px-4 py-3 border-b border-gray-50 dark:border-white/[0.05] space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                          Filter
+                        </span>
+                      </div>
+                      {hasLogFilters && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogDateFrom("");
+                            setLogDateTo("");
+                            setLogProvider("all");
+                          }}
+                          className="text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors"
+                        >
+                          Tozalash
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      value={logProvider}
+                      onChange={(event) =>
+                        setLogProvider(event.target.value as CashierLogProvider | "all")
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
+                    >
+                      {LOG_PROVIDER_FILTERS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={logDateFrom}
+                        max={logDateTo || undefined}
+                        onChange={(event) => setLogDateFrom(event.target.value)}
+                        className="min-w-0 px-2.5 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[11px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
+                      />
+                      <input
+                        type="date"
+                        value={logDateTo}
+                        min={logDateFrom || undefined}
+                        onChange={(event) => setLogDateTo(event.target.value)}
+                        className="min-w-0 px-2.5 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[11px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
+                      />
+                    </div>
+                    {logData?.summary && (
+                      <div className="flex items-center justify-between text-[11px] pt-1">
+                        <span className="text-gray-400 dark:text-gray-500">
+                          Filter jami
+                        </span>
+                        <span className="font-black text-gray-700 dark:text-gray-200">
+                          {formatCurrencySum(logData.summary.total)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="px-4 py-1 max-h-[50vh] lg:max-h-[65vh] overflow-y-auto overscroll-contain">
                     {logLoading ? (
