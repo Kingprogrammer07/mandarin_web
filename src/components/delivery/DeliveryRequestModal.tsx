@@ -31,8 +31,11 @@ import { Loader2, AlertCircle, PackageOpen, Upload, MapPin, Phone, User, Globe, 
 
 import { regions, DISTRICTS } from '@/lib/validation';
 import { submitAdminDeliveryRequest } from '@/api/delivery';
+import { updateClient } from '@/api/services/client';
 import type { Transaction } from '@/api/transactions';
 import { formatCurrencySum } from '@/lib/format';
+
+const DELIVERY_ADDRESS_CONFIRMED_SESSION_PREFIX = 'delivery_address_confirmed_this_session';
 
 // Reusing general rules for client info
 const deliverySchema = z.object({
@@ -40,7 +43,7 @@ const deliverySchema = z.object({
     phone: z.string().min(9, 'Telefon raqam noto\'g\'ri'),
     region: z.string().min(1, 'Viloyat tanlanishi shart'),
     district: z.string().min(1, 'Tuman tanlanishi shart'),
-    address: z.string().optional(),
+    address: z.string().trim().min(5, 'deliveryRequest.adminModal.errors.addressRequired'),
 });
 
 type DeliveryFormData = z.infer<typeof deliverySchema>;
@@ -80,6 +83,8 @@ export function DeliveryRequestModal({
     const [isDragging, setIsDragging] = useState(false);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSavingAddress, setIsSavingAddress] = useState(false);
+    const [isAddressConfirmedThisSession, setIsAddressConfirmedThisSession] = useState(false);
     const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
     const form = useForm<DeliveryFormData>({
@@ -94,10 +99,35 @@ export function DeliveryRequestModal({
     });
 
     const selectedRegion = form.watch('region');
+    const watchedFullName = form.watch('full_name');
+    const watchedPhone = form.watch('phone');
+    const watchedDistrict = form.watch('district');
+    const watchedAddress = form.watch('address');
+
+    const getAddressConfirmationSessionKey = useCallback((clientId: string | number) => (
+        `${DELIVERY_ADDRESS_CONFIRMED_SESSION_PREFIX}:${clientId}`
+    ), []);
+
+    const isAddressFormComplete = Boolean(
+        watchedFullName?.trim()
+        && watchedPhone?.trim()
+        && selectedRegion?.trim()
+        && watchedDistrict?.trim()
+        && watchedAddress?.trim()
+    );
+
+    const isDeliverySubmissionBlocked = !isAddressConfirmedThisSession || !isAddressFormComplete || isSavingAddress;
 
     // Reset / Load form when modal opens or profile changes
     useEffect(() => {
         if (isOpen && clientProfile) {
+            const addressConfirmationKey = clientProfile.id
+                ? getAddressConfirmationSessionKey(clientProfile.id)
+                : null;
+            const isConfirmedInCurrentSession = addressConfirmationKey
+                ? sessionStorage.getItem(addressConfirmationKey) === 'true'
+                : false;
+
             form.reset({
                 full_name: clientProfile.full_name || '',
                 phone: clientProfile.phone ? clientProfile.phone.replace('+998', '').replace(/\D/g, '') : '',
@@ -106,17 +136,17 @@ export function DeliveryRequestModal({
                 address: clientProfile.address || '',
             });
             setDeliveryType('uzpost');
-            // Auto-open edit mode when address is incomplete so the worker fills it before submitting
-            const hasIncompleteAddress = !clientProfile.region || !clientProfile.district;
-            setIsEditingClient(hasIncompleteAddress);
+            setIsAddressConfirmedThisSession(isConfirmedInCurrentSession);
+            setIsEditingClient(!isConfirmedInCurrentSession);
             setUseWallet(false);
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             setPreviewUrl(null);
             setIsDragging(false);
             setReceiptFile(null);
             setErrorStatus(null);
+            setIsSavingAddress(false);
         }
-    }, [isOpen, clientProfile, form, previewUrl]);
+    }, [isOpen, clientProfile, form, getAddressConfirmationSessionKey, previewUrl]);
 
     useEffect(() => {
         if (selectedRegion && clientProfile?.region !== selectedRegion) {
@@ -160,6 +190,45 @@ export function DeliveryRequestModal({
         }
     };
 
+    const handleSaveAddressConfirmation = async () => {
+        if (!clientProfile?.id) {
+            setErrorStatus(t('deliveryRequest.adminModal.errors.clientIdMissing'));
+            return;
+        }
+
+        const isValidAddress = await form.trigger(['full_name', 'phone', 'region', 'district', 'address']);
+        if (!isValidAddress) {
+            setErrorStatus(t('deliveryRequest.adminModal.errors.checkAddressBeforeSubmit'));
+            setIsEditingClient(true);
+            return;
+        }
+
+        const currentValues = form.getValues();
+
+        setIsSavingAddress(true);
+        setErrorStatus(null);
+
+        try {
+            await updateClient(Number(clientProfile.id), {
+                full_name: currentValues.full_name.trim(),
+                phone: `+998${currentValues.phone.replace(/\D/g, '')}`,
+                region: currentValues.region,
+                district: currentValues.district,
+                address: currentValues.address.trim(),
+            });
+
+            sessionStorage.setItem(getAddressConfirmationSessionKey(clientProfile.id), 'true');
+            setIsAddressConfirmedThisSession(true);
+            setIsEditingClient(false);
+        } catch (err: unknown) {
+            console.error('Failed to save delivery address confirmation', err);
+            const e = err as { message?: string; data?: { detail?: string } };
+            setErrorStatus(e?.data?.detail || e?.message || t('deliveryRequest.adminModal.errors.saveAddressFailed'));
+        } finally {
+            setIsSavingAddress(false);
+        }
+    };
+
     // Global Paste Event Listener
     useEffect(() => {
         const handlePaste = (e: ClipboardEvent) => {
@@ -192,6 +261,12 @@ export function DeliveryRequestModal({
     const onSubmit = async (data: DeliveryFormData) => {
         if (!transaction || !clientProfile) return;
 
+        if (isDeliverySubmissionBlocked) {
+            setIsEditingClient(true);
+            setErrorStatus(t('deliveryRequest.adminModal.errors.checkAddressBeforeSubmit'));
+            return;
+        }
+
         if (deliveryType === 'uzpost' && remainingAmount > 0 && !receiptFile) {
             setErrorStatus('Uzpost yetkazib berish uchun to\'lov cheki yuklanishi shart (agar hamyon yetmasa).');
             return;
@@ -203,12 +278,11 @@ export function DeliveryRequestModal({
         try {
             const formData = new FormData();
             if (!clientProfile.id) {
-                throw new Error("Mijoz ID si topilmadi. Mijozni tekshiring.");
+                throw new Error(t('deliveryRequest.adminModal.errors.clientIdMissing'));
             }
             formData.append('client_id', String(clientProfile.id)); 
             
-            // Telegram ID of admin.
-            const adminId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id || 0;
+            const adminId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 0;
             formData.append('admin_telegram_id', String(adminId));
             formData.append('delivery_type', deliveryType);
 
@@ -220,7 +294,7 @@ export function DeliveryRequestModal({
             formData.append('phone', `+998${data.phone}`);
             formData.append('region', data.region);
             formData.append('district', data.district);
-            formData.append('address', data.address || '');
+            formData.append('address', data.address);
 
             formData.append('wallet_used', String(applicableWallet));
 
@@ -319,12 +393,36 @@ export function DeliveryRequestModal({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setIsEditingClient(!isEditingClient)}
+                                            onClick={() => {
+                                                setIsEditingClient(!isEditingClient);
+                                                if (!isEditingClient) {
+                                                    if (clientProfile.id) {
+                                                        sessionStorage.removeItem(getAddressConfirmationSessionKey(clientProfile.id));
+                                                    }
+                                                    setIsAddressConfirmedThisSession(false);
+                                                }
+                                            }}
                                             className="text-orange-600 h-8"
                                         >
-                                            {isEditingClient ? 'Tasdiqlash' : 'Tahrirlash'}
+                                            {isEditingClient
+                                                ? t('deliveryRequest.adminModal.actions.closeEdit')
+                                                : t('deliveryRequest.adminModal.actions.editAddress')}
                                         </Button>
                                     </div>
+
+                                    {!isAddressConfirmedThisSession && (
+                                        <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                                            <TriangleAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                            <div>
+                                                <p className="font-semibold text-amber-800">
+                                                    {t('deliveryRequest.adminModal.addressGate.title')}
+                                                </p>
+                                                <p className="text-amber-700 text-xs mt-0.5">
+                                                    {t('deliveryRequest.adminModal.addressGate.description')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {!isEditingClient ? (
                                         <div className="space-y-2">
@@ -332,9 +430,9 @@ export function DeliveryRequestModal({
                                                 <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
                                                     <TriangleAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                                                     <div>
-                                                        <p className="font-semibold text-amber-800">Manzil to'liq emas</p>
+                                                        <p className="font-semibold text-amber-800">{t('deliveryRequest.adminModal.addressGate.incompleteTitle')}</p>
                                                         <p className="text-amber-700 text-xs mt-0.5">
-                                                            Yetkazib berish uchun viloyat va tuman kiritilishi shart. "Tahrirlash" tugmasini bosib to'ldiring.
+                                                            {t('deliveryRequest.adminModal.addressGate.incompleteDescription')}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -443,11 +541,29 @@ export function DeliveryRequestModal({
                                                 name="address"
                                                 render={({ field }) => (
                                                     <FormItem>
-                                                        <FormLabel>Uy manzili <span className="text-gray-400 font-normal text-xs">(Ixtiyoriy)</span></FormLabel>
-                                                        <FormControl><Input {...field} placeholder="Ko'cha, uy raqami" /></FormControl>
+                                                        <FormLabel>{t('client.address')} <span className="text-red-500">*</span></FormLabel>
+                                                        <FormControl><Input {...field} placeholder={t('client.addressPlaceholder')} /></FormControl>
                                                     </FormItem>
                                                 )}
                                             />
+                                            <div className="rounded-lg border border-orange-200 bg-white p-3 text-xs text-gray-600">
+                                                {t('deliveryRequest.adminModal.addressGate.description')}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                                                onClick={handleSaveAddressConfirmation}
+                                                disabled={isSavingAddress}
+                                            >
+                                                {isSavingAddress ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                        {t('deliveryRequest.adminModal.actions.savingAddress')}
+                                                    </>
+                                                ) : (
+                                                    t('deliveryRequest.adminModal.actions.saveAndConfirmAddress')
+                                                )}
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -553,7 +669,13 @@ export function DeliveryRequestModal({
                                 )}
 
                                 {/* Verification Actions MUST BE INSIDE <form> */}
-                                <div className="flex gap-3 pt-4 border-t mt-4 pb-4">
+                                <div className="space-y-2 pt-4 border-t mt-4 pb-4">
+                                    {isDeliverySubmissionBlocked && (
+                                        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                            {t('deliveryRequest.adminModal.addressGate.shortHint')}
+                                        </p>
+                                    )}
+                                    <div className="flex gap-3">
                                     <Button
                                         variant="outline"
                                         type="button"
@@ -566,7 +688,7 @@ export function DeliveryRequestModal({
                                     <Button
                                         type="submit"
                                         className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || isDeliverySubmissionBlocked}
                                     >
                                         {isSubmitting ? (
                                             <>
@@ -577,6 +699,7 @@ export function DeliveryRequestModal({
                                             'Tasdiqlash'
                                         )}
                                     </Button>
+                                    </div>
                                 </div>
                             </form>
                         </Form>

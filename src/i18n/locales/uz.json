@@ -987,6 +987,27 @@
     "headerTitle": "Zayavka qoldirish",
     "headerTitleShort": "Zayavka",
     "historyButton": "Tarix",
+    "adminModal": {
+      "addressGate": {
+        "title": "Zayafka yuborishdan oldin yetkazib berish manzilini tekshiring",
+        "description": "Bu manzil kuryerga yuboriladi. Manzilni saqlamaguncha zayafka yuborilmaydi.",
+        "shortHint": "Avval yetkazib berish manzilini tekshiring.",
+        "incompleteTitle": "Manzil to'liq emas",
+        "incompleteDescription": "Yetkazib berish uchun viloyat, tuman va uy manzili kiritilishi shart. \"Manzilni tahrirlash\" tugmasini bosib to'ldiring."
+      },
+      "actions": {
+        "editAddress": "Manzilni tahrirlash",
+        "closeEdit": "Yopish",
+        "saveAndConfirmAddress": "Manzilni saqlash va tasdiqlash",
+        "savingAddress": "Saqlanmoqda..."
+      },
+      "errors": {
+        "addressRequired": "Yetkazib berish manzilini to'liq kiriting",
+        "checkAddressBeforeSubmit": "Zayafka yuborishdan oldin yetkazib berish manzilini tekshiring.",
+        "clientIdMissing": "Mijoz ID si topilmadi. Mijozni tekshiring.",
+        "saveAddressFailed": "Manzilni saqlashda xatolik yuz berdi. Qayta urinib ko'ring."
+      }
+    },
     "steps": {
       "type": {
         "title": "Yetkazish turini tanlang",
