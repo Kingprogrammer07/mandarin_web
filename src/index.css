@@ -156,6 +156,53 @@
     animation-delay: 4s;
   }
 
+  /* Aurora / Orb background animations for TV display */
+  @keyframes aurora {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg) scale(1.2);
+      opacity: 0.35;
+    }
+    33% {
+      transform: translate(-40%, -60%) rotate(120deg) scale(1.35);
+      opacity: 0.25;
+    }
+    66% {
+      transform: translate(-60%, -40%) rotate(240deg) scale(1.15);
+      opacity: 0.3;
+    }
+    100% {
+      transform: translate(-50%, -50%) rotate(360deg) scale(1.2);
+      opacity: 0.35;
+    }
+  }
+
+  @keyframes orb-float {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(20px, -30px) scale(1.08);
+    }
+  }
+
+  .animate-aurora {
+    animation: aurora 20s linear infinite;
+  }
+
+  .animate-orb {
+    animation: orb-float 12s ease-in-out infinite;
+  }
+
+  .animate-orb-delay {
+    animation: orb-float 14s ease-in-out infinite;
+    animation-delay: 3s;
+  }
+
+  .animate-orb-delay-2 {
+    animation: orb-float 16s ease-in-out infinite;
+    animation-delay: 6s;
+  }
+
   /* Smooth scroll */
   html {
     scroll-behavior: smooth;

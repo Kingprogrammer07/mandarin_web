@@ -177,7 +177,6 @@ function TVBoardItem({
   theme: "light" | "dark";
 }) {
   const isDark = theme === "dark";
-
   return (
     <motion.div
       layout
@@ -189,18 +188,18 @@ function TVBoardItem({
         isNew
           ? isReady
             ? isDark
-              ? "bg-emerald-500/10 border-emerald-400/40 shadow-lg shadow-emerald-500/10"
-              : "bg-emerald-50 border-emerald-300 shadow-lg shadow-emerald-500/10"
+              ? "bg-emerald-500/[0.07] border-emerald-400/40 shadow-[0_0_40px_-12px_rgba(16,185,129,0.25)]"
+              : "bg-emerald-50/80 border-emerald-300 shadow-[0_0_40px_-12px_rgba(16,185,129,0.2)]"
             : isDark
-              ? "bg-amber-500/10 border-amber-400/40 shadow-lg shadow-amber-500/10"
-              : "bg-amber-50 border-amber-300 shadow-lg shadow-amber-500/10"
+              ? "bg-amber-500/[0.07] border-amber-400/40 shadow-[0_0_40px_-12px_rgba(245,158,11,0.25)]"
+              : "bg-amber-50/80 border-amber-300 shadow-[0_0_40px_-12px_rgba(245,158,11,0.2)]"
           : isReady
             ? isDark
-              ? "bg-white/[0.03] border-white/10 hover:border-emerald-500/30"
-              : "bg-white border-gray-200 hover:border-emerald-300 shadow-sm"
+              ? "bg-white/[0.025] border-white/[0.08] hover:border-emerald-500/25"
+              : "bg-white/80 border-gray-200/80 hover:border-emerald-300/80 shadow-sm"
             : isDark
-              ? "bg-white/[0.03] border-white/10 hover:border-amber-500/30"
-              : "bg-white border-gray-200 hover:border-amber-300 shadow-sm"
+              ? "bg-white/[0.025] border-white/[0.08] hover:border-amber-500/25"
+              : "bg-white/80 border-gray-200/80 hover:border-amber-300/80 shadow-sm"
       }`}
     >
       {/* New item flash indicator */}
@@ -211,42 +210,46 @@ function TVBoardItem({
           transition={{ duration: 2.5 }}
           className={`absolute inset-0 rounded-2xl ${
             isReady
-              ? isDark ? "bg-emerald-400/5" : "bg-emerald-400/10"
-              : isDark ? "bg-amber-400/5" : "bg-amber-400/10"
+              ? isDark ? "bg-emerald-400/[0.04]" : "bg-emerald-400/[0.06]"
+              : isDark ? "bg-amber-400/[0.04]" : "bg-amber-400/[0.06]"
           }`}
         />
       )}
 
       <div className="flex items-start justify-between gap-4 relative z-10">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3 mb-2">
+          {/* Client code — BIG, primary focus */}
+          <p className={`text-3xl sm:text-4xl font-black tracking-tight truncate ${isDark ? "text-white" : "text-gray-900"}`}>
+            {item.client_code}
+          </p>
+
+          <div className="flex items-center gap-3 mt-2">
+            {/* Queue number — smaller, secondary */}
             <span
-              className={`text-4xl sm:text-5xl font-black tracking-tight ${
+              className={`text-xl sm:text-2xl font-bold tabular-nums ${
                 isReady
-                  ? isDark ? "text-emerald-400" : "text-emerald-600"
-                  : isDark ? "text-amber-400" : "text-amber-600"
+                  ? isDark ? "text-emerald-400/80" : "text-emerald-600/80"
+                  : isDark ? "text-amber-400/80" : "text-amber-600/80"
               }`}
             >
               #{item.display_number}
             </span>
             <span
-              className={`shrink-0 text-xs sm:text-sm font-bold px-3 py-1.5 rounded-full ${
+              className={`shrink-0 text-xs sm:text-sm font-bold px-3 py-1 rounded-full ${
                 isReady
                   ? isDark
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : "bg-emerald-100 text-emerald-700"
+                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20"
+                    : "bg-emerald-100 text-emerald-700 border border-emerald-200"
                   : isDark
-                    ? "bg-amber-500/20 text-amber-300"
-                    : "bg-amber-100 text-amber-700"
+                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/20"
+                    : "bg-amber-100 text-amber-700 border border-amber-200"
               }`}
             >
               {isReady ? "Tayyor" : "Tayyorlanmoqda"}
             </span>
           </div>
-          <p className={`text-xl sm:text-2xl font-bold truncate ${isDark ? "text-white" : "text-gray-900"}`}>
-            {item.client_code}
-          </p>
-          <p className={`text-sm sm:text-base mt-1 truncate ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+
+          <p className={`text-sm sm:text-base mt-2 truncate ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             {item.flight_names.join(", ")}
           </p>
         </div>
@@ -403,24 +406,47 @@ function TVBoard({
       onClick={unlockAudio}
       className={`min-h-screen transition-colors duration-500 ${isDark ? "bg-[#0a0a0a] text-white" : "bg-[#f8f7f4] text-gray-900"}`}
     >
+      {/* Background ambient effect */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className={`absolute top-1/2 left-1/2 w-[800px] h-[800px] rounded-full blur-[120px] animate-aurora ${
+            isDark ? "bg-indigo-600/20" : "bg-indigo-400/15"
+          }`}
+        />
+        <div
+          className={`absolute top-[20%] right-[10%] w-[500px] h-[500px] rounded-full blur-[100px] animate-orb ${
+            isDark ? "bg-violet-600/15" : "bg-violet-400/10"
+          }`}
+        />
+        <div
+          className={`absolute bottom-[10%] left-[5%] w-[600px] h-[600px] rounded-full blur-[100px] animate-orb-delay ${
+            isDark ? "bg-cyan-700/10" : "bg-cyan-400/10"
+          }`}
+        />
+        <div
+          className={`absolute top-[60%] right-[30%] w-[400px] h-[400px] rounded-full blur-[90px] animate-orb-delay-2 ${
+            isDark ? "bg-fuchsia-700/10" : "bg-fuchsia-400/8"
+          }`}
+        />
+      </div>
+
       {/* Header */}
       <header className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
         isDark
-          ? "bg-[#0a0a0a]/80 border-white/5"
-          : "bg-[#f8f7f4]/80 border-gray-200/60"
+          ? "bg-[#0a0a0a]/70 border-white/5"
+          : "bg-[#f8f7f4]/70 border-gray-200/60"
       }`}>
         <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-md ${
-              isDark ? "bg-orange-500/10" : "bg-orange-100"
+              isDark ? "bg-indigo-500/10" : "bg-indigo-100"
             }`}>
-              <Monitor className={`w-5 h-5 sm:w-6 sm:h-6 ${isDark ? "text-orange-400" : "text-orange-600"}`} />
+              <Monitor className={`w-5 h-5 sm:w-6 sm:h-6 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
             </div>
             <div>
-              <h1 className={`text-base sm:text-lg font-black ${isDark ? "text-white" : "text-gray-900"}`}>
-                Mandarin Cargo
+              <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>
+                Navbat
               </h1>
-              <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>Navbat Sahifasi</p>
             </div>
           </div>
 

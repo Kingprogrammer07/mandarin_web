@@ -162,7 +162,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
       const now = Date.now();
       if (now - lastSoundTimeRef.current >= 2500) {
         lastSoundTimeRef.current = now;
-        playNotificationSound(urgent, { volume: urgent ? 0.3 : 0.25 });
+        playNotificationSound(urgent, { volume: urgent ? 0.8 : 0.7 });
       }
     }
 
