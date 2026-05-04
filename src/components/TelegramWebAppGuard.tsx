@@ -286,7 +286,8 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
     window.location.pathname.startsWith('/admin') ||
     window.location.pathname === '/pos' ||
     window.location.pathname.startsWith('/flights') ||
-    window.location.pathname.startsWith('/statistics');
+    window.location.pathname.startsWith('/statistics') ||
+    window.location.pathname === '/pickup-tv';
 
   const [isValidating, setIsValidating] = useState(!isBrowserRoute);
   const [isValid, setIsValid] = useState(isBrowserRoute);
@@ -339,7 +340,7 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
 
     const timer = setTimeout(checkTelegramWebApp, 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isBrowserRoute]);
 
   if (isValidating) return <LoadingScreen />;
   if (!isValid)     return <ErrorScreen />;

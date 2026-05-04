@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3, CalendarDays,
   LayoutGrid, Plane, CheckCircle, Monitor, UserCheck, Warehouse, PackageSearch,
-  Upload, X, ChevronDown,
+  Upload, X, ChevronDown, Truck,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -81,6 +81,22 @@ const quickAccessPages = [
     description: "Ma'lumot import qilish",
     iconBg: 'bg-slate-100 dark:bg-slate-500/15',
     iconColor: 'text-slate-600 dark:text-slate-400',
+  },
+  {
+    id: 'admin-delivery-request',
+    label: 'Zayavka',
+    icon: Truck,
+    description: "Yetkazib berish zayavkasi",
+    iconBg: 'bg-rose-100 dark:bg-rose-500/15',
+    iconColor: 'text-rose-600 dark:text-rose-400',
+  },
+  {
+    id: 'pickup-tv',
+    label: 'TV Ekran',
+    icon: Monitor,
+    description: "Navbat televizor ekrani",
+    iconBg: 'bg-cyan-100 dark:bg-cyan-500/15',
+    iconColor: 'text-cyan-600 dark:text-cyan-400',
   },
 ] as const;
 

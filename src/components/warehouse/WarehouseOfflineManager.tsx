@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useWarehouseQueueStore } from "../../store/useWarehouseQueueStore";
 import type { WarehouseQueueItem } from "../../store/useWarehouseQueueStore";
-import { DELIVERY_METHOD_LABELS } from "../../schemas/warehouseSchemas";
 import { formatTashkentDateTime } from "../../lib/format";
 
 // ── Item card ─────────────────────────────────────────────────────────────────
@@ -42,7 +41,7 @@ function QueueItemCard({
     setIsDeleting(false);
   };
 
-  const methodLabel = DELIVERY_METHOD_LABELS[item.deliveryMethod] ?? item.deliveryMethod;
+  const methodLabel = item.deliveryMethodLabel ?? item.deliveryMethod;
 
   return (
     <motion.div

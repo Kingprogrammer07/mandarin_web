@@ -13,6 +13,7 @@ export interface WarehousePendingItem {
   clientCode: string;
   flightName: string;
   deliveryMethod: string;
+  deliveryMethodLabel?: string;
   comment?: string;
   /** Compressed File objects (structured-cloneable, safe to store in IDB). */
   photos: File[];

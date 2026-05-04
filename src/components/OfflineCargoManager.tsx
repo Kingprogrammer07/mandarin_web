@@ -10,6 +10,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { offlineStorage, type FailedItem } from '@/utils/offlineStorage';
 import { uploadPhoto } from '@/api/services/cargo';
 import MultiPhotoUpload from '@/components/MultiPhotoUpload';
+import { normalizeNumber } from '@/utils/numberFormat';
 
 interface OfflineCargoManagerProps {
   onClose: () => void;
@@ -371,6 +372,11 @@ function EditOfflineItem({ item, onCancel, onSave }: {
 
   const INPUT_CLS = "h-11 rounded-xl bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 focus-visible:ring-offset-0 transition-all";
 
+  const handleDecimalChange = (value: string, update: (nextValue: string) => void) => {
+    const normalized = normalizeNumber(value);
+    if (normalized !== null) update(normalized);
+  };
+
   const handleSave = () => {
     if (!clientId || photos.length === 0 || !weightKg) {
       alert("Iltimos, barcha majburiy maydonlarni to'ldiring");
@@ -419,12 +425,12 @@ function EditOfflineItem({ item, onCancel, onSave }: {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1.5">Vazn (kg) *</label>
-                <Input value={weightKg} type="number" onChange={e => setWeightKg(e.target.value)}
+                <Input value={weightKg} type="text" inputMode="decimal" onChange={e => handleDecimalChange(e.target.value, setWeightKg)}
                   placeholder="0.0" className={INPUT_CLS} />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1.5">Narx ($)</label>
-                <Input value={pricePerKg} type="number" onChange={e => setPricePerKg(e.target.value)}
+                <Input value={pricePerKg} type="text" inputMode="decimal" onChange={e => handleDecimalChange(e.target.value, setPricePerKg)}
                   placeholder="0.0" className={INPUT_CLS} />
               </div>
             </div>

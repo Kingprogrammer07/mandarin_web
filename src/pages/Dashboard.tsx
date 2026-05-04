@@ -709,6 +709,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     
     const touchStartX = useRef<number | null>(null);
     const touchStartY = useRef<number | null>(null);
+    const touchStartedInSwipeLockedArea = useRef(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isPaused, setIsPaused] = useState(false);
 
@@ -766,12 +767,35 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     }, [handleSetActiveTab]);
 
     const onTouchStart = (e: React.TouchEvent) => {
+        // Swipe only works on home and track tabs
+        if (activeTab !== 'home' && activeTab !== 'track') {
+            return;
+        }
+
+        const targetElement = e.target instanceof Element ? e.target : null;
+        touchStartedInSwipeLockedArea.current = !!targetElement?.closest('[data-dashboard-swipe-lock="true"]');
+        if (touchStartedInSwipeLockedArea.current) {
+            return;
+        }
+
         touchStartX.current = e.targetTouches[0].clientX;
         touchStartY.current = e.targetTouches[0].clientY;
         setIsPaused(true); 
     };
 
     const onTouchEnd = (e: React.TouchEvent) => {
+        // Swipe only works on home and track tabs
+        if (activeTab !== 'home' && activeTab !== 'track') {
+            return;
+        }
+
+        if (touchStartedInSwipeLockedArea.current) {
+            touchStartedInSwipeLockedArea.current = false;
+            touchStartX.current = null;
+            touchStartY.current = null;
+            return;
+        }
+
         if (!touchStartX.current || !touchStartY.current) return;
 
         const touchEndX = e.changedTouches[0].clientX;

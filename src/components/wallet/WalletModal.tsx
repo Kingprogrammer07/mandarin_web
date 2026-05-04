@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import MakePaymentModal from '@/components/modals/MakePaymentModal';
+import { normalizeNumber } from '@/utils/numberFormat';
 
 interface WalletModalProps {
     isOpen: boolean;
@@ -584,9 +585,13 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                                                                     <Label className="text-sm font-semibold">{t('wallet.modal.refundAmount')}</Label>
                                                                     <div className="relative">
                                                                         <Input
-                                                                            type="number"
+                                                                            type="text"
+                                                                            inputMode="decimal"
                                                                             value={refundAmount}
-                                                                            onChange={(e) => setRefundAmount(e.target.value)}
+                                                                            onChange={(e) => {
+                                                                                const normalized = normalizeNumber(e.target.value);
+                                                                                if (normalized !== null) setRefundAmount(normalized);
+                                                                            }}
                                                                             placeholder="0"
                                                                             max={walletBalance}
                                                                             disabled

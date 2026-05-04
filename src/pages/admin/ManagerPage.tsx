@@ -137,7 +137,7 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
               </span>
 
               {/* Carousel management — only visible when the JWT contains carousel:read */}
-              {jwtClaims.permissions.has('carousel:read') && (
+              {(jwtClaims.isSuperAdmin || jwtClaims.permissions.has('carousel:read')) && (
                 <button
                   onClick={() => onNavigate('admin-carousel')}
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"

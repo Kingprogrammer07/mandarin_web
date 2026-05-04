@@ -154,7 +154,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
         return () => {
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         };
-    }, [weight, length, width, height, isGabarit]);
+    }, [weight, length, width, height, isGabarit, isAdminMode]);
 
     if (!mounted || !isOpen) return null;
 
@@ -172,6 +172,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                 rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden
                 animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300
                 border border-white/20 dark:border-amber-900/30
+                max-h-[90vh] flex flex-col
             ">
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
@@ -192,7 +193,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6 max-h-[85vh] overflow-y-auto pb-[env(safe-area-inset-bottom,24px)]">
+                <div className="p-6 space-y-6 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom,24px)]">
                     {/* Segmented Control (Tabs) */}
                     <div className="flex bg-gray-100 dark:bg-[#1f1810] p-1.5 rounded-2xl relative">
                         <button
@@ -228,7 +229,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                             </label>
                             <div className="relative">
                                 <input
-                                    type="number"
+                                    type="text"
                                     inputMode="decimal"
                                     value={weight}
                                     onChange={(e) => {
@@ -251,7 +252,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="relative">
                                         <input
-                                            type="number" inputMode="decimal" value={length} onChange={(e) => {
+                                            type="text" inputMode="decimal" value={length} onChange={(e) => {
                                                 const normalized = normalizeNumber(e.target.value);
                                                 if (normalized !== null) setLength(normalized);
                                             }} placeholder={t('calculator.inputs.length')}
@@ -261,7 +262,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                     </div>
                                     <div className="relative">
                                         <input
-                                            type="number" inputMode="decimal" value={width} onChange={(e) => {
+                                            type="text" inputMode="decimal" value={width} onChange={(e) => {
                                                 const normalized = normalizeNumber(e.target.value);
                                                 if (normalized !== null) setWidth(normalized);
                                             }} placeholder={t('calculator.inputs.width')}
@@ -271,7 +272,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                     </div>
                                     <div className="relative">
                                         <input
-                                            type="number" inputMode="decimal" value={height} onChange={(e) => {
+                                            type="text" inputMode="decimal" value={height} onChange={(e) => {
                                                 const normalized = normalizeNumber(e.target.value);
                                                 if (normalized !== null) setHeight(normalized);
                                             }} placeholder={t('calculator.inputs.height')}
@@ -398,7 +399,7 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                     )}
 
                     {!isAdminMode && (
-                        <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 leading-tight pb-20">
+                        <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 leading-tight pb-6">
                             {t('calculator.footerNote')}
                         </p>
                     )}

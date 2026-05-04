@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { Loader2, AlertCircle, CheckCircle, Info, Wallet, CreditCard } from 'lucide-react';
 import axios from 'axios';
 import { getTelegramWebAppData } from '@/api/services/auth';
+import { normalizeNumber } from '@/utils/numberFormat';
 
 
 // ============================================
@@ -529,9 +530,13 @@ export function PaymentModal({
                       <div className="relative">
                         <Input
                           id="paid_amount"
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={paidAmount}
-                          onChange={(e) => setPaidAmount(e.target.value)}
+                          onChange={(e) => {
+                            const normalized = normalizeNumber(e.target.value);
+                            if (normalized !== null) setPaidAmount(normalized);
+                          }}
                           placeholder="0"
                           className={cn(
                             "h-12 text-lg font-semibold pl-4",

@@ -5,10 +5,12 @@ import {
   getFlightTransactions,
   markTransactionTaken,
   getMyActivity,
+  getUzPostOrders,
   searchTransactions,
   searchTransactionsGrouped,
 } from "../services/warehouse";
-import type { GetFlightTransactionsParams, SearchTransactionsParams } from "../services/warehouse";
+import type { GetFlightTransactionsParams, SearchTransactionsParams, UzPostOrdersParams } from "../services/warehouse";
+import { pickupQueueKeys } from "./usePickupQueue";
 
 /** Query key factory for warehouse queries. */
 export const warehouseKeys = {
@@ -22,6 +24,8 @@ export const warehouseKeys = {
     ["warehouse_grouped_transaction_search", params] as const,
   myActivity: (page: number, size: number) =>
     ["warehouse_my_activity", page, size] as const,
+  uzpostOrders: (params: UzPostOrdersParams) =>
+    ["warehouse_uzpost_orders", params] as const,
 };
 
 /** Fetches the list of recent warehouse flights for the flight selector. */
@@ -100,6 +104,18 @@ export const useMarkTaken = () => {
       queryClient.invalidateQueries({
         queryKey: warehouseKeys.allTransactions(),
       });
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.groupedTransactionSearch({}),
+      });
+      queryClient.invalidateQueries({
+        queryKey: pickupQueueKeys.count({ status: 'preparing' }),
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['pickup_queue', 'warehouse_list'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['pickup_queue', 'detail'],
+      });
     },
     onError: (err: unknown) => {
       const e = err as { message?: string };
@@ -115,6 +131,14 @@ export const useMyActivity = (page: number, size: number) => {
   return useQuery({
     queryKey: warehouseKeys.myActivity(page, size),
     queryFn: () => getMyActivity(page, size),
+    placeholderData: (previousData) => previousData,
+  });
+};
+
+export const useUzPostOrders = (params: UzPostOrdersParams) => {
+  return useQuery({
+    queryKey: warehouseKeys.uzpostOrders(params),
+    queryFn: () => getUzPostOrders(params),
     placeholderData: (previousData) => previousData,
   });
 };

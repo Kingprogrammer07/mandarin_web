@@ -75,10 +75,10 @@ export default function WarehouseFilters() {
   return (
     <div className="space-y-3">
       {/* Flight name input + recent flights dropdown + client search */}
-      <div className="flex flex-col sm:flex-row gap-2.5">
+      <div className="flex gap-2">
 
         {/* Flight Name — with recent flights dropdown */}
-        <div className="relative flex-1 min-w-0">
+        <div className="relative min-w-0 flex-1">
           <Plane
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400 z-10"
             strokeWidth={1.8}
@@ -89,8 +89,8 @@ export default function WarehouseFilters() {
             value={flightName}
             onChange={(e) => setFlightName(e.target.value.toUpperCase())}
             onFocus={() => recentFlights.length > 0 && setShowFlightDropdown(true)}
-            placeholder="Reys nomini kiriting (masalan: CH123)"
-            className="w-full pl-9 pr-8 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
+            placeholder="Reys"
+            className="w-full pl-8 pr-8 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] sm:text-[13px] font-bold text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
           />
           {recentFlights.length > 0 && (
             <button
@@ -163,7 +163,7 @@ export default function WarehouseFilters() {
         </div>
 
         {/* Client code search within flight */}
-        <div className="relative flex-1 min-w-0">
+        <div className="relative min-w-0 flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
             strokeWidth={1.8}
@@ -173,8 +173,8 @@ export default function WarehouseFilters() {
             type="text"
             value={localSearch}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder={flightName ? "Mijoz kodi bo'yicha qidirish" : "Mijoz kodi — reyzsiz ham qidiradi"}
-            className="w-full pl-9 pr-3.5 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
+            placeholder="Mijoz kodi"
+            className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] sm:text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
           />
         </div>
       </div>

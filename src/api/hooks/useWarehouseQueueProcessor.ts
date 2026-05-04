@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWarehouseQueueStore } from '../../store/useWarehouseQueueStore';
 import { bulkMarkTransactionTaken } from '../services/warehouse';
 import { warehouseKeys } from './useWarehouse';
+import { pickupQueueKeys } from './usePickupQueue';
 
 /**
  * Initializes the warehouse upload queue and runs a background sequential processor.
@@ -23,12 +24,21 @@ export function useWarehouseQueueProcessor() {
 
   const processingRef = useRef(false);
 
+  // Page Visibility API: pause uploads when app is backgrounded
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const handler = () => setIsPageVisible(!document.hidden);
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
   useEffect(() => {
     initialize();
   }, [initialize]);
 
   useEffect(() => {
-    if (!isLoaded || processingRef.current) return;
+    if (!isLoaded || processingRef.current || !isPageVisible) return;
 
     const pendingItem = items.find((i) => i.status === 'pending');
     if (!pendingItem) return;
@@ -52,7 +62,12 @@ export function useWarehouseQueueProcessor() {
     // more reliable than the manual toast.loading + toast.success(id) pattern.
     toast.promise(uploadPromise, {
       loading: `${clientCode} (${pendingItem.transactionIds.length} ta) → yuklanmoqda...`,
-      success: `${clientCode} → muvaffaqiyatli ommaviy tasdiqlandi`,
+      success: (response) => {
+        if (response.uzpost_order_number) {
+          return `${clientCode} → UzPost ${response.uzpost_order_number} yaratildi`;
+        }
+        return response.message || `${clientCode} → muvaffaqiyatli ommaviy tasdiqlandi`;
+      },
       error: (err: unknown) =>
         (err as { message?: string }).message ?? 'Serverga ulanishda xatolik',
     });
@@ -62,6 +77,12 @@ export function useWarehouseQueueProcessor() {
       .then(() => {
         markSuccess(id);
         queryClient.invalidateQueries({ queryKey: warehouseKeys.allTransactions() });
+        queryClient.invalidateQueries({ queryKey: warehouseKeys.groupedTransactionSearch({}) });
+        queryClient.invalidateQueries({ queryKey: warehouseKeys.flights() });
+        queryClient.invalidateQueries({ queryKey: ["warehouse_uzpost_orders"] });
+        queryClient.invalidateQueries({ queryKey: pickupQueueKeys.count({ status: 'preparing' }) });
+        queryClient.invalidateQueries({ queryKey: ['pickup_queue', 'warehouse_list'] });
+        queryClient.invalidateQueries({ queryKey: ['pickup_queue', 'detail'] });
       })
       .catch((err: unknown) => {
         const message =
@@ -71,5 +92,5 @@ export function useWarehouseQueueProcessor() {
       .finally(() => {
         processingRef.current = false;
       });
-  }, [items, isLoaded, markUploading, markSuccess, markError, queryClient]);
+  }, [items, isLoaded, isPageVisible, markUploading, markSuccess, markError, queryClient]);
 }

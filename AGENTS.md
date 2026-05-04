@@ -1,115 +1,230 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
-## Commands
+## Project Overview
+
+**Mandarin Cargo** is a Telegram Mini App and Progressive Web App (PWA) for cargo/shipping logistics management. It serves multiple user roles — end clients tracking their parcels, warehouse workers managing flights and cargo, accountants verifying transactions, and administrators managing users and roles.
+
+The app is primarily designed to run inside Telegram via the Telegram WebApp SDK, but several internal routes (`/admin/*`, `/pos`, `/flights`, `/statistics`) are accessible directly from a browser for back-office staff.
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 19 (with StrictMode) |
+| Language | TypeScript 5.9 (strict mode, no `any`) |
+| Build Tool | Vite 7 with `@vitejs/plugin-react-swc` |
+| Styling | Tailwind CSS 4 + `tw-animate-css` |
+| UI Primitives | Radix UI (shadcn/ui-style wrappers in `src/components/ui/`) |
+| Icons | Lucide React |
+| State (Server) | TanStack Query (React Query) v5 |
+| State (Client) | Zustand v5 |
+| Forms | React Hook Form + Zod v4 |
+| Animations | Framer Motion |
+| Charts | Recharts |
+| Toasts | Sonner |
+| Maps | Leaflet + React-Leaflet |
+| QR Scanning | html5-qrcode |
+| i18n | i18next + react-i18next |
+| Offline DB | IndexedDB via `idb` |
+| HTTP Client | Axios (two instances: JSON and multipart/form-data) |
+
+## Build & Development Commands
 
 ```bash
-npm run dev        # Start Vite dev server
-npm run build      # TypeScript compile + Vite build
-npm run lint       # ESLint check
+npm run dev        # Start Vite dev server (host: true, port: 5173)
+npm run build      # TypeScript compile (tsc -b) + Vite production build
+npm run lint       # ESLint check across the project
 npm run preview    # Preview production build locally
 ```
 
 No test suite is configured.
 
-# PRIVACY
-PRIVACY AND SECURITY IS IMPORTANT!
+## Project Structure
 
-## Architecture
+```
+src/
+  api/               # Axios clients and domain API services
+    client.ts        # apiClient (JSON) & apiClientFormData (multipart)
+    services/        # Per-domain async functions (auth, cargo, flights, admin, etc.)
+    hooks/           # TanStack Query custom hooks (useAdminClients, etc.)
+  components/        # React components
+    ui/              # Shadcn/ui-style reusable primitives (button, dialog, input, etc.)
+    admin/           # Admin-layout shell components
+    carousel/        # Home page carousel management
+    delivery/        # UzPost delivery request flow
+    expectedCargo/   # Warehouse expected-cargo UI
+    history/         # Client cargo history
+    manager/         # Manager client data table
+    modals/          # Shared modal components
+    navigation/      # Nav bars (UserNav, VerificationNav, FloatingNavbar)
+    notifications/   # Notification center
+    pages/           # Page-level components (DeliveryHistoryPage, etc.)
+    profile/         # User profile sections
+    statistics/      # Charts and stat cards
+    user_page/       # User home action buttons
+    verification/    # Accountant verification UI
+    warehouse/       # Warehouse transaction tables & filters
+    wallet/          # Wallet & card management modals
+  config/
+    config.ts        # Runtime env var validation (VITE_API_BASE_URL, etc.)
+  constants/         # Static JSON data (districts in uz/ru)
+  hooks/             # Custom React hooks (useConfirm, useToast, useProfile, etc.)
+  i18n/              # i18next configuration and locale files (uz.json, ru.json)
+  lib/               # Utility libraries (cn, telegram helpers, validation, formatting)
+  pages/             # Top-level page components
+    admin/           # Admin pages (accounts, roles, audit, carousel, warehouse, etc.)
+    dashboard/       # Client dashboard & track-code search
+  schemas/           # Zod validation schemas
+  store/             # Zustand stores (warehouse filters, expected cargo, manager state)
+  types/             # Global TypeScript type definitions
+    telegram-web-app.d.ts  # Custom Telegram WebApp SDK types
+  utils/             # Helper modules (offlineStorage, audioUtils, numberFormat, etc.)
+  App.tsx            # Root component: auth, routing, layout orchestration
+  main.tsx           # React root render, QueryClient, ThemeProvider, service worker registration
+  index.css          # Tailwind imports, CSS variables (light/dark), custom scrollbar, focus styles
+```
 
-**Telegram Mini App** for cargo/shipping management. Users interact with it inside Telegram; the app validates Telegram `initData` on every request.
+## Architecture Deep Dive
 
 ### Entry & Auth Flow
 
-1. `src/main.tsx` → renders `<App />`
-2. `TelegramWebAppGuard` wraps the app — validates Telegram context, attempts auto-login with `initData`
-3. `App.tsx` checks token validity (`/auth/me`), loads user role, and resolves the initial route
-4. Session token stored in `sessionStorage`; cleared on 401/403 responses
+1. `index.html` loads the Telegram WebApp SDK (`telegram-web-app.js`) and PWA manifest.
+2. `src/main.tsx` creates the React root, wraps the tree in `QueryClientProvider` and `ThemeProvider`, and registers the service worker in production only.
+3. `TelegramWebAppGuard` wraps the entire app. It:
+   - Skips Telegram validation for browser routes (`/admin/*`, `/pos`, `/flights`, `/statistics`).
+   - Validates `initData` with the backend for all other routes.
+   - Calls `window.Telegram.WebApp.ready()` and `.expand()` on success.
+   - Attempts auto-login via `/auth/telegram-login` if no token exists.
+4. `App.tsx` performs the second auth gate:
+   - Admin tokens live in `localStorage` (`access_token`, `admin_role`).
+   - Regular user tokens live in `sessionStorage` (`access_token`).
+   - Calls `/auth/me` to validate user tokens.
+   - On 401, clears storage and dispatches `auth:logout`.
+
+**Important**: Admin auth and user auth are mutually exclusive. Admin tokens are sent via `X-Admin-Authorization`; user tokens via `Authorization`. Sending both causes the backend to reject the request.
 
 ### Routing
 
-Custom history-based routing — **not** React Router components. `App.tsx` maintains `currentPage` state:
-- `resolvePageFromPath()` — maps URL path to page type
-- `checkAccess(role, page)` — validates role-based permissions
-- `applyRoute()` — syncs state + `window.history` + URL
-- `popstate` listener handles browser back/forward
+Custom history-based routing — **not** React Router components. `App.tsx` maintains a `currentPage` state of type `Page` (a large string union).
+
+Key functions:
+- `resolvePageFromPath(path)` — maps a URL path to a `RouteInfo` object.
+- `checkAccess(targetPage, role)` — enforces role-based whitelists.
+- `applyRoute(routeInfo, role, method)` — syncs React state, `window.history`, and the URL bar atomically.
+- `popstate` listener handles browser back/forward.
+
+The `ROLE_CONFIG` object defines default landing pages and allowed page arrays for each role.
 
 ### API Layer (`src/api/`)
 
-All HTTP via Axios (`src/api/apiClient.ts`) with interceptors that:
-- Attach `Authorization: Bearer <token>` header
-- Attach Telegram `initData` header
-- Attach `Accept-Language` from i18next
-- On 401/403: clear session, dispatch logout event
+All HTTP goes through Axios instances defined in `src/api/client.ts`:
 
-Domain services live in `src/api/services/` (auth, cargo, flights, payments, stats, admin, etc.).
+- `apiClient` — JSON requests, 30s timeout.
+- `apiClientFormData` — multipart uploads, 60s timeout.
+
+Request interceptors attach:
+- `X-Telegram-Init-Data` from `window.Telegram.WebApp.initData`.
+- `X-Admin-Authorization: Bearer <token>` (if admin token in `localStorage`).
+- `Authorization: Bearer <token>` (if user token in `sessionStorage`).
+- `Accept-Language` from i18next (`uz` or `ru`).
+
+Response interceptors:
+- On 401 (except whitelisted public endpoints), clear all tokens and dispatch `auth:logout`.
+- Error messages are resolved with hardcoded Uzbek text for infrastructure errors (401, 403, 5xx) because the backend returns English for those. Business-logic errors (400, 409, 422) use the backend's `detail` field, which is already in Uzbek.
+
+Domain services live in `src/api/services/` (auth, cargo, flights, payments, stats, admin, etc.) and are plain async functions that call the Axios clients.
 
 ### State Management
 
-- **TanStack Query** — server/API state, caching, background refetch
-- **Zustand** — client UI state
-- **React Hook Form + Zod** — form state and validation
+- **TanStack Query** — server/API state, caching, background refetch. Default config: `retry: 1`, `staleTime: 5 * 60 * 1000`.
+- **Zustand** — client UI state (warehouse filters, expected-cargo bulk edits, manager search).
+- **React Hook Form + Zod** — form state and validation.
 
-### User Roles & Access
+### UI & Styling
 
-`user` → home, profile, history, reports
-`worker` → flight and cargo management
-`accountant` → client/transaction verification
-`admin` / `super-admin` → full access including user and role management
-
-Admin pages live in `src/pages/admin/` and `src/components/admin/`.
+- Tailwind CSS 4 with CSS variables for theming (`@theme inline`).
+- Dark mode supported via `next-themes` (`class` attribute strategy).
+- Custom focus rings use `oklch(0.646 0.222 41.116)` (orange accent).
+- Thin custom scrollbars are styled globally for WebKit and Firefox.
+- `font-size: 16px` is forced on inputs to prevent iOS zoom.
 
 ### Internationalization
 
-i18next with Uzbek (`uz`) and Russian (`ru`) locales in `src/i18n/`. Language is sent as `Accept-Language` header on every API request.
+i18next is configured in `src/i18n/config.ts` with two locales:
+- `uz` (Uzbek) — default and fallback language.
+- `ru` (Russian).
+
+All user-facing API error messages for infrastructure codes are in Uzbek. The `Accept-Language` header is sent on every request.
 
 ### Offline Support
 
-IndexedDB via `idb` library (`src/utils/`) caches cargo data for offline use.
+- IndexedDB via the `idb` library caches cargo data for offline warehouse use.
+- `src/utils/offlineStorage.ts` and `src/utils/warehouseOfflineStorage.ts` handle persistence.
+- A minimal service worker (`public/sw.js`) provides a network-first strategy for the app shell, satisfying PWA install criteria without interfering with API calls.
 
-### UI Stack
+### PWA / Installability
 
-- **Tailwind CSS 4** + **Radix UI** primitives
-- Shadcn-style wrappers in `src/components/ui/`
-- **Framer Motion** for animations, **Sonner** for toasts, **Recharts** for stats charts
-- **Eruda** for in-browser dev console on mobile
+- `manifest.json` defines the app as a standalone PWA with theme color `#f59e0b`.
+- `start_url` is `/admin/login`.
+- The service worker is only registered in production (`import.meta.env.PROD`).
 
-### Path Alias
+## User Roles & Access Control
 
-`@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.app.json`).
+| Role | Default Page | Allowed Pages |
+|------|-------------|---------------|
+| `user` | `user-home` | user-home, user-profile, user-history, user-reports |
+| `worker` | `flights` | flights, cargo-list, cargo-add, passkey-page, expected-cargo |
+| `accountant` | `verification-search` | verification-*, pos-dashboard, admin-profile, passkey-page |
+| `admin` | `admin-accounts` | Full access except manager-page |
+| `super-admin` | `admin-accounts` | Full access including manager-page |
+| `manager` | `manager-page` | manager-page, admin-carousel, admin-profile, passkey-page, flight-schedule-admin |
+| `warehouse_worker` | `warehouse-page` | warehouse-page, expected-cargo, admin-profile, passkey-page |
+| `warehouse` | `warehouse-page` | Same as warehouse_worker |
 
-## AI Developer Guidelines (Senior/Pro Level)
+The backend JWT may contain a `home_page` claim that overrides the static default.
+Admin pages (`admin-accounts`, `admin-roles`, etc.) are rendered inside `AdminLayout` only for roles that have `admin-accounts` in their allowed list. Other roles accessing `admin-profile` or `admin-carousel` get a standalone view without the sidebar.
 
-When writing or refactoring code in this repository, you MUST act as a Senior Backend/Frontend Architect and strictly adhere to the following standards:
+## Code Style & Conventions
 
-1. **Self-Documenting Code**:
-    - Write clear, readable, and modular code (SOLID principles).
-    - Variables and function names must be highly descriptive. The logic should explain itself.
-    - Use inline comments ONLY to explain _WHY_ a specific technical decision was made, never _WHAT_ the code is doing.
+- **TypeScript strict mode is enforced.** `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`, and `noUncheckedSideEffectImports` are enabled. Never use `any`.
+- **Path alias**: `@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.app.json`).
+- **Comments**: Technical comments are in English. UI text and validation messages are in Uzbek.
+- **Imports**: Use type-only imports where possible (`import type { … }`).
+- **File naming**: PascalCase for components, camelCase for utilities/hooks, kebab-case for JSON locale files.
+- **Component structure**: Prefer functional components with hooks. Keep components modular and focused.
+- **Error handling**: Always handle `null`/`undefined` gracefully (optional chaining `?.`, explicit checks). API errors are surfaced via Sonner toasts or inline form errors.
+- **Environment variables**: All env vars must be prefixed with `VITE_` and are strictly validated at runtime in `src/config/config.ts`. Missing vars throw hard errors on startup.
 
-2. **Strict Typing & Docstrings**:
-    - **Python**: 100% type hinting is required (`-> str`, `list[int]`, etc.). Use clear Docstrings for all endpoints, complex functions, and classes.
-    - **TypeScript**: Strict typing is mandatory. Never use `any`. Always define proper `interfaces` and `types`.
+## Environment Variables
 
-3. **Linting & Formatting Compliance**:
-    - Python code must pass `make lint` (Ruff formatting and checks) flawlessly.
-    - No unused imports, no unused variables.
-    - Ensure clean, PEP-8 compliant structures.
+Required variables (must be present in `.env`):
 
-4. **Defensive Programming & Error Handling**:
-    - Anticipate edge cases. Always handle `None`, `null`, or `undefined` gracefully (e.g., using optional chaining `?.` or explicit checks).
-    - Never use bare `except:` blocks. Catch specific exceptions and log them properly using the structured logger.
-    - Use correct HTTP status codes (400, 401, 403, 404, 409, 422) with descriptive error messages in APIs.
+```
+VITE_API_BASE_URL        # Backend API origin (e.g. https://api.example.com)
+VITE_API_INIT_DATA_URL   # Path segment for init-data validation endpoint
+VITE_API_LOGIN_URL       # Path segment for login endpoint
+VITE_API_REGISTER_URL    # Path segment for register endpoint
+```
 
-5. **Performance & Architecture**:
-    - Avoid N+1 query problems in SQLAlchemy (use `selectinload` or `joinedload` appropriately).
-    - Write non-blocking, purely asynchronous code (`async/await`).
-    - Use Redis caching for heavy read operations and ensure proper cache invalidation.
+## Security Considerations
+
+- **Telegram initData validation**: Every non-browser route requires valid Telegram `initData`. The backend validates the HMAC signature.
+- **Dual auth tokens**: Admin and user tokens are stored separately and sent in different headers to prevent collisions.
+- **Automatic logout**: 401 responses (except whitelisted endpoints) immediately purge all tokens and reload the app into the login flow.
+- **CSP / External scripts**: `index.html` loads `telegram-web-app.js` from `https://telegram.org`.
+- **No secrets in source**: All API URLs come from environment variables.
+
+## Deployment
+
+The project is configured for **Vercel** via `vercel.json`:
+- Uses `@vercel/static-build` with `distDir: "dist"`.
+- SPA fallback: all unmatched routes serve `index.html`.
 
 ## Task Planning & Execution (TASK.md)
 
-Whenever I give you a new feature request or a complex task, you MUST act as a Tech Lead and manage the workflow using a file named `TASK.md` in the root directory.
+Whenever you receive a new feature request or a complex task, you MUST act as a Tech Lead and manage the workflow using a file named `TASK.md` in the root directory.
 
 Before writing or modifying any source code, you must:
 1. Create or overwrite `TASK.md`.
@@ -117,6 +232,6 @@ Before writing or modifying any source code, you must:
 3. Draft a strict **Implementation Plan** using markdown checkboxes (e.g., `- [ ] Step 1`, `- [x] Step 2`).
 4. Write a brief **Walkthrough/Architecture** section explaining how the components will interact.
 
-As you complete each step of the plan, you MUST update `TASK.md` (checking off the boxes). If the plan changes due to errors or new requirements, update the document to reflect the reality. 
+As you complete each step of the plan, you MUST update `TASK.md` (checking off the boxes). If the plan changes due to errors or new requirements, update the document to reflect the reality.
 
 This file will serve as our shared "living memory" and progress tracker.

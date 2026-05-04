@@ -4,12 +4,14 @@ import {
   ClipboardCheck,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  FileText,
+  Package,
   Plane,
   Images,
   X,
 } from "lucide-react";
 import { useMyActivity } from "../../api/hooks/useWarehouse";
-import { DELIVERY_METHOD_LABELS } from "../../schemas/warehouseSchemas";
 import { formatCurrencySum, formatTashkentDateTime } from "../../lib/format";
 
 // ── Payment badge ─────────────────────────────────────────────────────────────
@@ -35,9 +37,22 @@ const PAYMENT_STYLES: Record<string, { bg: string; text: string; label: string }
     text: "text-red-500 dark:text-red-400",
     label: "Qarzdor",
   },
+  mixed: {
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    text: "text-blue-600 dark:text-blue-400",
+    label: "Aralash",
+  },
 };
 
-function getPaymentStyle(status: string) {
+function getPaymentStyle(status: string | null) {
+  if (!status) {
+    return {
+      bg: "bg-gray-50 dark:bg-white/[0.04]",
+      text: "text-gray-500 dark:text-gray-400",
+      label: "Noma'lum",
+    };
+  }
+
   return (
     PAYMENT_STYLES[status] ?? {
       bg: "bg-gray-50 dark:bg-white/[0.04]",
@@ -183,9 +198,13 @@ export default function MyActivityList({ page, onPageChange }: MyActivityListPro
         {/* Activity rows */}
         <div className="space-y-2">
           {data.items.map((item, idx) => {
-            const methodLabel =
-              DELIVERY_METHOD_LABELS[item.delivery_method] ?? item.delivery_method;
+            const methodLabel = item.delivery_method_label || item.delivery_method;
             const paymentStyle = getPaymentStyle(item.payment_status);
+            const cargoCount = item.cargo_count || item.transactions?.length || 1;
+            const transactionRows = item.transactions ?? [];
+            const transactionIds = item.transaction_ids?.length
+              ? item.transaction_ids
+              : [item.transaction_id];
 
             return (
               <motion.div
@@ -202,6 +221,12 @@ export default function MyActivityList({ page, onPageChange }: MyActivityListPro
                       <span className="text-[13px] font-bold text-gray-800 dark:text-white font-mono">
                         {item.client_code}
                       </span>
+                      {cargoCount > 1 && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-2 py-0.5 text-[10px] font-black text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
+                          <Package className="h-3 w-3" />
+                          {cargoCount} ta yuk
+                        </span>
+                      )}
                       <span className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
                         <Plane className="w-3 h-3 shrink-0" strokeWidth={1.8} />
                         {item.flight_name}
@@ -218,6 +243,53 @@ export default function MyActivityList({ page, onPageChange }: MyActivityListPro
                   </span>
                 </div>
 
+                {(item.uzpost_order_number || item.uzpost_printer_status || item.uzpost_label_pdf_url) && (
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    {item.uzpost_order_number && (
+                      <span className="rounded-lg bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
+                        UzPost #{item.uzpost_order_number}
+                      </span>
+                    )}
+                    {item.uzpost_order_status && (
+                      <span className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        {item.uzpost_order_status}
+                      </span>
+                    )}
+                    {item.uzpost_printer_status && (
+                      <span className="rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                        Printer: {item.uzpost_printer_status}
+                      </span>
+                    )}
+                    {item.uzpost_label_pdf_url && (
+                      <a
+                        href={item.uzpost_label_pdf_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700 dark:bg-white/[0.06] dark:text-gray-300"
+                      >
+                        <FileText className="h-3 w-3" />
+                        PDF
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {transactionRows.length > 1 && (
+                  <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+                    {transactionRows.map((transaction) => (
+                      <span
+                        key={`${transaction.proof_id}-${transaction.transaction_id}`}
+                        className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-300"
+                        title={`Transaction #${transaction.transaction_id}`}
+                      >
+                        #{transaction.row_number ?? transaction.transaction_id}
+                        {transaction.weight ? ` · ${transaction.weight} kg` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Bottom row: amounts + payment badge + photos */}
                 <div className="flex items-center gap-2.5 flex-wrap">
                   {/* Amount */}
@@ -226,9 +298,9 @@ export default function MyActivityList({ page, onPageChange }: MyActivityListPro
                       <span className="text-[12px] font-bold text-gray-800 dark:text-white">
                         {formatCurrencySum(item.total_amount)}
                       </span>
-                      {item.remaining_amount > 0 && item.payment_status !== "paid" && (
+                      {(item.remaining_amount ?? 0) > 0 && item.payment_status !== "paid" && (
                         <span className="text-[10px] font-semibold text-red-500 dark:text-red-400">
-                          −{formatCurrencySum(item.remaining_amount)}
+                          −{formatCurrencySum(item.remaining_amount ?? 0)}
                         </span>
                       )}
                     </div>
@@ -238,6 +310,12 @@ export default function MyActivityList({ page, onPageChange }: MyActivityListPro
                   <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${paymentStyle.bg} ${paymentStyle.text}`}>
                     {paymentStyle.label}
                   </span>
+
+                  {cargoCount > 1 && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
+                      ID: {transactionIds.join(", ")}
+                    </span>
+                  )}
 
                   {/* Photo thumbnails */}
                   {item.photo_urls.length > 0 && (

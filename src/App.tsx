@@ -42,6 +42,8 @@ import ManagerPage from "./pages/admin/ManagerPage";
 import PasskeyPage from "./pages/admin/PasskeyPage";
 import WarehousePage from "./pages/admin/WarehousePage";
 import ExpectedCargoPage from "./pages/admin/ExpectedCargoPage";
+import PickupQueueTVPage from "./pages/PickupQueueTVPage";
+import AdminDeliveryRequestPage from "./pages/admin/AdminDeliveryRequestPage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +76,9 @@ type Page =
   | "passkey-page"
   | "warehouse-page"
   | "expected-cargo"
-  | "flight-schedule-admin";
+  | "flight-schedule-admin"
+  | "pickup-tv"
+  | "admin-delivery-request";
 
 interface RouteInfo {
   page: Page;
@@ -134,6 +138,9 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "expected-cargo",
       "passkey-page",
       "flight-schedule-admin",
+      "manager-page",
+      "pickup-tv",
+      "admin-delivery-request",
     ],
   },
   "super-admin": {
@@ -165,6 +172,8 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "manager-page",
       "passkey-page",
       "flight-schedule-admin",
+      "pickup-tv",
+      "admin-delivery-request",
     ],
   },
   manager: {
@@ -188,9 +197,14 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
 
 const GUEST_PAGES: Page[] = ["login", "admin-login", "register"];
 const USER_PAGES: Page[] = ["user-profile", "user-home", "user-reports", "user-history"];
+const PUBLIC_PAGES: Page[] = ["pickup-tv"];
 
 function isGuestPage(page: Page): boolean {
   return GUEST_PAGES.includes(page);
+}
+
+function isPublicPage(page: Page): boolean {
+  return PUBLIC_PAGES.includes(page);
 }
 
 function getDefaultPageForRole(role: string): Page {
@@ -214,6 +228,8 @@ function getDefaultPageForRole(role: string): Page {
  * Returns the page the user should actually land on.
  */
 function checkAccess(targetPage: Page, role: string | null): Page {
+  if (isPublicPage(targetPage)) return targetPage;
+
   if (!role) {
     // Not logged in → only guest pages are accessible
     if (isGuestPage(targetPage)) return targetPage;
@@ -276,6 +292,8 @@ function getPathForPage(
   if (page === "pos-dashboard") return "/pos";
   if (page === "expected-cargo") return "/admin/expected-cargo";
   if (page === "flight-schedule-admin") return "/admin/flight-schedule";
+  if (page === "admin-delivery-request") return "/admin/delivery-request";
+  if (page === "pickup-tv") return "/pickup-tv";
   return "/auth/login";
 }
 
@@ -350,6 +368,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/admin/expected-cargo") return { page: "expected-cargo" };
   if (path === "/admin/flight-schedule") return { page: "flight-schedule-admin" };
   if (path === "/pos") return { page: "pos-dashboard" };
+  if (path === "/pickup-tv") return { page: "pickup-tv" };
 
   return { page: "login" };
 }
@@ -425,6 +444,11 @@ function AppContent() {
     setUserRole(null);
 
     const currentRouteInfo = resolvePageFromPath(window.location.pathname);
+    if (isPublicPage(currentRouteInfo.page)) {
+      applyRoute(currentRouteInfo, null, "replace");
+      return;
+    }
+
     const isUserRoute =
       USER_PAGES.includes(currentRouteInfo.page) ||
       currentRouteInfo.page === "login" ||
@@ -450,6 +474,15 @@ function AppContent() {
       const adminRole = localStorage.getItem("admin_role");
       const userToken = sessionStorage.getItem("access_token");
       const currentRouteInfo = resolvePageFromPath(window.location.pathname);
+      if (isPublicPage(currentRouteInfo.page)) {
+        if (!cancelled) {
+          const publicRouteRole = adminToken && adminRole ? adminRole : null;
+          setUserRole(publicRouteRole);
+          setIsCheckingAuth(false);
+          applyRoute(currentRouteInfo, publicRouteRole, "replace");
+        }
+        return;
+      }
 
       // ── 1. Admin session (localStorage) ──────────────────────────────────
       // Admin tokens are issued by a separate auth system and are NOT accepted
@@ -619,6 +652,7 @@ function AppContent() {
     "admin-profile",
     "admin-carousel",
     "flight-schedule-admin",
+    "admin-delivery-request",
   ].includes(currentPage);
 
   // Only roles with admin-accounts (admin, super-admin) get the full AdminLayout shell.
@@ -652,7 +686,7 @@ function AppContent() {
   const isAdminArea =
     isSuperAdminPages || isAdminLoginPage || isPOSPage ||
     isManagerPage || isStandaloneAdminSubpage || isPasskeyPage ||
-    isWarehousePage || isExpectedCargoPage;
+    isWarehousePage || isExpectedCargoPage || currentPage === "pickup-tv";
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -719,6 +753,7 @@ function AppContent() {
           {currentPage === "admin-profile" && <AdminProfilePage />}
           {currentPage === "admin-carousel" && <AdminCarouselPage />}
           {currentPage === "flight-schedule-admin" && <FlightScheduleAdminPage />}
+          {currentPage === "admin-delivery-request" && <AdminDeliveryRequestPage />}
         </AdminLayout>
       ) : isPOSPage ? (
         <POSDashboard
@@ -765,6 +800,8 @@ function AppContent() {
           onNavigate={(page) => navigateToPage(page as Page)}
           onLogout={handleLogout}
         />
+      ) : currentPage === "pickup-tv" ? (
+        <PickupQueueTVPage />
       ) : (
         <main
           className={`relative ${

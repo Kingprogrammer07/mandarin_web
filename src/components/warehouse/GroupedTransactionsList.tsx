@@ -11,7 +11,12 @@ import {
   BellRing,
   X
 } from "lucide-react";
-import type { ClientGroup } from "../../api/services/warehouse";
+import type {
+  ClientGroup,
+  DeliveryMethodOption,
+  FlightGroup,
+  GroupedTransactionItem,
+} from "../../api/services/warehouse";
 import { formatCurrencySum } from "../../lib/format";
 
 // ── Status Styling ────────────────────────────────────────────────────────────
@@ -27,10 +32,38 @@ function getPaymentStyle(status: string) {
   return PAYMENT_STYLES[status] ?? { bg: "bg-gray-500/10 dark:bg-white/[0.08]", text: "text-gray-600 dark:text-gray-300", label: status };
 }
 
+function getTransactionDeliveryMethods(
+  transaction: GroupedTransactionItem,
+  flight: FlightGroup,
+): DeliveryMethodOption[] {
+  return (transaction.available_delivery_methods?.length ?? 0) > 0
+    ? transaction.available_delivery_methods
+    : (flight.available_delivery_methods ?? []);
+}
+
+function intersectDeliveryMethods(methodGroups: DeliveryMethodOption[][]): DeliveryMethodOption[] {
+  if (methodGroups.length === 0) {
+    return [];
+  }
+
+  const [firstGroup, ...remainingGroups] = methodGroups;
+  return firstGroup.filter((method) =>
+    remainingGroups.every((group) =>
+      group.some((candidate) => candidate.value === method.value),
+    ),
+  );
+}
+
 interface GroupedTransactionsListProps {
   items: ClientGroup[];
   isLoading: boolean;
-  onMarkTaken: (transactionIds: number[], clientCode: string, flightName: string, isTakenAway: boolean) => void;
+  onMarkTaken: (
+    transactionIds: number[],
+    clientCode: string,
+    flightName: string,
+    isTakenAway: boolean,
+    deliveryMethods: DeliveryMethodOption[],
+  ) => void;
   canMarkTaken: boolean;
   onNotifyCashier?: (clientCode: string, flightName: string, amount: number) => void;
 }
@@ -94,11 +127,19 @@ export default function GroupedTransactionsList({
           return !deselectedFlights[key];
         });
 
-        const allPendingTxIds = selectedPendingFlights.flatMap(f => 
-          f.transactions.filter(tx => !tx.has_proof).map(tx => tx.id)
+        const selectedPendingTransactions = selectedPendingFlights.flatMap(f =>
+          f.transactions
+            .filter(tx => !tx.has_proof)
+            .map(tx => ({ transaction: tx, flight: f }))
+        );
+        const allPendingTxIds = selectedPendingTransactions.map(({ transaction }) => transaction.id);
+        const bulkDeliveryMethods = intersectDeliveryMethods(
+          selectedPendingTransactions.map(({ transaction, flight }) =>
+            getTransactionDeliveryMethods(transaction, flight)
+          )
         );
         
-        const canBulkMarkClient = canMarkTaken && allPendingTxIds.length > 0;
+        const canBulkMarkClient = canMarkTaken && allPendingTxIds.length > 0 && bulkDeliveryMethods.length > 0;
         const isAnyTakenAwayClient = selectedPendingFlights.some(f => 
           f.transactions.some(tx => tx.is_taken_away && !tx.has_proof)
         );
@@ -166,7 +207,13 @@ export default function GroupedTransactionsList({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onMarkTaken(allPendingTxIds, client.client_code, flightNamesStr, isAnyTakenAwayClient);
+                      onMarkTaken(
+                        allPendingTxIds,
+                        client.client_code,
+                        flightNamesStr,
+                        isAnyTakenAwayClient,
+                        bulkDeliveryMethods,
+                      );
                     }}
                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(249,115,22,0.3)] active:scale-95 transition-all"
                   >
@@ -293,6 +340,7 @@ export default function GroupedTransactionsList({
                             <div className="divide-y divide-gray-100/50 dark:divide-white/[0.02] bg-white/30 dark:bg-black/10">
                               {flight.transactions.map((tx) => {
                                 const paymentStyle = getPaymentStyle(tx.payment_status);
+                                const transactionDeliveryMethods = getTransactionDeliveryMethods(tx, flight);
 
                                 return (
                                   <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 gap-3 hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors group/tx">
@@ -328,7 +376,13 @@ export default function GroupedTransactionsList({
                                           </span>
                                           {canMarkTaken && (
                                             <button
-                                              onClick={() => onMarkTaken([tx.id], client.client_code, flight.flight_name, tx.is_taken_away)}
+                                              onClick={() => onMarkTaken(
+                                                [tx.id],
+                                                client.client_code,
+                                                flight.flight_name,
+                                                tx.is_taken_away,
+                                                transactionDeliveryMethods,
+                                              )}
                                               className="flex items-center gap-1 text-[11px] font-bold px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10 transition-colors shadow-sm active:scale-95"
                                             >
                                               Isbot
@@ -337,7 +391,14 @@ export default function GroupedTransactionsList({
                                         </div>
                                       ) : canMarkTaken ? (
                                         <button
-                                          onClick={() => onMarkTaken([tx.id], client.client_code, flight.flight_name, false)}
+                                          onClick={() => onMarkTaken(
+                                            [tx.id],
+                                            client.client_code,
+                                            flight.flight_name,
+                                            false,
+                                            transactionDeliveryMethods,
+                                          )}
+                                          disabled={transactionDeliveryMethods.length === 0}
                                           className="flex items-center gap-1.5 text-[11px] font-bold px-4 py-2 rounded-xl bg-orange-100/80 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-500/30 transition-colors border border-orange-200/50 dark:border-orange-500/30 active:scale-95"
                                         >
                                           <Truck className="w-4 h-4" />

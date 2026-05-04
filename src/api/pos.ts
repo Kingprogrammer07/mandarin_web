@@ -49,6 +49,16 @@ export interface BulkPaymentRequest {
   items: BulkPaymentItem[];
   /** Optional cashier note recorded in the audit log. */
   cashier_note: string | null;
+  /** Whether to create a pickup queue entry for the paid cargos. */
+  create_pickup_queue?: boolean;
+  /** Required when create_pickup_queue is true. */
+  pickup_method?: string | null;
+  /** Queue priority — currently only "normal" is supported. */
+  pickup_priority?: string;
+  /** Optional note for the warehouse. */
+  pickup_note?: string | null;
+  /** Idempotency key to prevent duplicate queues on retry. */
+  pickup_idempotency_key?: string | null;
 }
 
 /** Processing result for a single item within a bulk payment response. */

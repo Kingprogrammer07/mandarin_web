@@ -321,7 +321,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     queryKey: ['payment-available-flights'],
     queryFn: paymentService.getAvailableFlights,
     enabled: isOpen,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,   // 5 min — flight list rarely changes
+    gcTime: 10 * 60_000,     // 10 min — keep in cache even when modal is closed
   });
 
   // Step 2 — flight details

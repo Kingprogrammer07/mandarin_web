@@ -10,6 +10,7 @@ import {
   Truck,
   AlertTriangle,
   MapPin,
+  Phone,
 } from 'lucide-react';
 import {
   getDeliveryHistory,
@@ -141,6 +142,17 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
   const { t } = useTranslation();
   const typeLabel = t(`deliveryHistory.types.${item.delivery_type}`, item.delivery_type);
   const typeColor = DELIVERY_TYPE_COLORS[item.delivery_type] ?? DELIVERY_TYPE_COLORS.bts;
+  const hasUzpostLocation =
+    item.delivery_type === 'uzpost' &&
+    (item.uzpost_location_name || item.uzpost_location_index || item.uzpost_location_address);
+  const uzpostTrackingStatus = item.uzpost_tracking_status || item.uzpost_order_status;
+  const addressText = hasUzpostLocation
+    ? [
+        item.uzpost_location_index ? `${t('deliveryHistory.card.uzpostIndex')}: ${item.uzpost_location_index}` : null,
+        item.uzpost_location_name,
+        item.uzpost_location_address,
+      ].filter(Boolean).join(' · ')
+    : [item.region, item.address].filter(Boolean).join(', ');
 
   return (
     <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md transition-all hover:shadow-md">
@@ -175,13 +187,78 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
         ))}
       </div>
 
+      {/* Phone */}
+      {item.phone && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-2">
+          <Phone className="w-3.5 h-3.5 shrink-0" />
+          <span className="font-medium">{item.phone}</span>
+        </div>
+      )}
+
       {/* Address */}
-      {(item.region || item.address) && (
-        <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+      {addressText && (
+        <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 mt-2">
           <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span className="line-clamp-2">
-            {[item.region, item.address].filter(Boolean).join(', ')}
+            {addressText}
           </span>
+        </div>
+      )}
+
+      {/* Caption / Courier note */}
+      {item.caption && (
+        <div className="mt-2 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 p-2.5">
+          <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">
+            {t('deliveryHistory.card.caption')}
+          </p>
+          <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+            {item.caption}
+          </p>
+        </div>
+      )}
+
+      {/* Map link for standard deliveries */}
+      {item.location_url && (
+        <a
+          href={item.location_url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+        >
+          <MapPin className="w-3.5 h-3.5" />
+          {t('deliveryHistory.card.openInMap')}
+        </a>
+      )}
+
+      {item.delivery_type === 'uzpost' && (item.uzpost_order_number || uzpostTrackingStatus || item.uzpost_label_pdf_url) && (
+        <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs dark:border-orange-500/20 dark:bg-orange-500/10">
+          <div className="flex flex-wrap items-center gap-2">
+            {item.uzpost_order_number && (
+              <span className="rounded-lg bg-white px-2 py-1 font-bold text-orange-700 dark:bg-white/10 dark:text-orange-300">
+                #{item.uzpost_order_number}
+              </span>
+            )}
+            {uzpostTrackingStatus && (
+              <span className="rounded-lg bg-emerald-50 px-2 py-1 font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                {uzpostTrackingStatus}
+              </span>
+            )}
+            {item.uzpost_tracking_error && (
+              <span className="rounded-lg bg-amber-100 px-2 py-1 font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                Tracking vaqtincha mavjud emas
+              </span>
+            )}
+          </div>
+          {item.uzpost_label_pdf_url && (
+            <a
+              href={item.uzpost_label_pdf_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex font-bold text-orange-600 underline-offset-2 hover:underline dark:text-orange-300"
+            >
+              UzPost PDF yorlig'ini ochish
+            </a>
+          )}
         </div>
       )}
 
@@ -261,7 +338,7 @@ export default function DeliveryHistoryPage({ onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, t]);
 
   return (
     <div className="pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

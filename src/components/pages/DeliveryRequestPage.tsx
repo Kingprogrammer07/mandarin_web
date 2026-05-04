@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import {
   ChevronRight,
@@ -10,6 +11,7 @@ import {
   Check,
   Copy,
   Upload,
+  Camera,
   X,
   AlertTriangle,
   Wallet,
@@ -19,6 +21,8 @@ import {
   ArrowLeft,
   UserCog,
   Clock,
+  MapPin,
+  Phone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -30,8 +34,17 @@ import {
   type CalculateUzpostResponse,
 } from '@/api/services/deliveryService';
 import { useProfile } from '@/hooks/useProfile';
-import type { ProfileResponse } from '@/types/profile';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
+import { UzpostBranchPicker } from '@/components/delivery/UzpostBranchPicker';
+import { DeliveryMapPickerLazy } from '@/components/delivery/DeliveryMapPickerLazy';
+import { useUzpostBranches } from '@/hooks/useUzpostBranches';
+import type { UzpostBranch } from '@/types/uzpostBranch';
+import {
+  clearSavedUzpostBranchPreference,
+  getSavedUzpostBranchId,
+  saveUzpostBranchPreference,
+} from '@/utils/uzpostBranchStorage';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
 
 // ============================================
 // TYPES
@@ -115,6 +128,59 @@ const CalcSkeleton = () => (
     <div className="h-14 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
   </div>
 );
+
+const RECEIPT_IMAGE_MAX_WIDTH = 1280;
+const RECEIPT_IMAGE_MAX_HEIGHT = 720;
+const RECEIPT_IMAGE_QUALITY = 0.82;
+
+async function compressReceiptImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) {
+    return file;
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const nextImage = new Image();
+      nextImage.onload = () => resolve(nextImage);
+      nextImage.onerror = () => reject(new Error('Receipt image could not be loaded'));
+      nextImage.src = imageUrl;
+    });
+
+    const scale = Math.min(
+      RECEIPT_IMAGE_MAX_WIDTH / image.naturalWidth,
+      RECEIPT_IMAGE_MAX_HEIGHT / image.naturalHeight,
+      1
+    );
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return file;
+    }
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const compressedBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', RECEIPT_IMAGE_QUALITY);
+    });
+
+    if (!compressedBlob) {
+      return file;
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'receipt';
+    return new File([compressedBlob], `${baseName}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
 
 // ============================================
 // STEP INDICATOR
@@ -338,17 +404,35 @@ interface StepStandardProps {
   deliveryType: DeliveryType;
   selectedFlights: string[];
   submitting: boolean;
-  profile: ProfileResponse | undefined;
-  onEditProfile?: () => void;
   onSubmit: () => void;
   onBack: () => void;
+  phoneNumber: string;
+  onPhoneChange: (value: string) => void;
+  caption: string;
+  onCaptionChange: (value: string) => void;
+  mapLocation: { latitude: number; longitude: number } | null;
+  onMapConfirm: (location: { latitude: number; longitude: number }) => void;
+  onMapClear: () => void;
 }
 
 const StepStandardConfirm = memo(
-  ({ deliveryType, selectedFlights, submitting, profile, onEditProfile, onSubmit, onBack }: StepStandardProps) => {
+  ({
+    deliveryType,
+    selectedFlights,
+    submitting,
+    onSubmit,
+    onBack,
+    phoneNumber,
+    onPhoneChange,
+    caption,
+    onCaptionChange,
+    mapLocation,
+    onMapConfirm,
+    onMapClear,
+  }: StepStandardProps) => {
     const { t } = useTranslation();
-    const typeLabel =
-      DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.label ?? deliveryType;
+    const typeLabel = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.label ?? deliveryType;
+    const canSubmit = caption.trim().length > 0 && !submitting;
 
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
@@ -357,8 +441,54 @@ const StepStandardConfirm = memo(
           {t('deliveryRequest.steps.confirm.subtitle')}
         </p>
 
-        {/* Address Confirmation */}
-        <AddressConfirmation profile={profile} onEditProfile={onEditProfile} />
+        {/* Phone Number */}
+        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
+          <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+            <Phone className="w-3.5 h-3.5" />
+            {t('deliveryRequest.steps.confirm.phoneLabel')}
+          </label>
+          <input
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => onPhoneChange(e.target.value)}
+            placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
+            className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+          />
+          <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+            {t('deliveryRequest.steps.confirm.phoneHint')}
+          </p>
+        </div>
+
+        {/* Caption / Courier Note */}
+        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
+          <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+            <MapPin className="w-3.5 h-3.5" />
+            {t('deliveryRequest.steps.confirm.captionLabel')}
+          </label>
+          <textarea
+            value={caption}
+            onChange={(e) => onCaptionChange(e.target.value)}
+            placeholder={t('deliveryRequest.steps.confirm.captionPlaceholder')}
+            rows={4}
+            className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition resize-none"
+          />
+          <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+            {t('deliveryRequest.steps.confirm.captionHint')}
+          </p>
+        </div>
+
+        {/* Map Picker — lazy loaded */}
+        <div className="mb-4">
+          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+            {t('deliveryRequest.steps.confirm.mapLabel')}
+          </p>
+          <DeliveryMapPickerLazy
+            initialLocation={null}
+            confirmedLocation={mapLocation}
+            onConfirm={onMapConfirm}
+            onClear={onMapClear}
+          />
+        </div>
 
         {/* Summary Card */}
         <div className="rounded-3xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-5 mb-4 backdrop-blur-md">
@@ -415,14 +545,17 @@ const StepStandardConfirm = memo(
           </button>
           <button
             onClick={onSubmit}
-            disabled={submitting}
-            className="
+            disabled={!canSubmit}
+            className={`
               flex-1 h-14 rounded-2xl font-bold text-base text-white
               flex items-center justify-center gap-2
-              bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98]
-              shadow-lg shadow-emerald-500/25 transition-all duration-200
-              disabled:opacity-60 disabled:cursor-not-allowed
-            "
+              transition-all duration-200 active:scale-[0.98]
+              ${
+                canSubmit
+                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
+                  : 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
+              }
+            `}
           >
             {submitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -448,10 +581,17 @@ interface StepUzpostProps {
   loading: boolean;
   selectedFlights: string[];
   submitting: boolean;
-  profile: ProfileResponse | undefined;
-  onEditProfile?: () => void;
-  onSubmit: (walletUsed: number, file: File | null) => void;
+  branches: UzpostBranch[];
+  branchesLoading: boolean;
+  branchesError: boolean;
+  selectedBranch: UzpostBranch | null;
+  suggestedBranch: UzpostBranch | null;
+  onBranchSelect: (branch: UzpostBranch) => void;
+  onBranchesRetry: () => void;
+  onSubmit: (walletUsed: number, file: File | null, phoneNumber: string) => void;
   onBack: () => void;
+  phoneNumber: string;
+  onPhoneChange: (value: string) => void;
 }
 
 function StepUzpostPayment({
@@ -459,33 +599,219 @@ function StepUzpostPayment({
   loading,
   selectedFlights,
   submitting,
-  profile,
-  onEditProfile,
+  branches,
+  branchesLoading,
+  branchesError,
+  selectedBranch,
+  suggestedBranch,
+  onBranchSelect,
+  onBranchesRetry,
   onSubmit,
   onBack,
+  phoneNumber,
+  onPhoneChange,
 }: StepUzpostProps) {
   const { t } = useTranslation();
   const [useWallet, setUseWallet] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [receiptProcessing, setReceiptProcessing] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCapturingReceipt, setIsCapturingReceipt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const walletApplied = useWallet && calcData ? Math.min(calcData.wallet_balance, calcData.total_amount) : 0;
   const remaining = calcData ? Math.max(calcData.total_amount - walletApplied, 0) : 0;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setReceiptFile(file);
-    if (file && file.type.startsWith('image/')) {
-      setPreview(URL.createObjectURL(file));
-    } else {
-      setPreview(null);
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
+
+  const processReceiptFile = useCallback(async (file: File) => {
+    setReceiptProcessing(true);
+    try {
+      const preparedFile = await compressReceiptImage(file);
+      setReceiptFile(preparedFile);
+      setPreview((currentPreview) => {
+        if (currentPreview) {
+          URL.revokeObjectURL(currentPreview);
+        }
+
+        return preparedFile.type.startsWith('image/')
+          ? URL.createObjectURL(preparedFile)
+          : null;
+      });
+    } catch {
+      setReceiptFile(file);
+      setPreview((currentPreview) => {
+        if (currentPreview) {
+          URL.revokeObjectURL(currentPreview);
+        }
+
+        return file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      });
+    } finally {
+      setReceiptProcessing(false);
     }
+  }, []);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+    await processReceiptFile(file);
   };
+
+  const stopReceiptCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setIsCameraReady(false);
+  }, []);
+
+  const closeReceiptCamera = useCallback(() => {
+    stopReceiptCamera();
+    setIsCameraOpen(false);
+    setIsCapturingReceipt(false);
+  }, [stopReceiptCamera]);
+
+  const openReceiptCamera = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        window.Telegram?.WebApp?.showAlert?.("Kamera bu brauzerda qo'llab-quvvatlanmaydi.");
+        return;
+      }
+
+      stopReceiptCamera();
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      }
+
+      streamRef.current = stream;
+      setIsCameraOpen(true);
+
+      requestAnimationFrame(() => {
+        const video = videoRef.current;
+        if (!video || !streamRef.current) return;
+
+        video.srcObject = streamRef.current;
+        void video.play();
+
+        let pollAttempts = 0;
+        const pollVideoReady = () => {
+          pollAttempts += 1;
+
+          if (!video || !streamRef.current) return;
+
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            setIsCameraReady(true);
+            return;
+          }
+
+          if (pollAttempts >= 120) {
+            window.Telegram?.WebApp?.showAlert?.("Kamera tayyorlanmadi. Qaytadan urinib ko'ring.");
+            closeReceiptCamera();
+            return;
+          }
+
+          requestAnimationFrame(pollVideoReady);
+        };
+
+        pollVideoReady();
+      });
+    } catch {
+      window.Telegram?.WebApp?.showAlert?.("Kameraga ruxsat berilmadi. Telegram sozlamalarida kamera ruxsatini yoqing.");
+      stopReceiptCamera();
+      setIsCameraOpen(false);
+    }
+  }, [closeReceiptCamera, stopReceiptCamera]);
+
+  const captureReceiptPhoto = useCallback(() => {
+    if (isCapturingReceipt) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !isCameraReady || video.videoWidth === 0 || video.videoHeight === 0) {
+      window.Telegram?.WebApp?.showAlert?.("Kamera hali tayyor emas. Bir oz kuting va qayta urinib ko'ring.");
+      return;
+    }
+
+    setIsCapturingReceipt(true);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setIsCapturingReceipt(false);
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setIsCapturingReceipt(false);
+          return;
+        }
+
+        const file = new File([blob], `uzpost-receipt-${Date.now()}.jpg`, {
+          type: 'image/jpeg',
+        });
+        void processReceiptFile(file).finally(() => {
+          closeReceiptCamera();
+          setIsCapturingReceipt(false);
+        });
+      },
+      'image/jpeg',
+      0.9
+    );
+  }, [closeReceiptCamera, isCameraReady, isCapturingReceipt, processReceiptFile]);
+
+  useEffect(() => {
+    return () => {
+      stopReceiptCamera();
+    };
+  }, [stopReceiptCamera]);
 
   const clearFile = () => {
     setReceiptFile(null);
-    setPreview(null);
+    setPreview((currentPreview) => {
+      if (currentPreview) {
+        URL.revokeObjectURL(currentPreview);
+      }
+      return null;
+    });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -537,16 +863,96 @@ function StepUzpostPayment({
   if (!calcData) return null;
 
   const fullyCoveredByWallet = remaining <= 0;
+  const cameraOverlay =
+    isCameraOpen && typeof document !== 'undefined'
+      ? createPortal(
+          <div className="fixed inset-0 z-[2147483647] isolate flex flex-col bg-black">
+            <div className="relative flex-1">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full object-cover"
+              />
+              {!isCameraReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/55">
+                  <div className="text-center">
+                    <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-white" />
+                    <p className="text-sm font-semibold text-white">{t('camera.preparingCamera')}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 bg-gradient-to-t from-black via-black/90 to-transparent p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                onClick={closeReceiptCamera}
+                disabled={isCapturingReceipt}
+                className="h-12 rounded-2xl border border-white/30 bg-white/10 px-5 font-bold text-white backdrop-blur-sm active:scale-95 disabled:opacity-60"
+              >
+                {t('camera.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={captureReceiptPhoto}
+                disabled={isCapturingReceipt || !isCameraReady}
+                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 font-bold text-white shadow-lg shadow-amber-500/30 active:scale-95 disabled:opacity-60"
+              >
+                {isCapturingReceipt ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Camera className="h-5 w-5" />
+                )}
+                {isCapturingReceipt ? t('cargo.saving') : t('camera.takePhoto')}
+              </button>
+            </div>
+
+            <canvas ref={canvasRef} className="hidden" />
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
+      {cameraOverlay}
+
       <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.paymentTitle')}</h2>
-      <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+      <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
         {t('deliveryRequest.steps.uzpost.flightsFor', { flights: selectedFlights.join(', ') })}
       </p>
 
-      {/* Address Confirmation */}
-      <AddressConfirmation profile={profile} onEditProfile={onEditProfile} />
+      {/* Optional phone number */}
+      <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
+        <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+          <Phone className="w-3.5 h-3.5" />
+          {t('deliveryRequest.steps.confirm.phoneLabel')}
+        </label>
+        <input
+          type="tel"
+          value={phoneNumber}
+          onChange={(e) => onPhoneChange(e.target.value)}
+          placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
+          className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+        />
+        <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+          {t('deliveryRequest.steps.uzpost.phoneHint')}
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <UzpostBranchPicker
+          branches={branches}
+          selectedBranch={selectedBranch}
+          suggestedBranch={suggestedBranch}
+          isLoading={branchesLoading}
+          isError={branchesError}
+          onSelect={onBranchSelect}
+          onRetry={onBranchesRetry}
+        />
+      </div>
 
       {/* Summary Grid */}
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -687,22 +1093,26 @@ function StepUzpostPayment({
                 </div>
               )}
             </div>
+          ) : receiptProcessing ? (
+            <div className="w-full rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/[0.06] p-8 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+              <p className="font-bold text-sm text-amber-700 dark:text-amber-300">
+                {t('deliveryRequest.steps.uzpost.compressingReceipt')}
+              </p>
+            </div>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
+            <div
               className="
                 w-full rounded-2xl border-2 border-dashed
                 border-gray-300 dark:border-white/15
-                hover:border-amber-400 dark:hover:border-amber-500/40
                 bg-gray-50 dark:bg-white/[0.02]
-                p-8 flex flex-col items-center justify-center gap-3
-                transition-all duration-200 active:scale-[0.98] group
+                p-5 flex flex-col gap-3
               "
             >
-              <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
-                <Upload className="w-7 h-7" />
-              </div>
               <div className="text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center text-amber-500 mb-3">
+                  <Upload className="w-7 h-7" />
+                </div>
                 <p className="font-bold text-sm text-gray-700 dark:text-gray-200">
                   {t('deliveryRequest.steps.uzpost.uploadButton')}
                 </p>
@@ -710,7 +1120,26 @@ function StepUzpostPayment({
                   {t('deliveryRequest.steps.uzpost.uploadHint')}
                 </p>
               </div>
-            </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-12 rounded-2xl bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                >
+                  <Upload className="w-4 h-4 text-amber-500" />
+                  {t('deliveryRequest.steps.uzpost.uploadGalleryButton')}
+                </button>
+                <button
+                  type="button"
+                  onClick={openReceiptCamera}
+                  className="h-12 rounded-2xl bg-amber-500 text-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-500/20"
+                >
+                  <Camera className="w-4 h-4" />
+                  {t('deliveryRequest.steps.uzpost.uploadCameraButton')}
+                </button>
+              </div>
+            </div>
           )}
 
           <input
@@ -736,14 +1165,14 @@ function StepUzpostPayment({
           <ArrowLeft className="w-5 h-5" />
         </button>
         <button
-          onClick={() => onSubmit(walletApplied, receiptFile)}
-          disabled={submitting || (!fullyCoveredByWallet && !receiptFile)}
+          onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
+          disabled={submitting || receiptProcessing || !selectedBranch || (!fullyCoveredByWallet && !receiptFile)}
           className={`
             flex-1 h-14 rounded-2xl font-bold text-base text-white
             flex items-center justify-center gap-2
             transition-all duration-200 active:scale-[0.98]
             ${
-              submitting || (!fullyCoveredByWallet && !receiptFile)
+              submitting || receiptProcessing || !selectedBranch || (!fullyCoveredByWallet && !receiptFile)
                 ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
                 : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
             }
@@ -799,7 +1228,7 @@ const StepSuccess = memo(({ onGoHome }: { onGoHome: () => void }) => {
 // ============================================
 
 const ProfileIncompleteAlert = memo(
-  ({ onGoProfile, onBack }: { onGoProfile?: () => void; onBack: () => void }) => {
+  ({ onGoProfile, onBack, missingFields }: { onGoProfile?: () => void; onBack: () => void; missingFields: string[] }) => {
     const { t } = useTranslation();
     return (
     <div className="animate-in fade-in zoom-in-95 duration-400 text-center py-8">
@@ -807,9 +1236,27 @@ const ProfileIncompleteAlert = memo(
         <UserCog className="w-10 h-10 text-red-500" />
       </div>
       <h2 className="text-xl font-extrabold mb-2">{t('deliveryRequest.profile.title')}</h2>
-      <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs mx-auto mb-6">
+      <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs mx-auto mb-2">
         {t('deliveryRequest.profile.desc')}
       </p>
+
+      {missingFields.length > 0 && (
+        <div className="max-w-xs mx-auto mb-6">
+          <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 text-left">
+            <p className="text-xs font-bold text-red-700 dark:text-red-400 mb-1.5">
+              Quyidagi maydonlar to'ldirilmagan:
+            </p>
+            <ul className="space-y-1">
+              {missingFields.map((field) => (
+                <li key={field} className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                  {field}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3 max-w-xs mx-auto">
         {onGoProfile && (
@@ -845,51 +1292,30 @@ const ProfileIncompleteAlert = memo(
 );
 
 // ============================================
-// ADDRESS CONFIRMATION
-// ============================================
-
-const AddressConfirmation = memo(({ profile, onEditProfile }: { profile: ProfileResponse | undefined; onEditProfile?: () => void }) => {
-  return (
-    <div className="rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 p-4 mb-6 backdrop-blur-md">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 font-medium">
-            Sizning manzilingiz to'g'rimi?
-          </p>
-          <p className="font-bold text-sm text-gray-900 dark:text-gray-100">
-            {profile?.region}, {profile?.district}
-          </p>
-          {profile?.address && (
-            <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">
-              {profile.address}
-            </p>
-          )}
-        </div>
-        {onEditProfile && (
-          <button
-            onClick={onEditProfile}
-            className="px-3 py-1.5 bg-white dark:bg-white/10 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold border border-blue-100 dark:border-blue-500/20 hover:bg-blue-100 active:scale-95 transition-all shadow-sm"
-          >
-            O'zgartirish
-          </button>
-        )}
-      </div>
-    </div>
-  );
-});
-
-// ============================================
 // MAIN COMPONENT
 // ============================================
 
 export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Props) {
   const { t } = useTranslation();
-  const { data: userProfile, isLoading: profileLoading } = useProfile();
+  const { data: userProfile, isLoading: profileLoading, refetch: refetchProfile } = useProfile();
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1);
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(null);
   const [selectedFlights, setSelectedFlights] = useState<string[]>([]);
+  const [selectedUzpostBranch, setSelectedUzpostBranch] = useState<UzpostBranch | null>(null);
+  const [savedUzpostBranchId, setSavedUzpostBranchId] = useState<number | null>(() =>
+    getSavedUzpostBranchId()
+  );
+  const uzpostBranchesQuery = useUzpostBranches(deliveryType === 'uzpost');
+
+  // Standard delivery form state
+  const [standardPhone, setStandardPhone] = useState('');
+  const [standardCaption, setStandardCaption] = useState('');
+  const [standardMapLocation, setStandardMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // UzPost phone state
+  const [uzpostPhone, setUzpostPhone] = useState('');
 
   // API state
   const [flights, setFlights] = useState<FlightItem[]>([]);
@@ -902,19 +1328,75 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
 
   const totalSteps = deliveryType === 'uzpost' ? 4 : 4;
 
+  // Profile validation matching backend logic
+  const standardProfileMissingFields = useMemo(() => {
+    if (profileLoading || !userProfile) return [];
+    const missing: string[] = [];
+    if (!userProfile.full_name?.trim()) missing.push('Ism');
+    if (!userProfile.phone?.trim()) missing.push('Telefon');
+    if (!userProfile.region?.trim()) missing.push('Viloyat');
+    if (!userProfile.address?.trim()) missing.push('Manzil');
+    return missing;
+  }, [profileLoading, userProfile]);
+
+  const uzpostProfileMissingFields = useMemo(() => {
+    if (profileLoading || !userProfile) return [];
+    const missing: string[] = [];
+    if (!userProfile.full_name?.trim()) missing.push('Ism');
+    return missing;
+  }, [profileLoading, userProfile]);
+
+  const isStandardProfileIncomplete = standardProfileMissingFields.length > 0;
+  const isUzpostProfileIncomplete = uzpostProfileMissingFields.length > 0;
+  const suggestedUzpostBranch = useMemo(() => {
+    if (!savedUzpostBranchId) {
+      return null;
+    }
+
+    return uzpostBranchesQuery.data?.find((branch) => branch.id === savedUzpostBranchId) ?? null;
+  }, [savedUzpostBranchId, uzpostBranchesQuery.data]);
+
+  useEffect(() => {
+    if (!savedUzpostBranchId || !uzpostBranchesQuery.data) {
+      return;
+    }
+
+    const savedBranchStillExists = uzpostBranchesQuery.data.some(
+      (branch) => branch.id === savedUzpostBranchId
+    );
+
+    if (!savedBranchStillExists) {
+      clearSavedUzpostBranchPreference();
+      setSavedUzpostBranchId(null);
+    }
+  }, [savedUzpostBranchId, uzpostBranchesQuery.data]);
+
   // ---- Actions ----
 
   const handleTypeSelect = useCallback(async (type: DeliveryType) => {
     setDeliveryType(type);
     setSelectedFlights([]);
+    setSelectedUzpostBranch(null);
     setCalcData(null);
     setProfileIncomplete(false);
+    setStandardPhone(userProfile?.phone ?? '');
+    setStandardCaption('');
+    setStandardMapLocation(null);
+    setUzpostPhone(userProfile?.phone ?? '');
     setCurrentStep(2);
-    setFlightsLoading(true);
 
+    // Try cache first
+    const cached = useDeliveryStore.getState().getCachedFlights();
+    if (cached) {
+      setFlights(cached);
+      return;
+    }
+
+    setFlightsLoading(true);
     try {
       const res = await getPaidFlights();
       setFlights(res.flights);
+      useDeliveryStore.getState().setPaidFlights(res.flights);
     } catch (err: unknown) {
       const e = err as { message?: string };
       toast.error(e?.message || t('deliveryRequest.toast.flightsError'));
@@ -922,7 +1404,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
     } finally {
       setFlightsLoading(false);
     }
-  }, [t]);
+  }, [t, userProfile]);
 
   const toggleFlight = useCallback((name: string) => {
     setSelectedFlights((prev) =>
@@ -932,6 +1414,10 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
 
   const handleFlightContinue = useCallback(async () => {
     if (deliveryType === 'uzpost') {
+      if (isUzpostProfileIncomplete) {
+        setProfileIncomplete(true);
+        return;
+      }
       setCurrentStep(3);
       setCalcLoading(true);
       try {
@@ -944,15 +1430,32 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
         setCalcLoading(false);
       }
     } else {
+      if (isStandardProfileIncomplete) {
+        setProfileIncomplete(true);
+        return;
+      }
+
       setCurrentStep(3);
     }
-  }, [deliveryType, selectedFlights, t]);
+  }, [deliveryType, isStandardProfileIncomplete, isUzpostProfileIncomplete, selectedFlights, t]);
 
   const handleStandardSubmit = useCallback(async () => {
     if (!deliveryType || deliveryType === 'uzpost') return;
+    if (!standardCaption.trim()) {
+      toast.error(t('deliveryRequest.toast.captionRequired'));
+      return;
+    }
     setSubmitting(true);
     try {
-      await submitStandardDelivery(deliveryType as 'yandex' | 'mandarin' | 'bts', selectedFlights);
+      const phoneToSend = standardPhone.trim() || null;
+      await submitStandardDelivery(
+        deliveryType as 'yandex' | 'mandarin' | 'bts',
+        selectedFlights,
+        phoneToSend,
+        standardCaption.trim(),
+        standardMapLocation?.latitude ?? 0,
+        standardMapLocation?.longitude ?? 0
+      );
       setCurrentStep(4);
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string; data?: { detail?: string } };
@@ -962,6 +1465,8 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
       if (status === 429 && e?.data?.detail) {
         toast.error(e.data.detail);
       } else if (status === 400 && message.toLowerCase().includes('profile')) {
+        // Refetch profile to get latest data before showing incomplete screen
+        void refetchProfile();
         setProfileIncomplete(true);
       } else {
         toast.error(message);
@@ -969,13 +1474,21 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
     } finally {
       setSubmitting(false);
     }
-  }, [deliveryType, selectedFlights, t]);
+  }, [deliveryType, selectedFlights, standardPhone, standardCaption, standardMapLocation, t, refetchProfile]);
 
   const handleUzpostSubmit = useCallback(
-    async (walletUsed: number, file: File | null) => {
+    async (walletUsed: number, file: File | null, phoneNumber: string) => {
+      if (!selectedUzpostBranch) {
+        toast.error('UzPost punktini tanlang');
+        return;
+      }
+
       setSubmitting(true);
       try {
-        await submitUzpostDelivery(selectedFlights, walletUsed, file);
+        const phoneToSend = phoneNumber.trim() || null;
+        await submitUzpostDelivery(selectedFlights, walletUsed, file, selectedUzpostBranch, phoneToSend);
+        saveUzpostBranchPreference(selectedUzpostBranch);
+        setSavedUzpostBranchId(selectedUzpostBranch.id);
         setCurrentStep(4);
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string; data?: { detail?: string } };
@@ -993,7 +1506,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
         setSubmitting(false);
       }
     },
-    [selectedFlights, t]
+    [selectedFlights, selectedUzpostBranch, t]
   );
 
   const goBackStep = useCallback(() => {
@@ -1006,34 +1519,6 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
   }, [currentStep, onBack]);
 
   // ---- Render ----
-
-  const isAddressIncomplete =
-    !profileLoading && !!userProfile && (!userProfile.region || !userProfile.district);
-
-  // Show address incomplete screen before wizard even starts
-  if (isAddressIncomplete) {
-    return (
-      <div className="pb-8">
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-white/5 active:scale-90 transition-transform"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-bold">{t('deliveryRequest.headerTitleShort')}</h1>
-        </div>
-        <ProfileIncompleteAlert onGoProfile={() => setIsEditProfileOpen(true)} onBack={onBack} />
-        {userProfile && (
-          <EditProfileModal
-            isOpen={isEditProfileOpen}
-            onClose={() => setIsEditProfileOpen(false)}
-            user={userProfile}
-          />
-        )}
-      </div>
-    );
-  }
 
   // Profile incomplete overlay (from backend error during submission)
   if (profileIncomplete) {
@@ -1052,6 +1537,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
         <ProfileIncompleteAlert
           onGoProfile={() => setIsEditProfileOpen(true)}
           onBack={() => setProfileIncomplete(false)}
+          missingFields={deliveryType === 'uzpost' ? uzpostProfileMissingFields : standardProfileMissingFields}
         />
         {userProfile && (
           <EditProfileModal
@@ -1112,10 +1598,19 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
           loading={calcLoading}
           selectedFlights={selectedFlights}
           submitting={submitting}
-          profile={userProfile}
-          onEditProfile={() => setIsEditProfileOpen(true)}
+          branches={uzpostBranchesQuery.data ?? []}
+          branchesLoading={uzpostBranchesQuery.isLoading}
+          branchesError={uzpostBranchesQuery.isError}
+          selectedBranch={selectedUzpostBranch}
+          suggestedBranch={suggestedUzpostBranch}
+          onBranchSelect={setSelectedUzpostBranch}
+          onBranchesRetry={() => {
+            void uzpostBranchesQuery.refetch();
+          }}
           onSubmit={handleUzpostSubmit}
           onBack={goBackStep}
+          phoneNumber={uzpostPhone}
+          onPhoneChange={setUzpostPhone}
         />
       )}
 
@@ -1124,10 +1619,15 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
           deliveryType={deliveryType}
           selectedFlights={selectedFlights}
           submitting={submitting}
-          profile={userProfile}
-          onEditProfile={() => setIsEditProfileOpen(true)}
           onSubmit={handleStandardSubmit}
           onBack={goBackStep}
+          phoneNumber={standardPhone}
+          onPhoneChange={setStandardPhone}
+          caption={standardCaption}
+          onCaptionChange={setStandardCaption}
+          mapLocation={standardMapLocation}
+          onMapConfirm={setStandardMapLocation}
+          onMapClear={() => setStandardMapLocation(null)}
         />
       )}
 

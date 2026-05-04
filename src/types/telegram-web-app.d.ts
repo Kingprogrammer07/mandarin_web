@@ -39,6 +39,18 @@ interface TelegramWebAppThemeParams {
   secondary_bg_color?: string;
 }
 
+interface TelegramLocationData {
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+  course?: number;
+  speed?: number;
+  horizontal_accuracy?: number;
+  vertical_accuracy?: number;
+  course_accuracy?: number;
+  speed_accuracy?: number;
+}
+
 interface TelegramWebApp {
   initData: string;
   initDataUnsafe: TelegramWebAppInitData;
@@ -78,6 +90,17 @@ interface TelegramWebApp {
   readTextFromClipboard(callback?: (text: string) => void): void;
   requestWriteAccess(callback?: (granted: boolean) => void): void;
   requestContact(callback?: (granted: boolean) => void): void;
+
+  // Location manager (Bot API 8.0+)
+  LocationManager?: {
+    isInited: boolean;
+    isLocationAvailable: boolean;
+    isAccessRequested: boolean;
+    isAccessGranted: boolean;
+    init(callback?: () => void): void;
+    getLocation(callback: (locationData: TelegramLocationData | null) => void): void;
+    openSettings(): void;
+  };
 
   // Version check (Bot API 6.0+)
   isVersionAtLeast(version: string): boolean;

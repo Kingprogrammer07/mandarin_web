@@ -41,3 +41,48 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// ─── Push notifications ─────────────────────────────────────────────────────
+// Handles push messages from the backend (requires server-side Web Push).
+// Falls back to a generic alert if payload shape is unexpected.
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'Mandarin Cargo', body: event.data.text() };
+  }
+
+  const title = payload.title || 'Mandarin Cargo';
+  const options = {
+    body: payload.body || 'Yangi navbat',
+    icon: payload.icon || '/mandarin_cargo_logo.png',
+    badge: payload.badge || '/mandarin_cargo_logo.png',
+    tag: payload.tag || 'pickup-queue',
+    requireInteraction: payload.requireInteraction ?? false,
+    vibrate: payload.vibrate || [200, 100, 200],
+    data: payload.data || {},
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});

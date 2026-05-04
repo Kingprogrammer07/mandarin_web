@@ -50,6 +50,8 @@ import {
   posUpdateDeliveryRequestType,
   posUpdateTakenStatus,
 } from "@/api/pos";
+import { createPosPickupQueue, PICKUP_METHOD_LABELS, PICKUP_PRIORITY_LABELS } from "@/api/pickupQueue";
+import type { PickupMethod, PickupQueuePriority } from "@/api/pickupQueue";
 import {
   useBroadcastChannel,
   type BroadcastMessage,
@@ -77,6 +79,7 @@ import {
 } from "@/api/verification";
 import type { ClientSearchResult, UnpaidCargoItem } from "@/api/verification";
 import { formatCurrencySum, formatTashkentDateTime } from "@/lib/format";
+import { normalizeNumber } from "@/utils/numberFormat";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -398,12 +401,10 @@ function TodayTotal({ total, loading }: { total: number; loading: boolean }) {
 
 function LogEntry({
   item,
-  index,
   onSelect,
   currentAdminId,
 }: {
   item: CashierLogItem;
-  index: number;
   onSelect: (code: string) => void;
   /** The current user's Admin DB PK — used to colour-code own vs. peer entries. */
   currentAdminId: number | null;
@@ -413,10 +414,7 @@ function LogEntry({
   const cashierStyle = resolveCashierStyle(item.cashier_id, currentAdminId);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: Math.min(index * 0.025, 0.4) }}
+    <div
       onClick={() => hasCode && onSelect(item.client_code!)}
       className={`flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 dark:border-white/[0.04] last:border-0 rounded-lg px-2 -mx-1 transition-colors ${cashierStyle.row} ${
         hasCode ? "cursor-pointer hover:opacity-80" : ""
@@ -468,7 +466,7 @@ function LogEntry({
           {translatePayment(item.payment_provider)}
         </span>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -485,7 +483,6 @@ function CargoRow({
 }) {
   return (
     <motion.label
-      layout
       className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
         isSelected
           ? "bg-orange-50 dark:bg-orange-500/[0.08] border-orange-200/70 dark:border-orange-500/20"
@@ -575,6 +572,21 @@ function ClientProfileDrawer({
 
   // Full client info overlay
   const [showFullInfo, setShowFullInfo] = useState(false);
+
+  // Manual pickup queue from transaction drawer
+  const [selectedTxIds, setSelectedTxIds] = useState<Set<number>>(new Set());
+  const toggleTxSelection = useCallback((id: number) => {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const [showPickupQueueModal, setShowPickupQueueModal] = useState(false);
+  const [pickupQueueMethod, setPickupQueueMethod] = useState<PickupMethod>("self_pickup");
+  const [pickupQueuePriority, setPickupQueuePriority] = useState<PickupQueuePriority>("normal");
+  const [pickupQueueNote, setPickupQueueNote] = useState("");
 
   // Full client profile (phone, passport, region, …)
   const { data: profile } = useQuery({
@@ -676,6 +688,60 @@ function ClientProfileDrawer({
     },
   });
 
+  interface DuplicateConflict {
+    queue_id: number;
+    display_number: number;
+    client_code: string;
+    status: string;
+    transaction_ids: number[];
+  }
+
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateConflict | null>(null);
+
+  const createPickupQueueMut = useMutation({
+    mutationFn: (data: {
+      transaction_ids: number[];
+      pickup_method: PickupMethod;
+      priority?: PickupQueuePriority;
+      note: string | null;
+      idempotency_key?: string | null;
+    }) => createPosPickupQueue(data),
+    onSuccess: (res) => {
+      const queue = res as { display_number?: number };
+      toast.success(
+        queue.display_number
+          ? `Warehousega yuborildi. Navbat raqami: #${queue.display_number}`
+          : "Warehousega yuborildi",
+      );
+      setSelectedTxIds(new Set());
+      setShowPickupQueueModal(false);
+      setPickupQueueMethod("self_pickup");
+      setPickupQueuePriority("normal");
+      setPickupQueueNote("");
+      setDuplicateConflict(null);
+      queryClient.invalidateQueries({ queryKey: ["pos-txn", clientCode] });
+      queryClient.invalidateQueries({ queryKey: ["pickup_queue"] });
+    },
+    onError: (err: unknown) => {
+      const e = err as {
+        message?: string;
+        status?: number;
+        data?: DuplicateConflict & { detail?: string };
+      };
+      if (e.status === 409 && e.data) {
+        setDuplicateConflict({
+          queue_id: e.data.queue_id,
+          display_number: e.data.display_number,
+          client_code: e.data.client_code,
+          status: e.data.status,
+          transaction_ids: e.data.transaction_ids ?? [],
+        });
+      } else {
+        toast.error(e.message ?? "Navbat yaratishda xatolik");
+      }
+    },
+  });
+
   const askReason = (): string | null => {
     const reason = window.prompt("Sabab kiriting (majburiy):");
     if (!reason || !reason.trim()) {
@@ -749,9 +815,13 @@ function ClientProfileDrawer({
 
       <div className="flex gap-2">
         <input
-          type="number"
+          type="text"
+          inputMode="decimal"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => {
+            const normalized = normalizeNumber(e.target.value);
+            if (normalized !== null) setAmount(normalized);
+          }}
           placeholder="Summa"
           className="flex-1 min-w-0 px-3.5 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white"
         />
@@ -982,14 +1052,32 @@ function ClientProfileDrawer({
                   const isTakingThis =
                     markTakenMut.isPending &&
                     markTakenMut.variables?.transactionId === tx.id;
+                  const canQueue = !isAdjust && (tx.payment_status === "paid" || tx.payment_status === "partial") && !tx.is_taken_away;
+                  const isSelected = selectedTxIds.has(tx.id);
                   return (
                     <div
                       key={tx.id}
-                      className="flex flex-col gap-2.5 px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.05]"
+                      onClick={() => canQueue && toggleTxSelection(tx.id)}
+                      className={`flex flex-col gap-2.5 px-3.5 py-2.5 rounded-xl border transition-colors cursor-pointer ${
+                        canQueue
+                          ? isSelected
+                            ? "bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/30"
+                            : "bg-gray-50 dark:bg-white/[0.03] border-gray-100 dark:border-white/[0.05] hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+                          : "bg-gray-50 dark:bg-white/[0.03] border-gray-100 dark:border-white/[0.05] cursor-default"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            {canQueue && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => toggleTxSelection(tx.id)}
+                                className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500 dark:border-gray-600 dark:bg-[#222] shrink-0"
+                              />
+                            )}
                             <Plane className="w-3 h-3 text-gray-400 shrink-0" />
                             <span className="text-[12px] font-bold text-gray-800 dark:text-white truncate">
                               {tx.reys}
@@ -1141,6 +1229,23 @@ function ClientProfileDrawer({
                   </p>
                 </div>
               )}
+
+              {/* Manual pickup queue action bar */}
+              {selectedTxIds.size > 0 && (
+                <div className="sticky bottom-2 z-10">
+                  <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-orange-200 dark:border-orange-500/20 shadow-lg p-3 flex items-center justify-between">
+                    <span className="text-[12px] font-bold text-gray-700 dark:text-gray-200">
+                      {selectedTxIds.size} ta tanlandi
+                    </span>
+                    <button
+                      onClick={() => setShowPickupQueueModal(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[12px] font-bold rounded-lg shadow-sm"
+                    >
+                      Warehousega yuborish
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1233,6 +1338,156 @@ function ClientProfileDrawer({
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Manual pickup queue modal ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showPickupQueueModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+            onClick={() => setShowPickupQueueModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 340, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-white/[0.08] shadow-2xl overflow-hidden"
+            >
+              <div className="h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-amber-400" />
+              <div className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-[16px] font-black text-gray-900 dark:text-white">
+                      Warehousega yuborish
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      {selectedTxIds.size} ta tranzaksiya
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowPickupQueueModal(false)}
+                    className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/[0.08] transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                      Olib ketish usuli
+                    </label>
+                    <select
+                      value={pickupQueueMethod}
+                      onChange={(e) => setPickupQueueMethod(e.target.value as PickupMethod)}
+                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
+                    >
+                      {(Object.keys(PICKUP_METHOD_LABELS) as PickupMethod[]).map((m) => (
+                        <option key={m} value={m}>
+                          {PICKUP_METHOD_LABELS[m]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                      Navbat ustuvorligi
+                    </label>
+                    <select
+                      value={pickupQueuePriority}
+                      onChange={(e) => setPickupQueuePriority(e.target.value as PickupQueuePriority)}
+                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
+                    >
+                      {(Object.keys(PICKUP_PRIORITY_LABELS) as PickupQueuePriority[]).map((p) => (
+                        <option key={p} value={p}>
+                          {PICKUP_PRIORITY_LABELS[p]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                      Izoh (ixtiyoriy)
+                    </label>
+                    <input
+                      type="text"
+                      value={pickupQueueNote}
+                      onChange={(e) => setPickupQueueNote(e.target.value.slice(0, 200))}
+                      placeholder="Izoh..."
+                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-900 dark:text-white placeholder:text-gray-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Duplicate conflict alert */}
+                {duplicateConflict && (
+                  <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-red-700 dark:text-red-400">
+                          Bu yuklar allaqachon navbatda
+                        </p>
+                        <p className="text-[12px] text-red-600 dark:text-red-300 mt-0.5">
+                          Mijoz: <span className="font-bold">{duplicateConflict.client_code}</span>
+                        </p>
+                        <p className="text-[12px] text-red-600 dark:text-red-300">
+                          Navbat raqami: <span className="font-black text-[14px]">#{duplicateConflict.display_number}</span>
+                        </p>
+                        <p className="text-[12px] text-red-600 dark:text-red-300">
+                          Status: <span className="font-bold">{duplicateConflict.status === "preparing" ? "Tayyorlanmoqda" : duplicateConflict.status === "ready" ? "Tayyor" : duplicateConflict.status}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setDuplicateConflict(null)}
+                      className="w-full py-2 rounded-lg bg-white dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-[12px] font-bold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+                    >
+                      Tushundim, qayta urinish
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { setShowPickupQueueModal(false); setDuplicateConflict(null); }}
+                    className="flex-1 py-3 rounded-2xl border border-gray-200 dark:border-white/[0.08] text-[13px] font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
+                  >
+                    Bekor
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      if (selectedTxIds.size === 0) return;
+                      setDuplicateConflict(null);
+                      createPickupQueueMut.mutate({
+                        transaction_ids: Array.from(selectedTxIds),
+                        pickup_method: pickupQueueMethod,
+                        priority: pickupQueuePriority,
+                        note: pickupQueueNote.trim() || null,
+                        idempotency_key: crypto.randomUUID(),
+                      });
+                    }}
+                    disabled={createPickupQueueMut.isPending}
+                    className="flex-[2] py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-[14px] rounded-2xl shadow-lg shadow-orange-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {createPickupQueueMut.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCheck className="w-4 h-4" />
+                    )}
+                    Yuborish
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
@@ -1583,6 +1838,12 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [useWallet, setUseWallet] = useState(false);
   const [receivedInput, setReceivedInput] = useState("");
 
+  // ── Pickup queue state ──────────────────────────────────────────────────────
+  const [createPickupQueue, setCreatePickupQueue] = useState(false);
+  const [pickupMethod, setPickupMethod] = useState<PickupMethod>("self_pickup");
+  const [pickupPriority, setPickupPriority] = useState<PickupQueuePriority>("normal");
+  const [pickupNote, setPickupNote] = useState("");
+
   // ── UI overlays ───────────────────────────────────────────────────────────
   const [showProfile, setShowProfile] = useState(false);
   const [confirmPayload, setConfirmPayload] = useState<ConfirmPayload | null>(
@@ -1644,27 +1905,37 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     enabled: canProcess,
     staleTime: 2 * 60_000,
   });
-  const activeCards = (cardsData ?? []).filter((c) => c.is_active);
-  const selectedCard = activeCards.find((c) => c.id === selectedCardId) ?? null;
+  const activeCards = useMemo(() => (cardsData ?? []).filter((c) => c.is_active), [cardsData]);
+  const selectedCard = useMemo(
+    () => activeCards.find((c) => c.id === selectedCardId) ?? null,
+    [activeCards, selectedCardId],
+  );
 
   const cargos: UnpaidCargoItem[] = useMemo(
     () => cargoData?.items ?? [],
     [cargoData?.items],
   );
-  const allSelected =
-    cargos.length > 0 && cargos.every((c) => selectedIds.has(c.cargo_id));
+  const allSelected = useMemo(
+    () => cargos.length > 0 && cargos.every((c) => selectedIds.has(c.cargo_id)),
+    [cargos, selectedIds],
+  );
   const someSelected = selectedIds.size > 0;
 
   // ── Bulk payment mutation ─────────────────────────────────────────────────
   const payMut = useMutation({
     mutationFn: processBulkPayment,
     onSuccess: (result) => {
-      toast.success(
-        `${result.processed_count} ta yuk to'lovi qabul qilindi! Jami: ${formatCurrencySum(result.total_paid)}`,
-      );
+      const msg = createPickupQueue
+        ? `${result.processed_count} ta yuk to'lovi qabul qilindi va warehousega yuborildi! Jami: ${formatCurrencySum(result.total_paid)}`
+        : `${result.processed_count} ta yuk to'lovi qabul qilindi! Jami: ${formatCurrencySum(result.total_paid)}`;
+      toast.success(msg);
       setSelectedIds(new Set());
       setReceivedInput("");
       setConfirmPayload(null);
+      setCreatePickupQueue(false);
+      setPickupMethod("self_pickup");
+      setPickupPriority("normal");
+      setPickupNote("");
       // Aggressively invalidate all POS-related query keys
       queryClient.invalidateQueries({ queryKey: ["pos-unpaid"] });
       queryClient.invalidateQueries({ queryKey: ["cashier-log"] });
@@ -1678,44 +1949,61 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     },
     onError: (err: unknown) => {
       type PosError = {
+        status?: number;
         data?: {
-          detail?: { error?: string; failed_cargo_id?: number } | string;
+          detail?: { error?: string; failed_cargo_id?: number; display_number?: number } | string;
         };
         message?: string;
       };
       const apiErr = err as PosError;
-      const detail = apiErr?.data?.detail;
-      if (detail && typeof detail === "object" && detail.error) {
+      if (apiErr.status === 409) {
+        const detail = apiErr?.data?.detail;
+        const displayNumber =
+          detail && typeof detail === "object" ? detail.display_number : undefined;
         toast.error(
-          `Xatolik (cargo #${detail.failed_cargo_id ?? "?"}): ${detail.error}`,
+          displayNumber
+            ? `Bu yuklar allaqachon navbatda (#${displayNumber})`
+            : "Bu yuklar allaqachon navbatda",
           { duration: 6000 },
         );
       } else {
-        toast.error(apiErr.message ?? "To'lov qilishda xatolik yuz berdi");
+        const detail = apiErr?.data?.detail;
+        if (detail && typeof detail === "object" && detail.error) {
+          toast.error(
+            `Xatolik (cargo #${detail.failed_cargo_id ?? "?"}): ${detail.error}`,
+            { duration: 6000 },
+          );
+        } else {
+          toast.error(apiErr.message ?? "To'lov qilishda xatolik yuz berdi");
+        }
       }
       setConfirmPayload(null);
     },
   });
 
   // ── Derived payment totals ────────────────────────────────────────────────
-  const selectedCargos = cargos.filter((c) => selectedIds.has(c.cargo_id));
-  const totalOwed = selectedCargos.reduce(
-    (s, c) => s + (c.total_payment ?? 0),
-    0,
-  );
-  const totalSelectedWeight = selectedCargos.reduce(
-    (s, c) => s + (c.weight ?? 0),
-    0,
-  );
+  const { selectedCargos, totalOwed, totalSelectedWeight } = useMemo(() => {
+    const selected = cargos.filter((c) => selectedIds.has(c.cargo_id));
+    return {
+      selectedCargos: selected,
+      totalOwed: selected.reduce((s, c) => s + (c.total_payment ?? 0), 0),
+      totalSelectedWeight: selected.reduce((s, c) => s + (c.weight ?? 0), 0),
+    };
+  }, [cargos, selectedIds]);
+
   const walletDeduction = useWallet ? Math.min(displayBalance, totalOwed) : 0;
   const netAfterWallet = totalOwed - walletDeduction;
 
-  // Sync received input whenever cargo selection or wallet toggle changes
+  // Auto-fill received input when selection/wallet changes (only if user hasn't manually edited)
+  const userEditedRef = useRef(false);
+  const prevNetRef = useRef(0);
   useEffect(() => {
-    const net =
-      totalOwed - (useWallet ? Math.min(displayBalance, totalOwed) : 0);
-    setReceivedInput(net > 0 ? String(Math.round(net)) : "");
-  }, [selectedIds, useWallet, totalOwed, displayBalance]);
+    const net = totalOwed - (useWallet ? Math.min(displayBalance, totalOwed) : 0);
+    if (!userEditedRef.current || net !== prevNetRef.current) {
+      setReceivedInput(net > 0 ? String(Math.round(net)) : "");
+      prevNetRef.current = net;
+    }
+  }, [totalOwed, useWallet, displayBalance]);
 
   const receivedAmount = parseFloat(receivedInput) || netAfterWallet;
 
@@ -1760,6 +2048,12 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     (code: string) => handleSearch(code),
     [handleSearch],
   );
+  const handleCloseProfile = useCallback(() => setShowProfile(false), []);
+  const handleBalanceUpdate = useCallback((newBalance: number) => setLiveBalance(newBalance), []);
+  const handleRefreshClient = useCallback(
+    () => handleSearch(clientInfo?.client_code),
+    [handleSearch, clientInfo?.client_code],
+  );
 
   const handleRemoveRecent = (code: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1774,6 +2068,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     setSelectedIds(new Set());
     setUseWallet(false);
     setLiveBalance(null);
+    setCreatePickupQueue(false);
+    setPickupMethod("self_pickup");
+    setPickupNote("");
     setTimeout(() => searchRef.current?.focus(), 50);
   };
 
@@ -1814,6 +2111,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   const handleConfirmPay = () => {
     if (!confirmPayload || !clientInfo) return;
+    const idempotencyKey = crypto.randomUUID();
     payMut.mutate({
       items: confirmPayload.cargos.map((cargo, i) => ({
         cargo_id: cargo.cargo_id,
@@ -1825,6 +2123,11 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         card_id: confirmPayload.selectedCard?.id ?? null,
       })),
       cashier_note: null,
+      create_pickup_queue: createPickupQueue || undefined,
+      pickup_method: createPickupQueue ? pickupMethod : null,
+      pickup_priority: createPickupQueue ? pickupPriority : undefined,
+      pickup_note: createPickupQueue ? (pickupNote.trim() || null) : null,
+      pickup_idempotency_key: createPickupQueue ? idempotencyKey : null,
     });
   };
 
@@ -2027,11 +2330,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                         ))}
                       </div>
                     ) : logData && logData.items.length > 0 ? (
-                      logData.items.map((item, i) => (
+                      logData.items.map((item) => (
                         <LogEntry
                           key={item.id}
                           item={item}
-                          index={i}
                           onSelect={handleLogEntryClick}
                           currentAdminId={jwtClaims.admin_id}
                         />
@@ -2484,9 +2786,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                         Qabul qilingan summa (UZS)
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={receivedInput}
-                        onChange={(e) => setReceivedInput(e.target.value)}
+                        onChange={(e) => {
+                          const normalized = normalizeNumber(e.target.value);
+                          if (normalized !== null) setReceivedInput(normalized);
+                        }}
                         onFocus={(e) => e.target.select()}
                         placeholder={String(Math.round(netAfterWallet))}
                         className="w-full px-4 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[15px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white"
@@ -2534,6 +2840,83 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                       </div>
                     </div>
 
+                    {/* Pickup queue toggle */}
+                    <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-white/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => setCreatePickupQueue((p) => !p)}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border-2 transition-all ${
+                          createPickupQueue
+                            ? "bg-blue-50 dark:bg-blue-500/[0.1] border-blue-400 dark:border-blue-500/50"
+                            : "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                              createPickupQueue ? "bg-blue-500" : "bg-gray-200 dark:bg-white/[0.1]"
+                            }`}
+                          >
+                            <Package className="w-4 h-4 text-white" />
+                          </div>
+                          <span
+                            className={`text-[12px] font-bold ${
+                              createPickupQueue
+                                ? "text-blue-700 dark:text-blue-400"
+                                : "text-gray-500 dark:text-gray-400"
+                            }`}
+                          >
+                            Warehousega yuborish
+                          </span>
+                        </div>
+                        <div
+                          className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
+                            createPickupQueue ? "bg-blue-500" : "bg-gray-300 dark:bg-white/20"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                              createPickupQueue ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </div>
+                      </button>
+
+                      {createPickupQueue && (
+                        <div className="space-y-2">
+                          <select
+                            value={pickupMethod}
+                            onChange={(e) => setPickupMethod(e.target.value as PickupMethod)}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 text-gray-700 dark:text-gray-200"
+                          >
+                            {(Object.keys(PICKUP_METHOD_LABELS) as PickupMethod[]).map((m) => (
+                              <option key={m} value={m}>
+                                {PICKUP_METHOD_LABELS[m]}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={pickupPriority}
+                            onChange={(e) => setPickupPriority(e.target.value as PickupQueuePriority)}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 text-gray-700 dark:text-gray-200"
+                          >
+                            {(Object.keys(PICKUP_PRIORITY_LABELS) as PickupQueuePriority[]).map((p) => (
+                              <option key={p} value={p}>
+                                {PICKUP_PRIORITY_LABELS[p]}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={pickupNote}
+                            onChange={(e) => setPickupNote(e.target.value.slice(0, 200))}
+                            placeholder="Izoh (ixtiyoriy)"
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 text-gray-900 dark:text-white placeholder:text-gray-400"
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     {/* Pay button */}
                     <motion.button
                       onClick={handleOpenConfirm}
@@ -2560,9 +2943,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
             clientCode={clientInfo.client_code}
             clientName={clientInfo.full_name}
             currentBalance={displayBalance}
-            onClose={() => setShowProfile(false)}
-            onBalanceUpdate={(newBalance) => setLiveBalance(newBalance)}
-            onRefreshClient={() => handleSearch(clientInfo.client_code)}
+            onClose={handleCloseProfile}
+            onBalanceUpdate={handleBalanceUpdate}
+            onRefreshClient={handleRefreshClient}
             canAdjust={canAdjust}
             canUpdateStatus={canUpdateStatus}
           />

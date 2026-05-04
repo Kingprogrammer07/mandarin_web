@@ -1,22 +1,66 @@
-# Objective
+# Admin Delivery Request Page
 
-Apply the backend POS cashier-log filtering changes to the frontend POS dashboard so cashiers can filter log rows by date range and payment provider, with the displayed filtered total matching the selected provider.
+## Objective
+Create a beautiful, reusable, SOLID-compliant admin page that lets warehouse/admin staff create delivery requests on behalf of clients using the new backend endpoints:
+- `POST /api/v1/admin/delivery-requests/standard` (JSON)
+- `POST /api/v1/admin/delivery-requests/uzpost` (multipart)
 
-# Implementation Plan
+## Implementation Plan
 
-- [x] Update POS API types to include `payment_provider` request filtering and the new `summary` response payload.
-- [x] Add POS dashboard state for cashier-log date/provider filters and wire those values into the TanStack Query key/request.
-- [x] Add a compact cashier-log filter UI in the POS dashboard sidebar with clear/reset behavior.
-- [x] Display provider-specific summary totals when a provider filter is selected.
-- [x] Validate the change with the repository build/lint commands where feasible.
+- [x] Create `src/api/services/adminDeliveryService.ts`
+  - `adminCreateStandardDelivery()` → JSON POST
+  - `adminCreateUzpostDelivery()` → multipart POST
+- [x] Create `src/api/hooks/useAdminDelivery.ts`
+  - `useAdminCreateStandardDelivery()` mutation
+  - `useAdminCreateUzpostDelivery()` mutation
+- [x] Create reusable components in `src/components/admin/delivery/`
+  - `ClientLookupPanel.tsx` — search client by code via grouped warehouse search
+  - `FlightSelector.tsx` — multi-select flight cards
+  - `CargoPreviewList.tsx` — expandable cargo list per flight
+  - `DeliveryTypeSelector.tsx` — 5 type cards (self_pickup, yandex, mandarin, bts, uzpost)
+  - `StandardDeliveryForm.tsx` — phone, caption, map picker
+  - `UzpostDeliveryForm.tsx` — branch picker, receipt upload, wallet input
+- [x] Create `src/pages/admin/AdminDeliveryRequestPage.tsx`
+  - Step-based wizard: client → flights → type → form → success
+  - Sticky bottom action bar
+  - Orange accent theme consistent with warehouse
+- [x] Wire routing in `App.tsx`
+  - Add `admin-delivery-request` to Page union, paths, ROLE_CONFIG
+- [x] Add nav item in `AdminLayout.tsx` sidebar quick access
+- [x] Add i18n keys to `uz.json` and `ru.json`
+- [x] Build and verify TypeScript + Vite (passes)
 
-# Walkthrough/Architecture
+## Architecture
 
-`POSDashboard` owns the visible cashier-log filters because they are UI-only controls for the sidebar log. The component passes normalized query params to `getCashierLog`, which forwards them to `GET /api/v1/payments/cashier-log`. The query key includes the active filter values so TanStack Query caches and refetches each filtered view correctly. The API layer stays as the typed boundary for provider names and the backend summary response shape. The sidebar total uses `summary.total` only for the "all providers" view; provider-specific filters use their matching `summary.cash`, `summary.card`, `summary.click`, `summary.payme`, or `summary.wallet` value.
+```
+AdminDeliveryRequestPage
+├── Step 1: ClientLookupPanel
+│   └── useGroupedWarehouseSearch({ code, payment_status: paid, taken_status: not_taken })
+├── Step 2: FlightSelector + CargoPreviewList
+│   └── Multi-select flights from ClientGroup.flights
+├── Step 3: DeliveryTypeSelector
+│   └── self_pickup | yandex | mandarin | bts | uzpost
+├── Step 4a: StandardDeliveryForm
+│   └── phone, caption, DeliveryMapPickerLazy
+├── Step 4b: UzpostDeliveryForm
+│   └── phone, UzpostBranchPicker, receiptFile, walletUsed
+└── Submit → adminCreateStandardDelivery | adminCreateUzpostDelivery
+```
 
-# Verification
+## Files Created/Modified
 
-- `node_modules\.bin\tsc.cmd -b` passed.
-- `npx.cmd eslint src\api\pos.ts src\pages\POSDashboard.tsx` passed.
-- `npm.cmd run build` passed when run outside the sandbox after sandboxed esbuild process spawning failed with `EPERM`.
-- Full `npm.cmd run lint` still has pre-existing repository issues outside the touched POS files.
+| File | Action |
+|------|--------|
+| `src/api/services/adminDeliveryService.ts` | Created |
+| `src/api/hooks/useAdminDelivery.ts` | Created |
+| `src/components/admin/delivery/ClientLookupPanel.tsx` | Created |
+| `src/components/admin/delivery/FlightSelector.tsx` | Created |
+| `src/components/admin/delivery/CargoPreviewList.tsx` | Created |
+| `src/components/admin/delivery/DeliveryTypeSelector.tsx` | Created |
+| `src/components/admin/delivery/StandardDeliveryForm.tsx` | Created |
+| `src/components/admin/delivery/UzpostDeliveryForm.tsx` | Created |
+| `src/pages/admin/AdminDeliveryRequestPage.tsx` | Created |
+| `src/App.tsx` | Modified (routing + roles) |
+| `src/components/admin/AdminLayout.tsx` | Modified (nav item + Truck import) |
+| `src/i18n/locales/uz.json` | Modified (adminDeliveryRequest keys) |
+| `src/i18n/locales/ru.json` | Modified (adminDeliveryRequest keys) |

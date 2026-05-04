@@ -1,4 +1,4 @@
-import { useState, useCallback, useId } from "react";
+import { useState, useCallback, useId, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,13 +12,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  markTakenSchema,
-  DELIVERY_METHODS,
-  DELIVERY_METHOD_LABELS,
-} from "../../schemas/warehouseSchemas";
+import { markTakenSchema } from "../../schemas/warehouseSchemas";
 import type { MarkTakenFormValues } from "../../schemas/warehouseSchemas";
 import { useWarehouseQueueStore } from "../../store/useWarehouseQueueStore";
+import type { DeliveryMethodOption } from "../../api/services/warehouse";
 
 // ── Image compression ─────────────────────────────────────────────────────────
 
@@ -89,6 +86,7 @@ interface MarkTakenModalProps {
   transactionIds: number[];
   clientCode: string;
   flightName: string;
+  deliveryMethods: DeliveryMethodOption[];
   isTakenAway?: boolean;
   isOpen: boolean;
   onClose: () => void;
@@ -100,6 +98,7 @@ export default function MarkTakenModal({
   transactionIds,
   clientCode,
   flightName,
+  deliveryMethods,
   isTakenAway,
   isOpen,
   onClose,
@@ -121,10 +120,11 @@ export default function MarkTakenModal({
     formState: { errors },
   } = useForm<MarkTakenFormValues>({
     resolver: zodResolver(markTakenSchema),
-    defaultValues: { delivery_method: undefined, photos: [], comment: "" },
+    defaultValues: { delivery_method: "", photos: [], comment: "" },
   });
 
-  const photos = watch("photos") ?? [];
+  const watchedPhotos = watch("photos");
+  const photos = useMemo(() => watchedPhotos ?? [], [watchedPhotos]);
 
   const handleClose = useCallback(() => {
     previews.forEach((url) => URL.revokeObjectURL(url));
@@ -171,6 +171,10 @@ export default function MarkTakenModal({
 
   const onSubmit = useCallback(
     async (data: MarkTakenFormValues) => {
+      const selectedDeliveryMethod = deliveryMethods.find(
+        (method) => method.value === data.delivery_method,
+      );
+
       previews.forEach((url) => URL.revokeObjectURL(url));
       setPreviews([]);
       reset();
@@ -181,6 +185,7 @@ export default function MarkTakenModal({
         clientCode,
         flightName,
         deliveryMethod: data.delivery_method,
+        deliveryMethodLabel: selectedDeliveryMethod?.label,
         comment: data.comment,
         photos: data.photos,
       });
@@ -190,10 +195,11 @@ export default function MarkTakenModal({
         duration: 3000,
       });
     },
-    [previews, reset, onClose, enqueue, transactionIds, clientCode, flightName],
+    [previews, reset, onClose, enqueue, transactionIds, clientCode, flightName, deliveryMethods],
   );
 
   const canAddMore = photos.length < 10;
+  const hasDeliveryMethods = deliveryMethods.length > 0;
 
   return (
     <AnimatePresence>
@@ -280,21 +286,21 @@ export default function MarkTakenModal({
                     control={control}
                     render={({ field }) => (
                       <div className="grid grid-cols-2 gap-2.5">
-                        {DELIVERY_METHODS.map((method) => (
+                        {deliveryMethods.map((method) => (
                           <button
-                            key={method}
+                            key={method.value}
                             type="button"
-                            onClick={() => field.onChange(method)}
+                            onClick={() => field.onChange(method.value)}
                             className={`relative flex items-center justify-center px-4 py-3.5 rounded-2xl border-2 text-[13px] font-bold transition-all active:scale-[0.96] ${
-                              field.value === method
-                                ? method === "self_pickup"
+                              field.value === method.value
+                                ? method.value === "self_pickup"
                                   ? "bg-blue-50 dark:bg-blue-500/10 border-blue-400 dark:border-blue-500/50 text-blue-700 dark:text-blue-400"
                                   : "bg-orange-50 dark:bg-orange-500/10 border-orange-400 dark:border-orange-500/50 text-orange-700 dark:text-orange-400"
                                 : "bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.07] text-gray-600 dark:text-gray-400"
                             }`}
                           >
-                            {DELIVERY_METHOD_LABELS[method]}
-                            {field.value === method && (
+                            {method.label}
+                            {field.value === method.value && (
                               <motion.div
                                 layoutId="delivery-check"
                                 className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-orange-500"
@@ -305,6 +311,11 @@ export default function MarkTakenModal({
                       </div>
                     )}
                   />
+                  {!hasDeliveryMethods && (
+                    <p className="mt-2 text-[12px] text-red-500 font-medium">
+                      Bu yuk uchun yetkazib berish usuli mavjud emas.
+                    </p>
+                  )}
                   {errors.delivery_method && (
                     <p className="mt-2 text-[12px] text-red-500 font-medium">
                       {errors.delivery_method.message}
@@ -456,7 +467,7 @@ export default function MarkTakenModal({
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   type="submit"
-                  disabled={isCompressing}
+                  disabled={isCompressing || !hasDeliveryMethods}
                   className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-[14px] rounded-2xl shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/35 disabled:opacity-60 flex items-center justify-center gap-2 transition-all"
                 >
                   {isCompressing ? (

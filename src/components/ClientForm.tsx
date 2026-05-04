@@ -48,6 +48,7 @@ import {
 } from "@/api/services/client";
 
 import { regions, DISTRICTS } from "@/lib/validation";
+import { normalizeNumber } from "@/utils/numberFormat";
 
 // O'zbekiston passport seriyalari
 const UZBEKISTAN_NATIVE_PASSPORT_SERIES = [
@@ -1300,12 +1301,15 @@ export default function ClientForm({
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
+                                  type="text"
+                                  inputMode="decimal"
                                   placeholder="0.00"
                                   className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400"
                                   {...field}
+                                  onChange={(event) => {
+                                    const normalized = normalizeNumber(event.target.value);
+                                    if (normalized !== null) field.onChange(normalized);
+                                  }}
                                 />
                               </FormControl>
                             </FormItem>

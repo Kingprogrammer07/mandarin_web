@@ -1,4 +1,5 @@
 import { apiClient, apiClientFormData } from '@/api/client';
+import type { UzpostBranch } from '@/types/uzpostBranch';
 
 // ============================================
 // DELIVERY REQUEST SCHEMAS
@@ -35,8 +36,22 @@ export interface DeliveryRequestHistoryItem {
   id: number;
   delivery_type: string;
   flight_names: string[];
+  phone: string | null;
   region: string;
   address: string;
+  caption: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_url: string | null;
+  uzpost_location_id: number | null;
+  uzpost_location_name: string | null;
+  uzpost_location_index: string | null;
+  uzpost_location_address: string | null;
+  uzpost_order_number: string | null;
+  uzpost_order_status: string | null;
+  uzpost_tracking_status: string | null;
+  uzpost_tracking_error: string | null;
+  uzpost_label_pdf_url: string | null;
   status: string;
   admin_comment: string | null;
   created_at: string;
@@ -79,11 +94,22 @@ export async function calculateUzpost(flightNames: string[]): Promise<CalculateU
  */
 export async function submitStandardDelivery(
   deliveryType: 'yandex' | 'mandarin' | 'bts',
-  flightNames: string[]
+  flightNames: string[],
+  phoneNumber: string | null,
+  caption: string,
+  latitude: number,
+  longitude: number
 ): Promise<DeliverySuccessResponse> {
   const response = await apiClient.post<DeliverySuccessResponse>(
     '/api/user/delivery/request/standard',
-    { delivery_type: deliveryType, flight_names: flightNames }
+    {
+      delivery_type: deliveryType,
+      flight_names: flightNames,
+      phone_number: phoneNumber,
+      caption,
+      latitude,
+      longitude,
+    }
   );
   return response.data;
 }
@@ -94,11 +120,21 @@ export async function submitStandardDelivery(
 export async function submitUzpostDelivery(
   flightNames: string[],
   walletUsed: number,
-  receiptFile?: File | null
+  receiptFile?: File | null,
+  selectedBranch?: UzpostBranch | null,
+  phoneNumber?: string | null
 ): Promise<DeliverySuccessResponse> {
   const formData = new FormData();
   formData.append('flight_names', JSON.stringify(flightNames));
   formData.append('wallet_used', String(walletUsed));
+
+  if (selectedBranch) {
+    formData.append('location_id', String(selectedBranch.id));
+  }
+
+  if (phoneNumber) {
+    formData.append('phone_number', phoneNumber);
+  }
 
   if (receiptFile) {
     formData.append('receipt_file', receiptFile);
@@ -114,9 +150,13 @@ export async function submitUzpostDelivery(
 /**
  * Get delivery request history for the current user (paginated)
  */
-export async function getDeliveryHistory(page = 1, size = 10): Promise<DeliveryHistoryResponse> {
+export async function getDeliveryHistory(
+  page = 1,
+  size = 10,
+  refreshUzpostTracking = true
+): Promise<DeliveryHistoryResponse> {
   const response = await apiClient.get<DeliveryHistoryResponse>('/api/user/delivery/history', {
-    params: { page, size },
+    params: { page, size, refresh_uzpost_tracking: refreshUzpostTracking },
   });
   return response.data;
 }
