@@ -181,7 +181,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
     // admin-carousel is gated by JWT permission (carousel:read) checked in ManagerPage UI;
     // flight-schedule-admin is gated by JWT permission (flight_schedule:manage) in the page UI;
     // adding them here only unlocks the route — the backend enforces actual authorization.
-    allowed: ["manager-page", "admin-carousel", "admin-profile", "passkey-page", "flight-schedule-admin"],
+    allowed: ["manager-page", "admin-carousel", "admin-profile", "passkey-page", "flight-schedule-admin", "admin-delivery-request"],
   },
   warehouse_worker: {
     default: "warehouse-page",
@@ -778,6 +778,9 @@ function AppContent() {
             <FlightScheduleAdminPage
               onBack={() => navigateToPage(getDefaultPageForRole(userRole!) as Page)}
             />
+          )}
+          {currentPage === "admin-delivery-request" && (
+            <AdminDeliveryRequestPage />
           )}
         </>
       ) : isManagerPage && canAccessManagerPage ? (

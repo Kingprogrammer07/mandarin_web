@@ -110,6 +110,8 @@ const ACTION_TRANSLATIONS: Record<string, string> = {
   'CREATED_CAROUSEL_ITEM':   'Karousel elementi yaratildi',
   'UPDATED_CAROUSEL_ITEM':   'Karousel elementi tahrirlandi',
   'DELETED_CAROUSEL_ITEM':   'Karousel elementi o\'chirildi',
+  'bulk_mark_cargo_taken': 'Yuk olib ketildi deb belgilandi (massiv)',
+  
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
