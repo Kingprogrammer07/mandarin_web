@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,12 +6,12 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import {
   Loader2, Plus, Shield, UserCircle, ChevronLeft, ChevronRight,
-  AlertTriangle, Trash2, KeyRound, Info, X,
+  AlertTriangle, Trash2, KeyRound, Info, X, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import LightSelect from '../../components/ui/LightSelect';
-import type { LightSelectOption as SelectOption } from '../../components/ui/LightSelect';
+// import LightSelect from '../../components/ui/LightSelect';
+// import type { LightSelectOption as SelectOption } from '../../components/ui/LightSelect';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../../components/ui/drawer';
@@ -51,12 +51,12 @@ const createAdminSchema = z.object({
   client_code: z.string().min(1, "Mijoz kodini kiriting"),
   system_username: z.string().min(3, "Kamida 3 ta belgi"),
   pin: z.string().min(4, "Kamida 4 ta raqam").max(64),
-  role_id: z.string().min(1, "Rolni tanlang"),
+  role_ids: z.array(z.number()).min(1, "Kamida bitta rol tanlang"),
 });
 
 const editAdminSchema = z.object({
   system_username: z.string().min(3, "Kamida 3 ta belgi"),
-  role_id: z.string().min(1, "Rolni tanlang"),
+  role_ids: z.array(z.number()).min(1, "Kamida bitta rol tanlang"),
 });
 
 const pinResetSchema = z.object({
@@ -126,10 +126,17 @@ const AdminTableRow = memo(({
       {admin.client?.client_code ?? '—'}
     </td>
     <td className="px-4 py-3">
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400">
-        <Shield className="w-3 h-3" />
-        {admin.role_name ?? '—'}
-      </span>
+      <div className="flex flex-wrap gap-1">
+        {(admin.role_names ?? [admin.role_name]).map((rn) => (
+          <span
+            key={rn}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400"
+          >
+            <Shield className="w-3 h-3" />
+            {rn}
+          </span>
+        ))}
+      </div>
     </td>
     <td className="px-4 py-3">
       <StatusBadge isActive={admin.is_active} />
@@ -191,10 +198,17 @@ const AdminMobileCard = memo(({
       </div>
     </div>
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400">
-        <Shield className="w-3 h-3" />
-        {admin.role_name ?? '—'}
-      </span>
+      <div className="flex flex-wrap gap-1">
+        {(admin.role_names ?? [admin.role_name]).map((rn) => (
+          <span
+            key={rn}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400"
+          >
+            <Shield className="w-3 h-3" />
+            {rn}
+          </span>
+        ))}
+      </div>
       <StatusBadge isActive={admin.is_active} />
       {admin.client?.client_code && (
         <span className="text-[11px] text-gray-400 dark:text-gray-500">
@@ -220,18 +234,15 @@ interface CreateAdminFormProps {
 const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProps) => {
   const queryClient = useQueryClient();
 
-  const roleOptions: SelectOption[] = useMemo(() =>
-    roles.map((r) => ({ value: String(r.id), label: r.name })),
-    [roles]
-  );
-
   const { register, handleSubmit, control, formState: { errors } } = useForm<CreateAdminFormValues>({
     resolver: zodResolver(createAdminSchema),
+    defaultValues: {
+      client_code: '',
+      system_username: '',
+      pin: '',
+      role_ids: [],
+    },
   });
-
-  // Portal target for LightSelect — must be inside this component's DOM so
-  // Radix FocusScope (used by the surrounding Dialog/Drawer) does not block it.
-  const [lsPortalEl, setLsPortalEl] = useState<HTMLDivElement | null>(null);
 
   const { mutate: create, isPending } = useMutation({
     mutationFn: createAdminAccount,
@@ -246,12 +257,12 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
   });
 
   const onSubmit = (values: CreateAdminFormValues) => {
-    create({ ...values, role_id: Number(values.role_id) });
+    create(values);
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-4">
-      <div ref={setLsPortalEl} />
+      {/* Portal target removed — multi-select uses native checkboxes */}
       <div>
         <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
           Mijoz kodi
@@ -297,23 +308,58 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
 
       <div>
         <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-          Rol
+          Rollar
         </label>
         <Controller
-          name="role_id"
+          name="role_ids"
           control={control}
           render={({ field }) => (
-            <LightSelect
-              options={roleOptions}
-              value={field.value}
-              onChange={field.onChange}
-              placeholder="Rolni tanlang"
-              portalContainer={lsPortalEl}
-            />
+            <div className="space-y-1.5 max-h-[180px] overflow-y-auto p-2 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
+              {roles.map((r) => {
+                const checked = field.value.includes(r.id);
+                return (
+                  <label
+                    key={r.id}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[13px] ${
+                      checked
+                        ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                        checked
+                          ? 'bg-orange-500 border-orange-500'
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
+                    >
+                      {checked && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={checked}
+                      onChange={() => {
+                        const next = checked
+                          ? field.value.filter((id) => id !== r.id)
+                          : [r.id, ...field.value];
+                        field.onChange(next);
+                      }}
+                    />
+                    <span className="flex-1">{r.name}</span>
+                    {checked && field.value[0] === r.id && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500 text-white">
+                        Asosiy
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
           )}
         />
-        {errors.role_id && (
-          <p className="mt-1 text-[11px] text-red-500">{errors.role_id.message}</p>
+        {errors.role_ids && (
+          <p className="mt-1 text-[11px] text-red-500">{errors.role_ids.message}</p>
         )}
       </div>
 
@@ -354,14 +400,6 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
-  // Portal target for LightSelect dropdowns inside this Sheet/Dialog.
-  const [lsPortalEl, setLsPortalEl] = useState<HTMLDivElement | null>(null);
-
-  const roleOptions: SelectOption[] = useMemo(() =>
-    roles.map((r) => ({ value: String(r.id), label: r.name })),
-    [roles]
-  );
-
   // ── Edit form ──
   const {
     register: registerEdit,
@@ -373,7 +411,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
     resolver: zodResolver(editAdminSchema),
     defaultValues: {
       system_username: admin?.system_username ?? '',
-      role_id: String(admin?.role_id ?? ''),
+      role_ids: admin?.role_ids ?? [],
     },
   });
 
@@ -392,7 +430,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
     if (admin) {
       resetEditForm({
         system_username: admin.system_username,
-        role_id: String(admin.role_id ?? ''),
+        role_ids: admin.role_ids ?? [],
       });
     }
   }, [admin, resetEditForm]);
@@ -411,7 +449,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
     mutationFn: (values: EditAdminFormValues) =>
       updateAdminAccount(admin!.id, {
         system_username: values.system_username,
-        role_id: Number(values.role_id),
+        role_ids: values.role_ids,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-accounts'] });
@@ -553,20 +591,55 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                     Rol
                   </label>
                   <Controller
-                    name="role_id"
+                    name="role_ids"
                     control={editControl}
                     render={({ field }) => (
-                      <LightSelect
-                        options={roleOptions}
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder="Rolni tanlang"
-                        portalContainer={lsPortalEl}
-                      />
+                      <div className="space-y-1.5 max-h-[180px] overflow-y-auto p-2 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
+                        {roles.map((r) => {
+                          const checked = field.value.includes(r.id);
+                          return (
+                            <label
+                              key={r.id}
+                              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[13px] ${
+                                checked
+                                  ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                  checked
+                                    ? 'bg-orange-500 border-orange-500'
+                                    : 'border-gray-300 dark:border-gray-600'
+                                }`}
+                              >
+                                {checked && <Check className="w-3 h-3 text-white" />}
+                              </div>
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                onChange={() => {
+                                  const next = checked
+                                    ? field.value.filter((id) => id !== r.id)
+                                    : [r.id, ...field.value];
+                                  field.onChange(next);
+                                }}
+                              />
+                              <span className="flex-1">{r.name}</span>
+                              {checked && field.value[0] === r.id && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500 text-white">
+                                  Asosiy
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
                     )}
                   />
-                  {editErrors.role_id && (
-                    <p className="mt-1 text-[11px] text-red-500">{editErrors.role_id.message}</p>
+                  {editErrors.role_ids && (
+                    <p className="mt-1 text-[11px] text-red-500">{editErrors.role_ids.message}</p>
                   )}
                 </div>
 
@@ -754,7 +827,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
       >
         {/* LightSelect dropdown portal target — inside SheetContent so Radix
             FocusScope does not intercept pointer events on the dropdown. */}
-        <div ref={setLsPortalEl} />
+        {/* Portal target removed — multi-select uses native checkboxes */}
         <SheetHeader className="px-4 py-3 border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -768,9 +841,16 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                 <SheetDescription className="sr-only">
                   Admin hisobi tafsilotlari va boshqaruv
                 </SheetDescription>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                  {admin.role_name ?? 'Rol yo\u02bcq'}
-                </p>
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {(admin.role_names ?? [admin.role_name]).map((rn) => (
+                    <span
+                      key={rn}
+                      className="text-[11px] text-gray-400 dark:text-gray-500"
+                    >
+                      {rn}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             <button

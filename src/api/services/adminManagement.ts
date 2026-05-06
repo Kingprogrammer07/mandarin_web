@@ -39,6 +39,8 @@ export interface AdminAccountResponse {
   failed_login_attempts: number;
   role_id: number;
   role_name: string;
+  role_ids: number[];
+  role_names: string[];
   client: ClientBriefResponse;
   created_at: string;
 }
@@ -54,7 +56,7 @@ export interface AdminAccountListResponse {
 export interface CreateAdminAccountRequest {
   /** Client code (extra_code / client_code / legacy_code) used to look up the client. */
   client_code: string;
-  role_id: number;
+  role_ids: number[];
   system_username: string;
   pin: string;
 }
@@ -63,7 +65,7 @@ export interface UpdateAdminAccountRequest {
   system_username?: string;
   /** Plain-text PIN — will be bcrypt-hashed server-side. */
   pin?: string;
-  role_id?: number;
+  role_ids?: number[];
 }
 
 export interface ResetAdminPinRequest {
@@ -125,8 +127,10 @@ export interface GetAuditLogsParams {
 export interface AdminJwtClaims {
   /** "resource:action" permission slugs from the JWT. Empty for super-admins. */
   permissions: Set<string>;
-  /** Role name stored in the token (e.g. "super-admin", "cashier"). */
+  /** Primary role name stored in the token (e.g. "super-admin", "cashier"). */
   role_name: string;
+  /** All role names from the token (multi-role support). */
+  role_names: string[];
   /** Default home page path from the role config (e.g. "/pos", "/admin/accounts"). */
   home_page: string | null;
   /**
@@ -151,6 +155,7 @@ export function getAdminJwtClaims(): AdminJwtClaims {
   const empty: AdminJwtClaims = {
     permissions: new Set(),
     role_name: '',
+    role_names: [],
     home_page: null,
     isSuperAdmin: false,
     admin_id: null,
@@ -166,7 +171,14 @@ export function getAdminJwtClaims(): AdminJwtClaims {
     const payload = JSON.parse(json) as Record<string, unknown>;
 
     const role_name = String(payload.role_name ?? payload.role ?? '');
-    const isSuperAdmin = role_name === 'super_admin' || role_name === 'super-admin';
+    const role_names = Array.isArray(payload.roles)
+      ? payload.roles.map(String)
+      : role_name
+        ? [role_name]
+        : [];
+    const isSuperAdmin = role_names.some(
+      (r) => r === 'super_admin' || r === 'super-admin'
+    );
 
     // admin_id lives in `sub` (standard JWT subject) or directly as `admin_id`
     const rawAdminId = payload.admin_id ?? payload.sub;
@@ -175,6 +187,7 @@ export function getAdminJwtClaims(): AdminJwtClaims {
     return {
       permissions: new Set((payload.permissions as string[] | undefined) ?? []),
       role_name,
+      role_names,
       home_page: (payload.home_page as string | undefined) ?? null,
       isSuperAdmin,
       admin_id: Number.isFinite(admin_id) ? admin_id : null,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Users, LogOut, Sun, Moon, Layers, CalendarDays } from 'lucide-react';
+import { ArrowLeft, Users, LogOut, Sun, Moon, Layers, CalendarDays, Send } from 'lucide-react';
 import SearchAndFilterBar from '../../components/manager/SearchAndFilterBar';
 import type { SearchType } from '../../components/manager/SearchAndFilterBar';
 import ClientsDataTable from '../../components/manager/ClientsDataTable';
@@ -9,6 +9,7 @@ import { useManagerStore } from '../../store/useManagerStore';
 import { searchClientsPaginated } from '../../api/services/adminClients';
 import { getAdminJwtClaims } from '../../api/services/adminManagement';
 import { refreshAdminToken } from '../../api/services/adminAuth';
+import RoleSwitcher from '../../components/admin/RoleSwitcher';
 import type { ClientSearchResponse } from '../../api/services/adminClients';
 
 interface ManagerPageProps {
@@ -32,6 +33,7 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
   const [isDark, setIsDark] = useState(getInitialTheme);
   // Targeted search type: 'name' searches full_name only, 'code' searches client code only
   const [searchType, setSearchType] = useState<SearchType>('name');
+  const [strictSearch, setStrictSearch] = useState(false);
 
   // Apply theme on mount and when toggled
   useEffect(() => {
@@ -68,7 +70,7 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
   const searchParams = isQueryEmpty
     ? {}
     : searchType === 'code'
-      ? { code: searchQuery }
+      ? { code: searchQuery, strict: strictSearch }
       : searchType === 'phone'
         ? { phone: searchQuery }
         : { name: searchQuery };
@@ -87,6 +89,7 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
 
   const handleSearchTypeChange = useCallback((type: SearchType) => {
     setSearchType(type);
+    setStrictSearch(false);
     // Reset query and page when switching search type
     setSearchQuery('');
     setPage(1);
@@ -158,6 +161,18 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
                 </button>
               )}
 
+              {/* Delivery request — visible for managers and super-admins */}
+              {(jwtClaims.isSuperAdmin || jwtClaims.permissions.has('delivery_requests:create') || jwtClaims.role_name === 'manager') && (
+                <button
+                  onClick={() => onNavigate('admin-delivery-request')}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+                  title="Zayavka qoldirish"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
+
+              <RoleSwitcher onNavigate={onNavigate} />
               <button
                 onClick={toggleTheme}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
@@ -180,6 +195,8 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
             onChange={handleSearchChange}
             searchType={searchType}
             onSearchTypeChange={handleSearchTypeChange}
+            strict={strictSearch}
+            onStrictChange={setStrictSearch}
           />
         </div>
       </div>
@@ -196,6 +213,20 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
           totalPages={data?.total_pages ?? 0}
           onPageChange={handlePageChange}
         />
+      </div>
+
+      {/* Mobile bottom bar with RoleSwitcher */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/90 dark:bg-[#0f0f0f]/90 backdrop-blur-xl border-t border-gray-200 dark:border-white/[0.06] px-4 py-2">
+        <div className="flex items-center justify-between max-w-5xl mx-auto">
+          <RoleSwitcher onNavigate={onNavigate} />
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-red-500/80 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Chiqish
+          </button>
+        </div>
       </div>
 
       {/* Client detail drawer (reads/writes Zustand store internally) */}

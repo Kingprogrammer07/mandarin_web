@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '@/config/config';
 import i18n from '@/i18n/config';
+import { logFrontendError, flushPendingErrors } from '@/api/services/frontendErrors';
 
 // ─── Uzbek error messages by HTTP status ─────────────────────────────────────
 // Auth/infra errors always return English from FastAPI/middleware, so we
@@ -71,7 +72,10 @@ apiClient.interceptors.request.use(
 );
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    flushPendingErrors().catch(() => {}); // fire-and-forget
+    return response;
+  },
   (error) => {
     if (error.response) {
       const status: number = error.response.status;
@@ -93,17 +97,81 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      const resolved = resolveErrorMessage(status, error.response.data?.detail);
+      // Log API errors (4xx/5xx) to Telegram
+      if (status >= 500) {
+        logFrontendError('api', resolved, {
+          status,
+          endpoint: error.config?.url ?? window.location.href,
+          additional_data: { responseData: error.response.data },
+        }).catch(() => {});
+      }
       return Promise.reject({
-        message: resolveErrorMessage(status, error.response.data?.detail),
+        message: resolved,
         status,
         data: error.response.data,
       });
     }
 
     if (error.request) {
+      // Request yuborildi, lekin javob kelmay qoldi.
+      // Bu: timeout, DNS, CORS preflight, SSL, yoki haqiqiy network muammosi bo'lishi mumkin.
+      const isTimeout = error.code === 'ECONNABORTED';
+      const isNetworkError = error.message?.includes('Network Error');
+      const isCertError = error.code === 'ERR_CERT_AUTHORITY_INVALID' || error.code === 'ERR_CERT_COMMON_NAME_INVALID';
+      const isConnRefused = error.code === 'ERR_CONNECTION_REFUSED';
+      const isNameNotResolved = error.code === 'ERR_NAME_NOT_RESOLVED';
+      const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+      const url = error.config?.url ?? 'unknown';
+
+      // Debug ma'lumot — faqat browser console'da ko'rinadi
+      console.error('[API Network Error]', {
+        code: error.code,
+        message: error.message,
+        method,
+        url,
+        timeout: error.config?.timeout,
+        isTimeout,
+        isNetworkError,
+        isCertError,
+        isConnRefused,
+        isNameNotResolved,
+      });
+
+      let message: string;
+      if (isTimeout) {
+        message = "Server javob bermadi (vaqt tugadi). Iltimos, qayta urinib ko'ring.";
+      } else if (isCertError) {
+        message = "Xavfsiz ulanishda xatolik. Iltimos, boshqa brauzer yoki qurilmadan urinib ko'ring.";
+      } else if (isConnRefused) {
+        message = "Server vaqtincha javob bermayapti. Iltimos, keyinroq qayta urinib ko'ring.";
+      } else if (isNameNotResolved) {
+        message = "Server manzili topilmadi. DNS sozlamalarini tekshiring.";
+      } else if (isNetworkError) {
+        message = "Serverga ulanib bo'lmadi. Internetni tekshiring.";
+      } else {
+        message = "Serverga ulanishda xatolik. Iltimos, qayta urinib ko'ring.";
+      }
+
+      logFrontendError('network', message, {
+        endpoint: error.config?.url ?? window.location.href,
+        additional_data: {
+          code: error.code,
+          isTimeout,
+          isNetworkError,
+          isCertError,
+          isConnRefused,
+          isNameNotResolved,
+          method: error.config?.method?.toUpperCase(),
+        },
+      }).catch(() => {});
+
       return Promise.reject({
-        message: "Serverga ulanib bo'lmadi. Internetni tekshiring.",
+        message,
         status: 0,
+        code: error.code,
+        isTimeout,
+        isNetworkError,
       });
     }
 
@@ -146,7 +214,10 @@ apiClientFormData.interceptors.request.use(
 );
 
 apiClientFormData.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    flushPendingErrors().catch(() => {});
+    return response;
+  },
   (error) => {
     if (error.response) {
       const status: number = error.response.status;
@@ -166,17 +237,77 @@ apiClientFormData.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      const resolved = resolveErrorMessage(status, error.response.data?.detail);
+      if (status >= 500) {
+        logFrontendError('api', resolved, {
+          status,
+          endpoint: error.config?.url ?? window.location.href,
+          additional_data: { responseData: error.response.data },
+        }).catch(() => {});
+      }
       return Promise.reject({
-        message: resolveErrorMessage(status, error.response.data?.detail),
+        message: resolved,
         status,
         data: error.response.data,
       });
     }
 
     if (error.request) {
+      const isTimeout = error.code === 'ECONNABORTED';
+      const isNetworkError = error.message?.includes('Network Error');
+      const isCertError = error.code === 'ERR_CERT_AUTHORITY_INVALID' || error.code === 'ERR_CERT_COMMON_NAME_INVALID';
+      const isConnRefused = error.code === 'ERR_CONNECTION_REFUSED';
+      const isNameNotResolved = error.code === 'ERR_NAME_NOT_RESOLVED';
+      const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+      const url = error.config?.url ?? 'unknown';
+
+      console.error('[API Network Error]', {
+        code: error.code,
+        message: error.message,
+        method,
+        url,
+        timeout: error.config?.timeout,
+        isTimeout,
+        isNetworkError,
+        isCertError,
+        isConnRefused,
+        isNameNotResolved,
+      });
+
+      let message: string;
+      if (isTimeout) {
+        message = "Server javob bermadi (vaqt tugadi). Iltimos, qayta urinib ko'ring.";
+      } else if (isCertError) {
+        message = "Xavfsiz ulanishda xatolik. Iltimos, boshqa brauzer yoki qurilmadan urinib ko'ring.";
+      } else if (isConnRefused) {
+        message = "Server vaqtincha javob bermayapti. Iltimos, keyinroq qayta urinib ko'ring.";
+      } else if (isNameNotResolved) {
+        message = "Server manzili topilmadi. DNS sozlamalarini tekshiring.";
+      } else if (isNetworkError) {
+        message = "Serverga ulanib bo'lmadi. Internetni tekshiring.";
+      } else {
+        message = "Serverga ulanishda xatolik. Iltimos, qayta urinib ko'ring.";
+      }
+
+      logFrontendError('network', message, {
+        endpoint: url,
+        additional_data: {
+          code: error.code,
+          isTimeout,
+          isNetworkError,
+          isCertError,
+          isConnRefused,
+          isNameNotResolved,
+          method,
+        },
+      }).catch(() => {});
+
       return Promise.reject({
-        message: "Serverga ulanib bo'lmadi. Internetni tekshiring.",
+        message,
         status: 0,
+        code: error.code,
+        isTimeout,
+        isNetworkError,
       });
     }
 

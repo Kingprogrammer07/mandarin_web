@@ -3,10 +3,6 @@ import "./i18n/config";
 import { useState, useEffect, useCallback } from "react";
 
 import NavigationBar from "./components/NavigationBar";
-import {
-  VerificationNav,
-  type Page as VerificationPage,
-} from "./components/navigation/VerificationNav";
 import RegistrationForm from "./components/RegistrationForm";
 import LoginForm from "./components/LoginForm";
 import AdminLoginForm from "./components/AdminLoginForm";
@@ -17,32 +13,28 @@ import AdminProfilePage from "./pages/admin/AdminProfilePage";
 import AdminAuditLogsPage from "./pages/admin/AdminAuditLogsPage";
 import AdminCarouselPage from "./pages/admin/AdminCarouselPage";
 import FlightScheduleAdminPage from "./pages/admin/FlightScheduleAdminPage";
-import POSDashboard from "./pages/POSDashboard";
-import ImportPage from "./components/ImportPage";
-import ClientForm from "./components/ClientForm";
-import FlightsPage from "./components/FlightsPage";
-import CargoListPage from "./components/CargoListPage";
-import AddCargoForm from "./components/AddCargoForm";
-import StatisticsDashboard from "./components/StatisticsDashboard";
+import POSDashboard from "./pages/pos/POSDashboard";
+import ImportPage from "./pages/shared/ImportPage";
+import ClientForm from "./pages/shared/ClientForm";
+import FlightsPage from "./pages/worker/FlightsPage";
+import CargoListPage from "./pages/worker/CargoListPage";
+import AddCargoForm from "./pages/worker/AddCargoForm";
+import StatisticsDashboard from "./pages/shared/StatisticsDashboard";
 import TelegramWebAppGuard from "./components/TelegramWebAppGuard";
-import ClientSearchPage from "./pages/ClientSearchPage";
-import ClientProfilePage from "./pages/ClientProfilePage";
-import TransactionsPage from "./pages/TransactionsPage";
-import UnpaidCargoPage from "./pages/UnpaidCargoPage";
-import { PassportImagesModal } from "./components/verification/PassportImagesModal";
-import UserPage from "./pages/UserPage";
+import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
+import UserPage from "./pages/user/UserPage";
 import { UserNav } from "./components/navigation/UserNav";
 import { Toaster } from "sonner";
-import UserHome from "./pages/UserHome";
-import UserReportsPage from "./pages/UserReportsPage";
-import UserHistoryPage from "./pages/UserHistoryPage";
+import UserHome from "./pages/user/UserHome";
+import UserReportsPage from "./pages/user/UserReportsPage";
+import UserHistoryPage from "./pages/user/UserHistoryPage";
 import { fetchAuthMe } from "./api/services/auth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
 import ManagerPage from "./pages/admin/ManagerPage";
 import PasskeyPage from "./pages/admin/PasskeyPage";
 import WarehousePage from "./pages/admin/WarehousePage";
 import ExpectedCargoPage from "./pages/admin/ExpectedCargoPage";
-import PickupQueueTVPage from "./pages/PickupQueueTVPage";
+import PickupQueueTVPage from "./pages/shared/PickupQueueTVPage";
 import AdminDeliveryRequestPage from "./pages/admin/AdminDeliveryRequestPage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,10 +50,6 @@ type Page =
   | "cargo-list"
   | "cargo-add"
   | "statistics"
-  | "verification-search"
-  | "verification-profile"
-  | "verification-transactions"
-  | "verification-unpaid"
   | "user-profile"
   | "user-home"
   | "user-reports"
@@ -84,7 +72,6 @@ interface RouteInfo {
   page: Page;
   flightName?: string;
   clientId?: number;
-  clientCode?: string;
 }
 
 // ─── Role Config ──────────────────────────────────────────────────────────────
@@ -99,12 +86,8 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
     allowed: ["flights", "cargo-list", "cargo-add", "passkey-page", "expected-cargo"],
   },
   accountant: {
-    default: "verification-search",
+    default: "pos-dashboard",
     allowed: [
-      "verification-search",
-      "verification-profile",
-      "verification-transactions",
-      "verification-unpaid",
       "pos-dashboard",
       "admin-profile",
       "passkey-page",
@@ -120,10 +103,6 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "cargo-list",
       "cargo-add",
       "statistics",
-      "verification-search",
-      "verification-profile",
-      "verification-transactions",
-      "verification-unpaid",
       "user-home",
       "user-profile",
       "user-history",
@@ -153,10 +132,6 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "cargo-list",
       "cargo-add",
       "statistics",
-      "verification-search",
-      "verification-profile",
-      "verification-transactions",
-      "verification-unpaid",
       "user-home",
       "user-profile",
       "user-history",
@@ -257,7 +232,6 @@ function getPathForPage(
   page: Page,
   flightName?: string,
   clientId?: number,
-  clientCode?: string,
 ): string {
   if (page === "register") return "/auth/register";
   if (page === "admin-login") return "/admin/login";
@@ -270,13 +244,6 @@ function getPathForPage(
     return `/flights/${encodeURIComponent(flightName)}/photos`;
   if (page === "cargo-add" && flightName)
     return `/flights/${encodeURIComponent(flightName)}/photos/add`;
-  if (page === "verification-search") return "/verification/search";
-  if (page === "verification-profile" && clientId)
-    return `/verification/profile/${clientId}`;
-  if (page === "verification-transactions" && clientCode)
-    return `/verification/transactions/${encodeURIComponent(clientCode)}`;
-  if (page === "verification-unpaid" && clientCode)
-    return `/verification/unpaid/${encodeURIComponent(clientCode)}`;
   if (page === "user-profile") return "/user/profile";
   if (page === "user-home") return "/user/home";
   if (page === "user-reports") return "/user/reports";
@@ -313,23 +280,6 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
     ? parseInt(clientEditMatch[1], 10)
     : undefined;
 
-  const verificationProfileMatch = path.match(/\/verification\/profile\/(\d+)/);
-  const verificationClientId = verificationProfileMatch
-    ? parseInt(verificationProfileMatch[1], 10)
-    : undefined;
-
-  const verificationTransactionsMatch = path.match(
-    /\/verification\/transactions\/([^/]+)/,
-  );
-  const transactionsClientCode = verificationTransactionsMatch
-    ? decodeURIComponent(verificationTransactionsMatch[1])
-    : undefined;
-
-  const verificationUnpaidMatch = path.match(/\/verification\/unpaid\/([^/]+)/);
-  const unpaidClientCode = verificationUnpaidMatch
-    ? decodeURIComponent(verificationUnpaidMatch[1])
-    : undefined;
-
   if (path === "/auth/register") return { page: "register" };
   if (path === "/admin/login") return { page: "admin-login" };
   if (path === "/import") return { page: "import" };
@@ -342,17 +292,6 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
     return { page: "cargo-add", flightName };
   if (flightName && path.includes("/photos"))
     return { page: "cargo-list", flightName };
-  if (path === "/verification" || path === "/verification/search")
-    return { page: "verification-search" };
-  if (path.startsWith("/verification/profile/") && verificationClientId)
-    return { page: "verification-profile", clientId: verificationClientId };
-  if (path.startsWith("/verification/transactions/") && transactionsClientCode)
-    return {
-      page: "verification-transactions",
-      clientCode: transactionsClientCode,
-    };
-  if (path.startsWith("/verification/unpaid/") && unpaidClientCode)
-    return { page: "verification-unpaid", clientCode: unpaidClientCode };
   if (path === "/user/profile") return { page: "user-profile" };
   if (path === "/user/home") return { page: "user-home" };
   if (path === "/user/reports") return { page: "user-reports" };
@@ -378,10 +317,6 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("login");
   const [selectedFlightName, setSelectedFlightName] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState(0);
-  const [selectedClientCode, setSelectedClientCode] = useState("");
-  const [passportModalOpen, setPassportModalOpen] = useState(false);
-  const [passportClientId, setPassportClientId] = useState<number | null>(null);
 
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -398,7 +333,7 @@ function AppContent() {
       role: string | null,
       method: "push" | "replace" = "replace",
     ) => {
-      let { page, flightName, clientId, clientCode } = routeInfo;
+      let { page, flightName, clientId } = routeInfo;
 
       const finalPage = checkAccess(page, role);
 
@@ -407,10 +342,9 @@ function AppContent() {
         page = finalPage;
         flightName = undefined;
         clientId = undefined;
-        clientCode = undefined;
       }
 
-      const path = getPathForPage(page, flightName, clientId, clientCode);
+      const path = getPathForPage(page, flightName, clientId);
 
       // Preserve existing query params (e.g. ?tab=request) from the current URL
       const currentParams = window.location.search;
@@ -418,13 +352,13 @@ function AppContent() {
 
       if (method === "push") {
         window.history.pushState(
-          { page, flightName, clientId, clientCode },
+          { page, flightName, clientId },
           "",
           url,
         );
       } else {
         window.history.replaceState(
-          { page, flightName, clientId, clientCode },
+          { page, flightName, clientId },
           "",
           url,
         );
@@ -432,8 +366,6 @@ function AppContent() {
 
       setCurrentPage(page);
       if (flightName !== undefined) setSelectedFlightName(flightName);
-      if (clientId !== undefined) setSelectedClientId(clientId);
-      if (clientCode !== undefined) setSelectedClientCode(clientCode);
     },
     [],
   );
@@ -573,9 +505,8 @@ function AppContent() {
       page: Page,
       flightName?: string,
       clientId?: number,
-      clientCode?: string,
     ) => {
-      applyRoute({ page, flightName, clientId, clientCode }, userRole, "push");
+      applyRoute({ page, flightName, clientId }, userRole, "push");
     },
     [userRole, applyRoute],
   );
@@ -620,21 +551,7 @@ function AppContent() {
     [applyRoute],
   );
 
-  // ── Passport modal ───────────────────────────────────────────────────────
-
-  const handleViewPassportImages = (clientId: number) => {
-    setPassportClientId(clientId);
-    setPassportModalOpen(true);
-  };
-
   // ── Derived flags ────────────────────────────────────────────────────────
-
-  const isVerificationPage = [
-    "verification-search",
-    "verification-profile",
-    "verification-transactions",
-    "verification-unpaid",
-  ].includes(currentPage);
 
   const isUserPages = [
     "user-profile",
@@ -708,25 +625,8 @@ function AppContent() {
         <>
           <NavigationBar
             onStatisticsClick={() => navigateToPage("statistics")}
-            onVerificationClick={() => navigateToPage("verification-search")}
             currentPage={currentPage}
           />
-
-          {isVerificationPage && (
-            <VerificationNav
-              currentPage={currentPage as VerificationPage}
-              onNavigate={(page) =>
-                navigateToPage(
-                  page as Page,
-                  undefined,
-                  selectedClientId,
-                  selectedClientCode,
-                )
-              }
-              clientCode={selectedClientCode}
-              clientId={selectedClientId}
-            />
-          )}
 
           {isUserPages && (
             <UserNav
@@ -815,7 +715,7 @@ function AppContent() {
                 : ["flights", "cargo-list", "cargo-add", "statistics"].includes(currentPage)
                   ? "pt-20 pb-20"   // NavigationBar clearance only — inner pages control their own spacing
                   : "pb-12 pt-24"
-          } transition-all duration-300 ${isVerificationPage ? "pt-24 md:pt-48" : ""}`}
+          } transition-all duration-300`}
         >
           {currentPage === "login" && (
             <LoginForm
@@ -876,82 +776,6 @@ function AppContent() {
             <StatisticsDashboard onBack={() => window.history.back()} />
           )}
 
-          {currentPage === "verification-search" && (
-            <ClientSearchPage
-              onSelectClient={(clientId, clientCode) => {
-                setSelectedClientId(clientId);
-                setSelectedClientCode(clientCode);
-                navigateToPage(
-                  "verification-profile",
-                  undefined,
-                  clientId,
-                  clientCode,
-                );
-              }}
-            />
-          )}
-
-          {currentPage === "verification-profile" && selectedClientId > 0 && (
-            <ClientProfilePage
-              clientId={selectedClientId}
-              onBack={() => {
-                setSelectedClientId(0);
-                setSelectedClientCode("");
-                navigateToPage("verification-search");
-              }}
-              onViewTransactions={(clientCode) => {
-                setSelectedClientCode(clientCode);
-                navigateToPage(
-                  "verification-transactions",
-                  undefined,
-                  selectedClientId,
-                  clientCode,
-                );
-              }}
-              onViewUnpaidCargo={(clientCode) => {
-                setSelectedClientCode(clientCode);
-                navigateToPage(
-                  "verification-unpaid",
-                  undefined,
-                  selectedClientId,
-                  clientCode,
-                );
-              }}
-              onViewPassportImages={handleViewPassportImages}
-            />
-          )}
-
-          {currentPage === "verification-transactions" &&
-            selectedClientCode && (
-              <TransactionsPage
-                clientCode={selectedClientCode}
-                client_id={selectedClientId}
-                onBack={() =>
-                  navigateToPage(
-                    "verification-profile",
-                    undefined,
-                    selectedClientId || undefined,
-                    selectedClientCode,
-                  )
-                }
-              />
-            )}
-
-          {currentPage === "verification-unpaid" && selectedClientCode && (
-            <UnpaidCargoPage
-              clientCode={selectedClientCode}
-              clientId={selectedClientId}
-              onBack={() =>
-                navigateToPage(
-                  "verification-profile",
-                  undefined,
-                  selectedClientId || undefined,
-                  selectedClientCode,
-                )
-              }
-            />
-          )}
-
           {currentPage === "user-profile" && (
             <UserPage onLogout={handleLogout} />
           )}
@@ -974,17 +798,15 @@ function AppContent() {
       )}
 
       <Toaster position="top-center" richColors />
-
-      <PassportImagesModal
-        isOpen={passportModalOpen}
-        onClose={() => setPassportModalOpen(false)}
-        clientId={passportClientId}
-      />
     </div>
   );
 }
 
 export default function App() {
+  useEffect(() => {
+    installGlobalErrorHandlers();
+  }, []);
+
   return (
     <TelegramWebAppGuard>
       <AppContent />

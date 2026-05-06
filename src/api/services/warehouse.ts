@@ -251,6 +251,7 @@ export interface SearchTransactionsParams {
   name?: string;
   q?: string;
   flight?: string;
+  strict?: boolean;
   payment_status?: string;
   taken_status?: string;
   sort_order?: 'asc' | 'desc';
@@ -427,6 +428,7 @@ export async function searchTransactionsGrouped(params: SearchTransactionsParams
       ...(params.name ? { name: params.name } : {}),
       ...(params.q ? { q: params.q } : {}),
       ...(params.flight ? { flight: params.flight } : {}),
+      ...(params.strict ? { strict: 'true' } : {}),
       payment_status: params.payment_status ?? 'all',
       taken_status: params.taken_status ?? 'all',
       sort_order: params.sort_order ?? 'desc',
@@ -501,6 +503,18 @@ function filenameFromContentDisposition(header: string | undefined): string | nu
   if (quotedFilename) return quotedFilename;
 
   return header.match(/filename=([^;]+)/i)?.[1]?.trim() ?? null;
+}
+
+export async function revertTakenStatus(transactionId: number): Promise<unknown> {
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+  const response = await apiClient.post<unknown>(
+    `/api/v1/warehouse/transactions/${transactionId}/revert-taken`,
+    {},
+    {
+      headers: { 'X-Admin-Authorization': `Bearer ${token}` },
+    },
+  );
+  return response.data;
 }
 
 export async function downloadUzPostOrdersExport(

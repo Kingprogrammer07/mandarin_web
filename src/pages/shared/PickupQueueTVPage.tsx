@@ -4,9 +4,9 @@ import { Loader2, Monitor, AlertCircle, Sun, Moon, Volume2, VolumeX, Clock } fro
 import {
   useActivatePickupQueueTV,
   usePickupQueueTV,
-} from "../api/hooks/usePickupQueue";
-import { PICKUP_METHOD_LABELS } from "../api/pickupQueue";
-import type { PickupQueueTVItem } from "../api/pickupQueue";
+} from "@/api/hooks/usePickupQueue";
+import { PICKUP_METHOD_LABELS } from "@/api/pickupQueue";
+import type { PickupQueueTVItem } from "@/api/pickupQueue";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ function formatTime(date: Date): string {
 
 // ─── Audio Alert ──────────────────────────────────────────────────────────────
 
-import { playNotificationSound } from "../utils/notificationSounds";
+import { playNotificationSound } from "@/utils/notificationSounds";
 
 function playTVAlertSound(urgent: boolean) {
   // TV speakers are often quiet / far away — use much louder volume

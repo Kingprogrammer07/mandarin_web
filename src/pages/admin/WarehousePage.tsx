@@ -22,6 +22,7 @@ import { refreshAdminToken } from "../../api/services/adminAuth";
 import { useWarehouseStore } from "../../store/useWarehouseStore";
 import { useGroupedWarehouseSearch } from "../../api/hooks/useWarehouse";
 import { useWarehouseQueueProcessor } from "../../api/hooks/useWarehouseQueueProcessor";
+import RoleSwitcher from "../../components/admin/RoleSwitcher";
 import {
   useWarehousePickupQueueCount,
   useWarehousePickupQueueList,
@@ -35,6 +36,7 @@ import UzPostOrdersPanel from "../../components/warehouse/UzPostOrdersPanel";
 import PickupQueuePanel from "../../components/warehouse/PickupQueuePanel";
 import { useBroadcastChannel, type BroadcastMessage } from "../../hooks/useBroadcastChannel";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
+import { revertTakenStatus } from "../../api/services/warehouse";
 import type { PickupMethod, PickupQueuePriority } from "../../api/pickupQueue";
 import { PICKUP_PRIORITY_LABELS } from "../../api/pickupQueue";
 import { playNotificationSound } from "../../utils/notificationSounds";
@@ -89,6 +91,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   const {
     flightName,
     searchQuery,
+    strictSearch,
     paymentStatus,
     takenStatus,
     page,
@@ -115,7 +118,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
 
   // Pickup queue panel state
   const [showQueuePanel, setShowQueuePanel] = useState(false);
-  const [queuePickupMethod, setQueuePickupMethod] = useState<PickupMethod>("self_pickup");
+  const [queuePickupMethod, setQueuePickupMethod] = useState<PickupMethod | "all">("all");
   const [queuePriority, setQueuePriority] = useState<PickupQueuePriority | "all">("all");
   const [queueClientCode, setQueueClientCode] = useState("");
 
@@ -139,7 +142,10 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     });
   }, []);
 
-  const { data: queueCount } = useWarehousePickupQueueCount({ status: "preparing" });
+  const { data: queueCount } = useWarehousePickupQueueCount({
+    status: "preparing",
+    pickup_method: queuePickupMethod === "all" ? undefined : queuePickupMethod,
+  });
 
   // ── Notifications permission (ask once on first user gesture) ───────────────
   const notifPermissionRef = useRef<NotificationPermission>(
@@ -207,7 +213,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
 
   const { data: queueListData, isLoading: queueListLoading } = useWarehousePickupQueueList({
     status: "preparing",
-    pickup_method: queuePickupMethod,
+    pickup_method: queuePickupMethod === "all" ? undefined : queuePickupMethod,
     priority: queuePriority === "all" ? undefined : queuePriority,
     client_code: queueClientCode.trim() || undefined,
     page: 1,
@@ -253,6 +259,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     {
       flight: isFlightMode ? flightName : undefined,
       code: isSearchMode ? searchQuery : undefined,
+      strict: strictSearch,
       payment_status: paymentStatus,
       taken_status: takenStatus,
       page,
@@ -276,6 +283,26 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
       setModalIsTakenAway(isTakenAway);
     },
     [],
+  );
+
+  const handleRevertTaken = useCallback(
+    async (transactionId: number, clientCode: string, flightName: string) => {
+      if (!confirm(`${clientCode} - ${flightName} reysidagi yukni "Berilgan" holatidan qaytarib olishni xohlaysizmi?`)) {
+        return;
+      }
+      try {
+        await revertTakenStatus(transactionId);
+        toast.success("Yuk holati qaytarildi", {
+          description: `${clientCode} - ${flightName}`,
+        });
+        // Refetch data
+        setPage(1);
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        toast.error(e.message ?? "Holatni qaytarishda xatolik");
+      }
+    },
+    [setPage],
   );
 
   const handlePageChange = useCallback(
@@ -405,6 +432,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                   <PackageSearch className="w-4 h-4" />
                 </button>
               )}
+              <RoleSwitcher onNavigate={onNavigate} />
               <button
                 onClick={toggleTheme}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
@@ -497,6 +525,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                 items={activeData?.items ?? []}
                 isLoading={isLoading}
                 onMarkTaken={handleMarkTaken}
+                onRevertTaken={handleRevertTaken}
                 canMarkTaken={canMarkTaken}
                 onNotifyCashier={handleNotifyCashier}
               />
@@ -575,7 +604,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                 <div className="flex flex-col sm:flex-row gap-2">
                   {/* Method filter */}
                   <div className="flex gap-1 p-1 bg-gray-100 dark:bg-white/[0.05] rounded-xl overflow-x-auto">
-                    {(["self_pickup", "yandex", "bts", "uzpost", "mandarin"] as PickupMethod[]).map((m) => (
+                    {(["all", "self_pickup", "yandex", "bts", "uzpost", "mandarin"] as (PickupMethod | "all")[]).map((m) => (
                       <button
                         key={m}
                         onClick={() => setQueuePickupMethod(m)}
@@ -585,7 +614,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                             : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
                         }`}
                       >
-                        {m === "self_pickup" ? "O'zi" : m.toUpperCase()}
+                        {m === "all" ? "Barchasi" : m === "self_pickup" ? "O'zi" : m.toUpperCase()}
                       </button>
                     ))}
                   </div>
@@ -630,6 +659,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                   pickupMethod={queuePickupMethod}
                   onPickupMethodChange={setQueuePickupMethod}
                   onMarkTaken={handleMarkTaken}
+                  onRevertTaken={handleRevertTaken}
                   canMarkTaken={canMarkTaken}
                   canCancel={canCancelQueue}
                 />

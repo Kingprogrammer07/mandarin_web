@@ -1323,6 +1323,25 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
   const [calcData, setCalcData] = useState<CalculateUzpostResponse | null>(null);
   const [calcLoading, setCalcLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Recalculate UzPost price when branch is selected (step 3)
+  useEffect(() => {
+    if (
+      deliveryType === 'uzpost' &&
+      currentStep === 3 &&
+      selectedUzpostBranch &&
+      selectedFlights.length > 0
+    ) {
+      setCalcLoading(true);
+      calculateUzpost(selectedFlights, selectedUzpostBranch.id)
+        .then((res) => setCalcData(res))
+        .catch((err: unknown) => {
+          const e = err as { message?: string };
+          toast.error(e?.message || t('deliveryRequest.toast.calcError'));
+        })
+        .finally(() => setCalcLoading(false));
+    }
+  }, [deliveryType, currentStep, selectedUzpostBranch, selectedFlights, t]);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
@@ -1419,25 +1438,14 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
         return;
       }
       setCurrentStep(3);
-      setCalcLoading(true);
-      try {
-        const res = await calculateUzpost(selectedFlights);
-        setCalcData(res);
-      } catch (err: unknown) {
-        const e = err as { message?: string };
-        toast.error(e?.message || t('deliveryRequest.toast.calcError'));
-      } finally {
-        setCalcLoading(false);
-      }
     } else {
       if (isStandardProfileIncomplete) {
         setProfileIncomplete(true);
         return;
       }
-
       setCurrentStep(3);
     }
-  }, [deliveryType, isStandardProfileIncomplete, isUzpostProfileIncomplete, selectedFlights, t]);
+  }, [deliveryType, isStandardProfileIncomplete, isUzpostProfileIncomplete]);
 
   const handleStandardSubmit = useCallback(async () => {
     if (!deliveryType || deliveryType === 'uzpost') return;

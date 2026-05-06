@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, User, Phone, Wallet, Package } from "lucide-react";
+import { Search, User, Phone, Wallet, Package, History, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -11,11 +11,15 @@ import type { ClientGroup } from "@/api/services/warehouse";
 interface ClientLookupPanelProps {
   onSelectClient: (client: ClientGroup) => void;
   selectedClient: ClientGroup | null;
+  recentClients?: ClientGroup[];
+  onClearHistory?: () => void;
 }
 
 export default function ClientLookupPanel({
   onSelectClient,
   selectedClient,
+  recentClients = [],
+  onClearHistory,
 }: ClientLookupPanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -61,6 +65,43 @@ export default function ClientLookupPanel({
           {t("adminDeliveryRequest.clientSearch.button", "Qidirish")}
         </Button>
       </div>
+
+      {/* Recent clients */}
+      {recentClients.length > 0 && !searchTerm && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <History className="w-3.5 h-3.5" />
+              {t("adminDeliveryRequest.clientSearch.recent", "Oxirgi qidiruvlar")}
+            </div>
+            {onClearHistory && (
+              <button
+                onClick={onClearHistory}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recentClients.map((client) => (
+              <button
+                key={client.client_code}
+                onClick={() => onSelectClient(client)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  selectedClient?.client_code === client.client_code
+                    ? "border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-400"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-orange-200 hover:bg-orange-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300 dark:hover:border-orange-500/30"
+                }`}
+              >
+                <User className="w-3 h-3" />
+                <span>{client.full_name || client.client_code}</span>
+                <span className="text-gray-400 font-mono">{client.client_code}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {isLoading && (

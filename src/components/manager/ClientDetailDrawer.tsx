@@ -182,7 +182,7 @@ export function ClientDetailDrawer() {
   const { selectedClientId, setSelectedClientId } = useManagerStore();
 
   const { isSuperAdmin, permissions } = getAdminJwtClaims();
-  const canReadFinances = isSuperAdmin || permissions.has('finance_read') || permissions.has('finance_update');
+  const canReadFinances = isSuperAdmin || permissions.has('clients:finance_read') || permissions.has('clients:finance_update');
 
   const [activeTab, setActiveTab] = useState<"profile" | "finances">("profile");
 

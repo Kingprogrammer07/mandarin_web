@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3, CalendarDays,
-  LayoutGrid, Plane, CheckCircle, Monitor, UserCheck, Warehouse, PackageSearch,
+  LayoutGrid, Plane, Monitor, UserCheck, Warehouse, PackageSearch,
   Upload, X, ChevronDown, Truck,
 } from 'lucide-react';
+import RoleSwitcher from './RoleSwitcher';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -33,14 +34,6 @@ const quickAccessPages = [
     description: 'Ishchi bosh sahifasi',
     iconBg: 'bg-blue-100 dark:bg-blue-500/15',
     iconColor: 'text-blue-600 dark:text-blue-400',
-  },
-  {
-    id: 'verification-search',
-    label: 'Tasdiqlash',
-    icon: CheckCircle,
-    description: 'Buxgalter bosh sahifasi',
-    iconBg: 'bg-green-100 dark:bg-green-500/15',
-    iconColor: 'text-green-600 dark:text-green-400',
   },
   {
     id: 'pos-dashboard',
@@ -254,6 +247,9 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
 
         {/* Footer actions */}
         <div className="p-3 border-t border-gray-100 dark:border-white/[0.05] shrink-0 space-y-1">
+          <div className="px-3.5 py-2">
+            <RoleSwitcher onNavigate={onNavigate} />
+          </div>
           <button
             onClick={toggleTheme}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.04] transition-colors"
@@ -287,6 +283,7 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
             <span className="font-bold text-[15px] text-gray-900 dark:text-white">Admin</span>
           </div>
           <div className="flex items-center gap-1">
+            <RoleSwitcher onNavigate={onNavigate} />
             <button
               onClick={toggleTheme}
               className="p-2 text-gray-500 active:bg-gray-100 dark:active:bg-white/10 rounded-lg transition-colors"

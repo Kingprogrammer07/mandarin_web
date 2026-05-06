@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, FileSpreadsheet, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import StatusAnimation from './StatusAnimation';
+import StatusAnimation from '@/components/StatusAnimation';
 import { importExcel } from '@/api/services/import';
 
 type DatabaseType = 'uz' | 'china';

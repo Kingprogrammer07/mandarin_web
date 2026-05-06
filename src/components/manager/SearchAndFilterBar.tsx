@@ -8,6 +8,8 @@ interface SearchAndFilterBarProps {
   onChange: (value: string) => void;
   searchType: SearchType;
   onSearchTypeChange: (type: SearchType) => void;
+  strict?: boolean;
+  onStrictChange?: (strict: boolean) => void;
 }
 
 const SEARCH_TYPE_OPTIONS: { value: SearchType; label: string; placeholder: string }[] = [
@@ -21,6 +23,8 @@ export default function SearchAndFilterBar({
   onChange,
   searchType,
   onSearchTypeChange,
+  strict = false,
+  onStrictChange,
 }: SearchAndFilterBarProps) {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,6 +70,21 @@ export default function SearchAndFilterBar({
           className="w-full h-10 pl-10 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-[13px]"
         />
       </div>
+
+      {/* Strict toggle — only for code search */}
+      {searchType === 'code' && onStrictChange && (
+        <label className="flex items-center gap-1.5 shrink-0 px-2.5 h-10 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={strict}
+            onChange={(e) => onStrictChange(e.target.checked)}
+            className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+          />
+          <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+            Strict
+          </span>
+        </label>
+      )}
     </div>
   );
 }

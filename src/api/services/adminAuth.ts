@@ -26,9 +26,16 @@ export interface WebAuthnLoginBeginResponse {
   options: PublicKeyCredentialRequestOptionsJSON;
 }
 
+export interface PasskeyItem {
+  id: number;
+  device_name: string | null;
+  credential_id: string;
+}
+
 export interface MyPasskeysResponse {
   has_current_device_passkey: boolean;
   total_passkeys: number;
+  passkeys: PasskeyItem[];
 }
 
 // ── WebAuthn JSON types (matches py_webauthn's JSON serialization) ─────────
@@ -118,6 +125,31 @@ export async function refreshAdminToken(): Promise<RefreshTokenResponse> {
   return response.data;
 }
 
+export interface SwitchRoleResponse {
+  access_token: string;
+  token_type: string;
+  role_name: string;
+  admin_id: number;
+  home_page: string | null;
+}
+
+export async function switchAdminRole(role_name: string): Promise<SwitchRoleResponse> {
+  const token = localStorage.getItem('access_token');
+  if (!token) throw new Error('No token available for role switch');
+
+  const response = await apiClient.post<SwitchRoleResponse>(
+    '/admin/auth/switch-role',
+    { role_name },
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Admin-Authorization': `Bearer ${token}`,
+      },
+    },
+  );
+  return response.data;
+}
+
 export async function webauthnLoginBegin(system_username: string): Promise<WebAuthnLoginBeginResponse> {
   const response = await apiClient.post<WebAuthnLoginBeginResponse>('/admin/auth/webauthn/login/begin', { system_username });
   return response.data;
@@ -171,4 +203,11 @@ export async function fetchMyPasskeys(device_name: string): Promise<MyPasskeysRe
     headers: { 'X-Admin-Authorization': 'Bearer ' + token }
   });
   return response.data;
+}
+
+export async function deletePasskey(passkey_id: number): Promise<void> {
+  const token = localStorage.getItem('access_token');
+  await apiClient.delete(`/admin/auth/webauthn/passkeys/${passkey_id}`, {
+    headers: { 'X-Admin-Authorization': 'Bearer ' + token }
+  });
 }

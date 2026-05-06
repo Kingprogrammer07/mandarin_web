@@ -1,0 +1,85 @@
+import {
+  ShieldAlert,
+  ShieldOff,
+  IdCard,
+  Rocket,
+  Plane,
+  Calculator,
+  MapPin,
+  Calendar,
+  ListOrdered,
+} from 'lucide-react';
+import type { CarouselItemData, MainActionItem } from './types';
+
+export const CAROUSEL_ITEMS: CarouselItemData[] = [
+  {
+    id: 1,
+    type: 'feature',
+    titleKey: 'dashboard.carousel.prohibited.title',
+    subKey: 'dashboard.carousel.prohibited.sub',
+    gradient: 'from-red-900 to-red-600',
+    bgIcon: <ShieldAlert className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
+    mainIcon: <ShieldOff className="text-white/90" style={{ width: 32, height: 32 }} />,
+  },
+  {
+    id: 2,
+    type: 'feature',
+    titleKey: 'dashboard.carousel.id.title',
+    subKey: 'dashboard.carousel.id.sub',
+    gradient: 'from-blue-900 to-blue-600',
+    bgIcon: <IdCard className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
+    mainIcon: <IdCard className="text-white/90" style={{ width: 32, height: 32 }} />,
+  },
+  {
+    id: 3,
+    type: 'feature',
+    titleKey: 'dashboard.carousel.delivery.title',
+    subKey: 'dashboard.carousel.delivery.sub',
+    gradient: 'from-purple-900 to-purple-600',
+    bgIcon: <Rocket className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
+    mainIcon: <Plane className="text-white/90" style={{ width: 32, height: 32 }} />,
+  },
+];
+
+export const MAIN_ACTIONS: MainActionItem[] = [
+  {
+    id: 'calculator',
+    icon: <Calculator className="w-5 h-5" />,
+    bgIcon: <Calculator style={{ width: 80, height: 80 }} />,
+    labelKey: 'dashboard.actions.calculator.desc',
+    descKey: 'dashboard.actions.calculator.label',
+    badgeKey: 'dashboard.actions.calculator.badge',
+    actionLabelKey: 'dashboard.actions.calculator.action',
+    theme: 'cyan',
+  },
+  {
+    id: 'china',
+    icon: <MapPin className="w-5 h-5" />,
+    bgIcon: <MapPin style={{ width: 80, height: 80 }} />,
+    labelKey: 'dashboard.actions.china.label',
+    descKey: 'dashboard.actions.china.desc',
+    badgeKey: 'dashboard.actions.china.badge',
+    actionLabelKey: 'dashboard.actions.china.action',
+    theme: 'amber',
+  },
+  {
+    id: 'schedule',
+    icon: <Calendar className="w-5 h-5" />,
+    bgIcon: <Calendar style={{ width: 80, height: 80 }} />,
+    labelKey: 'dashboard.actions.schedule.label',
+    descKey: 'dashboard.actions.schedule.desc',
+    badgeKey: 'dashboard.actions.schedule.badge',
+    actionLabelKey: 'dashboard.actions.schedule.action',
+    theme: 'sky',
+  },
+  {
+    id: 'delivery_history',
+    icon: <ListOrdered className="w-5 h-5" />,
+    bgIcon: <ListOrdered style={{ width: 80, height: 80 }} />,
+    labelKey: 'dashboard.actions.history.label',
+    descKey: 'dashboard.actions.history.desc',
+    badgeKey: 'dashboard.actions.history.badge',
+    actionLabelKey: 'dashboard.actions.history.action',
+    theme: 'violet',
+  },
+];

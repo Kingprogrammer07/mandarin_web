@@ -20,10 +20,12 @@ export default function WarehouseFilters() {
   const {
     flightName,
     searchQuery,
+    strictSearch,
     paymentStatus,
     takenStatus,
     setFlightName,
     setSearchQuery,
+    setStrictSearch,
     setPaymentStatus,
     setTakenStatus,
     resetFilters,
@@ -75,7 +77,7 @@ export default function WarehouseFilters() {
   return (
     <div className="space-y-3">
       {/* Flight name input + recent flights dropdown + client search */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
 
         {/* Flight Name — with recent flights dropdown */}
         <div className="relative min-w-0 flex-1">
@@ -162,20 +164,33 @@ export default function WarehouseFilters() {
           )}
         </div>
 
-        {/* Client code search within flight */}
-        <div className="relative min-w-0 flex-1">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-            strokeWidth={1.8}
-          />
-          <input
-            id="warehouse-client-search"
-            type="text"
-            value={localSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Mijoz kodi"
-            className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] sm:text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
-          />
+        {/* Client code search within flight + strict toggle */}
+        <div className="flex gap-2 items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              strokeWidth={1.8}
+            />
+            <input
+              id="warehouse-client-search"
+              type="text"
+              value={localSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Mijoz kodi"
+              className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] sm:text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
+            />
+          </div>
+          <label className="flex items-center gap-1.5 shrink-0 px-2 py-1.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={strictSearch}
+              onChange={(e) => setStrictSearch(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+            />
+            <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+              Strict
+            </span>
+          </label>
         </div>
       </div>
 

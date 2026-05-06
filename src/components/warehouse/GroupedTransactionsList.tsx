@@ -64,6 +64,7 @@ interface GroupedTransactionsListProps {
     isTakenAway: boolean,
     deliveryMethods: DeliveryMethodOption[],
   ) => void;
+  onRevertTaken?: (transactionId: number, clientCode: string, flightName: string) => void;
   canMarkTaken: boolean;
   onNotifyCashier?: (clientCode: string, flightName: string, amount: number) => void;
 }
@@ -72,6 +73,7 @@ export default function GroupedTransactionsList({
   items,
   isLoading,
   onMarkTaken,
+  onRevertTaken,
   canMarkTaken,
   onNotifyCashier,
 }: GroupedTransactionsListProps) {
@@ -386,6 +388,14 @@ export default function GroupedTransactionsList({
                                               className="flex items-center gap-1 text-[11px] font-bold px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10 transition-colors shadow-sm active:scale-95"
                                             >
                                               Isbot
+                                            </button>
+                                          )}
+                                          {onRevertTaken && (
+                                            <button
+                                              onClick={() => onRevertTaken(tx.id, client.client_code, flight.flight_name)}
+                                              className="flex items-center gap-1 text-[11px] font-bold px-3 py-2 rounded-xl border border-red-200 dark:border-red-500/30 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors shadow-sm active:scale-95"
+                                            >
+                                              <X className="w-3 h-3" /> Bekor
                                             </button>
                                           )}
                                         </div>

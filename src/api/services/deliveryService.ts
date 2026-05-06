@@ -81,10 +81,13 @@ export async function getPaidFlights(): Promise<PaidFlightsResponse> {
 /**
  * Calculate UzPost delivery cost
  */
-export async function calculateUzpost(flightNames: string[]): Promise<CalculateUzpostResponse> {
+export async function calculateUzpost(
+  flightNames: string[],
+  locationId: number,
+): Promise<CalculateUzpostResponse> {
   const response = await apiClient.post<CalculateUzpostResponse>(
     '/api/user/delivery/calculate-uzpost',
-    { flight_names: flightNames }
+    { flight_names: flightNames, location_id: locationId }
   );
   return response.data;
 }

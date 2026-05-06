@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Phone, Upload, X, Wallet } from "lucide-react";
+import { Phone, Upload, X, Wallet, Loader2, Package, CreditCard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,15 @@ interface UzpostDeliveryFormProps {
   walletUsed: number;
   onWalletChange: (v: number) => void;
   clientWalletBalance: number;
+  calcData: {
+    total_weight: number;
+    price_per_kg: number;
+    total_amount: number;
+    wallet_balance: number;
+    card: { card_number: string; card_owner: string } | null;
+    warning?: string | null;
+  } | null;
+  calcLoading: boolean;
 }
 
 export default function UzpostDeliveryForm({
@@ -30,6 +39,8 @@ export default function UzpostDeliveryForm({
   walletUsed,
   onWalletChange,
   clientWalletBalance,
+  calcData,
+  calcLoading,
 }: UzpostDeliveryFormProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +66,43 @@ export default function UzpostDeliveryForm({
           className="h-12 rounded-xl"
         />
       </div>
+
+      {calcLoading && (
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Narx hisoblanmoqda...
+        </div>
+      )}
+
+      {calcData?.warning && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
+          {calcData.warning}
+        </div>
+      )}
+
+      {calcData && !calcLoading && !calcData.warning && (
+        <div className="space-y-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <Package className="w-4 h-4" />
+              Og&apos;irlik
+            </span>
+            <span className="text-sm font-bold text-gray-900 dark:text-white">{calcData.total_weight.toFixed(2)} kg</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Yetkazib berish narxi</span>
+            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{calcData.total_amount.toLocaleString()} so&apos;m</span>
+          </div>
+          {calcData.card && (
+            <div className="flex items-center gap-2 pt-2 border-t border-emerald-200 dark:border-emerald-500/20">
+              <CreditCard className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {calcData.card.card_number} — {calcData.card.card_owner}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">

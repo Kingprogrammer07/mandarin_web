@@ -6,6 +6,7 @@ import { offlineStorage } from '@/utils/offlineStorage';
 import { Plane, ChevronDown, ChevronRight, RefreshCw, WifiOff, ArrowRight, Lock, LogOut, ClipboardList } from 'lucide-react';
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
 import { refreshAdminToken } from '@/api/services/adminAuth';
+import RoleSwitcher from '@/components/admin/RoleSwitcher';
 
 interface FlightsPageProps {
   onSelectFlight: (flightName: string) => void;
@@ -109,7 +110,7 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-4">
-        <PageHeader t={t} count={0} isRefreshing={false} onRefresh={() => {}} onLogout={onLogout} onOpenExpectedCargo={canViewExpectedCargo && onNavigate ? () => onNavigate('expected-cargo') : undefined} loading />
+        <PageHeader t={t} count={0} isRefreshing={false} onRefresh={() => {}} onLogout={onLogout} onOpenExpectedCargo={canViewExpectedCargo && onNavigate ? () => onNavigate('expected-cargo') : undefined} onNavigate={onNavigate} loading />
         <div className="space-y-3">
           <div className="h-4 w-28 bg-gray-100 dark:bg-white/[0.05] rounded-lg mb-2" />
           <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-gray-100 dark:border-white/[0.06] overflow-hidden">
@@ -131,7 +132,7 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4">
-      <PageHeader t={t} count={flights.length} isRefreshing={isRefreshing} onRefresh={() => loadFlights(true)} onLogout={onLogout} onOpenExpectedCargo={canViewExpectedCargo && onNavigate ? () => onNavigate('expected-cargo') : undefined} />
+      <PageHeader t={t} count={flights.length} isRefreshing={isRefreshing} onRefresh={() => loadFlights(true)} onLogout={onLogout} onOpenExpectedCargo={canViewExpectedCargo && onNavigate ? () => onNavigate('expected-cargo') : undefined} onNavigate={onNavigate} />
 
       {flights.length === 0 ? (
         <div className="bg-white dark:bg-[#0d0a04] rounded-2xl border border-gray-100 dark:border-white/[0.06] flex flex-col items-center justify-center py-16">
@@ -227,13 +228,14 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
   );
 }
 
-function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, onOpenExpectedCargo, loading = false }: {
+function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, onOpenExpectedCargo, onNavigate, loading = false }: {
   t: (k: string) => string;
   count: number;
   isRefreshing: boolean;
   onRefresh: () => void;
   onLogout?: () => void;
   onOpenExpectedCargo?: () => void;
+  onNavigate?: (page: string) => void;
   loading?: boolean;
 }) {
   return (
@@ -265,6 +267,9 @@ function PageHeader({ t, count, isRefreshing, onRefresh, onLogout, onOpenExpecte
           <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
           Yangilash
         </button>
+        {onNavigate && (
+          <RoleSwitcher onNavigate={onNavigate} />
+        )}
         {onLogout && (
           <button
             onClick={onLogout}

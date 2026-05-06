@@ -129,6 +129,8 @@ export interface SearchClientsParams {
   name?: string;
   /** Search all fields at once (may produce false positives). */
   q?: string;
+  /** Exact match for code search (no partial matches). */
+  strict?: boolean;
   page?: number;
   size?: number;
 }

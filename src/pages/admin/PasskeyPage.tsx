@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, KeyRound, LogOut, Shield, ShieldCheck, ShieldOff, Loader2, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, KeyRound, LogOut, Shield, ShieldCheck, ShieldOff, Loader2, Sun, Moon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchMyPasskeys,
+  deletePasskey,
   webauthnRegisterBegin,
   webauthnRegisterComplete,
   refreshAdminToken,
@@ -103,6 +104,19 @@ export default function PasskeyPage({ onLogout }: PasskeyPageProps) {
 
   const hasCurrentDevicePasskey = passkeyStatus?.has_current_device_passkey ?? false;
   const totalPasskeys = passkeyStatus?.total_passkeys ?? 0;
+
+  const { mutate: removePasskey, isPending: isDeleting } = useMutation({
+    mutationFn: async (passkey_id: number) => {
+      await deletePasskey(passkey_id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-passkeys'] });
+      toast.success('Passkey o\'chirildi');
+    },
+    onError: () => {
+      toast.error('Passkey o\'chirishda xatolik');
+    },
+  });
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] dark:bg-[#0a0a0a]">
@@ -239,6 +253,43 @@ export default function PasskeyPage({ onLogout }: PasskeyPageProps) {
                 Passkey ro&apos;yxatdan o&apos;tkazish uchun ruxsat yo&apos;q.
                 Agar kerak bo&apos;lsa, super-admin bilan bog&apos;laning.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Passkey list */}
+        {passkeyStatus?.passkeys && passkeyStatus.passkeys.length > 0 && (
+          <div className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] p-5">
+            <h2 className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+              Ro&apos;yxatdan o&apos;tgan passkey&apos;lar
+            </h2>
+            <div className="space-y-2">
+              {passkeyStatus.passkeys.map((pk) => (
+                <div
+                  key={pk.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-white/[0.04]"
+                >
+                  <div className="flex items-center gap-3">
+                    <KeyRound className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <div>
+                      <p className="text-[13px] font-medium text-gray-900 dark:text-white">
+                        {pk.device_name || 'Noma\'lum qurilma'}
+                      </p>
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                        {pk.credential_id.slice(0, 16)}...
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removePasskey(pk.id)}
+                    disabled={isDeleting}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                    title="O'chirish"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}

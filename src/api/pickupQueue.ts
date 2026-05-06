@@ -199,7 +199,7 @@ export async function cancelPickupQueue(
   queueId: number,
   data: PickupQueueCancelRequest,
 ): Promise<unknown> {
-  const res = await apiClient.post<unknown>(`/api/v1/pickup-queue/${queueId}/cancel`, data, {
+  const res = await apiClient.post<unknown>(`/api/v1/warehouse/pickup-queue/${queueId}/cancel`, data, {
     headers: getAdminHeaders(),
   });
   return res.data;

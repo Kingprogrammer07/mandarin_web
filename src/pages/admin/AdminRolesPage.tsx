@@ -28,34 +28,45 @@ import type { LightSelectOption } from '../../components/ui/LightSelect';
 // ─── Permission label translations ────────────────────────────────────────────
 
 const RESOURCE_MAP: Record<string, string> = {
-  admin_accounts:  'Adminlar',
-  roles:           'Rollar',
-  audit_logs:      'Audit Jurnali',
-  clients:         'Mijozlar',
-  cargo:           'Yuklar',
-  payments:        "To'lovlar",
-  flights:         'Reyslar',
-  stats:           'Statistika',
-  pos:             'Kassa (POS)',
-  carousel:        'Karusel',
-  warehouse:       'Omborxona',
-  expected_cargo:  'Kutilayotgan yuklar',
+  admin_accounts:    'Adminlar',
+  roles:             'Rollar',
+  audit_logs:        'Audit Jurnali',
+  clients:           'Mijozlar',
+  cargo:             'Yuklar',
+  payments:          "To'lovlar",
+  flights:           'Reyslar',
+  stats:             'Statistika',
+  pos:               'Kassa (POS)',
+  carousel:          'Karusel',
+  warehouse:         'Omborxona',
+  expected_cargo:    'Kutilayotgan yuklar',
+  pickup_queue:      'Navbatlar',
+  flight_schedule:   'Reys jadvali',
+  delivery_requests: "Yetkazib berish so'rovlar",
+  auth:              'Autentifikatsiya',
 };
 
 const ACTION_MAP: Record<string, string> = {
-  read:    "Ko'rish",
-  create:  "Qo'shish",
-  update:  'Tahrirlash',
-  delete:  "O'chirish",
-  manage:  'Boshqarish',
-  process: "To'lov qabul qilish",
-  adjust:  'Balans tahriri',
-  export:  'Eksport',
-  block:   'Bloklash',
-  ban:     'Bloklash',
-  verify:  'Tasdiqlash',
-  approve: 'Ruxsat berish',
-  reject:  'Rad etish',
+  read:          "Ko'rish",
+  create:        "Qo'shish",
+  update:        'Tahrirlash',
+  delete:        "O'chirish",
+  manage:        'Boshqarish',
+  process:       "To'lov qabul qilish",
+  adjust:        'Balans tahriri',
+  export:        'Eksport',
+  block:         'Bloklash',
+  ban:           'Bloklash',
+  verify:        'Tasdiqlash',
+  approve:       'Ruxsat berish',
+  reject:        'Rad etish',
+  mark_taken:    'Berilgan deb belgilash',
+  cancel:        'Bekor qilish',
+  tv:            'TV ekran',
+  passkey:       'Passkey',
+  finance_read:  'Moliya (ko\'rish)',
+  finance_update:'Moliya (tahrirlash)',
+  update_status: 'Status yangilash',
 };
 
 // ─── Home page constants ───────────────────────────────────────────────────────
@@ -494,7 +505,7 @@ export default function AdminRolesPage() {
                                     : 'text-gray-600 dark:text-gray-400'
                                 }`}
                               >
-                                {ACTION_MAP[p.action] ?? p.action}
+                                {ACTION_MAP[p.action] ?? p.action.replace(/_/g, ' ')}
                               </span>
                             </label>
                           );

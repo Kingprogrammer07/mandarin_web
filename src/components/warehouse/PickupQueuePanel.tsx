@@ -32,8 +32,8 @@ import { formatCurrencySum, formatTashkentDateTime } from "../../lib/format";
 interface PickupQueuePanelProps {
   items: WarehousePickupQueueEntry[];
   isLoading: boolean;
-  pickupMethod: PickupMethod;
-  onPickupMethodChange: (method: PickupMethod) => void;
+  pickupMethod: PickupMethod | "all";
+  onPickupMethodChange: (method: PickupMethod | "all") => void;
   onMarkTaken: (
     transactionIds: number[],
     clientCode: string,
@@ -41,6 +41,7 @@ interface PickupQueuePanelProps {
     isTakenAway: boolean,
     deliveryMethods: { value: string; label: string }[],
   ) => void;
+  onRevertTaken?: (transactionId: number, clientCode: string, flightName: string) => void;
   canMarkTaken: boolean;
   canCancel?: boolean;
 }
@@ -62,6 +63,7 @@ export default function PickupQueuePanel({
   isLoading,
   pickupMethod,
   onMarkTaken,
+  onRevertTaken,
   canMarkTaken,
   canCancel = false,
 }: PickupQueuePanelProps) {
@@ -139,7 +141,7 @@ export default function PickupQueuePanel({
           Navbatlar yo'q
         </p>
         <p className="text-[12px] text-gray-400 dark:text-gray-600 mt-1">
-          {PICKUP_METHOD_LABELS[pickupMethod]} usulida faol navbat yo'q
+          {pickupMethod === "all" ? "Barchasi" : PICKUP_METHOD_LABELS[pickupMethod as PickupMethod]} usulida faol navbat yo'q
         </p>
       </div>
     );
@@ -424,6 +426,17 @@ export default function PickupQueuePanel({
                                   <span className="text-[10px] font-bold text-green-600 dark:text-green-400">
                                     Berilgan
                                   </span>
+                                )}
+                                {tx.is_taken_away && onRevertTaken && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onRevertTaken(tx.id, entry.client_code, flight.flight_name);
+                                    }}
+                                    className="text-[10px] font-bold text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 underline"
+                                  >
+                                    Bekor
+                                  </button>
                                 )}
                               </div>
                               <span className="font-bold">
