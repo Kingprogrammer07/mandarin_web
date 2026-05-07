@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Send, CheckCircle, RotateCcw } from "lucide-react";
@@ -13,7 +13,7 @@ import {
   useAdminCreateStandardDelivery,
   useAdminCreateUzpostDelivery,
 } from "@/api/hooks/useAdminDelivery";
-import { adminCalculateUzpost } from "@/api/services/adminDeliveryService";
+
 import type { ClientGroup } from "@/api/services/warehouse";
 import type { UzpostBranch } from "@/types/uzpostBranch";
 
@@ -39,17 +39,7 @@ export default function AdminDeliveryRequestPage() {
   // Uzpost form state
   const [uzpostPhone, setUzpostPhone] = useState("");
   const [uzpostBranch, setUzpostBranch] = useState<UzpostBranch | null>(null);
-  const [uzpostReceipt, setUzpostReceipt] = useState<File | null>(null);
-  const [uzpostWallet, setUzpostWallet] = useState(0);
-  const [calcData, setCalcData] = useState<{
-    total_weight: number;
-    price_per_kg: number;
-    total_amount: number;
-    wallet_balance: number;
-    card: { card_number: string; card_owner: string } | null;
-    warning?: string | null;
-  } | null>(null);
-  const [calcLoading, setCalcLoading] = useState(false);
+
 
   // Recent client search history (last 10)
   const [searchHistory, setSearchHistory] = useState<ClientGroup[]>(() => {
@@ -70,7 +60,6 @@ export default function AdminDeliveryRequestPage() {
     setSelectedClient(client);
     setSelectedFlights([]);
     setDeliveryType(null);
-    setCalcData(null);
     setStep("flights");
     setSearchHistory((prev) => {
       const filtered = prev.filter((c) => c.client_code !== client.client_code);
@@ -106,25 +95,7 @@ export default function AdminDeliveryRequestPage() {
   const isStandard = deliveryType && deliveryType !== "uzpost";
   const isUzpost = deliveryType === "uzpost";
 
-  // Recalculate UzPost price when branch is selected
-  useEffect(() => {
-    if (
-      isUzpost &&
-      selectedClient &&
-      selectedFlights.length > 0 &&
-      uzpostBranch
-    ) {
-      setCalcLoading(true);
-      adminCalculateUzpost({
-        client_code: selectedClient.client_code,
-        flight_names: selectedFlights,
-        location_id: uzpostBranch.id,
-      })
-        .then((res) => setCalcData(res))
-        .catch(() => setCalcData(null))
-        .finally(() => setCalcLoading(false));
-    }
-  }, [isUzpost, selectedClient, selectedFlights, uzpostBranch]);
+
 
   const handleSubmit = useCallback(() => {
     if (!selectedClient || !deliveryType || selectedFlights.length === 0) return;
@@ -155,10 +126,6 @@ export default function AdminDeliveryRequestPage() {
         formData.append("location_id", String(uzpostBranch.id));
       }
       formData.append("phone_number", uzpostPhone.trim() || selectedClient.phone || "");
-      formData.append("wallet_used", String(uzpostWallet));
-      if (uzpostReceipt) {
-        formData.append("receipt_file", uzpostReceipt);
-      }
 
       uzpostMutation.mutate(formData, {
         onSuccess: (res) => {
@@ -178,8 +145,6 @@ export default function AdminDeliveryRequestPage() {
     standardLocation,
     uzpostPhone,
     uzpostBranch,
-    uzpostReceipt,
-    uzpostWallet,
     standardMutation,
     uzpostMutation,
   ]);
@@ -195,10 +160,7 @@ export default function AdminDeliveryRequestPage() {
     setStandardLocation(null);
     setUzpostPhone("");
     setUzpostBranch(null);
-    setUzpostReceipt(null);
-    setUzpostWallet(0);
-    setCalcData(null);
-    setCalcLoading(false);
+
   }, []);
 
   const stepLabels = useMemo(
@@ -424,13 +386,6 @@ export default function AdminDeliveryRequestPage() {
                     onPhoneChange={setUzpostPhone}
                     selectedBranch={uzpostBranch}
                     onBranchChange={setUzpostBranch}
-                    receiptFile={uzpostReceipt}
-                    onReceiptChange={setUzpostReceipt}
-                    walletUsed={uzpostWallet}
-                    onWalletChange={setUzpostWallet}
-                    clientWalletBalance={selectedClient.wallet_balance}
-                    calcData={calcData}
-                    calcLoading={calcLoading}
                   />
                 )}
               </div>

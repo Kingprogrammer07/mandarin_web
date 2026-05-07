@@ -15,21 +15,6 @@ export interface AdminDeliverySuccessResponse {
   delivery_request_id: number;
 }
 
-export interface AdminCalculateUzpostRequest {
-  client_code: string;
-  flight_names: string[];
-  location_id: number | null;
-}
-
-export interface CalculateUzpostResponse {
-  total_weight: number;
-  price_per_kg: number;
-  total_amount: number;
-  wallet_balance: number;
-  card: { card_number: string; card_owner: string } | null;
-  warning?: string | null;
-}
-
 export async function adminCreateStandardDelivery(
   data: AdminStandardDeliveryRequest,
 ): Promise<AdminDeliverySuccessResponse> {
@@ -50,12 +35,4 @@ export async function adminCreateUzpostDelivery(
   return response.data;
 }
 
-export async function adminCalculateUzpost(
-  data: AdminCalculateUzpostRequest,
-): Promise<CalculateUzpostResponse> {
-  const response = await apiClient.post<CalculateUzpostResponse>(
-    "/api/v1/admin/delivery-requests/calculate-uzpost",
-    data,
-  );
-  return response.data;
-}
+

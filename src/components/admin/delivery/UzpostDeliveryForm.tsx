@@ -1,10 +1,8 @@
-import { useRef } from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Phone, Upload, X, Wallet, Loader2, Package, CreditCard } from "lucide-react";
+import { Phone, Search, MapPin, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { UzpostBranchPicker } from "@/components/delivery/UzpostBranchPicker";
 import { useUzpostBranches } from "@/hooks/useUzpostBranches";
 import type { UzpostBranch } from "@/types/uzpostBranch";
 
@@ -13,20 +11,6 @@ interface UzpostDeliveryFormProps {
   onPhoneChange: (v: string) => void;
   selectedBranch: UzpostBranch | null;
   onBranchChange: (branch: UzpostBranch | null) => void;
-  receiptFile: File | null;
-  onReceiptChange: (file: File | null) => void;
-  walletUsed: number;
-  onWalletChange: (v: number) => void;
-  clientWalletBalance: number;
-  calcData: {
-    total_weight: number;
-    price_per_kg: number;
-    total_amount: number;
-    wallet_balance: number;
-    card: { card_number: string; card_owner: string } | null;
-    warning?: string | null;
-  } | null;
-  calcLoading: boolean;
 }
 
 export default function UzpostDeliveryForm({
@@ -34,25 +18,25 @@ export default function UzpostDeliveryForm({
   onPhoneChange,
   selectedBranch,
   onBranchChange,
-  receiptFile,
-  onReceiptChange,
-  walletUsed,
-  onWalletChange,
-  clientWalletBalance,
-  calcData,
-  calcLoading,
 }: UzpostDeliveryFormProps) {
   const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data: branches, isLoading, isError, refetch } = useUzpostBranches();
+  const [query, setQuery] = useState("");
+  const { data: branches, isLoading, isError } = useUzpostBranches();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    onReceiptChange(file);
-  };
+  const filtered = useMemo(() => {
+    if (!branches || !query.trim()) return branches ?? [];
+    const q = query.trim().toLowerCase();
+    return branches.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.address.toLowerCase().includes(q) ||
+        String(b.index).includes(q),
+    );
+  }, [branches, query]);
 
   return (
     <div className="space-y-5">
+      {/* Phone */}
       <div className="space-y-2">
         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
           <Phone className="w-4 h-4 text-gray-400" />
@@ -67,137 +51,73 @@ export default function UzpostDeliveryForm({
         />
       </div>
 
-      {calcLoading && (
-        <div className="flex items-center gap-2 p-4 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Narx hisoblanmoqda...
-        </div>
-      )}
-
-      {calcData?.warning && (
-        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
-          {calcData.warning}
-        </div>
-      )}
-
-      {calcData && !calcLoading && !calcData.warning && (
-        <div className="space-y-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Package className="w-4 h-4" />
-              Og&apos;irlik
-            </span>
-            <span className="text-sm font-bold text-gray-900 dark:text-white">{calcData.total_weight.toFixed(2)} kg</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Yetkazib berish narxi</span>
-            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{calcData.total_amount.toLocaleString()} so&apos;m</span>
-          </div>
-          {calcData.card && (
-            <div className="flex items-center gap-2 pt-2 border-t border-emerald-200 dark:border-emerald-500/20">
-              <CreditCard className="w-4 h-4 text-gray-400" />
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {calcData.card.card_number} — {calcData.card.card_owner}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t("adminDeliveryRequest.uzpostForm.branchLabel", "UzPost filialini tanlash")}
-        </Label>
-        <UzpostBranchPicker
-          branches={branches ?? []}
-          selectedBranch={selectedBranch}
-          isLoading={isLoading}
-          isError={isError}
-          onSelect={onBranchChange}
-          onRetry={() => refetch()}
-          theme={{
-            shellClassName:
-              "rounded-2xl border border-orange-200 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/5 p-3",
-            mapClassName:
-              "h-[220px] w-full overflow-hidden rounded-xl border border-orange-200 dark:border-orange-500/20",
-            searchClassName:
-              "h-12 w-full rounded-xl border border-orange-200 dark:border-orange-500/20 bg-white dark:bg-white/[0.04] px-4 text-sm",
-            selectedPanelClassName:
-              "rounded-xl border border-orange-200 dark:border-orange-500/20 bg-white dark:bg-white/[0.04] p-4",
-            resultButtonClassName:
-              "w-full rounded-xl border border-transparent bg-white/80 dark:bg-white/[0.04] p-3 text-left text-sm hover:border-orange-200 dark:hover:border-orange-500/20 transition-colors",
-            selectedResultButtonClassName:
-              "border-orange-400 bg-orange-100 dark:bg-orange-500/10",
-            primaryTextClassName: "text-gray-900 dark:text-white",
-            mutedTextClassName: "text-gray-500 dark:text-gray-400",
-            markerColor: "#f97316",
-            selectedMarkerColor: "#16a34a",
-          }}
-        />
-      </div>
-
-      {clientWalletBalance > 0 && (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-gray-400" />
-            {t("adminDeliveryRequest.uzpostForm.walletLabel", "Hamyon balansidan foydalanish")}
-          </Label>
-          <div className="flex items-center gap-3">
-            <Input
-              type="number"
-              min={0}
-              max={clientWalletBalance}
-              value={walletUsed || ""}
-              onChange={(e) => onWalletChange(Number(e.target.value))}
-              className="h-12 rounded-xl"
-              placeholder="0"
-            />
-            <span className="text-sm text-gray-500 shrink-0">
-              / {clientWalletBalance.toLocaleString()} so&apos;m
-            </span>
-          </div>
-        </div>
-      )}
-
+      {/* Branch search */}
       <div className="space-y-2">
         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          <Upload className="w-4 h-4 text-gray-400" />
-          {t("adminDeliveryRequest.uzpostForm.receiptLabel", "To'lov cheki (ixtiyoriy)")}
+          <MapPin className="w-4 h-4 text-gray-400" />
+          {t("adminDeliveryRequest.uzpostForm.branchLabel", "UzPost filialini tanlash")}
         </Label>
 
-        {receiptFile ? (
-          <div className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3">
-            <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-              {receiptFile.name}
-            </span>
-            <button
-              onClick={() => {
-                onReceiptChange(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
-              className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="h-12 w-full rounded-xl border-dashed border-gray-300 dark:border-white/10 hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/5 text-gray-600 dark:text-gray-300"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {t("adminDeliveryRequest.uzpostForm.uploadReceipt", "Chekni yuklash")}
-          </Button>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder={t(
+              "adminDeliveryRequest.uzpostForm.branchSearchPlaceholder",
+              "Filial nomi, manzil yoki indeks...",
+            )}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-12 rounded-xl pl-10"
+            disabled={isLoading || isError}
+          />
+        </div>
+
+        {isLoading && (
+          <p className="text-sm text-gray-500 py-2">{t("common.loading", "Yuklanmoqda...")}</p>
         )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,.pdf"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
+        {isError && (
+          <p className="text-sm text-red-500 py-2">{t("common.error", "Xatolik yuz berdi")}</p>
+        )}
+
+        <div className="max-h-60 overflow-y-auto space-y-1 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-1">
+          {filtered.length === 0 && !isLoading && (
+            <p className="text-sm text-gray-500 py-4 text-center">
+              {t("adminDeliveryRequest.uzpostForm.noBranches", "Filial topilmadi")}
+            </p>
+          )}
+          {filtered.map((branch) => {
+            const isSelected = selectedBranch?.id === branch.id;
+            return (
+              <button
+                key={branch.id}
+                onClick={() => onBranchChange(isSelected ? null : branch)}
+                className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                  isSelected
+                    ? "bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20"
+                    : "hover:bg-gray-50 dark:hover:bg-white/[0.04] border border-transparent"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">{branch.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {branch.address}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                      Indeks: {branch.index}
+                    </p>
+                  </div>
+                  {isSelected && (
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center mt-0.5">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
