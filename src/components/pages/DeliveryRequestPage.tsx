@@ -860,8 +860,6 @@ function StepUzpostPayment({
     );
   }
 
-  if (!calcData) return null;
-
   const fullyCoveredByWallet = remaining <= 0;
   const cameraOverlay =
     isCameraOpen && typeof document !== 'undefined'
@@ -954,73 +952,77 @@ function StepUzpostPayment({
         />
       </div>
 
-      {/* Summary Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
-          <p className="text-xl font-extrabold">{calcData.total_weight} kg</p>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
-          <p className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
-            {calcData.total_amount.toLocaleString()} so'm
-          </p>
-        </div>
-      </div>
-
-      {/* Wallet Toggle */}
-      <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">{t('deliveryRequest.steps.uzpost.walletPay')}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t('deliveryRequest.steps.uzpost.walletBalance', { balance: calcData.wallet_balance.toLocaleString() })}
-              </p>
-            </div>
+      {/* Summary Grid — shown only after branch selected and calc completed */}
+      {calcData && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
+            <p className="text-xl font-extrabold">{calcData.total_weight} kg</p>
           </div>
+          <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
+            <p className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
+              {calcData.total_amount.toLocaleString()} so'm
+            </p>
+          </div>
+        </div>
+      )}
 
-          {/* Toggle */}
-          <button
-            onClick={() => setUseWallet(!useWallet)}
-            className={`
-              relative w-14 h-8 rounded-full transition-colors duration-300
-              ${useWallet ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/15'}
-            `}
-          >
-            <div
+      {/* Wallet Toggle — shown only after calc completed */}
+      {calcData && (
+        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">{t('deliveryRequest.steps.uzpost.walletPay')}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('deliveryRequest.steps.uzpost.walletBalance', { balance: calcData.wallet_balance.toLocaleString() })}
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle */}
+            <button
+              onClick={() => setUseWallet(!useWallet)}
               className={`
-                absolute top-1 w-6 h-6 rounded-full bg-white shadow-md
-                transition-transform duration-300
-                ${useWallet ? 'translate-x-7' : 'translate-x-1'}
+                relative w-14 h-8 rounded-full transition-colors duration-300
+                ${useWallet ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/15'}
               `}
-            />
-          </button>
-        </div>
-
-        {useWallet && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                -{walletApplied.toLocaleString()} so'm
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
-              <span className="font-extrabold text-lg">
-                {remaining.toLocaleString()} so'm
-              </span>
-            </div>
+            >
+              <div
+                className={`
+                  absolute top-1 w-6 h-6 rounded-full bg-white shadow-md
+                  transition-transform duration-300
+                  ${useWallet ? 'translate-x-7' : 'translate-x-1'}
+                `}
+              />
+            </button>
           </div>
-        )}
-      </div>
+
+          {useWallet && (
+            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  -{walletApplied.toLocaleString()} so'm
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
+                <span className="font-extrabold text-lg">
+                  {remaining.toLocaleString()} so'm
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Card Info (only if payment remains) */}
-      {!fullyCoveredByWallet && calcData.card && (
+      {calcData && !fullyCoveredByWallet && calcData.card && (
         <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.paymentCard')}
@@ -1166,13 +1168,13 @@ function StepUzpostPayment({
         </button>
         <button
           onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
-          disabled={submitting || receiptProcessing || !selectedBranch || (!fullyCoveredByWallet && !receiptFile)}
+          disabled={submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)}
           className={`
             flex-1 h-14 rounded-2xl font-bold text-base text-white
             flex items-center justify-center gap-2
             transition-all duration-200 active:scale-[0.98]
             ${
-              submitting || receiptProcessing || !selectedBranch || (!fullyCoveredByWallet && !receiptFile)
+              submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)
                 ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
                 : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
             }
