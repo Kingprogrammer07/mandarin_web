@@ -51,6 +51,14 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
     },
   });
 
+  // Keep text input in sync with form date value so backspace works
+  const dateOfBirthValue = form.watch('dateOfBirth');
+  useEffect(() => {
+    if (dateOfBirthValue) {
+      setDateInputValue(format(dateOfBirthValue, 'dd/MM/yyyy'));
+    }
+  }, [dateOfBirthValue]);
+
   const onSubmit = async (data: RegistrationFormData) => {
     setSubmitStatus('loading');
     setSubmitMessage(t('form.messages.loading'));
@@ -242,7 +250,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                       <div className="relative">
                         <Input
                           placeholder="DD/MM/YYYY"
-                          value={field.value ? format(field.value, 'dd/MM/yyyy') : dateInputValue}
+                          value={dateInputValue}
                           onChange={(e) => handleDateInput(e.target.value, field.onChange)}
                           onFocus={() => { if (!dateInputValue && !field.value) setDateInputValue(''); }}
                           className={`${inp} pr-12 font-mono tracking-widest placeholder:tracking-normal placeholder:font-normal`}

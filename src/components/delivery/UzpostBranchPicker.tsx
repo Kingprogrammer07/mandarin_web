@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Building2,
   CalendarDays,
+  Check,
   ChevronDown,
   Crosshair,
   Hash,
@@ -466,7 +467,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     if (!normalizedQuery) {
-      return userLocation ? branchesWithDistance.slice(0, 3) : [];
+      return branchesWithDistance;
     }
 
     return branchesWithDistance
@@ -682,8 +683,21 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         )}
       </div>
 
-      <div className={cn(theme.mapClassName, isMapExpanded && 'h-[420px]', 'relative')}>
-        {isMapExpanded ? (
+      {/* Open map button */}
+      {!isMapExpanded && (
+        <button
+          type="button"
+          onClick={() => setIsMapExpanded(true)}
+          className="w-full h-12 rounded-2xl bg-white dark:bg-white/5 border border-orange-200 dark:border-orange-500/20 text-sm font-bold text-orange-600 dark:text-orange-300 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+        >
+          <MapPin className="h-4 w-4" />
+          {t('deliveryRequest.branchPicker.openMap')}
+        </button>
+      )}
+
+      {/* Map container */}
+      {isMapExpanded && (
+        <div className={cn(theme.mapClassName, 'h-[420px]', 'relative')}>
           <MapContainer
             key="uzpost-map-expanded"
             center={DEFAULT_CENTER}
@@ -744,37 +758,18 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
               );
             })}
           </MapContainer>
-        ) : (
           <button
             type="button"
-            onClick={() => setIsMapExpanded(true)}
-            className="absolute inset-0 overflow-hidden bg-gradient-to-br from-orange-50 via-stone-50 to-amber-50 transition active:scale-[0.995] dark:from-orange-500/10 dark:via-gray-950 dark:to-amber-500/5"
+            onClick={() => setIsMapExpanded(false)}
+            className="absolute top-2 right-2 z-[1000] inline-flex items-center gap-1.5 rounded-xl bg-white/95 dark:bg-gray-950/95 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md active:scale-95 transition-all"
           >
-            <span
-              aria-hidden="true"
-              className="absolute inset-0 opacity-75 dark:opacity-45"
-              style={{
-                backgroundImage:
-                  'linear-gradient(rgba(251, 146, 60, 0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(251, 146, 60, 0.16) 1px, transparent 1px)',
-                backgroundSize: '38px 38px',
-              }}
-            />
-            <span aria-hidden="true" className="absolute left-[-8%] top-[44%] h-4 w-[116%] -rotate-12 rounded-full bg-white/80 shadow-sm dark:bg-white/10" />
-            <span aria-hidden="true" className="absolute left-[18%] top-[-10%] h-[120%] w-3 rotate-[28deg] rounded-full bg-white/70 shadow-sm dark:bg-white/10" />
-            <span aria-hidden="true" className="absolute right-[-10%] top-[16%] h-3 w-[78%] rotate-[34deg] rounded-full bg-amber-200/70 dark:bg-amber-400/15" />
-            <span aria-hidden="true" className="absolute left-[15%] top-[26%] h-3 w-3 rounded-full bg-orange-500 shadow-[0_0_0_6px_rgba(249,115,22,0.14)]" />
-            <span aria-hidden="true" className="absolute right-[22%] top-[34%] h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_0_5px_rgba(245,158,11,0.16)]" />
-            <span aria-hidden="true" className="absolute bottom-[24%] left-[42%] h-2.5 w-2.5 rounded-full bg-orange-400 shadow-[0_0_0_5px_rgba(251,146,60,0.16)]" />
-            <span aria-hidden="true" className="absolute bottom-[18%] right-[14%] h-8 w-8 rounded-full border-2 border-blue-500/40 bg-blue-500/10" />
-            <span className="relative inline-flex items-center gap-2 rounded-2xl bg-white/95 px-4 py-2 text-xs font-extrabold text-gray-800 shadow-lg ring-1 ring-black/5 backdrop-blur-md dark:bg-gray-950/95 dark:text-white dark:ring-white/10">
-              <Maximize2 className="h-4 w-4 text-orange-500" />
-              {t('deliveryRequest.branchPicker.mapControl')}
-            </span>
+            <Minimize2 className="h-3.5 w-3.5 text-orange-500" />
+            {t('deliveryRequest.branchPicker.closeMap')}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mt-3 grid gap-2">
+      <div className="mt-3 grid gap-2 max-h-60 overflow-y-auto">
         {filteredBranches.map((branch) => {
           const isSelected = selectedBranch?.id === branch.id;
           const distanceLabel = formatDistance(branch.distanceKm);
@@ -789,30 +784,37 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                 isSelected && isSelectionSettling && 'scale-[0.99] ring-2 ring-emerald-400'
               )}
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
-                  <Hash className="h-4 w-4" />
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
+                    <Hash className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={cn('text-sm font-extrabold leading-tight', theme.primaryTextClassName)}>
+                      {branch.index} - {branch.name}
+                    </p>
+                    <p className={cn('mt-1 line-clamp-2 text-xs leading-snug', theme.mutedTextClassName)}>
+                      {branch.address}
+                    </p>
+                    {branch.workdays && (
+                      <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {branch.workdays}
+                      </span>
+                    )}
+                    {distanceLabel && (
+                      <span className="mt-2 ml-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-300">
+                        <MapPin className="h-3.5 w-3.5" />
+                        {distanceLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className={cn('text-sm font-extrabold leading-tight', theme.primaryTextClassName)}>
-                    {branch.index} - {branch.name}
-                  </p>
-                  <p className={cn('mt-1 line-clamp-2 text-xs leading-snug', theme.mutedTextClassName)}>
-                    {branch.address}
-                  </p>
-                  {branch.workdays && (
-                    <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
-                      <CalendarDays className="h-3.5 w-3.5" />
-                      {branch.workdays}
-                    </span>
-                  )}
-                  {distanceLabel && (
-                    <span className="mt-2 ml-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-300">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {distanceLabel}
-                    </span>
-                  )}
-                </div>
+                {isSelected && (
+                  <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center mt-0.5">
+                    <Check className="w-3 h-3" />
+                  </div>
+                )}
               </div>
             </button>
           );

@@ -1061,6 +1061,8 @@
             "expandMap": "Xaritani kengaytirish",
             "collapseMap": "Ixcham xarita",
             "mapControl": "Xaritani boshqarish",
+            "openMap": "Xaritadan tanlash",
+            "closeMap": "Xaritani yopish",
             "loading": "UzPost punktlari yuklanmoqda...",
             "loadError": "UzPost punktlarini yuklab bo'lmadi",
             "retry": "Qayta yuklash",
