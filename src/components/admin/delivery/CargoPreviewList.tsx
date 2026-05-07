@@ -88,7 +88,7 @@ export default function CargoPreviewList({
                               #{tx.qator_raqami}
                             </span>
                             <span className="text-gray-700 dark:text-gray-300">
-                              {tx.vazn} kg
+                              {Number(tx.vazn).toFixed(2)} kg
                             </span>
                           </div>
                           <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
