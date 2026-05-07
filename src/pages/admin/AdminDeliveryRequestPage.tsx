@@ -182,9 +182,13 @@ export default function AdminDeliveryRequestPage() {
       <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-200 dark:border-white/10">
         <div className="max-w-5xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            {step !== "client" && step !== "success" && (
+            {step !== "success" && (
               <button
                 onClick={() => {
+                  if (step === "client") {
+                    window.history.back();
+                    return;
+                  }
                   const idx = stepsOrder.indexOf(step);
                   if (idx > 0) setStep(stepsOrder[idx - 1]);
                 }}
