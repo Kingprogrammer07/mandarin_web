@@ -1,41 +1,42 @@
 import "./i18n/config";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 
 import NavigationBar from "./components/NavigationBar";
-import RegistrationForm from "./components/RegistrationForm";
-import LoginForm from "./components/LoginForm";
-import AdminLoginForm from "./components/AdminLoginForm";
 import AdminLayout from "./components/admin/AdminLayout";
-import AdminAccountsPage from "./pages/admin/AdminAccountsPage";
-import AdminRolesPage from "./pages/admin/AdminRolesPage";
-import AdminProfilePage from "./pages/admin/AdminProfilePage";
-import AdminAuditLogsPage from "./pages/admin/AdminAuditLogsPage";
-import AdminCarouselPage from "./pages/admin/AdminCarouselPage";
-import FlightScheduleAdminPage from "./pages/admin/FlightScheduleAdminPage";
-import POSDashboard from "./pages/pos/POSDashboard";
-import ImportPage from "./pages/shared/ImportPage";
-import ClientForm from "./pages/shared/ClientForm";
-import FlightsPage from "./pages/worker/FlightsPage";
-import CargoListPage from "./pages/worker/CargoListPage";
-import AddCargoForm from "./pages/worker/AddCargoForm";
-import StatisticsDashboard from "./pages/shared/StatisticsDashboard";
 import TelegramWebAppGuard from "./components/TelegramWebAppGuard";
-import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
-import UserPage from "./pages/user/UserPage";
 import { UserNav } from "./components/navigation/UserNav";
 import { Toaster } from "sonner";
-import UserHome from "./pages/user/UserHome";
-import UserReportsPage from "./pages/user/UserReportsPage";
-import UserHistoryPage from "./pages/user/UserHistoryPage";
+import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
 import { fetchAuthMe } from "./api/services/auth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
-import ManagerPage from "./pages/admin/ManagerPage";
-import PasskeyPage from "./pages/admin/PasskeyPage";
-import WarehousePage from "./pages/admin/WarehousePage";
-import ExpectedCargoPage from "./pages/admin/ExpectedCargoPage";
-import PickupQueueTVPage from "./pages/shared/PickupQueueTVPage";
-import AdminDeliveryRequestPage from "./pages/admin/AdminDeliveryRequestPage";
+
+const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
+const LoginForm = lazy(() => import("./components/LoginForm"));
+const AdminLoginForm = lazy(() => import("./components/AdminLoginForm"));
+const AdminAccountsPage = lazy(() => import("./pages/admin/AdminAccountsPage"));
+const AdminRolesPage = lazy(() => import("./pages/admin/AdminRolesPage"));
+const AdminProfilePage = lazy(() => import("./pages/admin/AdminProfilePage"));
+const AdminAuditLogsPage = lazy(() => import("./pages/admin/AdminAuditLogsPage"));
+const AdminCarouselPage = lazy(() => import("./pages/admin/AdminCarouselPage"));
+const FlightScheduleAdminPage = lazy(() => import("./pages/admin/FlightScheduleAdminPage"));
+const POSDashboard = lazy(() => import("./pages/pos/POSDashboard"));
+const ImportPage = lazy(() => import("./pages/shared/ImportPage"));
+const ClientForm = lazy(() => import("./pages/shared/ClientForm"));
+const FlightsPage = lazy(() => import("./pages/worker/FlightsPage"));
+const CargoListPage = lazy(() => import("./pages/worker/CargoListPage"));
+const AddCargoForm = lazy(() => import("./pages/worker/AddCargoForm"));
+const StatisticsDashboard = lazy(() => import("./pages/shared/StatisticsDashboard"));
+const UserPage = lazy(() => import("./pages/user/UserPage"));
+const UserHome = lazy(() => import("./pages/user/UserHome"));
+const UserReportsPage = lazy(() => import("./pages/user/UserReportsPage"));
+const UserHistoryPage = lazy(() => import("./pages/user/UserHistoryPage"));
+const ManagerPage = lazy(() => import("./pages/admin/ManagerPage"));
+const PasskeyPage = lazy(() => import("./pages/admin/PasskeyPage"));
+const WarehousePage = lazy(() => import("./pages/admin/WarehousePage"));
+const ExpectedCargoPage = lazy(() => import("./pages/admin/ExpectedCargoPage"));
+const PickupQueueTVPage = lazy(() => import("./pages/shared/PickupQueueTVPage"));
+const AdminDeliveryRequestPage = lazy(() => import("./pages/admin/AdminDeliveryRequestPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -608,6 +609,13 @@ function AppContent() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
     <div
       className={`min-h-screen relative overflow-hidden transition-colors duration-300 ${
         isAdminArea
@@ -799,6 +807,7 @@ function AppContent() {
 
       <Toaster position="top-center" richColors />
     </div>
+    </Suspense>
   );
 }
 
