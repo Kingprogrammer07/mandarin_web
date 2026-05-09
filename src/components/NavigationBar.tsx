@@ -20,8 +20,8 @@ const LanguageToggle = ({ isDark }: { isDark: boolean }) => {
 
   const wrapStyle: React.CSSProperties = isDark
     ? {
-      backgroundColor: "rgba(22,15,5,0.72)",
-      borderColor: "rgba(180,83,9,0.35)",
+      backgroundColor: "rgba(10,14,21,0.78)",
+      borderColor: "rgba(251,146,60,0.18)",
       backdropFilter: "blur(16px)",
       WebkitBackdropFilter: "blur(16px)",
     }
@@ -43,9 +43,9 @@ const LanguageToggle = ({ isDark }: { isDark: boolean }) => {
         const btnStyle: React.CSSProperties = isActive
           ? isDark
             ? {
-              backgroundColor: "rgba(245,158,11,0.18)",
-              color: "#fcd34d",
-              boxShadow: "0 0 0 1px rgba(245,158,11,0.25)",
+              backgroundColor: "rgba(255,138,31,0.18)",
+              color: "#fed7aa",
+              boxShadow: "0 0 0 1px rgba(251,146,60,0.24)",
             }
             : {
               backgroundColor: "#ffffff",
@@ -133,8 +133,8 @@ const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
 
   const wrapStyle: React.CSSProperties = isDark
     ? {
-      backgroundColor: "rgba(22,15,5,0.72)",
-      borderColor: "rgba(180,83,9,0.35)",
+      backgroundColor: "rgba(10,14,21,0.78)",
+      borderColor: "rgba(251,146,60,0.18)",
       backdropFilter: "blur(16px)",
       WebkitBackdropFilter: "blur(16px)",
     }
@@ -156,9 +156,9 @@ const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
         const btnStyle: React.CSSProperties = isActive
           ? isDark
             ? {
-              backgroundColor: "rgba(245,158,11,0.18)",
-              color: "#fcd34d",       // amber-300 — yaxshi ko'rinadi
-              boxShadow: "0 0 0 1px rgba(245,158,11,0.25)",
+              backgroundColor: "rgba(255,138,31,0.18)",
+              color: "#fed7aa",
+              boxShadow: "0 0 0 1px rgba(251,146,60,0.24)",
             }
             : {
               backgroundColor: "#ffffff",
@@ -213,10 +213,9 @@ export default function NavigationBar(_props: NavigationBarProps) {
   const forceLight = !isScrolled && (isProfilePage || isDark);
 
   // ─── Inline style for scrolled dark bg ──────────────────────────────────
-  // rgba(13,10,4,0.78) — Dashboard #0d0a04 bilan bir xil tona, biroz transparent
   const navInlineStyle: React.CSSProperties = isScrolled && isDark
     ? {
-      backgroundColor: "rgba(13,10,4,0.78)",
+      backgroundColor: "rgba(6,8,13,0.80)",
       backdropFilter: "blur(28px)",
       WebkitBackdropFilter: "blur(28px)",
     }
@@ -230,7 +229,7 @@ export default function NavigationBar(_props: NavigationBarProps) {
           ? [
             "py-3 shadow-sm border-gray-200/50",
             "bg-white/80 backdrop-blur-xl",
-            "dark:border-amber-900/20 dark:shadow-[0_1px_0_rgba(245,158,11,0.07)]",
+            "dark:border-orange-200/10 dark:shadow-[0_1px_0_rgba(251,146,60,0.08)]",
           ].join(" ")
           : "bg-transparent border-transparent py-4"
       )}
@@ -260,7 +259,7 @@ export default function NavigationBar(_props: NavigationBarProps) {
                 "font-bold uppercase tracking-widest transition-colors duration-300 truncate text-[8px] sm:text-[10px]",
                 forceLight
                   ? "text-white/70 md:text-black/70 dark:text-white/70"
-                  : "text-gray-500 dark:text-amber-400/60"
+                  : "text-gray-500 dark:text-orange-200/55"
               )}>
                 Foydalanuvchi tizimi
               </span>

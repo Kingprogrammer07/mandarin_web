@@ -2,10 +2,24 @@ import { useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
 
 export interface PosNotificationPayload {
-  flightName: string;
+  id: string;
+  timestamp: string;
   clientCode: string;
-  /** Unpaid amount — optional, shown in the toast when available */
+  clientName: string;
+  flightName: string;
+  amountPaid: number;
+  totalAmount: number;
+  remainingAmount: number;
+  paymentStatus: string;
+  paymentType: string;
+  receiptImageUrl?: string | null;
+  telegramMessageId?: number | null;
+  telegramChatId?: number | null;
+  confirmedBy?: string | null;
+  confirmedAt?: string | null;
+  /** @deprecated Legacy alias used by warehouse → cashier notifications. */
   amount?: number;
+  /** @deprecated Legacy alias used by warehouse → cashier notifications. */
   currency?: string;
 }
 

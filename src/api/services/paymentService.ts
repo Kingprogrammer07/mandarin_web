@@ -16,6 +16,13 @@ export interface AvailableFlightsResponse {
   count: number;
 }
 
+export interface CargoPriceItem {
+  weight_kg: number;
+  price_per_kg_usd: number;
+  price_per_kg_uzs: number;
+  total_usd: number;
+}
+
 export interface FlightPaymentDetailsResponse {
   flight_name: string;
   client_code: string;
@@ -32,6 +39,7 @@ export interface FlightPaymentDetailsResponse {
   existing_remaining_amount: number | null;
   card_number: string | null;
   card_owner: string | null;
+  cargo_prices: CargoPriceItem[];
 }
 
 export interface WalletOnlyPaymentRequest {

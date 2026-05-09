@@ -65,11 +65,11 @@ export const ProfileHero = memo(({ user, onBalanceClick }: ProfileHeroProps) => 
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="
-                    bg-gradient-to-br from-[#1e1a45] via-[#2a2356] to-[#0f0c29] 
-                    dark:from-[#0f0c29] dark:via-[#1a1638] dark:to-black 
-                    pt-25 pb-24 md:pt-12 md:pb-12 px-6 
-                    rounded-b-[3rem] md:rounded-[2.5rem] 
-                    shadow-xl text-white text-center relative transform-gpu 
+                    bg-gradient-to-br from-[#1e1a45] via-[#2a2356] to-[#0f0c29]
+                    dark:from-[#0f0c29] dark:via-[#1a1638] dark:to-black
+                    pt-25 pb-24 md:pt-12 md:pb-12 px-6
+                    rounded-b-[3rem] md:rounded-[2.5rem]
+                    shadow-xl text-white text-center relative transform-gpu
                     border-2 border-white/20 dark:border-white/10
                     overflow-hidden
                 "

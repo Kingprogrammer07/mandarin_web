@@ -18,7 +18,6 @@ import {
 } from '@/api/services/carousel';
 import CarouselMediaModal from '@/components/carousel/CarouselMediaModal';
 import { toast } from 'sonner';
-import NotificationCenter from '@/components/notifications/NotificationCenter';
 import { ActionButton } from '@/components/user_page/ActionButtons';
 import { useTranslation } from 'react-i18next';
 
@@ -31,6 +30,8 @@ import { CarouselCard } from './dashboard-components/CarouselCard';
 import { CAROUSEL_ITEMS, MAIN_ACTIONS } from './dashboard-components/constants';
 import type { CarouselItemData } from './dashboard-components/types';
 
+const loadNotificationCenter = () => import('@/components/notifications/NotificationCenter');
+
 const ChinaAddressModal = lazy(() => import('@/components/modals/ChinaAddressModal'));
 const MakePaymentModal = lazy(() => import('@/components/modals/MakePaymentModal'));
 const FlightSchedulePage = lazy(() => import('@/components/pages/FlightSchedulePage'));
@@ -38,6 +39,7 @@ const DeliveryRequestPage = lazy(() => import('@/components/pages/DeliveryReques
 const DeliveryHistoryPage = lazy(() => import('@/components/pages/DeliveryHistoryPage'));
 const CalculatorModal = lazy(() => import('@/components/modals/CalculatorModal'));
 const ProhibitedItemsModal = lazy(() => import('@/components/modals/ProhibitedItemsModal'));
+const NotificationCenter = lazy(loadNotificationCenter);
 
 interface DashboardProps {
   onNavigateToReports?: () => void;
@@ -69,6 +71,24 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
+
+  useEffect(() => {
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const prefetch = () => {
+      void loadNotificationCenter();
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      const id = idleWindow.requestIdleCallback(prefetch);
+      return () => idleWindow.cancelIdleCallback?.(id);
+    }
+
+    const id = window.setTimeout(prefetch, 1_500);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const sortedCarouselItems = useMemo((): CarouselItemData[] => {
     const fromApi: CarouselItemData[] = apiCarouselItems
@@ -216,7 +236,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
 
   return (
     <div
-      className="min-h-screen bg-gray-50 dark:bg-[#0d0a04] text-gray-900 dark:text-white pb-24 transition-colors duration-300 font-sans selection:bg-orange-500/30"
+      className="min-h-screen bg-gray-50 dark:bg-[#06080d] text-gray-900 dark:text-white transition-colors duration-300 font-sans selection:bg-orange-500/30 pb-24"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -265,7 +285,9 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                   {t('dashboard.sections.important')}
                 </h2>
                 <div className="flex items-center gap-2">
-                  <NotificationCenter />
+                  <Suspense fallback={<div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-white/5" />}>
+                    <NotificationCenter />
+                  </Suspense>
                   <div className="hidden md:flex items-center gap-2">
                     <button
                       onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: 'smooth' })}

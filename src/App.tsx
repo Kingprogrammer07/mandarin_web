@@ -1,6 +1,6 @@
 import "./i18n/config";
 
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense, useTransition } from "react";
 
 import NavigationBar from "./components/NavigationBar";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -8,8 +8,10 @@ import TelegramWebAppGuard from "./components/TelegramWebAppGuard";
 import { UserNav } from "./components/navigation/UserNav";
 import { Toaster } from "sonner";
 import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
-import { fetchAuthMe } from "./api/services/auth";
+import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
+import { TopProgressBar } from "./components/ui/TopProgressBar";
+import { Skeleton } from "./components/ui/skeleton";
 
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
 const LoginForm = lazy(() => import("./components/LoginForm"));
@@ -318,6 +320,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("login");
   const [selectedFlightName, setSelectedFlightName] = useState("");
+  const [isTransitioning, startTransition] = useTransition();
 
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -365,9 +368,15 @@ function AppContent() {
         );
       }
 
-      setCurrentPage(page);
-      if (flightName !== undefined) setSelectedFlightName(flightName);
+      // startTransition keeps the current page visible while the lazy chunk loads,
+      // eliminating the blank-screen flash between route changes.
+      startTransition(() => {
+        setCurrentPage(page);
+        if (flightName !== undefined) setSelectedFlightName(flightName);
+      });
     },
+    // startTransition is stable — safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
   const handleLogout = useCallback(() => {
@@ -468,12 +477,22 @@ function AppContent() {
           setIsCheckingAuth(false);
           applyRoute(currentRouteInfo, role, "replace");
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          sessionStorage.removeItem("access_token");
-          setUserRole(null);
-          setIsCheckingAuth(false);
-          applyRoute({ page: "login" }, null, "replace");
+          if (isRequestCanceled(error)) {
+            // Do not trap users behind the auth spinner when /auth/me is slow.
+            // The next protected API call will still validate the token and
+            // trigger the global 401 logout flow if the session is invalid.
+            const fallbackRole = "user";
+            setUserRole(fallbackRole);
+            setIsCheckingAuth(false);
+            applyRoute(currentRouteInfo, fallbackRole, "replace");
+          } else {
+            sessionStorage.removeItem("access_token");
+            setUserRole(null);
+            setIsCheckingAuth(false);
+            applyRoute({ page: "login" }, null, "replace");
+          }
         }
       }
     };
@@ -609,24 +628,24 @@ function AppContent() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-screen items-center justify-center">
-          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }
-    >
+    <>
+    {/* Fixed progress bar: shows during auth check, lazy-page transitions, and Suspense fallback */}
+    {(isTransitioning || isCheckingAuth) && <TopProgressBar />}
     <div
       className={`min-h-screen relative overflow-hidden transition-colors duration-300 ${
         isAdminArea
           ? "bg-[#f5f5f4] dark:bg-[#09090b]"
-          : "bg-gradient-to-br from-orange-50 via-amber-50 to-orange-100 dark:from-[#0d0a04] dark:via-[#1a1612] dark:to-[#0d0a04]"
+          : "bg-[#f8fafc] dark:bg-[#06080d]"
       }`}
     >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-orange-300/20 dark:bg-orange-500/10 rounded-full blur-3xl animate-blob" />
-        <div className="absolute top-40 right-10 w-96 h-96 bg-amber-300/20 dark:bg-amber-500/10 rounded-full blur-3xl animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-20 left-1/2 w-80 h-80 bg-orange-200/20 dark:bg-orange-400/10 rounded-full blur-3xl animate-blob animation-delay-4000" />
+        {!isAdminArea && (
+          <>
+            <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.18),rgba(249,115,22,0.07)_38%,transparent_72%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.20),rgba(249,115,22,0.08)_38%,transparent_72%)]" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-300/70 to-transparent dark:via-orange-200/55" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.55),transparent_24%)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_28%)]" />
+          </>
+        )}
       </div>
 
       {!isAdminArea && (
@@ -646,10 +665,16 @@ function AppContent() {
       )}
 
       {isCheckingAuth ? (
-        <div className="flex h-[60vh] items-center justify-center">
-          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <div className="pt-24 px-4 space-y-4 max-w-lg mx-auto animate-in fade-in duration-300">
+          <Skeleton className="h-10 w-1/3 rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-3xl" />
+          <Skeleton className="h-32 w-full rounded-3xl" />
+          <Skeleton className="h-32 w-3/4 rounded-3xl" />
         </div>
-      ) : isSuperAdminPages && canAccessAdminPanel ? (
+      ) : (
+      <Suspense fallback={<TopProgressBar />}>
+      {/* Pages rendered here: isSuperAdminPages first branch */}
+      {isSuperAdminPages && canAccessAdminPanel ? (
         <AdminLayout
           currentPage={currentPage}
           onNavigate={(page) => navigateToPage(page as Page)}
@@ -796,7 +821,15 @@ function AppContent() {
           )}
 
           {currentPage === "user-reports" && (
-            <UserReportsPage onBack={() => navigateToPage("user-home")} />
+            <UserReportsPage
+              onBack={() => navigateToPage("user-home")}
+              onNavigateToDelivery={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.set("tab", "request");
+                window.history.replaceState({}, "", url.toString());
+                navigateToPage("user-home");
+              }}
+            />
           )}
 
           {currentPage === "user-history" && (
@@ -804,10 +837,12 @@ function AppContent() {
           )}
         </main>
       )}
+      </Suspense>
+      )}
 
       <Toaster position="top-center" richColors />
     </div>
-    </Suspense>
+    </>
   );
 }
 

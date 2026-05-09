@@ -51,6 +51,13 @@ interface TelegramLocationData {
   speed_accuracy?: number;
 }
 
+interface TelegramSafeAreaInset {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 interface TelegramWebApp {
   initData: string;
   initDataUnsafe: TelegramWebAppInitData;
@@ -64,6 +71,9 @@ interface TelegramWebApp {
   headerColor: string;
   backgroundColor: string;
   isClosingConfirmationEnabled: boolean;
+  isFullscreen?: boolean;
+  safeAreaInset?: TelegramSafeAreaInset;
+  contentSafeAreaInset?: TelegramSafeAreaInset;
 
   // Methods
   ready(): void;
@@ -101,6 +111,12 @@ interface TelegramWebApp {
     getLocation(callback: (locationData: TelegramLocationData | null) => void): void;
     openSettings(): void;
   };
+
+  // Fullscreen mode (Bot API 7.7+)
+  requestFullscreen?(): void;
+  exitFullscreen?(): void;
+  disableVerticalSwipes?(): void;
+  enableVerticalSwipes?(): void;
 
   // Version check (Bot API 6.0+)
   isVersionAtLeast(version: string): boolean;

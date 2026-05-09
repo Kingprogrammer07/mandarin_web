@@ -146,9 +146,32 @@ Domain services live in `src/api/services/` (auth, cargo, flights, payments, sta
 
 - Tailwind CSS 4 with CSS variables for theming (`@theme inline`).
 - Dark mode supported via `next-themes` (`class` attribute strategy).
-- Custom focus rings use `oklch(0.646 0.222 41.116)` (orange accent).
+- Orange/amber is a useful brand accent, but it is not the only allowed palette. Use other colors when they improve hierarchy, meaning, accessibility, or role-specific workflows. Choose palettes deliberately, keep contrast strong, and avoid making every new surface look like a variation of the same orange/amber theme.
+- Custom focus rings may use the established orange accent (`oklch(0.646 0.222 41.116)`) or another accessible token when the surrounding UI requires a different semantic color.
 - Thin custom scrollbars are styled globally for WebKit and Firefox.
 - `font-size: 16px` is forced on inputs to prevent iOS zoom.
+
+### Premium Mandarin User Theme
+
+The approved user-side dark-mode direction is **Premium Mandarin**:
+
+- Keep Mandarin Cargo's orange/amber brand color, but never use it as a full-screen muddy brown/amber wash.
+- Dark surfaces should start from a clean obsidian base (`#06080d`, `#0a0e15`, `#0f151f`) with subtle top warm light.
+- Orange/amber should appear as controlled premium accents: logo, active nav pill, key CTA, icon badge, status chip, thin rim light.
+- Avoid amber diagonal grids, large blurred amber orbs, amber rings, decorative watermarks, and repeated animated blobs on user pages.
+- Mobile-first matters more than hover. Use `active:` or `whileTap` feedback, clear tap targets, strong text contrast, and compact scannable cards.
+- Flight/report list cards should not show "new", "paid", or other status labels unless the API provides real status/freshness data. Do not invent state from a flight name string.
+- The current reference preview is `frontend/design-previews/premium-mandarin-flightcard-preview.html`.
+
+### Senior Frontend & UX Expectations
+
+- Think like a senior frontend engineer and UI/UX designer before changing UI: understand the user role, workflow frequency, data density, failure states, and mobile/desktop constraints.
+- Prefer existing local patterns, shared primitives, strict TypeScript types, accessible Radix/shadcn-style components, and predictable state boundaries.
+- Build complete states for real usage: loading, empty, error, disabled, optimistic or pending states where appropriate, validation, and recovery paths.
+- Keep operational screens efficient and scannable. Do not turn admin, warehouse, accounting, or logistics workflows into marketing-style pages.
+- Use semantic color intentionally: status, risk, success, warnings, ownership, grouping, and action priority should be visually distinct and accessible.
+- Verify responsive behavior, text overflow, tap targets, keyboard focus, and dark mode impact when a UI change can affect them.
+- Avoid `any`, fragile string parsing, duplicated business rules, hidden coupling, and cosmetic changes that make future maintenance harder.
 
 ### Internationalization
 

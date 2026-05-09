@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Package, Weight, Calendar, Plane, FileText, MapPin, CheckCircle, PackageCheck } from 'lucide-react';
 import { format } from 'date-fns';
@@ -259,7 +259,8 @@ export default function ClientCargoHistory() {
         queryKey: ['flightHistory', clientCode],
         queryFn: () => getClientFlightHistory(clientCode!),
         enabled: !!clientCode,
-        staleTime: 0,
+        staleTime: 1000 * 60 * 5,
+        placeholderData: keepPreviousData,
     });
 
     if (isProfileLoading || (isHistoryLoading && !history)) {

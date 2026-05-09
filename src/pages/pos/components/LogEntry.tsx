@@ -22,7 +22,7 @@ export function LogEntry({
   return (
     <div
       onClick={() => hasCode && onSelect(item.client_code!)}
-      className={`flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 dark:border-white/[0.04] last:border-0 rounded-lg px-2 -mx-1 transition-colors ${cashierStyle.row} ${
+      className={`flex items-center justify-between gap-3 py-3 rounded-lg px-2 -mx-1 transition-colors ${cashierStyle.row} ${
         hasCode ? "cursor-pointer hover:opacity-80" : ""
       }`}
     >

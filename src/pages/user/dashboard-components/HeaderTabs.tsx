@@ -16,8 +16,8 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
       left: isHome ? '4px' : 'calc(50% + 2px)',
       right: isHome ? 'calc(50% + 2px)' : '4px',
       borderRadius: '10px',
-      background: 'linear-gradient(135deg, rgba(245,158,11,0.25) 0%, rgba(234,88,12,0.15) 100%)',
-      boxShadow: '0 2px 16px rgba(245,158,11,0.2), inset 0 0 0 1px rgba(245,158,11,0.3)',
+      background: 'linear-gradient(135deg, rgba(255,138,31,0.95) 0%, rgba(251,191,36,0.86) 100%)',
+      boxShadow: '0 8px 20px rgba(249,115,22,0.22), inset 0 1px 0 rgba(255,255,255,0.28)',
       transition: 'all 300ms cubic-bezier(0.34,1.56,0.64,1)',
     }
     : {
@@ -34,9 +34,9 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
 
   const wrapperStyle: React.CSSProperties = dark
     ? {
-      background: 'rgba(26,18,8,0.85)',
-      border: '1px solid rgba(180,83,9,0.35)',
-      boxShadow: '0 0 0 1px rgba(245,158,11,0.08), 0 8px 32px rgba(0,0,0,0.5)',
+      background: 'rgba(10,14,21,0.78)',
+      border: '1px solid rgba(251,146,60,0.16)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 34px rgba(0,0,0,0.26)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
     }
@@ -48,7 +48,7 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
       WebkitBackdropFilter: 'blur(12px)',
     };
 
-  const activeTextClass = dark ? 'text-amber-300' : 'text-gray-900';
+  const activeTextClass = dark ? 'text-orange-950' : 'text-gray-900';
   const inactiveTextClass = dark
     ? 'text-white/35 hover:text-white/55'
     : 'text-gray-400 hover:text-gray-600';
@@ -109,7 +109,7 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
             left: isHome ? '15%' : '55%',
             width: isHome ? '25%' : '30%',
             height: '1px',
-            background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.7), transparent)',
+            background: 'linear-gradient(to right, transparent, rgba(254,215,170,0.7), transparent)',
             transition: 'all 400ms cubic-bezier(0.34,1.56,0.64,1)',
           }}
         />

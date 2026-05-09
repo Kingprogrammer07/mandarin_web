@@ -242,6 +242,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [copied, setCopied] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showTrackCodes, setShowTrackCodes] = useState(false);
+  const [showCargoPrices, setShowCargoPrices] = useState(false);
   const [selectedTrackCode, setSelectedTrackCode] = useState<string | null>(null);
   const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
@@ -678,15 +679,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     return (
       <div className="space-y-5">
         {/* ---- Big Amount Display ---- */}
-        <div className="text-center py-4 px-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/[0.08] dark:to-orange-500/[0.05] border border-amber-200/60 dark:border-amber-500/20">
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-600/70 dark:text-amber-400/60 mb-1">
+        <div className="text-center py-5 px-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/[0.08] dark:to-orange-500/[0.05] border border-amber-300/70 dark:border-amber-500/25 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-700/80 dark:text-amber-400/70 mb-1.5">
             {details.has_existing_partial
               ? t('makePayment.existingRemaining')
               : t('makePayment.totalAmount')}
           </p>
-          <p className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white tracking-tight">
+          <p className="text-5xl sm:text-[56px] font-black text-gray-900 dark:text-white tracking-tight leading-none">
             {formatMoney(payableAmount)}
-            <span className="text-lg ml-2 font-bold text-amber-600 dark:text-amber-400">
+            <span className="text-xl ml-2 font-bold text-amber-600 dark:text-amber-400">
               so'm
             </span>
           </p>
@@ -699,11 +700,28 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             label={t('makePayment.weight')}
             value={`${details.total_weight.toFixed(2)} kg`}
           />
-          <InfoCard
-            icon={<CircleDollarSign className="w-4 h-4" />}
-            label={t('makePayment.pricePerKg')}
-            value={`$${details.price_per_kg_usd.toFixed(2)}`}
-          />
+          {details.cargo_prices.length > 1 ? (
+            <InfoCard
+              icon={<CircleDollarSign className="w-4 h-4" />}
+              label={t('makePayment.pricePerKg')}
+              value="Turli"
+              onClick={() => setShowCargoPrices(!showCargoPrices)}
+              trailing={
+                <motion.div
+                  animate={{ rotate: showCargoPrices ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                </motion.div>
+              }
+            />
+          ) : (
+            <InfoCard
+              icon={<CircleDollarSign className="w-4 h-4" />}
+              label={t('makePayment.pricePerKg')}
+              value={`$${details.price_per_kg_usd.toFixed(2)}`}
+            />
+          )}
           {details.has_existing_partial && details.existing_paid_amount != null && (
             <InfoCard
               icon={<CheckCircle2 className="w-4 h-4" />}
@@ -763,6 +781,49 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     </span>
                     <Search className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors flex-shrink-0 ml-2" />
                   </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ---- Expandable Cargo Prices List ---- */}
+        <AnimatePresence>
+          {showCargoPrices && details.cargo_prices.length > 1 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02] p-3 space-y-2">
+                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
+                  Har bir yuk narxi
+                </p>
+                {details.cargo_prices.map((cargo, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.03 }}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg
+                      bg-white dark:bg-white/[0.04]
+                      border border-gray-100 dark:border-white/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Scale className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {cargo.weight_kg} kg
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        ${cargo.price_per_kg_usd.toFixed(2)}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-1">/kg</span>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
@@ -938,7 +999,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => handleChooseMethod('wallet')}
-            className="w-full h-14 rounded-2xl font-bold text-base
+            className="w-full h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-emerald-500 to-teal-500
               hover:from-emerald-600 hover:to-teal-600
               text-white shadow-lg shadow-emerald-500/20
@@ -954,7 +1015,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => handleChooseMethod('online')}
-            className="h-14 rounded-2xl font-bold text-base
+            className="h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-blue-500 to-indigo-500
               hover:from-blue-600 hover:to-indigo-600
               text-white shadow-lg shadow-blue-500/20
@@ -970,7 +1031,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             disabled={isPartial}
             aria-disabled={isPartial}
             className={
-              `h-14 rounded-lg font-bold text-base
+              `h-16 rounded-2xl font-black text-[16px]
               bg-white
               hover:bg-[#eef6ff]
               text-[#07182f] border border-[#dbe8f4] shadow-sm
@@ -1012,9 +1073,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           </p>
           <button
             onClick={handleClose}
-            className="mt-4 w-full max-w-[260px] h-14 rounded-2xl font-bold text-base
+            className="mt-4 w-full max-w-[280px] h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-amber-500 to-orange-500
-              text-white shadow-lg shadow-amber-500/20
+              text-white shadow-xl shadow-amber-500/25
               active:scale-[0.97] transition-all"
           >
             {t('makePayment.done')}
@@ -1104,10 +1165,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <button
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="w-full max-w-xs h-14 rounded-2xl font-bold text-base
+            className="w-full max-w-xs h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-emerald-500 to-teal-500
               hover:from-emerald-600 hover:to-teal-600
-              text-white shadow-lg shadow-emerald-500/20
+              text-white shadow-xl shadow-emerald-500/25
               active:scale-[0.97] transition-all
               disabled:opacity-60 disabled:cursor-not-allowed
               flex items-center justify-center gap-2"
@@ -1247,10 +1308,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <button
             onClick={handleConfirm}
             disabled={!receiptFile || isSubmitting}
-            className="w-full h-14 rounded-2xl font-bold text-base
+            className="w-full h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-blue-500 to-indigo-500
               hover:from-blue-600 hover:to-indigo-600
-              text-white shadow-lg shadow-blue-500/20
+              text-white shadow-xl shadow-blue-500/25
               active:scale-[0.97] transition-all
               disabled:opacity-50 disabled:cursor-not-allowed
               flex items-center justify-center gap-2.5"

@@ -34,7 +34,7 @@ import MarkTakenModal from "../../components/warehouse/MarkTakenModal";
 import WarehouseOfflineManager from "../../components/warehouse/WarehouseOfflineManager";
 import UzPostOrdersPanel from "../../components/warehouse/UzPostOrdersPanel";
 import PickupQueuePanel from "../../components/warehouse/PickupQueuePanel";
-import { useBroadcastChannel, type BroadcastMessage } from "../../hooks/useBroadcastChannel";
+import { useBroadcastChannel, type BroadcastMessage, type PosNotificationPayload } from "../../hooks/useBroadcastChannel";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
 import { revertTakenStatus } from "../../api/services/warehouse";
 import type { PickupMethod, PickupQueuePriority } from "../../api/pickupQueue";
@@ -326,11 +326,18 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
       sendMessage({
         type: "POS_NOTIFY",
         payload: {
-          flightName,
+          id: `wh-${Date.now()}`,
+          timestamp: new Date().toISOString(),
           clientCode,
-          amount,
+          clientName: clientCode,
+          flightName,
+          amountPaid: amount,
+          totalAmount: amount,
+          remainingAmount: 0,
+          paymentStatus: "pending",
+          paymentType: "cash",
           currency: "UZS",
-        },
+        } as PosNotificationPayload,
       });
       toast.success(`Kassirga xabar yuborildi: ${clientCode}`, {
         description: `Reys: ${flightName}`,

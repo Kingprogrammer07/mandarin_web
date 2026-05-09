@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, lazy, Suspense, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/hooks/useProfile';
 import { reportService, type ReportResponse } from '@/api/services/reportService';
@@ -7,7 +7,6 @@ import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { UniqueBackground } from '@/components/ui/UniqueBackground';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CardContent } from '@/components/ui/card';
 import {
     Plane,
     Calendar,
@@ -22,14 +21,18 @@ import {
     XCircle,
     RefreshCw,
     Search,
-    ArrowRight
+    ArrowRight,
+    Truck,
+    Tag,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import MakePaymentModal from '@/components/modals/MakePaymentModal';
+const MakePaymentModal = lazy(() => import('@/components/modals/MakePaymentModal'));
 import { useTranslation } from 'react-i18next';
+
+const PAGE_SIZE = 10;
 
 // --- Types ---
 
@@ -40,9 +43,97 @@ interface FlightCardProps {
     onClick: () => void;
 }
 
+interface FlightActionBarProps {
+    reports: ReportResponse[];
+    onPay: (amount: number) => void;
+    onDeliveryRequest?: () => void;
+}
+
+const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActionBarProps) => {
+    const totalExpected = reports.reduce((s, r) => s + (r.expected_amount ?? 0), 0);
+    const totalPaid = reports.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
+    const totalRemaining = Math.max(0, totalExpected - totalPaid);
+    const allTakenAway = reports.every((r) => r.is_taken_away);
+    const anyUnpaid = reports.some((r) => r.payment_status !== 'paid' && (r.expected_amount ?? 0) - (r.paid_amount ?? 0) > 0);
+    const firstReport = reports[0];
+
+    // Taken away — no action, just status
+    if (allTakenAway) {
+        return (
+            <div className="sticky bottom-0 z-10 bg-white/80 dark:bg-[#06080d]/85 backdrop-blur-md border-t border-gray-100 dark:border-white/5 px-4 py-4 -mx-4">
+                <div className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-500/10 rounded-xl border border-slate-200 dark:border-slate-500/20">
+                    <CheckCircle2 className="w-5 h-5 text-slate-500" />
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                        Olib ketilgan
+                        {firstReport?.taken_away_date && (
+                            <span className="font-normal text-slate-400 ml-1">
+                                ({format(new Date(firstReport.taken_away_date), 'dd MMM, HH:mm', { locale: uz })})
+                            </span>
+                        )}
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    // Not fully paid — show pay button
+    if (anyUnpaid && totalRemaining > 0) {
+        return (
+            <div className="sticky bottom-0 z-10 bg-white/80 dark:bg-[#06080d]/85 backdrop-blur-md border-t border-gray-100 dark:border-white/5 px-4 py-4 -mx-4 space-y-2.5">
+                {/* Amount badges */}
+                <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08]">
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                            Jami
+                        </span>
+                        <span className="text-sm font-black text-gray-800 dark:text-gray-200">
+                            {totalExpected.toLocaleString('uz-UZ')} so'm
+                        </span>
+                    </div>
+                    <div className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
+                        <span className="text-[10px] font-bold text-red-400 dark:text-red-400 uppercase tracking-wider">
+                            Qoldiq
+                        </span>
+                        <span className="text-sm font-black text-red-600 dark:text-red-400">
+                            {totalRemaining.toLocaleString('uz-UZ')} so'm
+                        </span>
+                    </div>
+                </div>
+                <Button
+                    className={`w-full rounded-2xl font-black text-[16px] text-white shadow-xl shadow-orange-500/25 active:scale-[0.97] transition-all py-6 h-auto
+                        ${firstReport?.payment_status === 'unpaid'
+                            ? 'bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700'
+                            : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                        }`}
+                    onClick={() => onPay(totalRemaining)}
+                >
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Barchasiga to'lov qilish
+                </Button>
+            </div>
+        );
+    }
+
+    // Fully paid — show delivery request button
+    if (!anyUnpaid && onDeliveryRequest) {
+        return (
+            <div className="sticky bottom-0 z-10 bg-white/80 dark:bg-[#06080d]/85 backdrop-blur-md border-t border-gray-100 dark:border-white/5 px-4 py-4 -mx-4">
+                <Button
+                    className="w-full rounded-xl font-bold text-white shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                    onClick={onDeliveryRequest}
+                >
+                    <Truck className="w-4 h-4 mr-2" />
+                    Zayafka qoldirish
+                </Button>
+            </div>
+        );
+    }
+
+    return null;
+});
+
 interface ReportHistoryItemProps {
     report: ReportResponse;
-    onPay: (amount: number) => void;
     onTrackClick: (code: string) => void;
     onImageClick: (url: string) => void;
 }
@@ -51,37 +142,69 @@ interface ReportHistoryItemProps {
 
 const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
     const { t } = useTranslation();
+    const label = t('reports.cargoReport', 'Yuk hisoboti');
+
     return (
-    <motion.div
-        layoutId={`flight-${flightName}`}
-        onClick={onClick}
-        className="group cursor-pointer relative overflow-hidden rounded-3xl bg-white/80 dark:bg-black/40 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-lg hover:shadow-orange-500/10 transition-all duration-300 transform hover:scale-[1.02]"
-    >
-        {/* Dark Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-orange-500/5 dark:to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <motion.button
+            type="button"
+            layoutId={`flight-${flightName}`}
+            onClick={onClick}
+            whileTap={{ scale: 0.985 }}
+            aria-label={`${flightName} ${label}`}
+            className="
+                w-full min-h-[84px] grid grid-cols-[48px_minmax(0,1fr)_28px] items-center gap-3
+                rounded-[19px] px-3 py-3 text-left select-none
+                border transition-colors duration-150
+                bg-[var(--flight-card-bg)] text-[var(--flight-card-text)]
+                border-[var(--flight-card-border)] shadow-[var(--flight-card-shadow)]
+                active:bg-[var(--flight-card-active-bg)] active:border-[var(--flight-card-active-border)]
+                [--flight-card-bg:#ffffff]
+                [--flight-card-text:#0f172a]
+                [--flight-card-border:#e2e8f0]
+                [--flight-card-shadow:0_1px_3px_rgba(15,23,42,0.06)]
+                [--flight-card-active-bg:#fff7ed]
+                [--flight-card-active-border:rgba(249,115,22,0.26)]
+                dark:[--flight-card-bg:linear-gradient(180deg,rgba(255,255,255,0.062),rgba(255,255,255,0.026)),radial-gradient(circle_at_0%_0%,rgba(255,138,31,0.10),transparent_36%),rgba(15,21,31,0.88)]
+                dark:[--flight-card-text:#f8fafc]
+                dark:[--flight-card-border:rgba(255,255,255,0.10)]
+                dark:[--flight-card-shadow:inset_0_1px_0_rgba(255,255,255,0.06)]
+                dark:[--flight-card-active-bg:linear-gradient(180deg,rgba(255,138,31,0.11),rgba(255,255,255,0.03)),rgba(18,25,36,0.94)]
+                dark:[--flight-card-active-border:rgba(253,186,116,0.30)]
+            "
+        >
+            <span className="
+                flex h-12 w-12 items-center justify-center rounded-2xl
+                border border-[var(--flight-icon-border)] bg-[var(--flight-icon-bg)] text-[var(--flight-icon-text)]
+                [--flight-icon-bg:#fff7ed] [--flight-icon-border:#fed7aa] [--flight-icon-text:#ea580c]
+                dark:[--flight-icon-bg:linear-gradient(145deg,rgba(255,138,31,0.28),rgba(251,146,60,0.11))]
+                dark:[--flight-icon-border:rgba(253,186,116,0.25)] dark:[--flight-icon-text:#fff7ed]
+                dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]
+            ">
+                <Plane className="h-[22px] w-[22px]" />
+            </span>
 
-        <CardContent className="p-6 relative z-10">
-            <div className="flex items-center justify-between mb-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-100 to-amber-50 dark:from-orange-500/20 dark:to-amber-500/10 flex items-center justify-center text-orange-600 dark:text-orange-400 group-hover:rotate-12 transition-transform duration-500 shadow-inner">
-                    <Plane className="w-7 h-7" />
-                </div>
-                <div className="text-gray-300 dark:text-gray-600 group-hover:text-orange-500 transition-colors">
-                    <ArrowRight className="w-6 h-6" />
-                </div>
-            </div>
+            <span className="min-w-0">
+                <span className="flex min-w-0 items-center">
+                    <span className="truncate text-[17px] font-black leading-tight tracking-normal">
+                        {flightName}
+                    </span>
+                </span>
+                <span className="mt-1.5 block truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {label} - {t('reports.viewDetails', "Batafsil ko'rish")}
+                </span>
+            </span>
 
-            <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">{t('reports.flight')}</p>
-                <h3 className="text-2xl font-black text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors tracking-tight">
-                    {flightName}
-                </h3>
-            </div>
-        </CardContent>
-    </motion.div>
+            <span className="
+                flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-400
+                dark:bg-white/[0.045] dark:text-orange-100/50
+            ">
+                <ArrowRight className="h-4 w-4" />
+            </span>
+        </motion.button>
     );
 });
 
-const ReportHistoryItem = memo(({ report, onPay, onTrackClick, onImageClick }: ReportHistoryItemProps) => {
+const ReportHistoryItem = memo(({ report, onTrackClick, onImageClick }: ReportHistoryItemProps) => {
     const { t } = useTranslation();
     const sentDate = report.is_sent_web_date
         ? format(new Date(report.is_sent_web_date), 'dd MMMM, HH:mm', { locale: uz })
@@ -106,26 +229,35 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick, onImageClick }: R
                         </p>
                     </div>
                 </div>
-                {/* Status Badge */}
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
-                    style={{
-                        backgroundColor: report.payment_status === 'paid' ? 'rgba(16, 185, 129, 0.1)' :
-                            report.payment_status === 'partial' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                        borderColor: report.payment_status === 'paid' ? 'rgba(16, 185, 129, 0.2)' :
-                            report.payment_status === 'partial' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                        color: report.payment_status === 'paid' ? '#10b981' :
-                            report.payment_status === 'partial' ? '#f59e0b' : '#ef4444'
-                    }}
-                >
-                    {report.payment_status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> :
-                        report.payment_status === 'partial' ? <Clock className="w-3 h-3" /> :
-                            <XCircle className="w-3 h-3" />}
-                    {report.payment_status === 'paid' ? t('reports.status.paid') :
-                        report.payment_status === 'partial' ? t('reports.status.partial') : t('reports.status.unpaid')}
+                <div className="flex items-center gap-2">
+                    {/* Taken away mini badge */}
+                    {report.is_taken_away && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border bg-slate-100 dark:bg-slate-500/10 border-slate-200 dark:border-slate-500/20 text-slate-600 dark:text-slate-400">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Olib ketilgan
+                        </div>
+                    )}
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+                        style={{
+                            backgroundColor: report.payment_status === 'paid' ? 'rgba(16, 185, 129, 0.1)' :
+                                report.payment_status === 'partial' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            borderColor: report.payment_status === 'paid' ? 'rgba(16, 185, 129, 0.2)' :
+                                report.payment_status === 'partial' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            color: report.payment_status === 'paid' ? '#10b981' :
+                                report.payment_status === 'partial' ? '#f59e0b' : '#ef4444'
+                        }}
+                    >
+                        {report.payment_status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> :
+                            report.payment_status === 'partial' ? <Clock className="w-3 h-3" /> :
+                                <XCircle className="w-3 h-3" />}
+                        {report.payment_status === 'paid' ? t('reports.status.paid') :
+                            report.payment_status === 'partial' ? t('reports.status.partial') : t('reports.status.unpaid')}
+                    </div>
                 </div>
             </div>
 
-            {/* Info Grid */}
+            {/* Info Grid — aggregate totals */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-50 dark:bg-black/20 rounded-2xl p-3">
                     <span className="text-[10px] uppercase text-gray-400 font-semibold">{t('reports.weight')}</span>
@@ -150,6 +282,65 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick, onImageClick }: R
                     </div>
                 </div>
             </div>
+
+            {/* Per-track-code breakdown (from cargo_items) */}
+            {report.cargo_items && report.cargo_items.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-[10px] uppercase text-gray-400 font-semibold">{t('reports.trackCodes')}</p>
+                    <div className="space-y-2">
+                        {report.cargo_items.map((item, i) => (
+                            <div
+                                key={i}
+                                onClick={() => onTrackClick(item.track_code)}
+                                className="bg-gray-50 dark:bg-black/20 rounded-2xl p-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+                            >
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <Tag className="w-3.5 h-3.5 text-orange-500" />
+                                        <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
+                                            {item.track_code}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                        {item.total_payment_uzs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} so'm
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-[11px] text-gray-500 dark:text-gray-400">
+                                    <span className="flex items-center gap-1">
+                                        <Scale className="w-3 h-3" />
+                                        {item.weight_kg} kg
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <DollarSign className="w-3 h-3" />
+                                        ${item.price_per_kg.toFixed(2)}/kg
+                                    </span>
+                                    <span className="text-gray-400">
+                                        ≈ ${item.total_payment.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Fallback track codes when cargo_items is empty */}
+            {(!report.cargo_items || report.cargo_items.length === 0) && report.track_codes.length > 0 && (
+                <div>
+                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-2">{t('reports.trackCodes')}</p>
+                    <div className="flex flex-wrap gap-2">
+                        {report.track_codes.map((code, i) => (
+                            <button
+                                key={i}
+                                onClick={() => onTrackClick(code)}
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-gray-700 dark:text-gray-200 text-xs font-mono rounded-lg transition-colors border border-transparent hover:border-orange-200 dark:hover:border-orange-500/30 active:scale-95"
+                            >
+                                {code}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Photos Grid */}
             {report.photo_file_ids && report.photo_file_ids.length > 0 && (
@@ -176,41 +367,6 @@ const ReportHistoryItem = memo(({ report, onPay, onTrackClick, onImageClick }: R
                 </div>
             )}
 
-            {/* Track Codes */}
-            {report.track_codes.length > 0 && (
-                <div>
-                    <p className="text-[10px] uppercase text-gray-400 font-semibold mb-2">{t('reports.trackCodes')}</p>
-                    <div className="flex flex-wrap gap-2">
-                        {report.track_codes.map((code, i) => (
-                            <button
-                                key={i}
-                                onClick={() => onTrackClick(code)}
-                                className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-gray-700 dark:text-gray-200 text-xs font-mono rounded-lg transition-colors border border-transparent hover:border-orange-200 dark:hover:border-orange-500/30 active:scale-95"
-                            >
-                                {code}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Payment Action */}
-            {report.payment_status !== 'paid' && (
-                <Button
-                    className={`w-full rounded-xl font-bold text-white shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all
-                ${report.payment_status === 'unpaid'
-                            ? 'bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700'
-                            : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
-                        }`}
-                    onClick={() => onPay(report.total_price_uzs - report.paid_amount)}
-                >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    {report.payment_status === 'unpaid' ? t('reports.pay') : t('reports.payRemaining')}
-                    <span className="ml-1 opacity-90 text-xs font-normal">
-                        ({(report.expected_amount - report.paid_amount).toLocaleString()} so'm)
-                    </span>
-                </Button>
-            )}
         </motion.div>
     );
 });
@@ -293,9 +449,10 @@ const BottomDrawer = ({ open, onClose, children }: BottomDrawerProps) => (
 
 interface UserReportsPageProps {
     onBack?: () => void;
+    onNavigateToDelivery?: () => void;
 }
 
-export default function UserReportsPage({ onBack }: UserReportsPageProps) {
+export default function UserReportsPage({ onBack, onNavigateToDelivery }: UserReportsPageProps) {
     const { data: user, isLoading: isUserLoading, isError: isUserError } = useProfile();
     const { t } = useTranslation();
 
@@ -315,43 +472,62 @@ export default function UserReportsPage({ onBack }: UserReportsPageProps) {
     // Image Preview State
     const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+    // Pagination sizes — grow by PAGE_SIZE on each "Load more" click
+    const [flightsFetchSize, setFlightsFetchSize] = useState(PAGE_SIZE);
+    const [historyFetchSize, setHistoryFetchSize] = useState(PAGE_SIZE);
+
+    // Reset history page size when the selected flight changes
+    useEffect(() => { setHistoryFetchSize(PAGE_SIZE); }, [selectedFlight]);
+
     // --- Data Fetching (TanStack Query) ---
 
     // 1. Fetch Flights
     const {
         data: flights = [],
         isLoading: isLoadingFlights,
+        isFetching: isFetchingMoreFlights,
         refetch: refetchFlights,
         isRefetching: isRefetchingFlights
     } = useQuery({
-        queryKey: ['webFlights', user?.client_code],
-        queryFn: () => reportService.getWebFlights(user!.client_code),
+        queryKey: ['webFlights', user?.client_code, flightsFetchSize],
+        queryFn: () => reportService.getWebFlights(user!.client_code, 1, flightsFetchSize),
         enabled: !!user?.client_code,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
 
     // 2. Fetch History (Only when flight selected)
     const {
         data: history = [],
         isLoading: isLoadingHistory,
+        isFetching: isFetchingMoreHistory,
         refetch: refetchHistory,
         isRefetching: isRefetchingHistory
     } = useQuery({
-        queryKey: ['webHistory', user?.client_code, selectedFlight],
-        queryFn: () => reportService.getWebHistory(user!.client_code, selectedFlight!),
+        queryKey: ['webHistory', user?.client_code, selectedFlight, historyFetchSize],
+        queryFn: () => reportService.getWebHistory(user!.client_code, selectedFlight!, 1, historyFetchSize),
         enabled: !!user?.client_code && !!selectedFlight,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
+
+    const hasMoreFlights = flights.length === flightsFetchSize;
+    const hasMoreHistory = history.length === historyFetchSize;
+    const isLoadingMoreFlights = isFetchingMoreFlights && !isLoadingFlights;
+    const isLoadingMoreHistory = isFetchingMoreHistory && !isLoadingHistory;
 
     // --- Handlers ---
 
     const handleRefresh = () => {
         if (view === 'detail' && selectedFlight) {
+            setHistoryFetchSize(PAGE_SIZE);
             refetchHistory();
         } else {
+            setFlightsFetchSize(PAGE_SIZE);
             refetchFlights();
         }
     };
+
+    const handleLoadMoreFlights = () => setFlightsFetchSize(s => s + PAGE_SIZE);
+    const handleLoadMoreHistory = () => setHistoryFetchSize(s => s + PAGE_SIZE);
 
     const isRefreshing = isRefetchingFlights || isRefetchingHistory;
 
@@ -396,7 +572,7 @@ export default function UserReportsPage({ onBack }: UserReportsPageProps) {
 
     if (isUserLoading) {
         return (
-            <div className="container max-w-md mx-auto p-4 pt-24 space-y-4">
+            <div className="container max-w-md mx-auto p-4 space-y-4 pt-24">
                 <Skeleton className="h-10 w-1/2 rounded-xl" />
                 <Skeleton className="h-32 w-full rounded-3xl" />
                 <Skeleton className="h-32 w-full rounded-3xl" />
@@ -406,7 +582,7 @@ export default function UserReportsPage({ onBack }: UserReportsPageProps) {
 
     if (isUserError || !user) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] pt-24 text-center">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center pt-24">
                 <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
                 <h3 className="text-lg font-bold">{t('reports.errorTitle')}</h3>
                 <Button onClick={() => window.location.reload()} className="mt-4" variant="outline">
@@ -417,7 +593,9 @@ export default function UserReportsPage({ onBack }: UserReportsPageProps) {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#0d0a04] text-gray-900 dark:text-white font-sans transition-colors duration-300 pb-24 pt-24 md:pt-32">
+        <div
+            className="min-h-screen bg-gray-50 dark:bg-[#06080d] text-gray-900 dark:text-white font-sans transition-colors duration-300 pt-24 pb-28"
+        >
             <UniqueBackground />
 
             <div className="container max-w-lg mx-auto px-4 relative z-10">
@@ -478,13 +656,24 @@ export default function UserReportsPage({ onBack }: UserReportsPageProps) {
                             {isLoadingFlights ? (
                                 [1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full rounded-3xl bg-gray-200 dark:bg-white/5" />)
                             ) : flights.length > 0 ? (
-                                flights.map(flightName => (
-                                    <FlightCard
-                                        key={flightName}
-                                        flightName={flightName}
-                                        onClick={() => setSelectedFlight(flightName)}
-                                    />
-                                ))
+                                <>
+                                    {flights.map(flightName => (
+                                        <FlightCard
+                                            key={flightName}
+                                            flightName={flightName}
+                                            onClick={() => setSelectedFlight(flightName)}
+                                        />
+                                    ))}
+                                    {hasMoreFlights && (
+                                        <button
+                                            onClick={handleLoadMoreFlights}
+                                            disabled={isLoadingMoreFlights}
+                                            className="w-full py-3 rounded-2xl border border-gray-200 dark:border-white/10 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                                        >
+                                            {isLoadingMoreFlights ? t('reports.loading') : t('reports.loadMore')}
+                                        </button>
+                                    )}
+                                </>
                             ) : (
                                 <div className="text-center py-20 text-gray-400">
                                     <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -510,29 +699,52 @@ export default function UserReportsPage({ onBack }: UserReportsPageProps) {
                             {isLoadingHistory ? (
                                 [1, 2, 3].map(i => <Skeleton key={i} className="h-48 w-full rounded-3xl bg-gray-200 dark:bg-white/5" />)
                             ) : history.length > 0 ? (
-                                history.map((item, idx) => (
-                                    <ReportHistoryItem
-                                        key={idx}
-                                        report={item}
-                                        onPay={handlePay}
-                                        onTrackClick={handleTrackClick}
-                                        onImageClick={setPreviewImage}
-                                    />
-                                ))
+                                <div className="space-y-4">
+                                    {history.map((item, idx) => (
+                                        <ReportHistoryItem
+                                            key={idx}
+                                            report={item}
+                                            onTrackClick={handleTrackClick}
+                                            onImageClick={setPreviewImage}
+                                        />
+                                    ))}
+                                    {hasMoreHistory && (
+                                        <button
+                                            onClick={handleLoadMoreHistory}
+                                            disabled={isLoadingMoreHistory}
+                                            className="w-full py-3 rounded-2xl border border-gray-200 dark:border-white/10 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                                        >
+                                            {isLoadingMoreHistory ? t('reports.loading') : t('reports.loadMore')}
+                                        </button>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="text-center py-10 opacity-50">{t('reports.notFound')}</div>
+                            )}
+
+                            {/* Single bottom action bar for the whole flight */}
+                            {!isLoadingHistory && history.length > 0 && (
+                                <FlightActionBar
+                                    reports={history}
+                                    onPay={handlePay}
+                                    onDeliveryRequest={onNavigateToDelivery}
+                                />
                             )}
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
 
-            {/* Payment Modal */}
-            <MakePaymentModal
-                isOpen={isPaymentOpen}
-                onClose={handlePaymentClose}
-                preselectedFlightName={paymentFlightName}
-            />
+            {/* Payment Modal — lazy chunk loads only when first opened */}
+            {isPaymentOpen && (
+                <Suspense fallback={null}>
+                    <MakePaymentModal
+                        isOpen={isPaymentOpen}
+                        onClose={handlePaymentClose}
+                        preselectedFlightName={paymentFlightName}
+                    />
+                </Suspense>
+            )}
 
             {/* Custom Bottom Drawer for Track Details */}
             <BottomDrawer open={!!selectedTrackCode} onClose={() => setSelectedTrackCode(null)}>

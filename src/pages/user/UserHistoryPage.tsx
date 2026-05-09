@@ -174,7 +174,9 @@ export default function UserHistoryPage({ onBack }: UserHistoryPageProps) {
   const totalCount = data?.pages?.[0]?.total_count ?? 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0d0a04] text-gray-900 dark:text-white pb-28 pt-24 md:pt-32 relative">
+    <div
+      className="min-h-screen bg-gray-50 dark:bg-[#0d0a04] text-gray-900 dark:text-white relative pb-28 pt-24 md:pt-32"
+    >
       <UniqueBackground />
 
       <div className="container mx-auto px-4 max-w-lg md:max-w-3xl lg:max-w-5xl relative z-10">

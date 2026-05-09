@@ -897,7 +897,9 @@
         "errorTitle": "Xatolik yuz berdi",
         "retry": "Qayta urinish",
         "noFlightSelected": "Reys tanlanmagan",
-        "trackCodeNotFound": "Trek-kod ma'lumotlari topilmadi"
+        "trackCodeNotFound": "Trek-kod ma'lumotlari topilmadi",
+        "loadMore": "Ko'proq yuklash",
+        "loading": "Yuklanmoqda..."
     },
     "dashboard": {
         "tabs": {

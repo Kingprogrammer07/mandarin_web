@@ -94,14 +94,14 @@ const quickAccessPages = [
 ] as const;
 
 function getInitialTheme() {
-  return localStorage.getItem('adminTheme') === 'dark' ||
-    (!('adminTheme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  // Default to light mode; only dark if explicitly saved in localStorage
+  return localStorage.getItem('adminTheme') === 'dark';
 }
 
 export default function AdminLayout({ children, currentPage, onNavigate, onLogout }: AdminLayoutProps) {
   const [isDark, setIsDark] = useState(getInitialTheme);
   const [showPagesMenu, setShowPagesMenu] = useState(false);
-  const [showOtherPages, setShowOtherPages] = useState(false);
+  const [showOtherPages, setShowOtherPages] = useState(true);
 
   useEffect(() => {
     if (isDark) document.documentElement.classList.add('dark');

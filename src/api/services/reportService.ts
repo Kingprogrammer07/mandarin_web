@@ -1,5 +1,13 @@
 import { apiClient } from '../client';
 
+export interface CargoItemDetail {
+    track_code: string;
+    weight_kg: number;
+    price_per_kg: number;
+    total_payment: number;
+    total_payment_uzs: number;
+}
+
 export interface ReportResponse {
     flight_name: string;
     total_weight: number;
@@ -10,6 +18,9 @@ export interface ReportResponse {
     expected_amount: number;
     track_codes: string[];
     photo_file_ids: string[];
+    cargo_items: CargoItemDetail[];
+    is_taken_away: boolean;
+    taken_away_date?: string; // ISO date string
     is_sent_web_date: string; // ISO date string
     payment_date?: string; // ISO date string
 }
@@ -31,6 +42,7 @@ export const reportService = {
 
     /**
      * Get paginated web report history for a client.
+     * Pass size > 10 to load more items (load-more pattern).
      */
     getWebHistory: async (
         clientCode: string,

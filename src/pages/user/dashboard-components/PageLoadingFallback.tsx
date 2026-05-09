@@ -1,20 +1,16 @@
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Plane } from 'lucide-react';
+import { TopProgressBar } from '@/components/ui/TopProgressBar';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export const PageLoadingFallback = memo(() => {
-  const { t } = useTranslation();
-  return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center w-full animate-in fade-in duration-300">
-      <div className="w-16 h-16 relative flex items-center justify-center">
-        <div className="absolute inset-0 rounded-full border-4 border-gray-100 dark:border-white/5"></div>
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 dark:border-t-amber-500 dark:border-r-amber-500 animate-spin"></div>
-        <Plane className="w-6 h-6 text-blue-500 dark:text-amber-500 animate-pulse absolute" />
-      </div>
-      <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400 animate-pulse">
-        {t('dashboard.loading')}
-      </p>
+export const PageLoadingFallback = memo(() => (
+  <>
+    <TopProgressBar />
+    <div className="p-4 space-y-3 animate-in fade-in duration-200">
+      <Skeleton className="h-12 w-full rounded-2xl" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-24 w-3/4 rounded-2xl" />
     </div>
-  );
-});
+  </>
+));
 PageLoadingFallback.displayName = 'PageLoadingFallback';

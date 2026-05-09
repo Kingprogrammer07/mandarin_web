@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, memo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import {
@@ -35,7 +35,6 @@ import {
 } from '@/api/services/deliveryService';
 import { useProfile } from '@/hooks/useProfile';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
-import { UzpostBranchPicker } from '@/components/delivery/UzpostBranchPicker';
 import { DeliveryMapPickerLazy } from '@/components/delivery/DeliveryMapPickerLazy';
 import { useUzpostBranches } from '@/hooks/useUzpostBranches';
 import type { UzpostBranch } from '@/types/uzpostBranch';
@@ -45,6 +44,12 @@ import {
   saveUzpostBranchPreference,
 } from '@/utils/uzpostBranchStorage';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
+
+const UzpostBranchPicker = lazy(() =>
+  import('@/components/delivery/UzpostBranchPicker').then((module) => ({
+    default: module.UzpostBranchPicker,
+  }))
+);
 
 // ============================================
 // TYPES
@@ -941,15 +946,24 @@ function StepUzpostPayment({
       </div>
 
       <div className="mb-6">
-        <UzpostBranchPicker
-          branches={branches}
-          selectedBranch={selectedBranch}
-          suggestedBranch={suggestedBranch}
-          isLoading={branchesLoading}
-          isError={branchesError}
-          onSelect={onBranchSelect}
-          onRetry={onBranchesRetry}
-        />
+        <Suspense
+          fallback={
+            <div className="space-y-3">
+              <div className="h-12 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
+              <div className="h-64 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
+            </div>
+          }
+        >
+          <UzpostBranchPicker
+            branches={branches}
+            selectedBranch={selectedBranch}
+            suggestedBranch={suggestedBranch}
+            isLoading={branchesLoading}
+            isError={branchesError}
+            onSelect={onBranchSelect}
+            onRetry={onBranchesRetry}
+          />
+        </Suspense>
       </div>
 
       {/* Summary Grid — shown only after branch selected and calc completed */}

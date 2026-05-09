@@ -30,6 +30,19 @@ export interface AuthMeResponse {
   role: string;
 }
 
+const AUTH_ME_TIMEOUT_MS = 5_000;
+
+export function isRequestCanceled(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const maybeError = error as { code?: string; name?: string; message?: string };
+  return (
+    maybeError.code === 'ERR_CANCELED' ||
+    maybeError.name === 'CanceledError' ||
+    maybeError.name === 'AbortError' ||
+    maybeError.message === 'canceled'
+  );
+}
+
 export interface RegisterRequest {
   full_name: string;
   passport_series: string;
@@ -153,7 +166,17 @@ export function getTelegramWebAppData() {
 /**
  * Get current authenticated user profile and role
  */
-export async function fetchAuthMe(): Promise<AuthMeResponse> {
-  const response = await apiClient.get<AuthMeResponse>('/auth/me');
-  return response.data;
+export async function fetchAuthMe(timeoutMs: number = AUTH_ME_TIMEOUT_MS): Promise<AuthMeResponse> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await apiClient.get<AuthMeResponse>('/auth/me', {
+      signal: controller.signal,
+      timeout: timeoutMs + 1_000,
+    });
+    return response.data;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }

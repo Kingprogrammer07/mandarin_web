@@ -897,7 +897,9 @@
         "errorTitle": "Произошла ошибка",
         "retry": "Повторить попытку",
         "noFlightSelected": "Рейс не выбран",
-        "trackCodeNotFound": "Данные трек-кода не найдены"
+        "trackCodeNotFound": "Данные трек-кода не найдены",
+        "loadMore": "Загрузить ещё",
+        "loading": "Загрузка..."
     },
     "dashboard": {
         "tabs": {

@@ -15,19 +15,17 @@ import {
   Loader2,
   AlertCircle,
   Package,
-  ReceiptText,
-  RefreshCw,
   X,
   ChevronRight,
-  SlidersHorizontal,
+  ArrowLeft,
   Sun,
   Moon,
   Lock,
   UserCircle,
   LogOut,
-  Bell,
-  BellOff,
-  BellRing,
+  Volume2,
+  VolumeX,
+  Zap,
   Calculator,
 } from "lucide-react";
 import CalculatorModal from "@/components/modals/CalculatorModal";
@@ -45,6 +43,8 @@ import {
   useBroadcastChannel,
   type BroadcastMessage,
 } from "@/hooks/useBroadcastChannel";
+import { usePaymentNotifications } from "@/hooks/usePaymentNotifications";
+import { PaymentNotificationDrawer } from "@/components/pos/PaymentNotificationDrawer";
 import type {
   PaymentProvider,
   CashierLogProvider,
@@ -66,15 +66,13 @@ import {
   deleteRecentSearch,
   waterfallDistribute,
   toIsoDateBound,
-  getSelectedProviderTotal,
   PAYMENT_TYPES,
   SOUND_KEY,
-  LOG_PROVIDER_FILTERS,
   maskCard,
 } from "./components/utils";
 import type { PendingNotif } from "./components/utils";
 import { TodayTotal } from "./components/TodayTotal";
-import { LogEntry } from "./components/LogEntry";
+import { CashierLogPanel } from "./components/CashierLogPanel";
 import { CargoRow } from "./components/CargoRow";
 import { ClientProfileDrawer } from "./components/ClientProfileDrawer";
 import { ConfirmModal } from "./components/ConfirmModal";
@@ -93,10 +91,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
   const [isDark, setIsDark] = useState<boolean>(() => {
-    // Initialise from localStorage; fall back to the current <html> class
+    // Default to light mode; only dark if explicitly saved in localStorage
     const saved = localStorage.getItem("pos_theme");
     if (saved) return saved === "dark";
-    return document.documentElement.classList.contains("dark");
+    return false;
   });
 
   const toggleDark = useCallback(() => {
@@ -107,6 +105,22 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       return next;
     });
   }, []);
+
+  // ── Payment notifications (PostgreSQL-backed) ─────────────────────────────
+  const {
+    notifications: paymentNotifications,
+    total: paymentTotal,
+    page: paymentPage,
+    perPage: paymentPerPage,
+    unreadCount: paymentUnreadCount,
+    filters: paymentFilters,
+    setPage: setPaymentPage,
+    setFilters: setPaymentFilters,
+    resetFilters: resetPaymentFilters,
+    markAllRead: markPaymentNotificationsRead,
+    readIds: paymentReadIds,
+    isLoading: paymentLoading,
+  } = usePaymentNotifications();
 
   // ── Permissions ───────────────────────────────────────────────────────────
   // State (not memo) so the UI re-renders automatically after a silent token refresh.
@@ -306,12 +320,6 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     }),
     [logDateFrom, logDateTo, logProvider],
   );
-  const hasLogFilters = Boolean(
-    cashierLogParams.date_from ||
-      cashierLogParams.date_to ||
-      cashierLogParams.payment_provider,
-  );
-
   // ── Queries ───────────────────────────────────────────────────────────────
   const {
     data: logData,
@@ -482,10 +490,6 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   // calls the latest version of handleSearch (avoids stale closure over searchInput).
   handleSearchRef.current = handleSearch;
 
-  const handleLogEntryClick = useCallback(
-    (code: string) => handleSearch(code),
-    [handleSearch],
-  );
   const handleRecentChipClick = useCallback(
     (code: string) => handleSearch(code),
     [handleSearch],
@@ -605,21 +609,31 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-6">
-        {/* Dashboard header with theme toggle */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-6 bg-[#f5f3ef] dark:bg-[#0c0c0c] min-h-screen">
+        {/* Dashboard header */}
         <div className="flex items-center justify-between py-3 mb-1">
-          <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-            POS Kassa
-          </span>
+          <div className="flex items-center gap-2">
+            {/* Back button */}
+            <button
+              onClick={() => onNavigate("verification-search")}
+              title="Orqaga"
+              className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/[0.06] transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+              POS Kassa
+            </span>
+          </div>
           <div className="flex items-center gap-1">
-            {/* Dismiss all active notifications */}
+            {/* Dismiss all active warehouse notifications */}
             {notifCount > 0 && (
               <button
                 onClick={handleDismissAllNotifs}
                 title="Barcha bildirishnomalarni yopish"
                 className="relative p-2 rounded-xl text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/[0.08] transition-colors"
               >
-                <BellRing className="w-4 h-4" />
+                <Zap className="w-4 h-4" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               </button>
             )}
@@ -640,11 +654,28 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
               className="p-2 rounded-xl text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/[0.08] transition-colors"
             >
               {soundEnabled ? (
-                <Bell className="w-4 h-4" />
+                <Volume2 className="w-4 h-4" />
               ) : (
-                <BellOff className="w-4 h-4" />
+                <VolumeX className="w-4 h-4" />
               )}
             </button>
+
+            {/* Payment notifications */}
+            <PaymentNotificationDrawer
+              notifications={paymentNotifications}
+              total={paymentTotal}
+              page={paymentPage}
+              perPage={paymentPerPage}
+              unreadCount={paymentUnreadCount}
+              filters={paymentFilters}
+              setPage={setPaymentPage}
+              setFilters={setPaymentFilters}
+              resetFilters={resetPaymentFilters}
+              markAllRead={markPaymentNotificationsRead}
+              readIds={paymentReadIds}
+              onClientClick={handleSearch}
+              isLoading={paymentLoading}
+            />
 
             <button
               onClick={() => {onNavigate("admin-profile")}}
@@ -681,121 +712,22 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                   total={logData?.today_total ?? 0}
                   loading={logLoading}
                 />
-                <div className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-white/[0.05]">
-                    <div className="flex items-center gap-2">
-                      <ReceiptText className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                        So'nggi to'lovlar
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => refetchLog()}
-                      className="p-1 rounded-lg text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/[0.08] transition-colors"
-                      title="Yangilash"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="px-4 py-3 border-b border-gray-50 dark:border-white/[0.05] space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                          Filter
-                        </span>
-                      </div>
-                      {hasLogFilters && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLogDateFrom("");
-                            setLogDateTo("");
-                            setLogProvider("all");
-                          }}
-                          className="text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors"
-                        >
-                          Tozalash
-                        </button>
-                      )}
-                    </div>
-                    <select
-                      value={logProvider}
-                      onChange={(event) =>
-                        setLogProvider(event.target.value as CashierLogProvider | "all")
-                      }
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
-                    >
-                      {LOG_PROVIDER_FILTERS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="date"
-                        value={logDateFrom}
-                        max={logDateTo || undefined}
-                        onChange={(event) => setLogDateFrom(event.target.value)}
-                        className="min-w-0 px-2.5 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[11px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
-                      />
-                      <input
-                        type="date"
-                        value={logDateTo}
-                        min={logDateFrom || undefined}
-                        onChange={(event) => setLogDateTo(event.target.value)}
-                        className="min-w-0 px-2.5 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[11px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
-                      />
-                    </div>
-                    {logData?.summary && (
-                      <div className="flex items-center justify-between text-[11px] pt-1">
-                        <span className="text-gray-400 dark:text-gray-500">
-                          Filter jami
-                        </span>
-                        <span className="font-black text-gray-700 dark:text-gray-200">
-                          {formatCurrencySum(
-                            getSelectedProviderTotal(logData.summary, logProvider),
-                          )}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="px-4 py-1 max-h-[50vh] lg:max-h-[65vh] overflow-y-auto overscroll-contain">
-                    {logLoading ? (
-                      <div className="space-y-3 py-3">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div
-                            key={i}
-                            className="h-10 bg-gray-50 dark:bg-white/[0.04] rounded-lg animate-pulse"
-                          />
-                        ))}
-                      </div>
-                    ) : logData && logData.items.length > 0 ? (
-                      logData.items.map((item) => (
-                        <LogEntry
-                          key={item.id}
-                          item={item}
-                          onSelect={handleLogEntryClick}
-                          currentAdminId={jwtClaims.admin_id}
-                        />
-                      ))
-                    ) : (
-                      <div className="py-8 text-center">
-                        <ReceiptText
-                          className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600"
-                          strokeWidth={1.5}
-                        />
-                        <p className="text-[12px] text-gray-400">
-                          Bugun hali to'lov yo'q
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <CashierLogPanel
+                  logData={logData}
+                  logLoading={logLoading}
+                  onRefresh={() => refetchLog()}
+                  onEntryClick={(code) => handleSearch(code)}
+                  currentAdminId={jwtClaims.admin_id}
+                  logDateFrom={logDateFrom}
+                  setLogDateFrom={setLogDateFrom}
+                  logDateTo={logDateTo}
+                  setLogDateTo={setLogDateTo}
+                  logProvider={logProvider}
+                  setLogProvider={setLogProvider}
+                />
               </>
             ) : (
-              <div className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[160px]">
+              <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[160px]">
                 <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
                   <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
                 </div>
@@ -809,7 +741,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
           {/* ── Right column: Search & Payment ────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-3">
             {/* Search bar */}
-            <div className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-3">
+            <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-3">
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -896,7 +828,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   onClick={() => setShowProfile(true)}
-                  className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-4 cursor-pointer hover:border-orange-200/80 dark:hover:border-orange-500/20 transition-colors"
+                  className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-4 cursor-pointer hover:border-orange-200/80 dark:hover:border-orange-500/20 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -953,7 +885,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center"
+                  className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center"
                 >
                   <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
                     <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
@@ -971,9 +903,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden"
+                  className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-white/[0.05] sticky top-0 bg-white dark:bg-[#111] z-10">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-white/[0.05] sticky top-0 bg-white dark:bg-[#161616] z-10">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <div
                         onClick={toggleAll}
@@ -1074,7 +1006,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                   transition={{ type: "spring", stiffness: 300, damping: 28 }}
                   className="sticky bottom-4 z-30"
                 >
-                  <div className="bg-white/95 dark:bg-[#111]/95 backdrop-blur-xl rounded-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-2xl shadow-black/10 dark:shadow-black/40 p-4 space-y-3">
+                  <div className="bg-white/95 dark:bg-[#161616]/95 backdrop-blur-xl rounded-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-2xl shadow-black/10 dark:shadow-black/40 p-4 space-y-3">
                     {/* Payment type pills */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider shrink-0">
