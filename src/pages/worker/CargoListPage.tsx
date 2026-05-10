@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   ArrowLeft, Plus, Package, Trash2, Edit2, Search, X,
   ChevronLeft, ChevronRight, CheckCircle, Clock, SlidersHorizontal,
-  ArrowUpDown, ImageIcon, Download, RefreshCw, AlertTriangle, Lock, LogOut
+  ArrowUpDown, ImageIcon, Download, RefreshCw, AlertTriangle, Lock, LogOut, Send
 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -325,10 +325,11 @@ interface CargoListPageProps {
   flightName: string;
   onBack: () => void;
   onAddCargo: () => void;
+  onNavigateToNotifications?: () => void;
   onLogout?: () => void;
 }
 
-export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout }: CargoListPageProps) {
+export default function CargoListPage({ flightName, onBack, onAddCargo, onNavigateToNotifications, onLogout }: CargoListPageProps) {
   const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
   const hasPerm = (slug: string) => jwtClaims.isSuperAdmin || jwtClaims.permissions.has(slug);
   const canView   = hasPerm('flights:read');
@@ -385,10 +386,12 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
     } else {
       setIsFetching(true);
     }
+    // Map UI filter to server-side is_sent param
+    const isSentParam = filterStatus === 'all' ? undefined : filterStatus === 'sent';
     try {
       const [flightData, photosData] = await Promise.all([
         getFlightByName(flightName),
-        getFlightPhotos(flightName, currentPage, 50, debouncedSearchTerm || undefined),
+        getFlightPhotos(flightName, currentPage, 50, debouncedSearchTerm || undefined, isSentParam),
       ]);
       setStatistics({sent_count: photosData.sent_count, unsent_count: photosData.unsent_count});
       setFlight(flightData);
@@ -404,12 +407,12 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
       setIsFetching(false);
       isFirstLoad.current = false;
     }
-  }, [flightName, currentPage, debouncedSearchTerm, toast]);
+  }, [flightName, currentPage, debouncedSearchTerm, filterStatus, toast]);
 
-  // Reset to first page when search query changes
+  // Reset to first page when search query or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm]);
+  }, [debouncedSearchTerm, filterStatus]);
 
   useEffect(() => {
     loadData();
@@ -437,15 +440,13 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
     if (remainingItems.length > 0) toast({ title: `⚠️ ${remainingItems.length} ta yuk yuklanmadi`, description: "Internetni tekshirib qayta urinib ko'ring", variant: 'warning' });
   };
 
-  // Search is now server-side; only apply client-side status filter and sort
+  // Both search and is_sent filter are server-side; only sort client-side
   const filteredPhotos = useMemo(() => {
-    return photos
-      .filter(item => filterStatus === 'all' ? true : filterStatus === 'sent' ? item.is_sent : !item.is_sent)
-      .sort((a, b) => {
-        const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        return sortOrder === 'newest' ? diff : -diff;
-      });
-  }, [photos, filterStatus, sortOrder]);
+    return photos.slice().sort((a, b) => {
+      const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return sortOrder === 'newest' ? diff : -diff;
+    });
+  }, [photos, sortOrder]);
 
   // All hooks called — safe to guard now
   if (!canView) return <AccessDenied />;
@@ -600,6 +601,12 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onLogout
                     : <Download className="w-3.5 h-3.5" />}
                   {isExporting ? 'Yuklanmoqda...' : 'Excel'}
                 </button>
+                {onNavigateToNotifications && (hasPerm('flights:update') || jwtClaims.isSuperAdmin) && (
+                  <button onClick={onNavigateToNotifications}
+                    className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/15 border border-blue-200/60 dark:border-blue-500/20 active:scale-[0.98] rounded-xl transition-all">
+                    <Send className="w-3.5 h-3.5" />Bildirishnoma
+                  </button>
+                )}
                 {canCreate && (
                   <button onClick={onAddCargo}
                     className="flex items-center gap-1.5 h-9 px-4 text-[12px] font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:scale-[0.98] rounded-xl shadow-md shadow-orange-500/25 transition-all border-0">

@@ -39,6 +39,7 @@ const WarehousePage = lazy(() => import("./pages/admin/WarehousePage"));
 const ExpectedCargoPage = lazy(() => import("./pages/admin/ExpectedCargoPage"));
 const PickupQueueTVPage = lazy(() => import("./pages/shared/PickupQueueTVPage"));
 const AdminDeliveryRequestPage = lazy(() => import("./pages/admin/AdminDeliveryRequestPage"));
+const FlightNotificationPage = lazy(() => import("./pages/admin/FlightNotificationPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,8 @@ type Page =
   | "expected-cargo"
   | "flight-schedule-admin"
   | "pickup-tv"
-  | "admin-delivery-request";
+  | "admin-delivery-request"
+  | "admin-flight-notifications";
 
 interface RouteInfo {
   page: Page;
@@ -86,7 +88,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   },
   worker: {
     default: "flights",
-    allowed: ["flights", "cargo-list", "cargo-add", "passkey-page", "expected-cargo"],
+    allowed: ["flights", "cargo-list", "cargo-add", "passkey-page", "expected-cargo", "admin-flight-notifications"],
   },
   accountant: {
     default: "pos-dashboard",
@@ -123,6 +125,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "manager-page",
       "pickup-tv",
       "admin-delivery-request",
+      "admin-flight-notifications",
     ],
   },
   "super-admin": {
@@ -152,6 +155,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "flight-schedule-admin",
       "pickup-tv",
       "admin-delivery-request",
+      "admin-flight-notifications",
     ],
   },
   manager: {
@@ -167,7 +171,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   },
   warehouse: {
     default: "warehouse-page",
-    allowed: ["warehouse-page", "expected-cargo", "admin-profile", "passkey-page"],
+    allowed: ["warehouse-page", "expected-cargo", "admin-profile", "passkey-page", "admin-flight-notifications"],
   },
 };
 
@@ -264,6 +268,8 @@ function getPathForPage(
   if (page === "flight-schedule-admin") return "/admin/flight-schedule";
   if (page === "admin-delivery-request") return "/admin/delivery-request";
   if (page === "pickup-tv") return "/pickup-tv";
+  if (page === "admin-flight-notifications" && flightName)
+    return `/flights/${encodeURIComponent(flightName)}/notifications`;
   return "/auth/login";
 }
 
@@ -291,6 +297,8 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
     return { page: "client-edit", clientId: clientEditId };
   if (path === "/flights") return { page: "flights" };
   if (path === "/statistics") return { page: "statistics" };
+  if (flightName && path.includes("/notifications"))
+    return { page: "admin-flight-notifications", flightName };
   if (flightName && path.includes("/photos/add"))
     return { page: "cargo-add", flightName };
   if (flightName && path.includes("/photos"))
@@ -793,7 +801,17 @@ function AppContent() {
               flightName={selectedFlightName}
               onBack={() => navigateToPage("flights")}
               onAddCargo={() => navigateToPage("cargo-add", selectedFlightName)}
+              onNavigateToNotifications={() =>
+                navigateToPage("admin-flight-notifications", selectedFlightName)
+              }
               onLogout={handleLogout}
+            />
+          )}
+
+          {currentPage === "admin-flight-notifications" && selectedFlightName && (
+            <FlightNotificationPage
+              flightName={selectedFlightName}
+              onBack={() => navigateToPage("cargo-list", selectedFlightName)}
             />
           )}
 

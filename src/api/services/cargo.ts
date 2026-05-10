@@ -107,10 +107,14 @@ export const getFlightPhotos = async (
   page: number = 1,
   size: number = 50,
   search?: string,
+  isSent?: boolean,
 ): Promise<FlightPhotosResponse> => {
-  const params: Record<string, string | number> = { page, size };
+  const params: Record<string, string | number | boolean> = { page, size };
   if (search && search.trim() !== '') {
     params.search = search.trim();
+  }
+  if (isSent !== undefined) {
+    params.is_sent = isSent;
   }
   const response = await apiClient.get<FlightPhotosResponse>(
     `/api/v1/flights/${flightName}/photos`,
