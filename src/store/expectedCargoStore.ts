@@ -32,6 +32,13 @@ export interface FastEntryQueueItem {
   isContinuation: boolean;
   /** How many prior queue items share this same clientCode at the time of scan. */
   priorCountForClient: number;
+  /**
+   * True when the track code was found in DB but belongs to a different client
+   * than the one the admin explicitly entered (client-first entry mode).
+   */
+  isWrongClient: boolean;
+  /** The actual owning client code when isWrongClient is true. */
+  conflictClientCode: string | null;
 }
 
 // ── Notification History ───────────────────────────────────────────────────────
@@ -81,7 +88,10 @@ interface ExpectedCargoState {
   syncFlightTabOrder: (apiFlightNames: string[]) => void;
   setFlightTabOrder: (orderedNames: string[]) => void;
 
-  enqueueEntry: (item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentFlight'>) => void;
+  enqueueEntry: (
+    item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentFlight' | 'isWrongClient' | 'conflictClientCode'> &
+      Partial<Pick<FastEntryQueueItem, 'isWrongClient' | 'conflictClientCode'>>,
+  ) => void;
   resolveQueueItemClient: (
     trackCode: string,
     clientCode: string,
@@ -157,7 +167,17 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
         const id = crypto.randomUUID();
         set((state) => ({
           entryQueue: [
-            { ...item, id, isContinuation: false, priorCountForClient: 0, notFound: false, isAlreadySent: false, alreadySentFlight: null },
+            {
+              ...item,
+              id,
+              isContinuation: false,
+              priorCountForClient: 0,
+              notFound: false,
+              isAlreadySent: false,
+              alreadySentFlight: null,
+              isWrongClient: item.isWrongClient ?? false,
+              conflictClientCode: item.conflictClientCode ?? null,
+            },
             ...state.entryQueue,
           ],
         }));
