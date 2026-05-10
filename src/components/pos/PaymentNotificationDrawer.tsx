@@ -903,7 +903,7 @@ export function PaymentNotificationDrawer({
           </Button>
         </DrawerTrigger>
 
-        <DrawerContent aria-describedby={undefined} className="w-full sm:max-w-lg h-full flex flex-col right-0 top-0 bottom-0 left-auto rounded-none sm:rounded-l-xl">
+        <DrawerContent aria-describedby={undefined} className="w-full sm:max-w-lg h-full flex flex-col right-0 top-0 bottom-0 left-auto rounded-none sm:rounded-l-xl !h-[100dvh] !max-h-[100dvh]">
           {/* Header */}
           <DrawerHeader className="border-b border-gray-100 dark:border-white/[0.06] pb-3 shrink-0">
             <div className="flex items-center justify-between gap-3">
