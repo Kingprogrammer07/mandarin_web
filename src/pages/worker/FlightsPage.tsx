@@ -82,7 +82,7 @@ export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: Fl
           ? getFlightList().then(res => setExpectedFlights(res.items)).catch(() => {})
           : Promise.resolve(),
       ]);
-      const ordered = flightData.flights;
+      const ordered = flightData.flights.reverse();
       setFlights(ordered);
       const counts: Record<string, number> = {};
       await Promise.all(

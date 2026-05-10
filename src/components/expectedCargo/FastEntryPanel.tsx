@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   resolveClientByTrackCode,
   type AlreadySentErrorBody,
+  type ResolvedClientResponse,
 } from '@/api/services/expectedCargo';
 import { isAxiosError } from 'axios';
 import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expectedCargoStore';
@@ -316,6 +317,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
+  const [suggestion, setSuggestion] = useState<ResolvedClientResponse | null>(null);
 
   // ── Client-first mode: textarea + validation map ─────────────────────────
   const [trackCodesText, setTrackCodesText] = useState('');
@@ -901,6 +903,14 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                 autoComplete="off" autoCorrect="off" spellCheck={false}
               />
             </div>
+
+            {suggestion && (
+              <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md px-2.5 py-1.5">
+                <CheckCircle2 className="size-3 flex-shrink-0" />
+                <span className="font-semibold">{suggestion.client_code}</span>
+                {suggestion.full_name && <span className="truncate text-green-600/80 dark:text-green-500/80">· {suggestion.full_name}</span>}
+              </div>
+            )}
 
             {/* Track codes textarea */}
             <div className="relative">
