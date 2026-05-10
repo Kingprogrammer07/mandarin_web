@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
   resolveClientByTrackCode,
-  type ResolvedClientResponse,
   type AlreadySentErrorBody,
 } from '@/api/services/expectedCargo';
 import { isAxiosError } from 'axios';
@@ -317,9 +316,6 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
-
-  // ── Auto-fill mode: single suggestion state ──────────────────────────────
-  const [suggestion, setSuggestion] = useState<ResolvedClientResponse | null>(null);
 
   // ── Client-first mode: textarea + validation map ─────────────────────────
   const [trackCodesText, setTrackCodesText] = useState('');

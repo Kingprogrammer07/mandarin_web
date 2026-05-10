@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  ArrowLeft, RefreshCw, Send, Plus, CheckCircle, Clock,
+  ArrowLeft, RefreshCw, Send, Plus, Clock,
   AlertCircle, Loader2, X, Search, Filter, ChevronLeft, ChevronRight, Download, Bot, Globe,
 } from 'lucide-react';
 import {
@@ -530,7 +530,6 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
     );
   }
 
-  const sentCount = summary?.sent_count ?? 0;
   const pendingCount = summary?.pending_count ?? 0;
   const totalCount = summary?.total_clients ?? 0;
   const botSentCount = summary?.bot_sent_count ?? 0;

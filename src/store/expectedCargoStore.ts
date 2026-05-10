@@ -90,7 +90,7 @@ interface ExpectedCargoState {
 
   enqueueEntry: (
     item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentFlight' | 'isWrongClient' | 'conflictClientCode'> &
-      Partial<Pick<FastEntryQueueItem, 'isWrongClient' | 'conflictClientCode'>>,
+      Partial<Pick<FastEntryQueueItem, 'isWrongClient' | 'conflictClientCode' | 'isAlreadySent' | 'alreadySentFlight' | 'notFound'>>,
   ) => void;
   resolveQueueItemClient: (
     trackCode: string,
@@ -172,9 +172,9 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
               id,
               isContinuation: false,
               priorCountForClient: 0,
-              notFound: false,
-              isAlreadySent: false,
-              alreadySentFlight: null,
+              notFound: item.notFound ?? false,
+              isAlreadySent: item.isAlreadySent ?? false,
+              alreadySentFlight: item.alreadySentFlight ?? null,
               isWrongClient: item.isWrongClient ?? false,
               conflictClientCode: item.conflictClientCode ?? null,
             },
