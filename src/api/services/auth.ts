@@ -1,6 +1,26 @@
 import { apiClient, apiClientFormData } from '@/api/client';
 import { API_LOGIN_URL, API_REGISTER_URL, API_INIT_DATA_URL } from '@/config/config';
 
+// Retries fn up to maxAttempts times on transient network failures (ERR_NETWORK / timeout).
+// Each retry waits baseDelayMs * attempt ms. All other errors propagate immediately.
+async function withNetworkRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts: number = 3,
+  baseDelayMs: number = 800,
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      const e = error as Record<string, unknown>;
+      const isRetryable = e?.isNetworkError === true || e?.isTimeout === true;
+      if (!isRetryable || attempt === maxAttempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, baseDelayMs * attempt));
+    }
+  }
+  throw new Error('unreachable');
+}
+
 // Type definitions
 export interface LoginRequest {
   client_code: string;
@@ -91,7 +111,6 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
  * Yangi client ro'yxatdan o'tkazish
  */
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
-  // FormData yaratish
   const formData = new FormData();
 
   formData.append('full_name', data.full_name);
@@ -104,16 +123,14 @@ export async function register(data: RegisterRequest): Promise<RegisterResponse>
   formData.append('date_of_birth', data.date_of_birth);
   formData.append('telegram_id', data.telegram_id.toString());
 
-  // Rasmlarni qo'shish
   data.passport_images.forEach((file) => {
     formData.append('passport_images', file);
   });
 
-  const response = await apiClientFormData.post<RegisterResponse>(
-    API_REGISTER_URL,
-    formData
+  return withNetworkRetry(
+    () => apiClientFormData.post<RegisterResponse>(API_REGISTER_URL, formData).then(r => r.data),
+    2,
   );
-  return response.data;
 }
 
 /**
@@ -122,11 +139,9 @@ export async function register(data: RegisterRequest): Promise<RegisterResponse>
 export async function validateInitData(
   data: ValidateInitDataRequest
 ): Promise<ValidateInitDataResponse> {
-  const response = await apiClient.post<ValidateInitDataResponse>(
-    API_INIT_DATA_URL,
-    data
+  return withNetworkRetry(
+    () => apiClient.post<ValidateInitDataResponse>(API_INIT_DATA_URL, data).then(r => r.data),
   );
-  return response.data;
 }
 
 /**

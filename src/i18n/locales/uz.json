@@ -882,6 +882,10 @@
         "notFound": "Ma'lumot topilmadi",
         "searchResult": "Qidiruv Natijasi",
         "cargoReport": "Yuk hisoboti",
+        "statusNew": "Yangi",
+        "statusPartial": "Qisman",
+        "statusPaid": "To'langan",
+        "statusTakenAway": "Olib ketilgan",
         "unknownDate": "Noma'lum",
         "status": {
             "paid": "To'langan",

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AlertCircle, Package } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { AlertCircle, Package, WifiOff, RefreshCw } from 'lucide-react';
 import { getTelegramWebAppData, validateInitData, telegramAutoLogin } from '@/api/services/auth';
 import { TopProgressBar } from '@/components/ui/TopProgressBar';
 
@@ -107,6 +107,51 @@ function ErrorScreen() {
   );
 }
 
+/* ─────────────── NETWORK ERROR SCREEN ─────────────── */
+function NetworkErrorScreen({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a] px-4">
+      <style>{STYLES}</style>
+
+      <div className="fade-in-up w-full max-w-sm bg-white dark:bg-[#111111] rounded-3xl border border-gray-100 dark:border-white/[0.08] shadow-xl dark:shadow-black/40 overflow-hidden">
+
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-orange-500" />
+
+        <div className="p-8 text-center">
+
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 mb-6">
+            <WifiOff className="w-8 h-8 text-amber-500" />
+          </div>
+
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+            Ulanish xatosi
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-7">
+            Serverga ulanib bo'lmadi. Internet aloqangizni tekshirib, qayta urinib ko'ring.
+          </p>
+
+          <button
+            onClick={onRetry}
+            disabled={retrying}
+            className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold text-sm transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
+            {retrying ? 'Ulanmoqda...' : 'Qayta urinish'}
+          </button>
+
+        </div>
+      </div>
+
+      <p
+        className="fade-in-up mt-5 text-xs text-gray-300 dark:text-white/20 tracking-widest uppercase font-medium"
+        style={{ animationDelay: '0.3s' }}
+      >
+        Mandarin Cargo System
+      </p>
+    </div>
+  );
+}
+
 /* ─────────────── MAIN GUARD ─────────────── */
 export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardProps) {
   const isBrowserRoute =
@@ -118,59 +163,74 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
 
   const [isValidating, setIsValidating] = useState(!isBrowserRoute);
   const [isValid, setIsValid] = useState(isBrowserRoute);
+  const [isNetworkFailure, setIsNetworkFailure] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
-  useEffect(() => {
-    if (isBrowserRoute) {
-      return;
-    }
+  const checkTelegramWebApp = useCallback(async () => {
+    if (isBrowserRoute) return;
 
-    const checkTelegramWebApp = async () => {
-      try {
-        const telegramData = getTelegramWebAppData();
-        const validateResponse = await validateInitData({
-          init_data: telegramData?.initData || '',
-        });
+    try {
+      const telegramData = getTelegramWebAppData();
+      const validateResponse = await validateInitData({
+        init_data: telegramData?.initData || '',
+      });
 
-        if (!telegramData || !telegramData.user || !validateResponse.valid) {
-          setIsValid(false);
-          setIsValidating(false);
-          return;
-        }
-
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.ready();
-          window.Telegram.WebApp.expand();
-        }
-
-        // Attempt auto-login if no token exists in either storage
-        if (!sessionStorage.getItem('access_token') && !localStorage.getItem('access_token')) {
-          try {
-            const loginResponse = await telegramAutoLogin(telegramData.initData);
-            if (loginResponse && loginResponse.access_token) {
-              sessionStorage.setItem('access_token', loginResponse.access_token);
-            }
-          } catch {
-            // Auto-login failed (e.g., user not registered -> 404, or pending -> 403).
-            // We DO NOT fail the Telegram validation. We just let them proceed as an unauthenticated guest.
-            console.log('Auto-login info: User not registered or pending approval.');
-          }
-        }
-
-        setIsValid(true);
-        setIsValidating(false);
-      } catch (error) {
-        console.error('Telegram WebApp validation error:', error);
+      if (!telegramData || !telegramData.user || !validateResponse.valid) {
         setIsValid(false);
+        setIsNetworkFailure(false);
         setIsValidating(false);
+        return;
       }
-    };
 
-    // Artificial 500ms delay disabled: it made every Telegram launch wait even
-    // when initData validation could start immediately.
-    void checkTelegramWebApp();
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      }
+
+      // Attempt auto-login if no token exists in either storage
+      if (!sessionStorage.getItem('access_token') && !localStorage.getItem('access_token')) {
+        try {
+          const loginResponse = await telegramAutoLogin(telegramData.initData);
+          if (loginResponse && loginResponse.access_token) {
+            sessionStorage.setItem('access_token', loginResponse.access_token);
+          }
+        } catch {
+          // Auto-login failed (e.g., user not registered -> 404, or pending -> 403).
+          // We DO NOT fail the Telegram validation. We just let them proceed as an unauthenticated guest.
+          console.log('Auto-login info: User not registered or pending approval.');
+        }
+      }
+
+      setIsValid(true);
+      setIsNetworkFailure(false);
+      setIsValidating(false);
+    } catch (error) {
+      const e = error as Record<string, unknown>;
+      const isTransient = e?.isNetworkError === true || e?.isTimeout === true;
+      if (isTransient) {
+        // Telegram cold-start / proxy issue — show retry screen, not "access denied"
+        setIsNetworkFailure(true);
+      } else {
+        setIsValid(false);
+      }
+      setIsValidating(false);
+      setRetrying(false);
+    }
   }, [isBrowserRoute]);
 
+  useEffect(() => {
+    void checkTelegramWebApp();
+  }, [checkTelegramWebApp]);
+
+  const handleRetry = useCallback(() => {
+    setRetrying(true);
+    setIsNetworkFailure(false);
+    setIsValidating(true);
+    void checkTelegramWebApp();
+  }, [checkTelegramWebApp]);
+
   if (isValidating) return <LoadingScreen />;
-  if (!isValid)     return <ErrorScreen />;
+  if (isNetworkFailure) return <NetworkErrorScreen onRetry={handleRetry} retrying={retrying} />;
+  if (!isValid) return <ErrorScreen />;
   return <>{children}</>;
 }

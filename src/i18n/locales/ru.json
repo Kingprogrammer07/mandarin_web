@@ -882,6 +882,10 @@
         "notFound": "Данные не найдены",
         "searchResult": "Результат поиска",
         "cargoReport": "Отчет о грузе",
+        "statusNew": "Новый",
+        "statusPartial": "Частично",
+        "statusPaid": "Оплачено",
+        "statusTakenAway": "Забрано",
         "unknownDate": "Неизвестно",
         "status": {
             "paid": "Оплачено",

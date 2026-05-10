@@ -153,18 +153,27 @@ apiClient.interceptors.response.use(
         message = "Serverga ulanishda xatolik. Iltimos, qayta urinib ko'ring.";
       }
 
-      logFrontendError('network', message, {
-        endpoint: error.config?.url ?? window.location.href,
-        additional_data: {
-          code: error.code,
-          isTimeout,
-          isNetworkError,
-          isCertError,
-          isConnRefused,
-          isNameNotResolved,
-          method: error.config?.method?.toUpperCase(),
-        },
-      }).catch(() => {});
+      // Telegram cold-start and auto-login endpoints always fail transiently on
+      // Android WebView warm-up — no actionable server signal, suppress monitoring.
+      const endpoint = error.config?.url ?? '';
+      const isSilentEndpoint =
+        endpoint.includes('/auth/validate-init-data') ||
+        endpoint.includes('/auth/telegram-login');
+
+      if (!isSilentEndpoint) {
+        logFrontendError('network', message, {
+          endpoint: error.config?.url ?? window.location.href,
+          additional_data: {
+            code: error.code,
+            isTimeout,
+            isNetworkError,
+            isCertError,
+            isConnRefused,
+            isNameNotResolved,
+            method: error.config?.method?.toUpperCase(),
+          },
+        }).catch(() => {});
+      }
 
       return Promise.reject({
         message,
@@ -289,18 +298,24 @@ apiClientFormData.interceptors.response.use(
         message = "Serverga ulanishda xatolik. Iltimos, qayta urinib ko'ring.";
       }
 
-      logFrontendError('network', message, {
-        endpoint: url,
-        additional_data: {
-          code: error.code,
-          isTimeout,
-          isNetworkError,
-          isCertError,
-          isConnRefused,
-          isNameNotResolved,
-          method,
-        },
-      }).catch(() => {});
+      const isSilentEndpointFD =
+        url.includes('/auth/validate-init-data') ||
+        url.includes('/auth/telegram-login');
+
+      if (!isSilentEndpointFD) {
+        logFrontendError('network', message, {
+          endpoint: url,
+          additional_data: {
+            code: error.code,
+            isTimeout,
+            isNetworkError,
+            isCertError,
+            isConnRefused,
+            isNameNotResolved,
+            method,
+          },
+        }).catch(() => {});
+      }
 
       return Promise.reject({
         message,

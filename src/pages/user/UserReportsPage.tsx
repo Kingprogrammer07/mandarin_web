@@ -1,7 +1,7 @@
 import { useState, useCallback, memo, lazy, Suspense, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/hooks/useProfile';
-import { reportService, type ReportResponse } from '@/api/services/reportService';
+import { reportService, type ReportFlightSummary, type ReportResponse } from '@/api/services/reportService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { UniqueBackground } from '@/components/ui/UniqueBackground';
@@ -39,7 +39,7 @@ const PAGE_SIZE = 10;
 type ViewState = 'list' | 'detail';
 
 interface FlightCardProps {
-    flightName: string;
+    flight: ReportFlightSummary;
     onClick: () => void;
 }
 
@@ -140,17 +140,45 @@ interface ReportHistoryItemProps {
 
 // --- Components ---
 
-const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
+const FlightCard = memo(({ flight, onClick }: FlightCardProps) => {
     const { t } = useTranslation();
     const label = t('reports.cargoReport', 'Yuk hisoboti');
+    const statusConfig = {
+        new: {
+            label: t('reports.statusNew', 'Yangi'),
+            icon: Package,
+            className: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-300/25 dark:bg-orange-400/12 dark:text-orange-100',
+        },
+        partial: {
+            label: t('reports.statusPartial', 'Qisman'),
+            icon: Clock,
+            className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-300/25 dark:bg-amber-400/12 dark:text-amber-100',
+        },
+        paid: {
+            label: t('reports.statusPaid', "To'langan"),
+            icon: CheckCircle2,
+            className: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-300/25 dark:bg-emerald-400/12 dark:text-emerald-100',
+        },
+        taken_away: {
+            label: t('reports.statusTakenAway', 'Olib ketilgan'),
+            icon: CheckCircle2,
+            className: 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/12 dark:bg-white/[0.07] dark:text-slate-200',
+        },
+    } satisfies Record<ReportFlightSummary['payment_status'], {
+        label: string;
+        icon: typeof Package;
+        className: string;
+    }>;
+    const status = statusConfig[flight.payment_status];
+    const StatusIcon = status.icon;
 
     return (
         <motion.button
             type="button"
-            layoutId={`flight-${flightName}`}
+            layoutId={`flight-${flight.flight_name}`}
             onClick={onClick}
             whileTap={{ scale: 0.985 }}
-            aria-label={`${flightName} ${label}`}
+            aria-label={`${flight.flight_name} ${label} ${status.label}`}
             className="
                 w-full min-h-[84px] grid grid-cols-[48px_minmax(0,1fr)_28px] items-center gap-3
                 rounded-[19px] px-3 py-3 text-left select-none
@@ -158,6 +186,7 @@ const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
                 bg-[var(--flight-card-bg)] text-[var(--flight-card-text)]
                 border-[var(--flight-card-border)] shadow-[var(--flight-card-shadow)]
                 active:bg-[var(--flight-card-active-bg)] active:border-[var(--flight-card-active-border)]
+                dark:ring-1 dark:ring-white/[0.03] dark:active:ring-orange-300/20
                 [--flight-card-bg:#ffffff]
                 [--flight-card-text:#0f172a]
                 [--flight-card-border:#e2e8f0]
@@ -166,8 +195,8 @@ const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
                 [--flight-card-active-border:rgba(249,115,22,0.26)]
                 dark:[--flight-card-bg:linear-gradient(180deg,rgba(255,255,255,0.062),rgba(255,255,255,0.026)),radial-gradient(circle_at_0%_0%,rgba(255,138,31,0.10),transparent_36%),rgba(15,21,31,0.88)]
                 dark:[--flight-card-text:#f8fafc]
-                dark:[--flight-card-border:rgba(255,255,255,0.10)]
-                dark:[--flight-card-shadow:inset_0_1px_0_rgba(255,255,255,0.06)]
+                dark:[--flight-card-border:rgba(255,255,255,0.13)]
+                dark:[--flight-card-shadow:inset_0_1px_0_rgba(255,255,255,0.08),0_14px_30px_rgba(0,0,0,0.28)]
                 dark:[--flight-card-active-bg:linear-gradient(180deg,rgba(255,138,31,0.11),rgba(255,255,255,0.03)),rgba(18,25,36,0.94)]
                 dark:[--flight-card-active-border:rgba(253,186,116,0.30)]
             "
@@ -184,9 +213,13 @@ const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
             </span>
 
             <span className="min-w-0">
-                <span className="flex min-w-0 items-center">
+                <span className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-[17px] font-black leading-tight tracking-normal">
-                        {flightName}
+                        {flight.flight_name}
+                    </span>
+                    <span className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-extrabold leading-none ${status.className}`}>
+                        <StatusIcon className="h-3 w-3" />
+                        {status.label}
                     </span>
                 </span>
                 <span className="mt-1.5 block truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -195,8 +228,9 @@ const FlightCard = memo(({ flightName, onClick }: FlightCardProps) => {
             </span>
 
             <span className="
-                flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-400
-                dark:bg-white/[0.045] dark:text-orange-100/50
+                flex h-7 w-7 items-center justify-center rounded-full border bg-slate-50 text-slate-400
+                border-slate-200/70 dark:border-white/10 dark:bg-white/[0.07] dark:text-orange-100/70
+                dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
             ">
                 <ArrowRight className="h-4 w-4" />
             </span>
@@ -657,11 +691,11 @@ export default function UserReportsPage({ onBack, onNavigateToDelivery }: UserRe
                                 [1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full rounded-3xl bg-gray-200 dark:bg-white/5" />)
                             ) : flights.length > 0 ? (
                                 <>
-                                    {flights.map(flightName => (
+                                    {flights.map(flight => (
                                         <FlightCard
-                                            key={flightName}
-                                            flightName={flightName}
-                                            onClick={() => setSelectedFlight(flightName)}
+                                            key={flight.flight_name}
+                                            flight={flight}
+                                            onClick={() => setSelectedFlight(flight.flight_name)}
                                         />
                                     ))}
                                     {hasMoreFlights && (
