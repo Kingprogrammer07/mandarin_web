@@ -2,6 +2,32 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/config/config';
 import i18n from '@/i18n/config';
 import { logFrontendError, flushPendingErrors } from '@/api/services/frontendErrors';
+import { useMaintenanceStore } from '@/store/useMaintenanceStore';
+
+// Status codes that reliably mean the backend is down (gateway / proxy errors).
+const SERVER_DOWN_STATUSES = new Set([502, 503, 504]);
+
+function triggerMaintenanceIfServerDown(
+  status: number | undefined,
+  isNetworkDown: boolean,
+  endpointUrl: string,
+): void {
+  // Never trigger for silent auth-warmup endpoints — those fail transiently
+  // during Android WebView cold-start and would produce false positives.
+  const isSilent =
+    endpointUrl.includes('/auth/validate-init-data') ||
+    endpointUrl.includes('/auth/telegram-login');
+  if (isSilent) return;
+
+  // Gateway errors (502/503/504) = nginx is up but backend process is down.
+  // isNetworkDown = true when browser gets "Network Error" / ERR_CONNECTION_REFUSED
+  // meaning the server port is not accepting connections at all.
+  const isGatewayError = status !== undefined && SERVER_DOWN_STATUSES.has(status);
+
+  if (isGatewayError || isNetworkDown) {
+    useMaintenanceStore.getState().triggerMaintenance();
+  }
+}
 
 // ─── Uzbek error messages by HTTP status ─────────────────────────────────────
 // Auth/infra errors always return English from FastAPI/middleware, so we
@@ -97,6 +123,8 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      triggerMaintenanceIfServerDown(status, false, error.config?.url ?? '');
+
       const resolved = resolveErrorMessage(status, error.response.data?.detail);
       // Log API errors (4xx/5xx) to Telegram
       if (status >= 500) {
@@ -123,6 +151,14 @@ apiClient.interceptors.response.use(
       const isNameNotResolved = error.code === 'ERR_NAME_NOT_RESOLVED';
       const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
       const url = error.config?.url ?? 'unknown';
+
+      // Trigger maintenance when the backend port is unreachable (server down/restarting).
+      // Exclude cert/DNS errors — those are config issues, not temporary maintenance.
+      triggerMaintenanceIfServerDown(
+        undefined,
+        (isNetworkError || isConnRefused) && !isCertError && !isNameNotResolved,
+        url,
+      );
 
       // Debug ma'lumot — faqat browser console'da ko'rinadi
       console.error('[API Network Error]', {
@@ -246,6 +282,8 @@ apiClientFormData.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      triggerMaintenanceIfServerDown(status, false, error.config?.url ?? '');
+
       const resolved = resolveErrorMessage(status, error.response.data?.detail);
       if (status >= 500) {
         logFrontendError('api', resolved, {
@@ -269,6 +307,12 @@ apiClientFormData.interceptors.response.use(
       const isNameNotResolved = error.code === 'ERR_NAME_NOT_RESOLVED';
       const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
       const url = error.config?.url ?? 'unknown';
+
+      triggerMaintenanceIfServerDown(
+        undefined,
+        (isNetworkError || isConnRefused) && !isCertError && !isNameNotResolved,
+        url,
+      );
 
       console.error('[API Network Error]', {
         code: error.code,

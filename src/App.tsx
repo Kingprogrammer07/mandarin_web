@@ -12,6 +12,9 @@ import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
 import { TopProgressBar } from "./components/ui/TopProgressBar";
 import { Skeleton } from "./components/ui/skeleton";
+import MaintenancePage from "./components/MaintenancePage";
+import { useHealthCheck } from "./hooks/useHealthCheck";
+import { useMaintenanceStore } from "./store/useMaintenanceStore";
 
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
 const LoginForm = lazy(() => import("./components/LoginForm"));
@@ -333,6 +336,9 @@ function AppContent() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  const isMaintenanceMode = useMaintenanceStore((s) => s.isMaintenanceMode);
+  useHealthCheck();
+
   // ── Core routing ─────────────────────────────────────────────────────────
 
   /**
@@ -637,6 +643,7 @@ function AppContent() {
 
   return (
     <>
+    {isMaintenanceMode && <MaintenancePage />}
     {/* Fixed progress bar: shows during auth check, lazy-page transitions, and Suspense fallback */}
     {(isTransitioning || isCheckingAuth) && <TopProgressBar />}
     <div
