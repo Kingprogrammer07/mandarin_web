@@ -1,4 +1,4 @@
-import { useState, useCallback, useId, useMemo } from "react";
+import { useState, useCallback, useId, useMemo, useRef, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -107,9 +107,14 @@ export default function MarkTakenModal({
   const [previews, setPreviews] = useState<string[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
 
-  // Unique IDs so labels correctly bind to inputs even if multiple modals exist
-  const cameraInputId = useId();
+  // Unique ID for gallery input label binding
   const galleryInputId = useId();
+
+  // Back-camera overlay state
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const {
     control,
@@ -126,12 +131,34 @@ export default function MarkTakenModal({
   const watchedPhotos = watch("photos");
   const photos = useMemo(() => watchedPhotos ?? [], [watchedPhotos]);
 
-  const handleClose = useCallback(() => {
-    previews.forEach((url) => URL.revokeObjectURL(url));
-    setPreviews([]);
-    reset();
-    onClose();
-  }, [previews, reset, onClose]);
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setIsCameraOpen(false);
+  }, []);
+
+  // Release camera when modal unmounts or closes externally
+  useEffect(() => {
+    if (!isOpen) stopCamera();
+  }, [isOpen, stopCamera]);
+
+  const openBackCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: "environment" } },
+      });
+      streamRef.current = stream;
+      setIsCameraOpen(true);
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      });
+    } catch {
+      toast.error("Orqa kamera ochilmadi. Brauzer sozlamalarida kameraga ruxsat bering.");
+    }
+  }, []);
 
   const handleFileChange = useCallback(
     async (files: FileList | null) => {
@@ -140,8 +167,8 @@ export default function MarkTakenModal({
       try {
         const remaining = 10 - photos.length;
         const toProcess = Array.from(files).slice(0, remaining);
-        
-        // Dastur qotib qolmasligi va memory crash (OOM) bo'lmasligi uchun 
+
+        // Dastur qotib qolmasligi va memory crash (OOM) bo'lmasligi uchun
         // rasmlarni parallel emas, ketma-ket siqamiz (sequential processing)
         const compressed: File[] = [];
         for (const file of toProcess) {
@@ -158,6 +185,37 @@ export default function MarkTakenModal({
     },
     [photos, previews, setValue],
   );
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob((blob) => {
+      canvas.width = 0;
+      canvas.height = 0;
+      if (!blob) return;
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      stopCamera();
+      handleFileChange(dt.files);
+    }, "image/jpeg", 1.0);
+  }, [stopCamera, handleFileChange]);
+
+  const handleClose = useCallback(() => {
+    stopCamera();
+    previews.forEach((url) => URL.revokeObjectURL(url));
+    setPreviews([]);
+    reset();
+    onClose();
+  }, [stopCamera, previews, reset, onClose]);
 
   const removePhoto = useCallback(
     (index: number) => {
@@ -202,6 +260,7 @@ export default function MarkTakenModal({
   const hasDeliveryMethods = deliveryMethods.length > 0;
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -340,17 +399,18 @@ export default function MarkTakenModal({
                     )}
                   </div>
 
-                  {/* Camera + Gallery — using <label> for reliable mobile camera trigger */}
+                  {/* Camera + Gallery */}
                   {canAddMore && (
                     <div className="grid grid-cols-2 gap-2.5 mb-4">
-                      {/* Camera label — opens rear camera directly on mobile */}
-                      <label
-                        htmlFor={cameraInputId}
+                      {/* getUserMedia-based back camera — avoids WebView capture="environment" bug */}
+                      <button
+                        type="button"
+                        onClick={openBackCamera}
                         className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border-2 border-orange-200 dark:border-orange-500/25 bg-orange-50 dark:bg-orange-500/[0.06] text-orange-600 dark:text-orange-400 cursor-pointer active:scale-[0.97] transition-all select-none"
                       >
                         <Camera className="w-6 h-6" strokeWidth={1.8} />
                         <span className="text-[13px] font-bold">Kameradan</span>
-                      </label>
+                      </button>
 
                       {/* Gallery label — standard file picker */}
                       <label
@@ -361,25 +421,6 @@ export default function MarkTakenModal({
                         <span className="text-[13px] font-bold">Galereadan</span>
                       </label>
 
-                      {/*
-                       * Camera input: capture="environment" instructs the browser to
-                       * open the rear-facing camera directly — no file picker shown.
-                       * Using `image/*` (not specific mime types) for widest iOS support.
-                       */}
-                      <input
-                        id={cameraInputId}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="sr-only"
-                        onChange={(e) => {
-                          handleFileChange(e.target.files);
-                          // Reset input so the same photo can be retaken
-                          e.target.value = "";
-                        }}
-                      />
-
-                      {/* Gallery input: no capture attribute — shows full file picker */}
                       <input
                         id={galleryInputId}
                         type="file"
@@ -488,5 +529,43 @@ export default function MarkTakenModal({
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/* Back camera overlay — fullscreen, z above modal */}
+    {isCameraOpen && (
+      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          className="flex-1 w-full object-cover"
+        />
+        <canvas ref={canvasRef} className="hidden" />
+        <div
+          className="shrink-0 flex items-center justify-between px-8 py-6 bg-black"
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        >
+          <button
+            type="button"
+            onClick={stopCamera}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white active:scale-90 transition-transform"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Shutter button */}
+          <button
+            type="button"
+            onClick={capturePhoto}
+            className="w-18 h-18 rounded-full border-[5px] border-white bg-white/20 active:scale-90 transition-transform"
+            style={{ width: 72, height: 72 }}
+          />
+
+          {/* Spacer to balance layout */}
+          <div className="w-12 h-12" />
+        </div>
+      </div>
+    )}
+    </>
   );
 }
