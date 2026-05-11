@@ -102,30 +102,48 @@ function ReceiptPreview({ url, contentType, onClose }: { url: string; contentTyp
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+      className="absolute inset-0 z-[80] flex items-center justify-center bg-black/80 p-3 sm:p-4"
       onClick={onClose}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        aria-label="Chek oynasini yopish"
+        className="
+          absolute right-3 top-[calc(env(safe-area-inset-top)+12px)] z-[82]
+          flex h-11 w-11 items-center justify-center rounded-full
+          bg-white text-gray-700 shadow-2xl shadow-black/30
+          active:scale-95 dark:bg-[#111827] dark:text-white
+        "
+      >
+        <X className="h-5 w-5" />
+      </button>
+
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="relative max-w-2xl w-full max-h-[85vh] bg-white dark:bg-[#1a1a1a] rounded-2xl overflow-hidden shadow-2xl"
+        className="relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1a1a1a]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-3 pr-14 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
           <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Chek</span>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+            className="hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors sm:block"
           >
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-        <div className="p-4 overflow-auto max-h-[70vh] flex items-center justify-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-3 sm:p-4">
           {isPdf ? (
             <iframe
               src={url}
-              className="w-full h-[60vh] rounded-lg border border-gray-200 dark:border-white/[0.08]"
+              className="h-[76dvh] w-full rounded-lg border border-gray-200 dark:border-white/[0.08]"
               title="Receipt PDF"
             />
           ) : (
@@ -1006,29 +1024,29 @@ export function PaymentNotificationDrawer({
 
           {/* Pagination */}
           <Pagination page={page} perPage={perPage} total={total} onPageChange={setPage} />
+
+          {/* Receipt preview modal lives inside DrawerContent so Vaul's modal trap keeps it clickable. */}
+          <AnimatePresence>
+            {receiptPreview && (
+              <ReceiptPreview
+                url={receiptPreview.url}
+                contentType={receiptPreview.contentType}
+                onClose={() => setReceiptPreview(null)}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Receipt loading overlay */}
+          {isReceiptLoading && (
+            <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/40">
+              <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 shadow-xl flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Chek yuklanmoqda...</span>
+              </div>
+            </div>
+          )}
         </DrawerContent>
       </Drawer>
-
-      {/* Receipt preview modal */}
-      <AnimatePresence>
-        {receiptPreview && (
-          <ReceiptPreview
-            url={receiptPreview.url}
-            contentType={receiptPreview.contentType}
-            onClose={() => setReceiptPreview(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Receipt loading overlay */}
-      {isReceiptLoading && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 shadow-xl flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Chek yuklanmoqda...</span>
-          </div>
-        </div>
-      )}
     </>
   );
 }

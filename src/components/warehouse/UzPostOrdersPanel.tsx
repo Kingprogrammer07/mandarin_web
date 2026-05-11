@@ -30,6 +30,7 @@ const UZPOST_ORDER_STATUS_LABELS: Record<string, string> = {
   in_transit: "Yo'lda",
   in_delivery: "Yetkazilmoqda",
   delivered: "Yetkazildi",
+  issued_to_recipient: "Yetkazildi",
   returned: "Qaytarildi",
   cancelled: "Bekor qilindi",
   created: "Yaratildi",
@@ -64,7 +65,7 @@ function normalizeDateInput(value: string): string | undefined {
 function statusClassName(status: string | null): string {
   if (!status) return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300";
   if (status === "cancelled") return "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300";
-  if (status === "delivered") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
+  if (status === "delivered" || status === "issued_to_recipient") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
   if (status.includes("created") || status.includes("active") || status === "assigned") {
     return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
   }
