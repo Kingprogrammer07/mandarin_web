@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { AlertCircle, CheckCircle2, Image as ImageIcon, Loader2, RefreshCcw, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { compressImageFile } from '@/utils/imageCompression';
 
 interface ImageUploadProps {
   label: string;
@@ -12,137 +13,202 @@ interface ImageUploadProps {
   isLoading?: boolean;
 }
 
-const STYLES = `
-  @keyframes drag-bounce { 0%{transform:scale(1)} 50%{transform:scale(0.97)} 100%{transform:scale(1)} }
-  @keyframes upload-float {
-    0%,100% { transform: translateY(0); }
-    50%      { transform: translateY(-5px); }
-  }
-  .drag-active  { animation: drag-bounce .3s ease; }
-  .upload-icon  { animation: upload-float 2.5s ease-in-out infinite; }
-`;
+type UploadStatus = 'idle' | 'compressing' | 'ready' | 'error';
 
-export default function ImageUpload({ label, value, onChange, error, isLoading = false }: ImageUploadProps) {
+const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/heic', 'image/heif'];
+const allowedExtensions = ['jpeg', 'jpg', 'png', 'webp', 'heic', 'heif'];
+
+function isAllowedImage(file: File): boolean {
+  const fileExtension = file.name.split('.').pop()?.toLowerCase();
+  return allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension || '');
+}
+
+export default function ImageUpload({
+  label,
+  value,
+  onChange,
+  error,
+  isLoading = false,
+}: ImageUploadProps) {
   const { t } = useTranslation();
-  const [preview,    setPreview]    = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [status, setStatus] = useState<UploadStatus>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
-    if (typeof value === 'string') setPreview(value);
+    if (!value) {
+      setPreview(null);
+      setStatus('idle');
+      return undefined;
+    }
+
+    if (typeof value === 'string') {
+      setPreview(value);
+      setStatus('ready');
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(value);
+    setPreview(objectUrl);
+    setStatus('ready');
+
+    return () => URL.revokeObjectURL(objectUrl);
   }, [value]);
 
-  const handleFileChange = (file: File | null) => {
+  const resetFileInput = () => {
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileChange = async (file: File | null) => {
     if (!file) return;
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/heic", "image/heif"];
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    const allowedExtensions = ['jpeg', 'jpg', 'png', 'webp', 'heic', 'heif'];
-
-    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension || '')) {
+    if (!isAllowedImage(file)) {
       toast.error(t('form.messages.invalidFileType'));
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      resetFileInput();
+      setStatus('error');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
       toast.error(t('form.messages.fileTooLarge'));
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      resetFileInput();
+      setStatus('error');
       return;
     }
 
-    onChange(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    setStatus('compressing');
+
+    try {
+      const result = await compressImageFile(file);
+      onChange(result.file);
+      setStatus('ready');
+    } catch {
+      toast.error(t('form.messages.imagePrepareError'));
+      onChange(file);
+      setStatus('ready');
+    }
   };
 
-  const handleDrop      = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); handleFileChange(e.dataTransfer.files[0]); };
-  const handleDragOver  = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    void handleFileChange(e.dataTransfer.files[0] || null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
   const handleDragLeave = () => setIsDragging(false);
-  const handleRemove    = () => { onChange(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; };
+
+  const handleRemove = () => {
+    onChange(null);
+    setPreview(null);
+    setStatus('idle');
+    resetFileInput();
+  };
+
+  const openFilePicker = () => fileInputRef.current?.click();
+  const hasError = Boolean(error) || status === 'error';
+  const showReadyState = Boolean(preview);
 
   return (
-    <>
-      <style>{STYLES}</style>
-      <div className="space-y-2">
-        <label className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
-          <ImageIcon className="w-3.5 h-3.5 text-orange-500" />
-          {label}
-        </label>
+    <div className="space-y-2.5">
+      <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        <span className="flex size-7 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 dark:bg-orange-400/10 dark:text-orange-300">
+          <ImageIcon className="size-3.5" />
+        </span>
+        {label}
+      </label>
 
-        {isLoading ? (
-          <div className="relative border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl h-[180px] overflow-hidden bg-gray-50 dark:bg-white/5">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/50 dark:via-orange-500/8 to-transparent"
-              style={{ animation: 'shimmer 1.5s ease-in-out infinite' }} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      {isLoading ? (
+        <div className="relative h-[184px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/60 to-transparent dark:via-orange-400/10" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="size-9 animate-spin text-orange-500" />
+          </div>
+        </div>
+      ) : !showReadyState ? (
+        <button
+          type="button"
+          onClick={openFilePicker}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={[
+            'relative flex min-h-[184px] w-full flex-col items-center justify-center gap-4 rounded-2xl border p-5 text-center',
+            'bg-white shadow-sm transition active:scale-[0.99]',
+            'dark:bg-white/[0.035] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
+            isDragging
+              ? 'border-orange-400 ring-4 ring-orange-500/15 dark:border-orange-300/60'
+              : 'border-dashed border-slate-200 dark:border-white/12',
+            hasError ? 'border-red-400 ring-4 ring-red-500/10 dark:border-red-400/60' : '',
+          ].join(' ')}
+        >
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25">
+            {status === 'compressing' ? <Loader2 className="size-6 animate-spin" /> : <Upload className="size-6" />}
+          </span>
+
+          <span className="space-y-1">
+            <span className="block text-sm font-bold text-slate-800 dark:text-white">
+              {status === 'compressing' ? t('form.upload.compressing') : t('form.dragDropImage')}
+            </span>
+            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+              {t('form.supportedFormats')}
+            </span>
+          </span>
+        </button>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/12 dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_24px_rgba(0,0,0,0.22)]">
+          <div className="relative h-[184px] overflow-hidden bg-slate-100 dark:bg-black/20">
+            <img src={preview ?? undefined} alt={label} className="size-full object-cover" />
+            <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
+              <CheckCircle2 className="size-3.5" />
+              {t('form.upload.ready')}
             </div>
           </div>
-        ) : !preview ? (
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
-            className={[
-              'relative border-2 border-dashed rounded-2xl p-6 cursor-pointer min-h-[180px]',
-              'flex flex-col items-center justify-center gap-4',
-              'transition-all duration-300 ease-in-out group',
-              isDragging
-                ? 'drag-active border-orange-500 bg-orange-50 dark:bg-orange-500/10 shadow-lg shadow-orange-500/20'
-                : 'border-gray-200 dark:border-white/10 hover:border-orange-400 dark:hover:border-orange-500/40 hover:bg-orange-50/40 dark:hover:bg-orange-500/5',
-              error ? 'border-red-400 dark:border-red-500/40' : '',
-            ].join(' ')}
-          >
-            {/* drag glow overlay */}
-            {isDragging && (
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 pointer-events-none" />
-            )}
 
-            <div className={[
-              'p-4 rounded-2xl transition-all duration-300',
-              isDragging
-                ? 'bg-gradient-to-br from-orange-500 to-amber-500 shadow-xl shadow-orange-500/40 scale-110'
-                : 'bg-orange-100 dark:bg-orange-500/15 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/25',
-            ].join(' ')}>
-              <Upload className={[
-                'w-7 h-7 transition-colors duration-300',
-                isDragging ? 'text-white upload-icon' : 'text-orange-500',
-              ].join(' ')} />
-            </div>
-
-            <div className="text-center">
-              <p className="text-sm font-semibold text-gray-600 dark:text-gray-300 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200">
-                {t('form.dragDropImage')}
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 font-mono tracking-wider">{t('form.supportedFormats')}</p>
-            </div>
-
-            <input ref={fileInputRef} type="file" accept="image/jpeg, image/png, image/webp, .heic, .heif"
-              onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-              className="hidden" />
-          </div>
-        ) : (
-          <div className="relative group rounded-2xl overflow-hidden h-[180px] border-2 border-orange-200 dark:border-orange-500/30 hover:border-orange-400 dark:hover:border-orange-500/60 transition-all duration-300 shadow-md hover:shadow-xl hover:shadow-orange-500/15">
-            <img src={preview} alt={label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-
-            {/* gradient overlay on hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-            {/* remove button */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-              <Button type="button" onClick={handleRemove} variant="destructive" size="icon"
-                className="rounded-xl shadow-xl scale-75 group-hover:scale-100 transition-transform duration-300">
-                <X className="w-5 h-5" />
+          <div className="space-y-3 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openFilePicker}
+                className="h-11 rounded-xl border-slate-200 bg-white text-slate-700 active:scale-[0.98] dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-100"
+              >
+                <RefreshCcw className="size-4" />
+                {t('form.upload.change')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRemove}
+                className="h-11 rounded-xl border-red-200 bg-red-50 text-red-600 active:scale-[0.98] dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300"
+              >
+                <X className="size-4" />
+                {t('form.upload.remove')}
               </Button>
             </div>
-
-            {/* success badge */}
-            <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-              <span>✓</span>
-            </div>
           </div>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+
+      {hasError && error && (
+        <p className="flex items-center gap-1.5 text-xs font-medium text-red-500">
+          <AlertCircle className="size-3.5" />
+          {error}
+        </p>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,.heic,.heif"
+        onChange={(e) => void handleFileChange(e.target.files?.[0] || null)}
+        className="hidden"
+      />
+    </div>
   );
 }

@@ -9,6 +9,7 @@
     },
     "form": {
         "title": "Ro'yxatdan o'tish",
+        "subtitle": "Ma'lumotlarni bosqichma-bosqich kiriting. Pasport rasmlari yuborishdan oldin yengillashtiriladi.",
         "fullName": "Ism va familiya",
         "fullNamePlaceholder": "Ismingiz va familiyangizni kiriting",
         "passportSeries": "Passport seriya raqami",
@@ -29,8 +30,27 @@
         "uploadImage": "Rasmni yuklang",
         "dragDropImage": "Rasmni bu yerga torting yoki bosing",
         "submit": "Yuborish",
+        "next": "Davom etish",
+        "back": "Orqaga",
         "haveAccount": "Hisobingiz bormi?",
         "login": "Tizimga kiring",
+        "uploadHint": "Pasportning old va orqa tomonini tiniq qilib yuklang. Rasmlar avtomatik siqiladi, matnlar o'qilishi kerak.",
+        "steps": {
+            "identity": "Shaxsiy ma'lumotlar",
+            "contact": "Manzil va aloqa",
+            "documents": "Pasport rasmlari"
+        },
+        "stepDescriptions": {
+            "identity": "1-qadam · Hujjat ma'lumotlari",
+            "contact": "2-qadam · Yetkazish uchun aloqa",
+            "documents": "3-qadam · Tekshiruv uchun rasmlar"
+        },
+        "upload": {
+            "compressing": "Rasm tayyorlanmoqda...",
+            "ready": "Tayyor",
+            "change": "O'zgartirish",
+            "remove": "Olib tashlash"
+        },
         "validation": {
             "fullNameRequired": "Ism va familiya kiritilishi shart",
             "fullNameMin": "Ism va familiya kamida 9 ta harfdan iborat bo'lishi kerak",
@@ -50,10 +70,12 @@
             "districtRequired": "Tuman yoki shahar tanlanishi shart"
         },
         "messages": {
+            "preparingImages": "Rasmlar tayyorlanmoqda...",
             "loading": "Ro'yxatdan o'tkazilmoqda...",
             "success": "So'rovingiz yuborildi! Admin tomonidan tasdiqlanishini kuting.",
             "telegramError": "Telegram WebApp ma'lumotlari topilmadi. Iltimos, Telegram botidan ochishni tekshiring.",
             "generalError": "Ro'yxatdan o'tishda xatolik yuz berdi",
+            "imagePrepareError": "Rasmni tayyorlab bo'lmadi. Original fayl yuboriladi.",
             "invalidFileType": "Faqat JPG, PNG, WEBP yoki HEIC formatlar qabul qilinadi",
             "fileTooLarge": "Fayl hajmi 10MB dan oshmasligi kerak"
         },
@@ -886,6 +908,8 @@
         "statusPartial": "Qisman",
         "statusPaid": "To'langan",
         "statusTakenAway": "Olib ketilgan",
+        "takenAway": "Olib ketilgan",
+        "notTakenAway": "Olib ketilmagan",
         "unknownDate": "Noma'lum",
         "status": {
             "paid": "To'langan",
@@ -896,6 +920,13 @@
         "totalPrice": "Jami Narx",
         "photos": "Hisobot rasmlari",
         "trackCodes": "Trek-kodlar",
+        "showMoreTracks": "Yana {{count}} ta ko'rsatish",
+        "showLessTracks": "Kamroq ko'rsatish",
+        "totalAmountShort": "Jami",
+        "remainingAmountShort": "Qoldiq",
+        "currencySum": "{{amount}} so'm",
+        "payAll": "Barchasiga to'lov qilish",
+        "requestDelivery": "Zayafka qoldirish",
         "pay": "To'lov qilish",
         "payRemaining": "Qolganini to'lash",
         "errorTitle": "Xatolik yuz berdi",
@@ -1315,6 +1346,16 @@
             "payme": "Payme",
             "cash": "Naqd",
             "card": "Karta"
+        },
+        "paymentTypes": {
+            "cash": "Naqd",
+            "click": "Click",
+            "payme": "Payme",
+            "card": "Karta",
+            "online": "Online",
+            "wallet": "Balans",
+            "mixed": "Aralash",
+            "unknown": "Noma'lum ({{type}})"
         },
         "error": {
             "title": "Ma'lumotlarni yuklab bo'lmadi",

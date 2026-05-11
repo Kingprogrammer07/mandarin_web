@@ -9,6 +9,7 @@
     },
     "form": {
         "title": "Регистрация",
+        "subtitle": "Заполните данные по шагам. Фото паспорта будут облегчены перед отправкой.",
         "fullName": "Имя и фамилия",
         "fullNamePlaceholder": "Введите ваше имя и фамилию",
         "passportSeries": "Серия и номер паспорта",
@@ -29,8 +30,27 @@
         "uploadImage": "Загрузить фото",
         "dragDropImage": "Перетащите изображение сюда или нажмите",
         "submit": "Отправить",
+        "next": "Продолжить",
+        "back": "Назад",
         "haveAccount": "У вас есть аккаунт?",
         "login": "Войти",
+        "uploadHint": "Загрузите чёткие фото лицевой и обратной стороны паспорта. Изображения сжимаются автоматически, текст должен быть читаемым.",
+        "steps": {
+            "identity": "Личные данные",
+            "contact": "Адрес и связь",
+            "documents": "Фото паспорта"
+        },
+        "stepDescriptions": {
+            "identity": "Шаг 1 · Данные документа",
+            "contact": "Шаг 2 · Контакты для доставки",
+            "documents": "Шаг 3 · Фото для проверки"
+        },
+        "upload": {
+            "compressing": "Подготавливаем фото...",
+            "ready": "Готово",
+            "change": "Изменить",
+            "remove": "Удалить"
+        },
         "validation": {
             "fullNameRequired": "Имя и фамилия обязательны",
             "fullNameMin": "Имя и фамилия должны содержать минимум 9 букв",
@@ -50,10 +70,12 @@
             "districtRequired": "Необходимо выбрать район или город"
         },
         "messages": {
+            "preparingImages": "Подготавливаем фото...",
             "loading": "Регистрация...",
             "success": "Ваш запрос отправлен! Ожидайте подтверждения от администратора.",
             "telegramError": "Данные Telegram WebApp не найдены. Пожалуйста, откройте через Telegram бота.",
             "generalError": "Произошла ошибка при регистрации",
+            "imagePrepareError": "Не удалось подготовить фото. Будет отправлен исходный файл.",
             "invalidFileType": "Принимаются только JPG, PNG, WEBP или HEIC форматы",
             "fileTooLarge": "Размер файла не должен превышать 10 МБ"
         },
@@ -886,6 +908,8 @@
         "statusPartial": "Частично",
         "statusPaid": "Оплачено",
         "statusTakenAway": "Забрано",
+        "takenAway": "Забрано",
+        "notTakenAway": "Не забрано",
         "unknownDate": "Неизвестно",
         "status": {
             "paid": "Оплачено",
@@ -896,6 +920,13 @@
         "totalPrice": "Итоговая цена",
         "photos": "Фото отчета",
         "trackCodes": "Трек-коды",
+        "showMoreTracks": "Показать ещё {{count}}",
+        "showLessTracks": "Показать меньше",
+        "totalAmountShort": "Итого",
+        "remainingAmountShort": "Остаток",
+        "currencySum": "{{amount}} сум",
+        "payAll": "Оплатить всё",
+        "requestDelivery": "Оставить заявку",
         "pay": "Оплатить",
         "payRemaining": "Оплатить остаток",
         "errorTitle": "Произошла ошибка",
@@ -1315,6 +1346,16 @@
             "payme": "Payme",
             "cash": "Наличные",
             "card": "Карта"
+        },
+        "paymentTypes": {
+            "cash": "Наличные",
+            "click": "Click",
+            "payme": "Payme",
+            "card": "Карта",
+            "online": "Онлайн",
+            "wallet": "Баланс",
+            "mixed": "Смешанный",
+            "unknown": "Неизвестно ({{type}})"
         },
         "error": {
             "title": "Не удалось загрузить данные",

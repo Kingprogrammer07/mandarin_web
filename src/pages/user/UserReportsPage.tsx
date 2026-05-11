@@ -14,6 +14,8 @@ import {
     DollarSign,
     Scale,
     ChevronLeft,
+    ChevronDown,
+    ChevronUp,
     AlertCircle,
     CreditCard,
     CheckCircle2,
@@ -33,6 +35,7 @@ const MakePaymentModal = lazy(() => import('@/components/modals/MakePaymentModal
 import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 10;
+const TRACK_PREVIEW_LIMIT = 3;
 
 // --- Types ---
 
@@ -50,6 +53,7 @@ interface FlightActionBarProps {
 }
 
 const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActionBarProps) => {
+    const { t } = useTranslation();
     const totalExpected = reports.reduce((s, r) => s + (r.expected_amount ?? 0), 0);
     const totalPaid = reports.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
     const totalRemaining = Math.max(0, totalExpected - totalPaid);
@@ -64,7 +68,7 @@ const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActio
                 <div className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-500/10 rounded-xl border border-slate-200 dark:border-slate-500/20">
                     <CheckCircle2 className="w-5 h-5 text-slate-500" />
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                        Olib ketilgan
+                        {t('reports.takenAway', 'Olib ketilgan')}
                         {firstReport?.taken_away_date && (
                             <span className="font-normal text-slate-400 ml-1">
                                 ({format(new Date(firstReport.taken_away_date), 'dd MMM, HH:mm', { locale: uz })})
@@ -84,18 +88,18 @@ const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActio
                 <div className="flex items-center gap-2">
                     <div className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08]">
                         <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                            Jami
+                            {t('reports.totalAmountShort', 'Jami')}
                         </span>
                         <span className="text-sm font-black text-gray-800 dark:text-gray-200">
-                            {totalExpected.toLocaleString('uz-UZ')} so'm
+                            {t('reports.currencySum', { amount: totalExpected.toLocaleString('uz-UZ'), defaultValue: '{{amount}} so‘m' })}
                         </span>
                     </div>
                     <div className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
                         <span className="text-[10px] font-bold text-red-400 dark:text-red-400 uppercase tracking-wider">
-                            Qoldiq
+                            {t('reports.remainingAmountShort', 'Qoldiq')}
                         </span>
                         <span className="text-sm font-black text-red-600 dark:text-red-400">
-                            {totalRemaining.toLocaleString('uz-UZ')} so'm
+                            {t('reports.currencySum', { amount: totalRemaining.toLocaleString('uz-UZ'), defaultValue: '{{amount}} so‘m' })}
                         </span>
                     </div>
                 </div>
@@ -108,7 +112,7 @@ const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActio
                     onClick={() => onPay(totalRemaining)}
                 >
                     <CreditCard className="w-5 h-5 mr-2" />
-                    Barchasiga to'lov qilish
+                    {t('reports.payAll', "Barchasiga to'lov qilish")}
                 </Button>
             </div>
         );
@@ -123,7 +127,7 @@ const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActio
                     onClick={onDeliveryRequest}
                 >
                     <Truck className="w-4 h-4 mr-2" />
-                    Zayafka qoldirish
+                    {t('reports.requestDelivery', 'Zayafka qoldirish')}
                 </Button>
             </div>
         );
@@ -240,9 +244,21 @@ const FlightCard = memo(({ flight, onClick }: FlightCardProps) => {
 
 const ReportHistoryItem = memo(({ report, onTrackClick, onImageClick }: ReportHistoryItemProps) => {
     const { t } = useTranslation();
+    const [areTracksExpanded, setAreTracksExpanded] = useState(false);
     const sentDate = report.is_sent_web_date
         ? format(new Date(report.is_sent_web_date), 'dd MMMM, HH:mm', { locale: uz })
         : t('reports.unknownDate');
+    const cargoItems = report.cargo_items ?? [];
+    const hasCargoItems = cargoItems.length > 0;
+    const visibleCargoItems = areTracksExpanded ? cargoItems : cargoItems.slice(0, TRACK_PREVIEW_LIMIT);
+    const hiddenCargoItemCount = Math.max(0, cargoItems.length - TRACK_PREVIEW_LIMIT);
+    const fallbackTrackCodes = !hasCargoItems ? report.track_codes : [];
+    const visibleFallbackTrackCodes = areTracksExpanded
+        ? fallbackTrackCodes
+        : fallbackTrackCodes.slice(0, TRACK_PREVIEW_LIMIT);
+    const hiddenFallbackTrackCount = Math.max(0, fallbackTrackCodes.length - TRACK_PREVIEW_LIMIT);
+    const hiddenTrackCount = hasCargoItems ? hiddenCargoItemCount : hiddenFallbackTrackCount;
+    const hasHiddenTracks = hiddenTrackCount > 0;
 
     return (
         <motion.div
@@ -251,26 +267,30 @@ const ReportHistoryItem = memo(({ report, onTrackClick, onImageClick }: ReportHi
             className="bg-white dark:bg-white/5 backdrop-blur-md rounded-3xl p-5 border border-gray-100 dark:border-white/5 shadow-sm space-y-4"
         >
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/5">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
+            <div className="pb-3 border-b border-gray-100 dark:border-white/5 space-y-3">
+                <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                         <Package className="w-5 h-5" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <p className="text-sm font-bold text-gray-900 dark:text-white">{t('reports.cargoReport')}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                             <Calendar className="w-3 h-3" /> {sentDate}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    {/* Taken away mini badge */}
-                    {report.is_taken_away && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border bg-slate-100 dark:bg-slate-500/10 border-slate-200 dark:border-slate-500/20 text-slate-600 dark:text-slate-400">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Olib ketilgan
-                        </div>
-                    )}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Pickup status badge */}
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${
+                        report.is_taken_away
+                            ? 'bg-slate-100 dark:bg-slate-500/10 border-slate-200 dark:border-slate-500/20 text-slate-600 dark:text-slate-400'
+                            : 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20 text-orange-600 dark:text-orange-300'
+                    }`}>
+                        {report.is_taken_away ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                        {report.is_taken_away
+                            ? t('reports.takenAway', 'Olib ketilgan')
+                            : t('reports.notTakenAway', 'Olib ketilmagan')}
+                    </div>
                     {/* Status Badge */}
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
                         style={{
@@ -318,52 +338,59 @@ const ReportHistoryItem = memo(({ report, onTrackClick, onImageClick }: ReportHi
             </div>
 
             {/* Per-track-code breakdown (from cargo_items) */}
-            {report.cargo_items && report.cargo_items.length > 0 && (
+            {hasCargoItems && (
                 <div className="space-y-2">
                     <p className="text-[10px] uppercase text-gray-400 font-semibold">{t('reports.trackCodes')}</p>
                     <div className="space-y-2">
-                        {report.cargo_items.map((item, i) => (
-                            <div
+                        {visibleCargoItems.map((item, i) => (
+                            <button
                                 key={i}
                                 onClick={() => onTrackClick(item.track_code)}
-                                className="bg-gray-50 dark:bg-black/20 rounded-2xl p-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+                                className="w-full bg-gray-50 dark:bg-black/20 rounded-2xl p-3 text-left active:scale-[0.99] hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-all"
                             >
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0 flex items-center gap-2">
                                         <Tag className="w-3.5 h-3.5 text-orange-500" />
                                         <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                                             {item.track_code}
                                         </span>
                                     </div>
-                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                        {item.total_payment_uzs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} so'm
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-4 text-[11px] text-gray-500 dark:text-gray-400">
-                                    <span className="flex items-center gap-1">
+                                    <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                                         <Scale className="w-3 h-3" />
                                         {item.weight_kg} kg
                                     </span>
-                                    <span className="flex items-center gap-1">
-                                        <DollarSign className="w-3 h-3" />
-                                        ${item.price_per_kg.toFixed(2)}/kg
-                                    </span>
-                                    <span className="text-gray-400">
-                                        ≈ ${item.total_payment.toFixed(2)}
-                                    </span>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                     </div>
+                    {hasHiddenTracks && (
+                        <button
+                            type="button"
+                            onClick={() => setAreTracksExpanded((value) => !value)}
+                            className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-orange-200/70 bg-orange-50/70 px-3 py-2 text-xs font-bold text-orange-600 active:scale-[0.98] transition-all dark:border-orange-400/20 dark:bg-orange-400/10 dark:text-orange-200"
+                        >
+                            {areTracksExpanded ? (
+                                <>
+                                    <ChevronUp className="w-4 h-4" />
+                                    {t('reports.showLessTracks', 'Kamroq ko‘rsatish')}
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="w-4 h-4" />
+                                    {t('reports.showMoreTracks', { count: hiddenTrackCount, defaultValue: 'Yana {{count}} ta ko‘rsatish' })}
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             )}
 
             {/* Fallback track codes when cargo_items is empty */}
-            {(!report.cargo_items || report.cargo_items.length === 0) && report.track_codes.length > 0 && (
+            {!hasCargoItems && fallbackTrackCodes.length > 0 && (
                 <div>
                     <p className="text-[10px] uppercase text-gray-400 font-semibold mb-2">{t('reports.trackCodes')}</p>
                     <div className="flex flex-wrap gap-2">
-                        {report.track_codes.map((code, i) => (
+                        {visibleFallbackTrackCodes.map((code, i) => (
                             <button
                                 key={i}
                                 onClick={() => onTrackClick(code)}
@@ -373,6 +400,25 @@ const ReportHistoryItem = memo(({ report, onTrackClick, onImageClick }: ReportHi
                             </button>
                         ))}
                     </div>
+                    {hasHiddenTracks && (
+                        <button
+                            type="button"
+                            onClick={() => setAreTracksExpanded((value) => !value)}
+                            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl border border-orange-200/70 bg-orange-50/70 px-3 py-2 text-xs font-bold text-orange-600 active:scale-[0.98] transition-all dark:border-orange-400/20 dark:bg-orange-400/10 dark:text-orange-200"
+                        >
+                            {areTracksExpanded ? (
+                                <>
+                                    <ChevronUp className="w-4 h-4" />
+                                    {t('reports.showLessTracks', 'Kamroq ko‘rsatish')}
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="w-4 h-4" />
+                                    {t('reports.showMoreTracks', { count: hiddenTrackCount, defaultValue: 'Yana {{count}} ta ko‘rsatish' })}
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             )}
 
