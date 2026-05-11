@@ -24,6 +24,38 @@ import { formatTashkentDateTime } from "../../lib/format";
 
 const PAGE_SIZE = 20;
 
+const UZPOST_ORDER_STATUS_LABELS: Record<string, string> = {
+  unassigned: "Biriktirilmagan",
+  assigned: "Biriktirilgan",
+  in_transit: "Yo'lda",
+  in_delivery: "Yetkazilmoqda",
+  delivered: "Yetkazildi",
+  returned: "Qaytarildi",
+  cancelled: "Bekor qilindi",
+  created: "Yaratildi",
+  active: "Faol",
+  lost: "Yo'qoldi",
+};
+
+const PRINTER_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Kutmoqda",
+  CLAIMED: "Qabul qilindi",
+  DOWNLOADED: "Yuklab olindi",
+  PRINTED: "Chop etildi",
+  FAILED: "Xatolik",
+  CANCELLED: "Bekor qilindi",
+};
+
+function uzpostOrderStatusLabel(status: string | null): string {
+  if (!status) return "Status yo'q";
+  return UZPOST_ORDER_STATUS_LABELS[status] ?? status;
+}
+
+function printerStatusLabel(status: string | null): string {
+  if (!status) return "";
+  return PRINTER_STATUS_LABELS[status] ?? status;
+}
+
 function normalizeDateInput(value: string): string | undefined {
   if (!value) return undefined;
   return new Date(value).toISOString();
@@ -32,10 +64,18 @@ function normalizeDateInput(value: string): string | undefined {
 function statusClassName(status: string | null): string {
   if (!status) return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300";
   if (status === "cancelled") return "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300";
-  if (status.includes("created") || status.includes("active")) {
+  if (status === "delivered") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
+  if (status.includes("created") || status.includes("active") || status === "assigned") {
     return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
   }
   return "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300";
+}
+
+function printerStatusClassName(status: string | null): string {
+  if (!status) return "";
+  if (status === "PRINTED") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
+  if (status === "FAILED") return "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300";
+  return "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300";
 }
 
 const actionBadgeBaseClassName =
@@ -63,11 +103,11 @@ function OrderCard({
               {order.order_number || `#${order.delivery_request_id}`}
             </span>
             <span className={`rounded-xl px-2.5 py-1 text-[11px] font-bold ${statusClassName(order.order_status)}`}>
-              {order.order_status || "status yo'q"}
+              {uzpostOrderStatusLabel(order.order_status)}
             </span>
             {order.printer.status && (
-              <span className="rounded-xl bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-                Printer: {order.printer.status}
+              <span className={`rounded-xl px-2.5 py-1 text-[11px] font-bold ${printerStatusClassName(order.printer.status)}`}>
+                Printer: {printerStatusLabel(order.printer.status)}
               </span>
             )}
           </div>
