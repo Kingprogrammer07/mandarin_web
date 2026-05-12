@@ -15,6 +15,7 @@ export interface WarehouseQueueItem {
   deliveryMethodLabel?: string;
   comment?: string;
   photos: File[];
+  force?: boolean;
   status: QueueItemStatus;
   error?: string;
   timestamp: number;

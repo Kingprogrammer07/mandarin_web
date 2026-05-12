@@ -76,7 +76,7 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
         : { name: searchQuery };
 
   const { data, isLoading } = useQuery<ClientSearchResponse>({
-    queryKey: ['manager-clients', searchType, searchQuery, page],
+    queryKey: ['manager-clients', searchType, searchQuery, strictSearch, page],
     queryFn: () => searchClientsPaginated({ ...searchParams, page, size: 20 }),
     enabled: !isQueryEmpty,
     placeholderData: (prev) => prev,

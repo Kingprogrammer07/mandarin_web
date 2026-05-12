@@ -52,6 +52,9 @@ export function useWarehouseQueueProcessor() {
     if (pendingItem.comment) {
       formData.append('comment', pendingItem.comment);
     }
+    if (pendingItem.force) {
+      formData.append('force', 'true');
+    }
     pendingItem.photos.forEach((photo) => formData.append('photos', photo));
 
     // Capture stable values before async operations

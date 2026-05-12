@@ -15,6 +15,8 @@ export interface WarehousePendingItem {
   deliveryMethod: string;
   deliveryMethodLabel?: string;
   comment?: string;
+  /** If true, override existing proof (re-delivery flow). */
+  force?: boolean;
   /** Compressed File objects (structured-cloneable, safe to store in IDB). */
   photos: File[];
   status: 'pending' | 'uploading' | 'error';

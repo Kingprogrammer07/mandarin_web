@@ -154,9 +154,10 @@ apiClient.interceptors.response.use(
 
       // Trigger maintenance when the backend port is unreachable (server down/restarting).
       // Exclude cert/DNS errors — those are config issues, not temporary maintenance.
+      // Exclude warehouse endpoints — they poll frequently and transient failures are expected.
       triggerMaintenanceIfServerDown(
         undefined,
-        (isNetworkError || isConnRefused) && !isCertError && !isNameNotResolved,
+        (isNetworkError || isConnRefused) && !isCertError && !isNameNotResolved && !url.includes('/warehouse/'),
         url,
       );
 
@@ -191,10 +192,12 @@ apiClient.interceptors.response.use(
 
       // Telegram cold-start and auto-login endpoints always fail transiently on
       // Android WebView warm-up — no actionable server signal, suppress monitoring.
+      // Warehouse endpoints also poll frequently — transient failures should be silent.
       const endpoint = error.config?.url ?? '';
       const isSilentEndpoint =
         endpoint.includes('/auth/validate-init-data') ||
-        endpoint.includes('/auth/telegram-login');
+        endpoint.includes('/auth/telegram-login') ||
+        endpoint.includes('/warehouse/');
 
       if (!isSilentEndpoint) {
         logFrontendError('network', message, {
@@ -344,7 +347,8 @@ apiClientFormData.interceptors.response.use(
 
       const isSilentEndpointFD =
         url.includes('/auth/validate-init-data') ||
-        url.includes('/auth/telegram-login');
+        url.includes('/auth/telegram-login') ||
+        url.includes('/warehouse/');
 
       if (!isSilentEndpointFD) {
         logFrontendError('network', message, {

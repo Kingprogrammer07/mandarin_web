@@ -5,11 +5,13 @@ import {
   getFlightTransactions,
   markTransactionTaken,
   getMyActivity,
+  getAllWarehouseActivity,
   getUzPostOrders,
   searchTransactions,
   searchTransactionsGrouped,
+  undoTakeaway,
 } from "../services/warehouse";
-import type { GetFlightTransactionsParams, SearchTransactionsParams, UzPostOrdersParams } from "../services/warehouse";
+import type { GetFlightTransactionsParams, SearchTransactionsParams, UzPostOrdersParams, WarehouseActivityQueryParams } from "../services/warehouse";
 import { pickupQueueKeys } from "./usePickupQueue";
 
 /** Query key factory for warehouse queries. */
@@ -22,8 +24,10 @@ export const warehouseKeys = {
     ["warehouse_transaction_search", params] as const,
   groupedTransactionSearch: (params: SearchTransactionsParams) =>
     ["warehouse_grouped_transaction_search", params] as const,
-  myActivity: (page: number, size: number) =>
-    ["warehouse_my_activity", page, size] as const,
+  myActivity: (params: WarehouseActivityQueryParams) =>
+    ["warehouse_my_activity", params] as const,
+  allActivity: (params: WarehouseActivityQueryParams) =>
+    ["warehouse_all_activity", params] as const,
   uzpostOrders: (params: UzPostOrdersParams) =>
     ["warehouse_uzpost_orders", params] as const,
 };
@@ -95,10 +99,12 @@ export const useMarkTaken = () => {
     mutationFn: ({
       transactionId,
       data,
+      force,
     }: {
       transactionId: number;
       data: FormData;
-    }) => markTransactionTaken(transactionId, data),
+      force?: boolean;
+    }) => markTransactionTaken(transactionId, data, force),
     onSuccess: (res) => {
       toast.success(res.message || "Yuk muvaffaqiyatli olib ketildi deb belgilandi");
       queryClient.invalidateQueries({
@@ -116,6 +122,12 @@ export const useMarkTaken = () => {
       queryClient.invalidateQueries({
         queryKey: ['pickup_queue', 'detail'],
       });
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.myActivity({}),
+      });
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.allActivity({}),
+      });
     },
     onError: (err: unknown) => {
       const e = err as { message?: string };
@@ -125,12 +137,50 @@ export const useMarkTaken = () => {
 };
 
 /**
+ * Mutation to undo a take-away marking.
+ */
+export const useUndoTakeaway = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (transactionIds: number[]) => undoTakeaway(transactionIds),
+    onSuccess: (res) => {
+      toast.success(res.message);
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.allTransactions(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.groupedTransactionSearch({}),
+      });
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.myActivity({}),
+      });
+      queryClient.invalidateQueries({
+        queryKey: warehouseKeys.allActivity({}),
+      });
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string };
+      toast.error(e.message ?? "Bekor qilishda xatolik yuz berdi");
+    },
+  });
+};
+
+/**
  * Fetches the current warehouse worker's mark-taken activity log.
  */
-export const useMyActivity = (page: number, size: number) => {
+export const useMyActivity = (params: WarehouseActivityQueryParams = {}) => {
   return useQuery({
-    queryKey: warehouseKeys.myActivity(page, size),
-    queryFn: () => getMyActivity(page, size),
+    queryKey: warehouseKeys.myActivity(params),
+    queryFn: () => getMyActivity(params),
+    placeholderData: (previousData) => previousData,
+  });
+};
+
+export const useAllWarehouseActivity = (params: WarehouseActivityQueryParams = {}) => {
+  return useQuery({
+    queryKey: warehouseKeys.allActivity(params),
+    queryFn: () => getAllWarehouseActivity(params),
     placeholderData: (previousData) => previousData,
   });
 };

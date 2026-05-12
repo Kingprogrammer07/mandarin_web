@@ -29,7 +29,7 @@ import {
 } from "../../api/hooks/usePickupQueue";
 import WarehouseFilters from "../../components/warehouse/WarehouseFilters";
 import GroupedTransactionsList from "../../components/warehouse/GroupedTransactionsList";
-import MyActivityList from "../../components/warehouse/MyActivityList";
+import MyActivityList, { type ActivityScope, type ActivityItemData } from "../../components/warehouse/MyActivityList";
 import MarkTakenModal from "../../components/warehouse/MarkTakenModal";
 import WarehouseOfflineManager from "../../components/warehouse/WarehouseOfflineManager";
 import UzPostOrdersPanel from "../../components/warehouse/UzPostOrdersPanel";
@@ -108,6 +108,9 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   const canViewExpectedCargo = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('expected_cargo:manage');
   const [activeTab, setActiveTab] = useState<ActiveTab>("transactions");
   const [activityPage, setActivityPage] = useState(1);
+  const [activityScope, setActivityScope] = useState<ActivityScope>("self");
+  const [activityClientCode, setActivityClientCode] = useState("");
+  const [activityStrict, setActivityStrict] = useState(false);
 
   // Mark-taken modal state
   const [modalTxIds, setModalTxIds] = useState<number[]>([]);
@@ -115,6 +118,8 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   const [modalFlightName, setModalFlightName] = useState("");
   const [modalDeliveryMethods, setModalDeliveryMethods] = useState<DeliveryMethodOption[]>([]);
   const [modalIsTakenAway, setModalIsTakenAway] = useState(false);
+  const [modalPreSelectedDeliveryMethod, setModalPreSelectedDeliveryMethod] = useState<string | undefined>(undefined);
+  const [modalIsRedelivery, setModalIsRedelivery] = useState(false);
 
   // Pickup queue panel state
   const [showQueuePanel, setShowQueuePanel] = useState(false);
@@ -281,6 +286,8 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
       setModalFlightName(txFlightName);
       setModalDeliveryMethods(deliveryMethods);
       setModalIsTakenAway(isTakenAway);
+      setModalPreSelectedDeliveryMethod(undefined);
+      setModalIsRedelivery(false);
     },
     [],
   );
@@ -351,6 +358,21 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     (newPage: number) => setActivityPage(newPage),
     [],
   );
+
+  const handleActivityScopeChange = useCallback((scope: ActivityScope) => {
+    setActivityScope(scope);
+    setActivityPage(1);
+  }, []);
+
+  const handleActivityClientCodeChange = useCallback((value: string) => {
+    setActivityClientCode(value);
+    setActivityPage(1);
+  }, []);
+
+  const handleActivityStrictChange = useCallback((value: boolean) => {
+    setActivityStrict(value);
+    setActivityPage(1);
+  }, []);
 
   if (!canView) return <AccessDenied />;
 
@@ -565,8 +587,31 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
           )
         ) : activeTab === "my-activity" ? (
           <MyActivityList
+            scope={activityScope}
+            onScopeChange={handleActivityScopeChange}
+            clientCode={activityClientCode}
+            onClientCodeChange={handleActivityClientCodeChange}
+            strict={activityStrict}
+            onStrictChange={handleActivityStrictChange}
             page={activityPage}
             onPageChange={handleActivityPageChange}
+            onRedeliver={(item: ActivityItemData) => {
+              if (!item.transaction_ids?.length || !item.client_code) return;
+              setModalTxIds(item.transaction_ids);
+              setModalClientCode(item.client_code ?? "");
+              setModalFlightName(item.flight_name ?? "");
+              setModalPreSelectedDeliveryMethod(item.delivery_method ?? undefined);
+              setModalIsRedelivery(true);
+              // Derive delivery methods from the item's delivery_method
+              if (item.delivery_method) {
+                setModalDeliveryMethods([
+                  { value: item.delivery_method, label: item.delivery_method_label ?? item.delivery_method },
+                ]);
+              } else {
+                setModalDeliveryMethods([]);
+              }
+              setModalIsTakenAway(false);
+            }}
           />
         ) : (
           <UzPostOrdersPanel />
@@ -684,10 +729,14 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
           flightName={modalFlightName}
           deliveryMethods={modalDeliveryMethods}
           isTakenAway={modalIsTakenAway}
+          preSelectedDeliveryMethod={modalPreSelectedDeliveryMethod}
+          isRedelivery={modalIsRedelivery}
           isOpen={modalTxIds.length > 0}
           onClose={() => {
             setModalTxIds([]);
             setModalDeliveryMethods([]);
+            setModalPreSelectedDeliveryMethod(undefined);
+            setModalIsRedelivery(false);
           }}
         />
       )}

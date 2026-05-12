@@ -17,7 +17,14 @@ import type { MarkTakenFormValues } from "../../schemas/warehouseSchemas";
 import { useWarehouseQueueStore } from "../../store/useWarehouseQueueStore";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
 
-// ── Image compression ─────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Converts a base64 data URL to a File object. */
+async function dataUrlToFile(dataUrl: string, filename?: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], filename || `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+}
 
 /** Compresses an image to max 1920px wide at 92% JPEG quality using canvas API. */
 async function compressImage(file: File): Promise<File> {
@@ -88,6 +95,8 @@ interface MarkTakenModalProps {
   flightName: string;
   deliveryMethods: DeliveryMethodOption[];
   isTakenAway?: boolean;
+  preSelectedDeliveryMethod?: string;
+  isRedelivery?: boolean;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -100,6 +109,8 @@ export default function MarkTakenModal({
   flightName,
   deliveryMethods,
   isTakenAway,
+  preSelectedDeliveryMethod,
+  isRedelivery,
   isOpen,
   onClose,
 }: MarkTakenModalProps) {
@@ -131,6 +142,15 @@ export default function MarkTakenModal({
   const watchedPhotos = watch("photos");
   const photos = useMemo(() => watchedPhotos ?? [], [watchedPhotos]);
 
+  // Auto-select the only delivery method so the user doesn't have to tap
+  useEffect(() => {
+    if (preSelectedDeliveryMethod && !watch("delivery_method")) {
+      setValue("delivery_method", preSelectedDeliveryMethod, { shouldValidate: true });
+    } else if (deliveryMethods.length === 1 && !watch("delivery_method")) {
+      setValue("delivery_method", deliveryMethods[0].value, { shouldValidate: true });
+    }
+  }, [deliveryMethods, setValue, watch, preSelectedDeliveryMethod]);
+
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -148,31 +168,35 @@ export default function MarkTakenModal({
 
   const openBackCamera = useCallback(async () => {
     try {
+      // Samsung phones choke on { exact: "environment" } when no back camera is available.
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { exact: "environment" },
+          facingMode: "environment",
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         },
       });
 
-      // Reset zoom to 1x if the device supports zoom controls
+      // Reset zoom to 1x if the device supports zoom controls.
+      // Do this BEFORE attaching to <video> so a failed constraint doesn't break the stream.
       const [track] = stream.getVideoTracks();
-      const capabilities = track.getCapabilities?.() as Record<string, unknown> | undefined;
-      const zoomCap = capabilities?.zoom as { min?: number; max?: number } | undefined;
-      if (zoomCap?.min !== undefined && zoomCap?.max !== undefined) {
-        const targetZoom = Math.max(zoomCap.min, Math.min(zoomCap.max, 1.0));
-        try {
+      try {
+        const capabilities = track.getCapabilities?.() as Record<string, unknown> | undefined;
+        const zoomCap = capabilities?.zoom as { min?: number; max?: number } | undefined;
+        if (zoomCap?.min !== undefined && zoomCap?.max !== undefined) {
+          const targetZoom = Math.max(zoomCap.min, Math.min(zoomCap.max, 1.0));
           await track.applyConstraints({
             advanced: [{ zoom: targetZoom } as MediaTrackConstraintSet],
           });
-        } catch {
-          // ignore zoom constraint errors
         }
+      } catch {
+        // ignore zoom constraint errors — many Samsung devices throw here
       }
 
       streamRef.current = stream;
       setIsCameraOpen(true);
+
+      // Wait for the video element to be mounted before attaching the stream.
       requestAnimationFrame(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -210,29 +234,84 @@ export default function MarkTakenModal({
     [photos, previews, setValue],
   );
 
-  const capturePhoto = useCallback(() => {
+  const capturePhoto = useCallback(async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    // Immediately hide camera so user isn't stuck on frozen frame
+    // Some Samsung browsers return 0 for videoWidth/Height right after play().
+    const vw = video.videoWidth || video.clientWidth || 1920;
+    const vh = video.videoHeight || video.clientHeight || 1080;
+
+    // ── Prefer ImageCapture API (works better on Samsung Android) ─────────────
+    const stream = streamRef.current;
+    const track = stream?.getVideoTracks()[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ImgCaptureCtor = (window as any).ImageCapture;
+    if (track && ImgCaptureCtor) {
+      try {
+        const imgCapture = new ImgCaptureCtor(track) as {
+          takePhoto: (opts?: Record<string, unknown>) => Promise<Blob>;
+        };
+        const blob = await imgCapture.takePhoto();
+        stopCamera();
+        const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        handleFileChange(dt.files);
+        return;
+      } catch {
+        // Fall through to canvas fallback
+      }
+    }
+
+    // ── Canvas fallback ───────────────────────────────────────────────────────
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      stopCamera();
+      return;
+    }
+    ctx.drawImage(video, 0, 0, vw, vh);
     stopCamera();
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-
-    canvas.toBlob((blob) => {
+    // Samsung Internet sometimes returns null from toBlob; use toDataURL fallback.
+    const quality = 0.92;
+    if (canvas.toBlob) {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            // Fallback if toBlob returns null — read data URL BEFORE clearing canvas
+            const dataUrl = canvas.toDataURL("image/jpeg", quality);
+            canvas.width = 0;
+            canvas.height = 0;
+            dataUrlToFile(dataUrl).then((file) => {
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              handleFileChange(dt.files);
+            });
+            return;
+          }
+          canvas.width = 0;
+          canvas.height = 0;
+          const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          handleFileChange(dt.files);
+        },
+        "image/jpeg",
+        quality,
+      );
+    } else {
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
       canvas.width = 0;
       canvas.height = 0;
-      if (!blob) return;
-      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+      const file = await dataUrlToFile(dataUrl);
       const dt = new DataTransfer();
       dt.items.add(file);
       handleFileChange(dt.files);
-    }, "image/jpeg", 1.0);
+    }
   }, [stopCamera, handleFileChange]);
 
   const handleClose = useCallback(() => {
@@ -272,6 +351,7 @@ export default function MarkTakenModal({
         deliveryMethodLabel: selectedDeliveryMethod?.label,
         comment: data.comment,
         photos: data.photos,
+        force: isRedelivery,
       });
 
       toast.success(`${clientCode} - navbatga qo'shildi`, {
@@ -321,7 +401,7 @@ export default function MarkTakenModal({
                 </div>
                 <div>
                   <h2 id="mark-taken-title" className="text-[15px] font-bold text-gray-900 dark:text-white">
-                    Yukni berish
+                    {isRedelivery ? "Qayta yetkazib berish" : "Yukni berish"}
                   </h2>
                   <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">
                     <span className="font-mono font-bold text-gray-700 dark:text-gray-300">

@@ -202,6 +202,8 @@ export interface WarehouseActivityItem {
   uzpost_printer_job_id: number | null;
   uzpost_printer_status: string | null;
   created_at: string;
+  worker_username: string | null;
+  worker_role: string | null;
 }
 
 export interface WarehouseActivityTransactionItem {
@@ -332,6 +334,11 @@ export interface BulkMarkTakenResponse {
   message: string;
 }
 
+export interface UndoTakeawayResponse {
+  undone_count: number;
+  message: string;
+}
+
 // API Functions
 
 export async function getWarehouseFlights(
@@ -379,11 +386,17 @@ export async function getFlightTransactions(
 export async function markTransactionTaken(
   transactionId: number,
   data: FormData,
+  force = false,
 ): Promise<MarkTakenResponse> {
-  const response = await apiClientFormData.post<MarkTakenResponse>(
-    `/api/v1/warehouse/transactions/${transactionId}/mark-taken`,
-    data,
-  );
+  const url = `/api/v1/warehouse/transactions/${transactionId}/mark-taken${force ? '?force=true' : ''}`;
+  const response = await apiClientFormData.post<MarkTakenResponse>(url, data);
+  return response.data;
+}
+
+export async function undoTakeaway(transactionIds: number[]): Promise<UndoTakeawayResponse> {
+  const response = await apiClient.post<UndoTakeawayResponse>('/api/v1/warehouse/undo-takeaway', {
+    transaction_ids: transactionIds,
+  });
   return response.data;
 }
 
@@ -410,13 +423,43 @@ export async function searchTransactions(
   return response.data;
 }
 
+export interface WarehouseActivityQueryParams {
+  page?: number;
+  size?: number;
+  client_code?: string;
+  strict?: boolean;
+}
+
 export async function getMyActivity(
-  page = 1,
-  size = 20,
+  params: WarehouseActivityQueryParams = {},
 ): Promise<WarehouseActivityResponse> {
   const response = await apiClient.get<WarehouseActivityResponse>(
     '/api/v1/warehouse/my-activity',
-    { params: { page, size } },
+    {
+      params: {
+        page: params.page ?? 1,
+        size: params.size ?? 20,
+        ...(params.client_code ? { client_code: params.client_code } : {}),
+        ...(params.strict ? { strict: 'true' } : {}),
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function getAllWarehouseActivity(
+  params: WarehouseActivityQueryParams = {},
+): Promise<WarehouseActivityResponse> {
+  const response = await apiClient.get<WarehouseActivityResponse>(
+    '/api/v1/warehouse/all-activity',
+    {
+      params: {
+        page: params.page ?? 1,
+        size: params.size ?? 20,
+        ...(params.client_code ? { client_code: params.client_code } : {}),
+        ...(params.strict ? { strict: 'true' } : {}),
+      },
+    },
   );
   return response.data;
 }
