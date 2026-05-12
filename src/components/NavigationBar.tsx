@@ -200,7 +200,7 @@ export default function NavigationBar(_props: NavigationBarProps) {
               {/* <LayoutDashboard className="h-5 w-5 max-[360px]:h-4 max-[360px]:w-4" /> */}
             {/* </div> */}
             <div className="flex shrink-0 items-center justify-center">
-              <img src="/mandarin.png" alt="Mandarin Cargo" className="h-[32px] w-[32px]" />
+              <img src="/mandarin.png" alt="Mandarin Cargo" className="h-[32px] w-[32px] object-contain" />
             </div>
 
             <div className="flex flex-col min-w-0">
