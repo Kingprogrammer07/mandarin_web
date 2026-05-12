@@ -4,8 +4,6 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
-  Edit3,
-  Wallet,
   Smartphone,
   MessageSquare,
 } from 'lucide-react';
@@ -22,12 +20,12 @@ import { ActionButton } from '@/components/user_page/ActionButtons';
 import { useTranslation } from 'react-i18next';
 
 import { UniqueBackground } from './dashboard-components/UniqueBackground';
-import { BetaBadge } from './dashboard-components/BetaBadge';
+// import { BetaBadge } from './dashboard-components/BetaBadge';
 import { HeaderTabs } from './dashboard-components/HeaderTabs';
 import { PageLoadingFallback } from './dashboard-components/PageLoadingFallback';
 import { QuickSearchBar } from './dashboard-components/QuickSearchBar';
 import { CarouselCard } from './dashboard-components/CarouselCard';
-import { CAROUSEL_ITEMS, MAIN_ACTIONS } from './dashboard-components/constants';
+import { CAROUSEL_ITEMS, PRIMARY_ACTIONS, SECONDARY_ACTIONS } from './dashboard-components/constants';
 import type { CarouselItemData } from './dashboard-components/types';
 
 const loadNotificationCenter = () => import('@/components/notifications/NotificationCenter');
@@ -39,6 +37,7 @@ const DeliveryRequestPage = lazy(() => import('@/components/pages/DeliveryReques
 const DeliveryHistoryPage = lazy(() => import('@/components/pages/DeliveryHistoryPage'));
 const CalculatorModal = lazy(() => import('@/components/modals/CalculatorModal'));
 const ProhibitedItemsModal = lazy(() => import('@/components/modals/ProhibitedItemsModal'));
+const OurAddressModal = lazy(() => import('@/components/modals/OurAddressModal'));
 const NotificationCenter = lazy(loadNotificationCenter);
 
 interface DashboardProps {
@@ -56,6 +55,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
   const [initialTrackView] = useState<'search' | 'history'>('search');
   const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isOurAddressModalOpen, setIsOurAddressModalOpen] = useState(false);
 
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isProhibitedModalOpen, setIsProhibitedModalOpen] = useState(false);
@@ -90,6 +90,15 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     return () => window.clearTimeout(id);
   }, []);
 
+  useEffect(() => {
+    const handleOpenPayment = () => {
+      setIsPaymentModalOpen(true);
+    };
+
+    window.addEventListener('dashboard:open-payment', handleOpenPayment);
+    return () => window.removeEventListener('dashboard:open-payment', handleOpenPayment);
+  }, []);
+
   const sortedCarouselItems = useMemo((): CarouselItemData[] => {
     const fromApi: CarouselItemData[] = apiCarouselItems
       ? [...apiCarouselItems]
@@ -115,6 +124,11 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
 
     return [...fromApi, ...staticFeatures];
   }, [apiCarouselItems]);
+
+  const secondaryActions = useMemo(
+    () => SECONDARY_ACTIONS.filter((action) => action.id !== 'report' || onNavigateToReports),
+    [onNavigateToReports],
+  );
 
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -227,8 +241,14 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
       handleSetActiveTab('delivery_history');
     } else if (id === 'payment') {
       setIsPaymentModalOpen(true);
+    } else if (id === 'our_address') {
+      setIsOurAddressModalOpen(true);
     } else if (id === 'report') {
-      onNavigateToReports?.();
+      if (onNavigateToReports) {
+        onNavigateToReports();
+      } else {
+        toast.info(t('dashboard.toast.comingSoon', { id }));
+      }
     } else {
       toast.info(t('dashboard.toast.comingSoon', { id }));
     }
@@ -242,8 +262,8 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     >
       <UniqueBackground />
 
-      <div className="relative z-10 max-w-4xl mx-auto px-4 pt-12 sm:pt-16">
-        <BetaBadge />
+      <div className="relative z-10 max-w-4xl mx-auto px-4 pt-[5.75rem] sm:pt-[6rem]">
+        {/* <BetaBadge /> */}
 
         <HeaderTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
 
@@ -281,7 +301,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
             <section>
               <div className="flex items-center mb-4 ml-1">
                 <h2 className="flex-1 text-lg font-bold flex items-center gap-2">
-                  <span className="w-1 h-5 bg-blue-500 rounded-full inline-block"></span>
+                  <span className="inline-block h-5 w-1 rounded-full bg-amber-500 shadow-[0_0_16px_rgba(245,158,11,0.35)]"></span>
                   {t('dashboard.sections.important')}
                 </h2>
                 <div className="flex items-center gap-2">
@@ -291,13 +311,13 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                   <div className="hidden md:flex items-center gap-2">
                     <button
                       onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: 'smooth' })}
-                      className="p-1.5 rounded-full bg-gray-200 dark:bg-white/10 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 transition-colors active:scale-95"
+                      className="rounded-full border border-gray-200/80 bg-white/90 p-1.5 text-gray-500 transition-colors active:scale-95 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-white/48 dark:hover:border-orange-300/20 dark:hover:bg-orange-400/[0.09] dark:hover:text-amber-300"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => scrollRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
-                      className="p-1.5 rounded-full bg-gray-200 dark:bg-white/10 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 transition-colors active:scale-95"
+                      className="rounded-full border border-gray-200/80 bg-white/90 p-1.5 text-gray-500 transition-colors active:scale-95 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-white/48 dark:hover:border-orange-300/20 dark:hover:bg-orange-400/[0.09] dark:hover:text-amber-300"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -332,56 +352,28 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
               </div>
             </section>
 
-            <section className="mb-4">
+            <section className="mb-5">
               <div className="flex items-center justify-between mb-3 ml-1 mr-1">
                 <h2 className="text-lg font-bold flex items-center gap-2">
-                  <span className="w-1 h-5 bg-emerald-500 rounded-full inline-block"></span>
-                  {t('dashboard.sections.reportsAndPayments')}
+                  <span className="w-1 h-5 bg-amber-500 rounded-full inline-block shadow-[0_0_16px_rgba(245,158,11,0.35)]"></span>
+                  {t('dashboard.sections.primaryActions')}
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {/* To'lov tugmasi (Mobile-Optimized Premium) */}
-                <button
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="relative overflow-hidden rounded-[1.75rem] p-4 sm:p-5 flex flex-col items-center text-center border border-white/60 border-b-white/20 dark:border-white/10 dark:border-t-white/20 bg-gradient-to-b from-white/90 to-white/50 dark:from-[#2a2218]/80 dark:to-[#1a150e]/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] active:scale-[0.95] active:shadow-inner transition-all duration-200 select-none"
-                >
-                  <div className="absolute -top-8 -right-8 w-28 h-28 bg-rose-400/40 dark:bg-rose-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '3s' }} />
-                  <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-pink-400/30 dark:bg-pink-600/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '4s' }} />
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/50 to-white/0 dark:via-white/5 opacity-40 pointer-events-none" />
-
-                  <div className="relative z-10 flex flex-col items-center gap-2.5">
-                    <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center bg-white dark:bg-white/10 text-rose-500 dark:text-rose-400 shadow-md ring-1 ring-rose-100 dark:ring-white/10">
-                      <Wallet className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-sm" />
-                      <div className="absolute inset-0 rounded-2xl ring-2 ring-rose-500/30 animate-pulse" style={{ animationDuration: '2.5s' }} />
-                    </div>
-                    <div className="space-y-0.5">
-                      <h3 className="text-[14px] sm:text-[16px] font-extrabold text-gray-900 dark:text-white tracking-tight drop-shadow-sm">{t('dashboard.actions.payment.label')}</h3>
-                      <p className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-gray-400/80 leading-snug line-clamp-2 px-1">{t('dashboard.actions.payment.desc')}</p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Zayavka tugmasi (Mobile-Optimized Premium) */}
-                <button
-                  onClick={() => handleSetActiveTab('request')}
-                  className="relative overflow-hidden rounded-[1.75rem] p-4 sm:p-5 flex flex-col items-center text-center border border-white/60 border-b-white/20 dark:border-white/10 dark:border-t-white/20 bg-gradient-to-b from-white/90 to-white/50 dark:from-[#2a2218]/80 dark:to-[#1a150e]/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] active:scale-[0.95] active:shadow-inner transition-all duration-200 select-none"
-                >
-                  <div className="absolute -top-8 -left-8 w-28 h-28 bg-emerald-400/40 dark:bg-emerald-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '3.5s' }} />
-                  <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-teal-400/30 dark:bg-teal-600/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '4.5s' }} />
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/50 to-white/0 dark:via-white/5 opacity-40 pointer-events-none" />
-
-                  <div className="relative z-10 flex flex-col items-center gap-2.5">
-                    <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center bg-white dark:bg-white/10 text-emerald-500 dark:text-emerald-400 shadow-md ring-1 ring-emerald-100 dark:ring-white/10">
-                      <Edit3 className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-sm" />
-                      <div className="absolute inset-0 rounded-2xl ring-2 ring-emerald-500/30 animate-pulse" style={{ animationDuration: '2s' }} />
-                    </div>
-                    <div className="space-y-0.5">
-                      <h3 className="text-[14px] sm:text-[16px] font-extrabold text-gray-900 dark:text-white tracking-tight drop-shadow-sm">{t('dashboard.actions.request.label')}</h3>
-                      <p className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-gray-400/80 leading-snug line-clamp-2 px-1">{t('dashboard.actions.request.desc')}</p>
-                    </div>
-                  </div>
-                </button>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {PRIMARY_ACTIONS.map((action) => (
+                  <ActionButton
+                    key={action.id}
+                    item={{
+                      ...action,
+                      label: t(action.labelKey),
+                      desc: t(action.descKey),
+                      badge: t(action.badgeKey),
+                      actionLabel: t(action.actionLabelKey),
+                    }}
+                    onClick={() => handleActionClick(action.id)}
+                  />
+                ))}
               </div>
             </section>
 
@@ -389,14 +381,15 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
               <div className="flex items-center justify-between mb-4 ml-1 mr-1">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <span className="w-1 h-5 bg-amber-500 rounded-full inline-block"></span>
-                  {t('dashboard.sections.services')}
+                  {t('dashboard.sections.otherServices')}
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {MAIN_ACTIONS.map((action) => (
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-4">
+                {secondaryActions.map((action) => (
                   <ActionButton
                     key={action.id}
+                    variant="secondary"
                     item={{
                       ...action,
                       label: t(action.labelKey),
@@ -494,6 +487,10 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
           <ProhibitedItemsModal
             isOpen={isProhibitedModalOpen}
             onClose={() => setIsProhibitedModalOpen(false)}
+          />
+          <OurAddressModal
+            isOpen={isOurAddressModalOpen}
+            onClose={() => setIsOurAddressModalOpen(false)}
           />
         </Suspense>
 

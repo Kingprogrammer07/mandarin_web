@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useNavLoadingStore } from '@/store/navLoadingStore';
@@ -33,20 +33,9 @@ export const FloatingNavbar = <T,>({
     className,
     desktopPosition = 'top',
 }: FloatingNavbarProps<T>) => {
-    // Mount ring: plays once on first render, then stops.
-    const [mountRingActive, setMountRingActive] = useState(true);
-    useEffect(() => {
-        const t = setTimeout(() => setMountRingActive(false), RING_DURATION_MS);
-        return () => clearTimeout(t);
-    }, []);
-
-    // Loading ring: loops while any TopProgressBar is mounted.
     const isNavLoading = useNavLoadingStore((s) => s.isLoading);
-
-    const showRing = mountRingActive || isNavLoading;
-    const ringAnimation = isNavLoading
-        ? `nav-ring-spin ${RING_DURATION_MS}ms linear infinite`
-        : `nav-ring-spin ${RING_DURATION_MS}ms linear 1 forwards`;
+    const showRing = isNavLoading;
+    const ringAnimation = `nav-ring-spin ${RING_DURATION_MS}ms linear infinite`;
 
     const handleNavClick = (item: FloatingNavItem<T>) => {
         if (item.disabled) return;
@@ -56,14 +45,14 @@ export const FloatingNavbar = <T,>({
     const isItemActive = (item: FloatingNavItem<T>) => activePage === item.page;
 
     const containerClasses = cn(
-        "flex items-center gap-3 p-1.5 rounded-full pointer-events-auto",
-        "backdrop-blur-xl shadow-[0_8px_32px_rgba(249,115,22,0.08)]",
-        "bg-white/80 border border-orange-100 ring-1 ring-orange-50",
-        "dark:bg-[#0a0e15]/80 dark:border-orange-200/10 dark:ring-orange-200/5 dark:shadow-[0_12px_34px_rgba(0,0,0,0.26)]"
+        "flex items-center gap-1.5 rounded-full p-1.5 pointer-events-auto",
+        "border backdrop-blur-2xl shadow-[0_20px_42px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.40)]",
+        "bg-white/88 border-orange-100/80",
+        "dark:bg-[#0a0e15]/86 dark:border-orange-200/14 dark:shadow-[0_20px_42px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08)]"
     );
 
     const desktopWrapperClasses = cn(
-        "hidden md:flex fixed left-0 right-0 z-40 justify-center pointer-events-none",
+        "hidden md:flex fixed left-0 right-0 z-40 justify-center pointer-events-none px-4",
         desktopPosition === 'top' ? "top-24" : "bottom-8",
         className
     );
@@ -81,9 +70,7 @@ export const FloatingNavbar = <T,>({
     return (
         <>
             {/* Mobile Bottom */}
-            <div
-                className={cn("md:hidden fixed left-0 right-0 bottom-4 z-50 flex justify-center pointer-events-none px-4", className)}
-            >
+            <div className={cn("md:hidden fixed left-0 right-0 bottom-4 z-50 flex justify-center pointer-events-none px-4", className)}>
                 <div className="relative">
                     {ringOverlay}
                     <div className={containerClasses}>
@@ -97,14 +84,14 @@ export const FloatingNavbar = <T,>({
                                     onClick={() => !disabled && handleNavClick(item)}
                                     disabled={disabled}
                                     className={cn(
-                                        "relative flex flex-col items-center justify-center gap-0.5 px-4.5 py-2 rounded-full transition-all duration-300",
+                                        "relative flex h-[52px] min-w-[70px] flex-col items-center justify-center gap-0.5 rounded-full px-3 transition-all duration-300",
                                         disabled ? "opacity-50 cursor-not-allowed grayscale" : "cursor-pointer"
                                     )}
                                 >
                                     {active && (
                                         <motion.div
                                             layoutId="mobile-nav-pill"
-                                            className="absolute inset-0 bg-gradient-to-tr from-orange-500 to-amber-500 shadow-[0_4px_12px_rgba(249,115,22,0.3)] rounded-full"
+                                            className="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 shadow-[0_4px_12px_rgba(249,115,22,0.30)]"
                                             initial={false}
                                             transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                         />
@@ -112,11 +99,11 @@ export const FloatingNavbar = <T,>({
                                     <span className="relative z-10 flex flex-col items-center gap-0.5">
                                         <item.icon className={cn(
                                             "w-5 h-5 transition-all duration-200",
-                                            active ? "stroke-[2.5px] text-white" : "text-gray-400 dark:text-gray-500"
+                                            active ? "stroke-[2.5px] text-white" : "text-gray-400 dark:text-white/38"
                                         )} />
                                         <span className={cn(
-                                            "text-[10px] font-semibold leading-none transition-all duration-200",
-                                            active ? "text-white" : "text-gray-400 dark:text-gray-500"
+                                            "text-[10px] font-extrabold leading-none transition-all duration-200",
+                                            active ? "text-white" : "text-gray-400 dark:text-white/38"
                                         )}>
                                             {item.label}
                                         </span>
@@ -146,21 +133,21 @@ export const FloatingNavbar = <T,>({
                                         "relative flex items-center justify-center rounded-full transition-all duration-300",
                                         active
                                             ? "px-6 py-2.5 text-white"
-                                            : "px-5 py-2.5 text-gray-500 dark:text-gray-400 hover:bg-orange-50/50 dark:hover:bg-white/5 hover:text-orange-600 dark:hover:text-white",
+                                            : "px-5 py-2.5 text-gray-500 hover:bg-orange-50/70 hover:text-orange-600 dark:text-white/38 dark:hover:bg-white/[0.055] dark:hover:text-white/72",
                                         disabled ? "opacity-40 cursor-not-allowed grayscale" : "cursor-pointer"
                                     )}
                                 >
                                     {active && (
                                         <motion.div
                                             layoutId="desktop-nav-pill"
-                                            className="absolute inset-0 bg-gradient-to-tr from-orange-500 to-amber-500 shadow-[0_4px_12px_rgba(249,115,22,0.3)] rounded-full"
+                                            className="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 shadow-[0_4px_12px_rgba(249,115,22,0.30)]"
                                             initial={false}
                                             transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                         />
                                     )}
                                     <span className={cn(
                                         "relative z-10 flex items-center gap-2 transition-colors duration-200",
-                                        active ? "text-white" : "text-gray-500 dark:text-gray-400"
+                                        active ? "text-white" : "text-gray-500 dark:text-white/38"
                                     )}>
                                         <item.icon className={cn("w-4 h-4", active && "stroke-[2.5px]")} />
                                         <span className="font-semibold text-sm">{item.label}</span>

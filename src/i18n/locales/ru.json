@@ -539,7 +539,10 @@
             "referrals": "Рефералы",
             "referralCount": "{{count}} шт.",
             "extraCode": "Новый Код",
-            "notAvailable": "Нет данных"
+            "notAvailable": "Нет данных",
+            "secureHint": "Личные данные защищены",
+            "show": "Показать",
+            "hide": "Скрыть"
         },
         "edit": {
             "title": "Редактировать профиль",
@@ -556,11 +559,16 @@
         },
         "quickActions": {
             "payments": "Кошелёк",
+            "paymentsDesc": "Баланс и платежи",
             "addPassport": "Добавить паспорт",
-            "myCards": "Мои карты"
+            "addPassportDesc": "Добавить документ",
+            "myCards": "Мои карты",
+            "myCardsDesc": "Сохраненные карты"
         },
         "session": {
             "title": "История активности",
+            "secureHint": "Последние входы и сигналы безопасности",
+            "recentTitle": "Последние действия",
             "loading": "Загрузка...",
             "empty": "История не найдена",
             "prev": "Назад",
@@ -578,6 +586,7 @@
         },
         "documents": {
             "title": "Личные документы",
+            "secureHint": "Документы открываются в режиме просмотра",
             "noDocuments": "Нет документов",
             "noDocumentsDesc": "Подтверждённые фотографии паспорта отсутствуют."
         },
@@ -1003,11 +1012,25 @@
                 "desc": "Пополнить баланс",
                 "badge": "Оплата",
                 "action": "Оплатить"
+            },
+            "ourAddress": {
+                "label": "Наш адрес",
+                "desc": "Офис и соцсети",
+                "badge": "Map",
+                "action": "Открыть"
+            },
+            "report": {
+                "label": "Отчеты",
+                "desc": "Ваши грузы и обращения",
+                "badge": "Отчет",
+                "action": "Смотреть"
             }
         },
         "sections": {
             "important": "Важная информация",
             "reportsAndPayments": "Отчеты и оплаты",
+            "primaryActions": "Основные действия",
+            "otherServices": "Другие услуги",
             "myCargo": "Мои грузы",
             "cargoReport": "Отчет по грузам",
             "paymentHistory": "История оплат",
@@ -1018,6 +1041,30 @@
         },
         "toast": {
             "comingSoon": "{{id}} выбран (Скоро...)"
+        }
+    },
+    "ourAddress": {
+        "title": "Наш адрес",
+        "subtitle": "Офис, карта и официальные страницы",
+        "close": "Закрыть",
+        "mapTitle": "Местоположение на карте",
+        "openYandex": "Открыть в Яндексе",
+        "addressLabel": "Адрес",
+        "locationName": "Офис Mandarin Cargo",
+        "addressValue": "Ташкент, Узбекистан. Нажмите кнопку ниже, чтобы открыть маршрут на карте.",
+        "coordinates": "Координаты: {{latitude}}, {{longitude}}",
+        "socialsTitle": "Социальные сети",
+        "telegram": {
+            "label": "Telegram канал",
+            "desc": "Новости и объявления"
+        },
+        "instagram": {
+            "label": "Instagram",
+            "desc": "Официальная страница"
+        },
+        "admin": {
+            "label": "Связаться с админом",
+            "desc": "Вопросы и помощь"
         }
     },
     "chinaAddress": {

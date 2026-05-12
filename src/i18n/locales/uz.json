@@ -539,7 +539,10 @@
             "referrals": "Referallar",
             "referralCount": "{{count}} ta",
             "extraCode": "Yangi Kod",
-            "notAvailable": "Mavjud emas"
+            "notAvailable": "Mavjud emas",
+            "secureHint": "Maxfiy ma'lumotlar himoyalangan",
+            "show": "Ko'rish",
+            "hide": "Yashirish"
         },
         "edit": {
             "title": "Profilni Tahrirlash",
@@ -556,11 +559,16 @@
         },
         "quickActions": {
             "payments": "Hamyonim",
+            "paymentsDesc": "Balans va to'lovlar",
             "addPassport": "Passport qo'shish",
-            "myCards": "Mening Kartalarim"
+            "addPassportDesc": "Hujjat qo'shish",
+            "myCards": "Mening Kartalarim",
+            "myCardsDesc": "Saqlangan kartalar"
         },
         "session": {
             "title": "Faollik tarixi",
+            "secureHint": "Oxirgi login va xavfsizlik signallari",
+            "recentTitle": "Oxirgi harakatlar",
             "loading": "Yuklanmoqda...",
             "empty": "Tarix topilmadi",
             "prev": "Ortga",
@@ -578,6 +586,7 @@
         },
         "documents": {
             "title": "Shaxsiy Hujjatlar",
+            "secureHint": "Ko'rish rejimida hujjatlar ochiladi",
             "noDocuments": "Hujjatlar yo'q",
             "noDocumentsDesc": "Tasdiqlangan pasport rasmlari mavjud emas."
         },
@@ -1003,11 +1012,25 @@
                 "desc": "Balansni to'ldirish",
                 "badge": "To'lov",
                 "action": "To'lash"
+            },
+            "ourAddress": {
+                "label": "Bizning manzil",
+                "desc": "Ofis va ijtimoiy tarmoqlar",
+                "badge": "Map",
+                "action": "Ochish"
+            },
+            "report": {
+                "label": "Hisobotlar",
+                "desc": "Yuklaringiz va murojaatlar",
+                "badge": "Hisobot",
+                "action": "Ko'rish"
             }
         },
         "sections": {
             "important": "Muhim ma'lumotlar",
             "reportsAndPayments": "Hisobotlar va to'lovlar",
+            "primaryActions": "Asosiy amallar",
+            "otherServices": "Boshqa xizmatlar",
             "myCargo": "Mening yuklarim",
             "cargoReport": "Yuklaringiz hisoboti",
             "paymentHistory": "To'lovlar tarixi",
@@ -1018,6 +1041,30 @@
         },
         "toast": {
             "comingSoon": "{{id}} tanlandi (Tez orada...)"
+        }
+    },
+    "ourAddress": {
+        "title": "Bizning manzil",
+        "subtitle": "Ofis, xarita va rasmiy sahifalar",
+        "close": "Yopish",
+        "mapTitle": "Xaritadagi joylashuv",
+        "openYandex": "Yandex'da ochish",
+        "addressLabel": "Manzil",
+        "locationName": "Mandarin Cargo ofisi",
+        "addressValue": "Toshkent, O'zbekiston. Yo'l xaritasini ochish uchun pastdagi tugmani bosing.",
+        "coordinates": "Koordinata: {{latitude}}, {{longitude}}",
+        "socialsTitle": "Ijtimoiy tarmoqlar",
+        "telegram": {
+            "label": "Telegram kanal",
+            "desc": "Yangiliklar va e'lonlar"
+        },
+        "instagram": {
+            "label": "Instagram",
+            "desc": "Rasmiy sahifamiz"
+        },
+        "admin": {
+            "label": "Admin bilan bog'lanish",
+            "desc": "Savol va yordam uchun"
         }
     },
     "chinaAddress": {

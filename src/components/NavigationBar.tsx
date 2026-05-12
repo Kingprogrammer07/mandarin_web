@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Sun, Moon, Monitor, LayoutDashboard
+  Sun, Moon, LayoutDashboard, Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,184 +15,133 @@ interface NavigationBarProps {
 
 
 // ─── LANGUAGE TOGGLE ────────────────────────────────────────────────────────
-const LanguageToggle = ({ isDark }: { isDark: boolean }) => {
+const LanguageMenu = () => {
   const { i18n } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const wrapStyle: React.CSSProperties = isDark
-    ? {
-      backgroundColor: "rgba(10,14,21,0.78)",
-      borderColor: "rgba(251,146,60,0.18)",
-      backdropFilter: "blur(16px)",
-      WebkitBackdropFilter: "blur(16px)",
-    }
-    : {
-      backgroundColor: "rgba(255,255,255,0.75)",
-      borderColor: "rgba(0,0,0,0.09)",
-      backdropFilter: "blur(12px)",
-      WebkitBackdropFilter: "blur(12px)",
+  useEffect(() => {
+    const closeMenu = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
     };
 
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', closeMenu);
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', closeMenu);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
+
+  const activeLanguage = i18n.language?.startsWith('ru') ? 'ru' : 'uz';
+  const languages = [
+    { code: 'uz', label: 'UZ' },
+    { code: 'ru', label: 'RU' },
+  ] as const;
+
   return (
-    <div
-      className="flex items-center p-1 rounded-full border transition-all duration-300 shadow-sm"
-      style={wrapStyle}
-    >
-      {['uz', 'ru'].map((lang) => {
-        const isActive = i18n.language === lang;
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        className={cn(
+          "grid h-10 w-10 place-items-center rounded-[15px] border transition-all duration-200 max-[360px]:h-9 max-[360px]:w-9",
+          isOpen
+            ? "border-orange-300/40 bg-orange-100/85 text-orange-600 dark:border-orange-300/24 dark:bg-orange-300/[0.13] dark:text-amber-300"
+            : "border-gray-200/80 bg-white/70 text-gray-600 hover:border-orange-200 hover:bg-orange-50 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-white/64 dark:hover:border-orange-300/20 dark:hover:bg-orange-300/[0.09]"
+        )}
+        aria-label="Tilni tanlash"
+        aria-expanded={isOpen}
+      >
+        <Globe className="h-5 w-5 max-[360px]:h-4 max-[360px]:w-4" />
+      </button>
 
-        const btnStyle: React.CSSProperties = isActive
-          ? isDark
-            ? {
-              backgroundColor: "rgba(255,138,31,0.18)",
-              color: "#fed7aa",
-              boxShadow: "0 0 0 1px rgba(251,146,60,0.24)",
-            }
-            : {
-              backgroundColor: "#ffffff",
-              color: "#ea580c",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-            }
-          : {
-            backgroundColor: "transparent",
-            color: isDark ? "rgba(255,255,255,0.35)" : "rgba(100,100,100,0.8)",
-          };
+      {isOpen && (
+        <div className="absolute right-0 top-[calc(100%+10px)] w-[132px] overflow-hidden rounded-[1.15rem] border border-gray-100 bg-white/96 p-1.5 shadow-[0_18px_42px_rgba(15,23,42,0.15)] backdrop-blur-2xl dark:border-white/[0.075] dark:bg-[#080b11]/96 dark:shadow-[0_24px_58px_rgba(0,0,0,0.54)]">
+          {languages.map((language) => {
+            const isActive = activeLanguage === language.code;
 
-        return (
-          <button
-            key={lang}
-            onClick={() => i18n.changeLanguage(lang)}
-            className="px-2.5 py-1.5 text-xs font-bold rounded-full transition-all duration-200 border-none cursor-pointer"
-            style={btnStyle}
-          >
-            {lang.toUpperCase()}
-          </button>
-        );
-      })}
+            return (
+              <button
+                key={language.code}
+                type="button"
+                onClick={() => {
+                  i18n.changeLanguage(language.code);
+                  setIsOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-[0.85rem] px-3 py-2 text-left text-xs font-black transition-all duration-200",
+                  isActive
+                    ? "bg-orange-50 text-orange-600 dark:bg-orange-300/[0.13] dark:text-amber-200"
+                    : "text-gray-500 hover:bg-gray-50 dark:text-white/50 dark:hover:bg-white/[0.055]"
+                )}
+              >
+                <span>{language.label}</span>
+                {isActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500 dark:bg-amber-300" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
 // ─── THEME TOGGLE ───────────────────────────────────────────────────────────
 const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
-  /* 
-   * Initialize state from localStorage if available, otherwise default to 'system'.
-   * This ensures the user's preference is remembered across reloads.
-   */
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
-      return (saved as 'light' | 'dark' | 'system') || 'system';
+      return saved === 'dark' ? 'dark' : 'light';
     }
-    return 'system';
+    return 'light';
   });
 
   useEffect(() => {
     const root = window.document.documentElement;
 
-    // 1. Save preference to localStorage whenever it changes
     localStorage.setItem('theme', theme);
-
-    // 2. Function to apply the theme
-    const applyTheme = () => {
-      // Remove any existing manual overrides
-      root.classList.remove('light', 'dark');
-
-      if (theme === 'system') {
-        // If system, check OS preference
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        root.classList.add(systemTheme);
-      } else {
-        // Otherwise use the explicit preference
-        root.classList.add(theme);
-      }
-    };
-
-    applyTheme();
-
-    // 3. Listener for System Theme Changes
-    // If the user selects 'system', we want to react if their OS mode changes live.
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-      const handleChange = () => applyTheme();
-
-      // Modern event listener
-      mediaQuery.addEventListener('change', handleChange);
-
-      // Cleanup
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
   }, [theme]);
 
-  const items = [
-    { id: 'light', icon: Sun },
-    { id: 'system', icon: Monitor },
-    { id: 'dark', icon: Moon },
-  ] as const;
-
-  const wrapStyle: React.CSSProperties = isDark
-    ? {
-      backgroundColor: "rgba(10,14,21,0.78)",
-      borderColor: "rgba(251,146,60,0.18)",
-      backdropFilter: "blur(16px)",
-      WebkitBackdropFilter: "blur(16px)",
-    }
-    : {
-      backgroundColor: "rgba(255,255,255,0.75)",
-      borderColor: "rgba(0,0,0,0.09)",
-      backdropFilter: "blur(12px)",
-      WebkitBackdropFilter: "blur(12px)",
-    };
+  const nextTheme = theme === 'dark' ? 'light' : 'dark';
+  const Icon = theme === 'dark' ? Sun : Moon;
 
   return (
-    <div
-      className="flex items-center gap-0.5 p-1 rounded-full border transition-all duration-300 shadow-sm"
-      style={wrapStyle}
+    <button
+      type="button"
+      onClick={() => setTheme(nextTheme)}
+      className={cn(
+        "grid h-10 w-10 place-items-center rounded-[15px] border transition-all duration-200 max-[360px]:h-9 max-[360px]:w-9",
+        isDark
+          ? "border-white/[0.085] bg-white/[0.055] text-amber-200 hover:border-orange-300/22 hover:bg-orange-300/[0.09]"
+          : "border-gray-200/80 bg-white/70 text-gray-600 hover:border-orange-200 hover:bg-orange-50"
+      )}
+      aria-label={nextTheme === 'light' ? 'Light mode' : 'Dark mode'}
+      title={nextTheme === 'light' ? 'Light mode' : 'Dark mode'}
     >
-      {items.map((item) => {
-        const isActive = theme === item.id;
-
-        const btnStyle: React.CSSProperties = isActive
-          ? isDark
-            ? {
-              backgroundColor: "rgba(255,138,31,0.18)",
-              color: "#fed7aa",
-              boxShadow: "0 0 0 1px rgba(251,146,60,0.24)",
-            }
-            : {
-              backgroundColor: "#ffffff",
-              color: "#f59e0b",       // amber-500
-              boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-            }
-          : {
-            backgroundColor: "transparent",
-            color: isDark ? "rgba(255,255,255,0.30)" : "rgba(120,120,120,0.9)",
-          };
-
-        return (
-          <button
-            key={item.id}
-            onClick={() => setTheme(item.id)}
-            className="p-1.5 rounded-full transition-all duration-200 border-none cursor-pointer hover:opacity-80"
-            style={btnStyle}
-          >
-            <item.icon size={14} />
-          </button>
-        );
-      })}
-    </div>
+      <Icon className="h-5 w-5 max-[360px]:h-4 max-[360px]:w-4" />
+    </button>
   );
 };
 
 // ─── MAIN NAVBAR ────────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function NavigationBar(_props: NavigationBarProps) {
-  useTranslation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isDark, setIsDark] = useState(false);
-
-  const isProfilePage = window.location.pathname === '/user/profile';
 
   // Scroll listener
   useEffect(() => {
@@ -210,55 +159,58 @@ export default function NavigationBar(_props: NavigationBarProps) {
     return () => observer.disconnect();
   }, []);
 
-  const forceLight = !isScrolled && (isProfilePage || isDark);
+  const useLightText = isDark;
 
   // ─── Inline style for scrolled dark bg ──────────────────────────────────
-  const navInlineStyle: React.CSSProperties = isScrolled && isDark
+  const panelStyle: React.CSSProperties = isDark
     ? {
-      backgroundColor: "rgba(6,8,13,0.80)",
-      backdropFilter: "blur(28px)",
-      WebkitBackdropFilter: "blur(28px)",
+      background: "linear-gradient(135deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025)), rgba(10,14,21,0.84)",
+      borderColor: "rgba(245,158,11,0.16)",
+      boxShadow: isScrolled
+        ? "0 18px 38px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.08)"
+        : "0 16px 34px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.08)",
+      backdropFilter: "blur(22px)",
+      WebkitBackdropFilter: "blur(22px)",
     }
-    : {};
+    : {
+      background: "rgba(255,255,255,0.88)",
+      borderColor: "rgba(251,146,60,0.22)",
+      boxShadow: isScrolled
+        ? "0 16px 34px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.8)"
+        : "0 12px 28px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.8)",
+      backdropFilter: "blur(18px)",
+      WebkitBackdropFilter: "blur(18px)",
+    };
 
   return (
     <nav
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
-        isScrolled
-          ? [
-            "py-3 shadow-sm border-gray-200/50",
-            "bg-white/80 backdrop-blur-xl",
-            "dark:border-orange-200/10 dark:shadow-[0_1px_0_rgba(251,146,60,0.08)]",
-          ].join(" ")
-          : "bg-transparent border-transparent py-4"
-      )}
-      style={navInlineStyle}
+      className="fixed left-0 right-0 top-3 z-50 px-3 transition-all duration-300 max-[360px]:px-2 sm:px-4"
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
+      <div
+        className="mx-auto max-w-4xl rounded-[22px] border px-2.5 py-2 transition-all duration-300 max-[360px]:rounded-[19px] max-[360px]:px-2 max-[360px]:py-1.5 sm:px-3"
+        style={panelStyle}
+      >
+        <div className="flex min-h-[42px] items-center justify-between gap-3 max-[360px]:min-h-[38px] max-[360px]:gap-2">
 
           {/* ── LOGO ── */}
-          <div className="flex items-center gap-2.5 cursor-pointer shrink-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center
-              bg-gradient-to-br from-orange-500 to-amber-500 text-white
-              shadow-lg shadow-orange-500/25 shrink-0">
-              <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer max-[360px]:gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-gradient-to-br from-amber-300 to-orange-500 text-orange-950 shadow-[0_12px_26px_rgba(245,158,11,0.22),inset_0_1px_0_rgba(255,255,255,0.35)] max-[360px]:h-8 max-[360px]:w-8 max-[360px]:rounded-[13px] sm:h-10 sm:w-10">
+              <LayoutDashboard className="h-5 w-5 max-[360px]:h-4 max-[360px]:w-4" />
             </div>
 
             <div className="flex flex-col min-w-0">
               <span className={cn(
-                "font-bold leading-tight tracking-tight transition-colors duration-300 truncate text-base sm:text-lg",
-                forceLight
-                  ? `text-white ${isProfilePage ? "md:text-black dark:text-white" : "md:text-white dark:text-white"}`
+                "truncate text-sm font-black leading-tight tracking-normal transition-colors duration-300 max-[360px]:text-[12px] sm:text-base",
+                useLightText
+                  ? "text-white"
                   : "text-gray-900 dark:text-white"
               )}>
                 Mandarin Cargo
               </span>
               <span className={cn(
-                "font-bold uppercase tracking-widest transition-colors duration-300 truncate text-[8px] sm:text-[10px]",
-                forceLight
-                  ? "text-white/70 md:text-black/70 dark:text-white/70"
+                "truncate text-[8px] font-extrabold uppercase tracking-[0.08em] transition-colors duration-300 max-[360px]:hidden sm:text-[9px]",
+                useLightText
+                  ? "text-white/70"
                   : "text-gray-500 dark:text-orange-200/55"
               )}>
                 Foydalanuvchi tizimi
@@ -267,12 +219,9 @@ export default function NavigationBar(_props: NavigationBarProps) {
           </div>
 
           {/* ── RIGHT SIDE ── */}
-          <div className="flex items-center gap-2 sm:gap-3">
-
-            {/* Togglelar — isDark prop to'g'ridan-to'g'ri uzatiladi */}
+          <div className="flex shrink-0 items-center gap-1.5 max-[360px]:gap-1">
             <NavbarThemeToggle isDark={isDark} />
-            <LanguageToggle isDark={isDark} />
-
+            <LanguageMenu />
           </div>
         </div>
       </div>

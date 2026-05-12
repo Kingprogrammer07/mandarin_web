@@ -1,17 +1,26 @@
-import { useState, useEffect, useCallback, memo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-    X, Copy, Check, MapPin, Loader2, Download,
-    ZoomIn, 
-    // Phone, 
-    AlertTriangle, RefreshCw,
+    AlertTriangle,
+    Check,
+    Copy,
+    Download,
+    FileText,
+    Loader2,
+    MapPin,
+    PackageCheck,
+    Phone,
+    RefreshCw,
+    type LucideIcon,
+    X,
+    ZoomIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/api/client';
+import { cn } from '@/lib/utils';
 
-// --- Types ---
 interface ChinaAddressData {
     client_code: string;
     phone: string;
@@ -27,9 +36,9 @@ interface ChinaAddressModalProps {
     onClose: () => void;
 }
 
-// --- Image tab labels (keyed by filename substring) ---
 const IMAGE_TAB_LABELS: Record<string, string> = {
     pindoudou: 'Pinduoduo',
+    pinduoduo: 'Pinduoduo',
     taobao: 'Taobao',
 };
 
@@ -40,6 +49,41 @@ function getTabLabel(url: string, index: number): string {
     }
     return `${index + 1}`;
 }
+
+function cleanWarningText(value: string): string {
+    return value.replace(/<\/?b>/g, ' ').replace(/⚠/g, '').replace(/\s+/g, ' ').trim();
+}
+
+const InfoRow = ({
+    icon: Icon,
+    label,
+    value,
+    monospace = false,
+}: {
+    icon: LucideIcon;
+    label: string;
+    value: string;
+    monospace?: boolean;
+}) => (
+    <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white/80 p-3.5 dark:border-white/[0.075] dark:bg-white/[0.035]">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[15px] border border-orange-200/70 bg-orange-50 text-orange-600 dark:border-orange-300/15 dark:bg-orange-300/[0.10] dark:text-amber-300">
+            <Icon className="h-[18px] w-[18px]" />
+        </div>
+        <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-wide text-gray-400 dark:text-white/34">
+                {label}
+            </p>
+            <p
+                className={cn(
+                    'mt-0.5 truncate text-sm font-bold text-gray-950 dark:text-[#fff8ed]',
+                    monospace && 'font-mono tracking-wide',
+                )}
+            >
+                {value}
+            </p>
+        </div>
+    </div>
+);
 
 const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
     const { t } = useTranslation();
@@ -52,8 +96,11 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
     const [previewIndex, setPreviewIndex] = useState(0);
 
     const isLoading = isOpen && !data && !error;
+    const addressLines = useMemo(
+        () => data?.full_address_string.split('\n').map((line) => line.trim()).filter(Boolean) ?? [],
+        [data],
+    );
 
-    // Fetch from real API
     useEffect(() => {
         if (!isOpen || data || error) return;
         let cancelled = false;
@@ -67,24 +114,40 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                 if (!cancelled) setError(err?.message ?? t('chinaAddress.error.generic'));
             });
 
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [isOpen, data, error, t]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setCopied(false);
+            setPreviewOpen(false);
+            return;
+        }
+
+        if (data?.images.length && activeTab > data.images.length - 1) {
+            setActiveTab(0);
+        }
+    }, [activeTab, data?.images.length, isOpen]);
 
     const handleRetry = useCallback(() => {
         setError(null);
         setData(null);
+        setImageLoaded({});
+        setActiveTab(0);
     }, []);
 
     const handleCopy = useCallback(() => {
         if (!data) return;
-        navigator.clipboard.writeText(data.full_address_string);
+        void navigator.clipboard.writeText(data.full_address_string);
         setCopied(true);
         toast.success(t('chinaAddress.toast.copied'));
-        setTimeout(() => setCopied(false), 2000);
+        window.setTimeout(() => setCopied(false), 2000);
     }, [data, t]);
 
-    const handleDownloadImage = useCallback(async (e: React.MouseEvent, imageUrl: string) => {
-        e.stopPropagation();
+    const handleDownloadImage = useCallback(async (event: React.MouseEvent, imageUrl: string) => {
+        event.stopPropagation();
         try {
             const response = await fetch(imageUrl);
             const blob = await response.blob();
@@ -95,10 +158,10 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+            window.setTimeout(() => window.URL.revokeObjectURL(url), 5000);
             toast.success(t('chinaAddress.toast.downloading'));
         } catch {
-            window.open(imageUrl, '_blank');
+            window.open(imageUrl, '_blank', 'noopener,noreferrer');
             toast.error(t('chinaAddress.toast.downloadFailed'));
         }
     }, [t]);
@@ -108,163 +171,174 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
         setPreviewOpen(true);
     }, []);
 
-    // --- Portal content ---
     const modalContent = (
         <AnimatePresence>
             {isOpen && (
                 <>
-                    {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
-                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+                        className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/55 p-0 backdrop-blur-[3px] sm:items-center sm:p-4"
                     >
-                        {/* Modal Card */}
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-white dark:bg-[#1a1b1e] w-full max-w-md max-h-[90vh] rounded-3xl overflow-y-auto shadow-2xl border border-white/10 relative z-[10000]"
+                            initial={{ opacity: 0, y: 34, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 28, scale: 0.98 }}
+                            transition={{ type: 'spring', damping: 27, stiffness: 300 }}
+                            onClick={(event) => event.stopPropagation()}
+                            className="relative z-[10000] flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-gray-100 bg-white shadow-[0_-18px_48px_rgba(0,0,0,0.18)] dark:border-white/[0.075] dark:bg-[#080b11] dark:shadow-[0_-24px_70px_rgba(0,0,0,0.58)] sm:rounded-[1.8rem]"
                         >
-                            {/* Header */}
-                            <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-gray-100 dark:border-white/5 bg-white/80 dark:bg-[#1a1b1e]/80 backdrop-blur-md">
-                                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
-                                    <MapPin className="w-5 h-5 text-orange-500 fill-orange-500/20" />
-                                    {t('chinaAddress.title')}
-                                </h2>
-                                <button
-                                    onClick={onClose}
-                                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-gray-500"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                            <div className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-gray-200 dark:bg-white/14 sm:hidden" />
+
+                            <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white/88 px-5 pb-4 pt-4 backdrop-blur-xl dark:border-white/[0.075] dark:bg-[#080b11]/92">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[17px] border border-orange-200/70 bg-orange-50 text-orange-600 dark:border-orange-300/15 dark:bg-orange-300/[0.10] dark:text-amber-300">
+                                            <MapPin className="h-5 w-5" />
+                                        </span>
+                                        <div className="min-w-0">
+                                            <h2 className="truncate text-lg font-black tracking-tight text-gray-950 dark:text-[#fff8ed]">
+                                                {t('chinaAddress.title')}
+                                            </h2>
+                                            <p className="mt-0.5 text-xs font-semibold text-gray-500 dark:text-white/42">
+                                                {t('chinaAddress.fullAddress')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-white/42 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                                    >
+                                        <X className="h-5 w-5" />
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Body */}
-                            <div className="p-5 space-y-4">
-                                {/* --- Loading State --- */}
+                            <div className="flex-1 overflow-y-auto px-5 py-4">
                                 {isLoading && (
-                                    <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-                                        <p className="text-sm text-gray-400">{t('chinaAddress.loading')}</p>
+                                    <div className="flex flex-col items-center justify-center gap-3 py-16">
+                                        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+                                        <p className="text-sm font-semibold text-gray-400">{t('chinaAddress.loading')}</p>
                                     </div>
                                 )}
 
-                                {/* --- Error State --- */}
                                 {error && (
                                     <motion.div
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="flex flex-col items-center justify-center py-12 gap-4"
+                                        className="flex flex-col items-center justify-center gap-4 py-12 text-center"
                                     >
-                                        <div className="p-4 rounded-full bg-red-50 dark:bg-red-500/10">
-                                            <AlertTriangle className="w-8 h-8 text-red-500" />
+                                        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-red-50 text-red-500 dark:bg-red-500/10">
+                                            <AlertTriangle className="h-8 w-8" />
                                         </div>
-                                        <p className="text-center text-gray-600 dark:text-gray-300 text-sm max-w-xs">
+                                        <p className="max-w-xs text-sm font-semibold leading-relaxed text-gray-600 dark:text-white/58">
                                             {error}
                                         </p>
                                         <button
+                                            type="button"
                                             onClick={handleRetry}
-                                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors active:scale-95"
+                                            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-400 px-5 text-sm font-black text-white shadow-[0_10px_24px_rgba(245,158,11,0.24)] active:scale-95"
                                         >
-                                            <RefreshCw className="w-4 h-4" />
+                                            <RefreshCw className="h-4 w-4" />
                                             {t('chinaAddress.retry')}
                                         </button>
                                     </motion.div>
                                 )}
 
-                                {/* --- Data Loaded --- */}
                                 {data && (
                                     <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.1 }}
+                                        initial={{ opacity: 0, y: 6 }}
+                                        animate={{ opacity: 1, y: 0 }}
                                         className="space-y-4"
                                     >
-                                        {/* Client Code Badge */}
-                                        {/* <motion.div
-                                            initial={{ scale: 0.9, opacity: 0 }}
-                                            animate={{ scale: 1, opacity: 1 }}
-                                            transition={{ type: 'spring', damping: 20, stiffness: 260 }}
-                                            className="text-center"
-                                        >
-                                            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 shadow-lg shadow-orange-500/25">
-                                                <span className="text-white/80 text-sm font-medium">{t('chinaAddress.clientCode')}</span>
-                                                <span className="text-white text-2xl font-extrabold tracking-wider">{data.client_code}</span>
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <InfoRow
+                                                icon={PackageCheck}
+                                                label={t('chinaAddress.clientCode')}
+                                                value={data.client_code}
+                                                monospace
+                                            />
+                                            <InfoRow
+                                                icon={Phone}
+                                                label="Telefon"
+                                                value={data.phone}
+                                                monospace
+                                            />
+                                        </div>
+
+                                        <div className="overflow-hidden rounded-[1.35rem] border border-orange-200/70 bg-orange-50/80 dark:border-orange-300/15 dark:bg-orange-300/[0.075]">
+                                            <div className="flex items-center justify-between border-b border-orange-200/70 px-4 py-3 dark:border-orange-300/12">
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-orange-600 dark:text-amber-300" />
+                                                    <p className="text-xs font-black uppercase tracking-wide text-orange-700 dark:text-amber-300">
+                                                        {t('chinaAddress.fullAddress')}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCopy}
+                                                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl bg-white px-2.5 text-[11px] font-black text-orange-700 shadow-sm transition-transform active:scale-95 dark:bg-orange-300/[0.12] dark:text-amber-200"
+                                                >
+                                                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                                    {copied ? t('chinaAddress.copied') : t('chinaAddress.copyButton')}
+                                                </button>
                                             </div>
-                                        </motion.div> */}
-
-                                        {/* Phone */}
-                                        {/* <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5">
-                                            <Phone className="w-4 h-4 text-orange-500 shrink-0" />
-                                            <span className="text-base font-mono font-semibold text-gray-800 dark:text-gray-200">{data.phone}</span>
-                                        </div> */}
-
-                                        {/* Address Card */}
-                                        <div className="bg-orange-50 dark:bg-orange-500/10 rounded-2xl p-4 border border-orange-100 dark:border-orange-500/20 space-y-1">
-                                            <p className="text-sm text-gray-500 dark:text-orange-200/70 font-medium">
-                                                {t('chinaAddress.fullAddress')}
-                                            </p>
-                                            <div className="text-base font-mono font-bold text-gray-900 dark:text-orange-100 leading-relaxed whitespace-pre-wrap break-words">
-                                                {data.full_address_string.split('\n').filter(Boolean).map((line, i) => (
-                                                    <div key={i} className="mb-1 last:mb-0">{line}</div>
+                                            <div className="space-y-2 p-4">
+                                                {addressLines.map((line, index) => (
+                                                    <div
+                                                        key={`${line}-${index}`}
+                                                        className="rounded-2xl border border-white/70 bg-white/76 px-3 py-2.5 dark:border-white/[0.065] dark:bg-[#0a0e15]/72"
+                                                    >
+                                                        <p className="break-words font-mono text-sm font-bold leading-relaxed text-gray-900 dark:text-[#fff8ed]">
+                                                            {line}
+                                                        </p>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
 
-                                        {/* Copy Button — large & obvious */}
                                         <button
+                                            type="button"
                                             onClick={handleCopy}
-                                            className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold text-lg shadow-lg shadow-orange-500/25 active:scale-[0.97] transition-all flex items-center justify-center gap-3 group"
+                                            className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-[1.15rem] bg-gradient-to-r from-orange-500 to-amber-400 text-base font-black text-white shadow-[0_14px_30px_rgba(245,158,11,0.24)] transition-transform active:scale-[0.98]"
                                         >
-                                            {copied ? (
-                                                <>
-                                                    <Check className="w-7 h-7" />
-                                                    <span className="text-xl">{t('chinaAddress.copied')}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy className="w-7 h-7 group-hover:rotate-12 transition-transform" />
-                                                    <span className="text-xl">{t('chinaAddress.copyButton')}</span>
-                                                </>
-                                            )}
+                                            {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                                            {copied ? t('chinaAddress.copied') : t('chinaAddress.copyButton')}
                                         </button>
 
-                                        {/* Image Tabs */}
                                         {data.images.length > 0 && (
                                             <div className="space-y-3">
-                                                {/* Tab selector */}
                                                 {data.images.length > 1 && (
-                                                    <div className="flex gap-2 p-1 rounded-xl bg-gray-100 dark:bg-white/5">
-                                                        {data.images.map((url, i) => (
+                                                    <div className="flex gap-1.5 rounded-2xl border border-gray-100 bg-gray-50 p-1 dark:border-white/[0.075] dark:bg-white/[0.035]">
+                                                        {data.images.map((url, index) => (
                                                             <button
-                                                                key={i}
-                                                                onClick={() => setActiveTab(i)}
-                                                                className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
-                                                                    activeTab === i
-                                                                        ? 'bg-white dark:bg-white/10 text-orange-600 dark:text-orange-400 shadow-sm'
-                                                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                                                }`}
+                                                                key={url}
+                                                                type="button"
+                                                                onClick={() => setActiveTab(index)}
+                                                                className={cn(
+                                                                    'min-w-0 flex-1 rounded-xl px-3 py-2 text-xs font-black transition-all',
+                                                                    activeTab === index
+                                                                        ? 'bg-white text-orange-700 shadow-sm dark:bg-orange-300/[0.12] dark:text-amber-300'
+                                                                        : 'text-gray-500 hover:text-gray-800 dark:text-white/38 dark:hover:text-white/70',
+                                                                )}
                                                             >
-                                                                {getTabLabel(url, i)}
+                                                                {getTabLabel(url, index)}
                                                             </button>
                                                         ))}
                                                     </div>
                                                 )}
 
-                                                {/* Active image */}
-                                                <div
-                                                    className="relative w-full aspect-[4/3] bg-gray-100 dark:bg-white/5 rounded-2xl overflow-hidden group cursor-pointer"
+                                                <button
+                                                    type="button"
+                                                    className="group relative aspect-[4/3] w-full overflow-hidden rounded-[1.35rem] border border-gray-100 bg-gray-50 dark:border-white/[0.075] dark:bg-white/[0.035]"
                                                     onClick={() => openPreview(activeTab)}
                                                 >
                                                     {!imageLoaded[activeTab] && (
-                                                        <div className="absolute inset-0 flex items-center justify-center">
-                                                            <Loader2 className="w-7 h-7 text-orange-500 animate-spin" />
+                                                        <div className="absolute inset-0 grid place-items-center">
+                                                            <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
                                                         </div>
                                                     )}
                                                     <AnimatePresence mode="wait">
@@ -273,33 +347,29 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                                                             initial={{ opacity: 0 }}
                                                             animate={{ opacity: imageLoaded[activeTab] ? 1 : 0 }}
                                                             exit={{ opacity: 0 }}
-                                                            transition={{ duration: 0.3 }}
+                                                            transition={{ duration: 0.25 }}
                                                             src={data.images[activeTab]}
                                                             alt={getTabLabel(data.images[activeTab], activeTab)}
-                                                            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                                                            className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]"
                                                             onLoad={() => setImageLoaded((prev) => ({ ...prev, [activeTab]: true }))}
                                                         />
                                                     </AnimatePresence>
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                                        <div className="bg-black/50 p-2 rounded-full text-white backdrop-blur-sm">
-                                                            <ZoomIn className="w-6 h-6" />
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                    <span className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-black/42 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
+                                                        <ZoomIn className="h-5 w-5" />
+                                                    </span>
+                                                </button>
                                             </div>
                                         )}
 
-                                        {/* Warning Banner */}
                                         {data.warning_text && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: 8 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: 0.25 }}
-                                                className="flex gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20"
+                                                className="flex gap-3 rounded-[1.2rem] border border-red-200 bg-red-50 p-4 dark:border-red-400/18 dark:bg-red-500/[0.08]"
                                             >
-                                                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                                                <p className="text-sm font-medium text-red-700 dark:text-red-300 leading-relaxed">
-                                                    {data.warning_text.replace(/<\/?b>/g, ' ').replace(/⚠/g, '').trim()}
+                                                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                                                <p className="text-sm font-semibold leading-relaxed text-red-700 dark:text-red-200">
+                                                    {cleanWarningText(data.warning_text)}
                                                 </p>
                                             </motion.div>
                                         )}
@@ -309,62 +379,64 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                         </motion.div>
                     </motion.div>
 
-                    {/* Fullscreen Image Preview */}
                     <AnimatePresence>
-                        {previewOpen && data && data.images[previewIndex] && (
+                        {previewOpen && data?.images[previewIndex] && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 onClick={() => setPreviewOpen(false)}
-                                className="fixed inset-0 bg-black/90 z-[11000] flex items-center justify-center p-4 backdrop-blur-md"
-                                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+                                className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/92 p-4 backdrop-blur-md"
                             >
                                 <button
+                                    type="button"
                                     onClick={() => setPreviewOpen(false)}
-                                    className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
+                                    className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="h-6 w-6" />
                                 </button>
 
-                                {/* Preview tab switcher */}
                                 {data.images.length > 1 && (
-                                    <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-                                        {data.images.map((url, i) => (
+                                    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 gap-2">
+                                        {data.images.map((url, index) => (
                                             <button
-                                                key={i}
-                                                onClick={(e) => { e.stopPropagation(); setPreviewIndex(i); }}
-                                                className={`px-4 py-2 rounded-lg text-sm font-semibold backdrop-blur-lg transition-all ${
-                                                    previewIndex === i
+                                                key={url}
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setPreviewIndex(index);
+                                                }}
+                                                className={cn(
+                                                    'rounded-xl px-3 py-2 text-xs font-black backdrop-blur-lg transition-all',
+                                                    previewIndex === index
                                                         ? 'bg-white/20 text-white'
-                                                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                                                }`}
+                                                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white',
+                                                )}
                                             >
-                                                {getTabLabel(url, i)}
+                                                {getTabLabel(url, index)}
                                             </button>
                                         ))}
                                     </div>
                                 )}
 
-                                <div className="absolute bottom-6 left-0 right-0 px-4 flex items-center justify-center gap-3 z-20">
-                                    <button
-                                        onClick={(e) => handleDownloadImage(e, data.images[previewIndex])}
-                                        className="px-6 py-3.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 backdrop-blur-lg rounded-xl text-white font-medium flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-orange-500/20"
-                                    >
-                                        <Download className="w-5 h-5" />
-                                        {t('chinaAddress.downloadButton')}
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={(event) => handleDownloadImage(event, data.images[previewIndex])}
+                                    className="absolute bottom-6 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-400 px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(245,158,11,0.24)] active:scale-95"
+                                >
+                                    <Download className="h-5 w-5" />
+                                    {t('chinaAddress.downloadButton')}
+                                </button>
 
                                 <motion.img
                                     key={previewIndex}
-                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    initial={{ scale: 0.92, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.9, opacity: 0 }}
-                                    onClick={(e) => e.stopPropagation()}
+                                    exit={{ scale: 0.92, opacity: 0 }}
+                                    onClick={(event) => event.stopPropagation()}
                                     src={data.images[previewIndex]}
-                                    alt="Full Preview"
-                                    className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+                                    alt="Full preview"
+                                    className="max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl"
                                 />
                             </motion.div>
                         )}

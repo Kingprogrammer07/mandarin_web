@@ -44,15 +44,15 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
    if (!images || images.length === 0) {
       return (
          <div className="
-            relative overflow-hidden rounded-3xl p-6 text-center
-            bg-white/80 dark:bg-white/5 border border-white/20 dark:border-white/10
-            backdrop-blur-md shadow-sm
+            relative overflow-hidden rounded-[22px] p-5 text-center
+            bg-white/92 dark:bg-[#0a0e15]/86 border border-gray-900/[0.07] dark:border-white/[0.085]
+            shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:shadow-none
          ">
-            <div className="w-12 h-12 bg-gray-100 dark:bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-gray-400 dark:text-gray-500">
-               <ShieldCheck className="w-6 h-6" />
+            <div className="mx-auto mb-3 flex h-[38px] w-[38px] items-center justify-center rounded-[14px] bg-white/[0.055] text-orange-500 dark:bg-white/[0.055] dark:text-amber-300">
+               <ShieldCheck className="h-5 w-5" />
             </div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{t('profile.documents.noDocuments')}</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <h3 className="mb-1 text-[13px] font-black text-gray-950 dark:text-[#fff8ed]">{t('profile.documents.noDocuments')}</h3>
+            <p className="text-xs font-semibold text-gray-500 dark:text-[#fff8ed]/52">
                {t('profile.documents.noDocumentsDesc')}
             </p>
          </div>
@@ -62,10 +62,15 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
    return (
       <>
          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-200 ml-1 flex items-center gap-2">
-               <span className="w-1 h-4 bg-emerald-500 rounded-full inline-block"></span>
-               {t('profile.documents.title')}
-            </h3>
+            <div className="ml-0.5">
+               <h3 className="flex items-center gap-2 text-[16px] font-black text-gray-950 dark:text-[#fff8ed]">
+                  <span className="inline-block h-[19px] w-1 rounded-full bg-orange-500"></span>
+                  {t('profile.documents.title')}
+               </h3>
+               <p className="mt-1 text-[11px] font-bold text-gray-500 dark:text-[#fff8ed]/52">
+                  {t('profile.documents.secureHint')}
+               </p>
+            </div>
 
             <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1 snap-x scrollbar-hide">
                {images.map((src, idx) => (
@@ -74,8 +79,8 @@ const PassportImages = memo(({ images }: { images: string[] }) => {
                      className="
                         flex-shrink-0 relative overflow-hidden rounded-2xl
                         w-40 sm:w-48 aspect-[3/2] snap-start
-                        bg-gray-100 dark:bg-white/5 border border-white/20 dark:border-white/10
-                        shadow-sm group cursor-pointer
+                        bg-white/92 dark:bg-[#0a0e15]/86 border border-gray-900/[0.07] dark:border-white/[0.085]
+                        shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:shadow-none group cursor-pointer
                      "
                      onClick={() => setSelectedImage(src)}
                   >
@@ -156,6 +161,7 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
    const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
    const [isPassportsModalOpen, setIsPassportsModalOpen] = useState(false);
    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+   const [isSensitiveVisible, setIsSensitiveVisible] = useState(false);
    const [isModalLoading, startTransition] = useTransition();
 
    const handleLogout = useCallback(() => {
@@ -207,7 +213,7 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
    }
 
    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0d0a04] text-gray-900 dark:text-white transition-colors duration-500 font-sans">
+      <div className="min-h-screen bg-[#f6f7f9] dark:bg-[#06080d] text-gray-900 dark:text-white transition-colors duration-500 font-sans">
          <UniqueBackground />
 
          <AnimatePresence mode="wait">
@@ -219,14 +225,11 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
             >
                {/* Desktop Container Wrapper */}
                <div className="md:container md:mx-auto md:max-w-7xl md:p-6 lg:p-8">
-                  <div className="flex flex-col md:grid md:grid-cols-12 md:gap-8 md:items-start md:mt-12 pb-10">
+                  <div className="flex flex-col pb-10 pt-[94px] md:grid md:grid-cols-12 md:items-start md:gap-8 md:pt-0 md:mt-12">
 
                      {/* LEFT COLUMN (Desktop): Profile Hero & Quick Actions */}
                      <aside className="w-full md:col-span-5 lg:col-span-4 md:sticky md:top-8 self-start z-30">
-                        {/* Hero Section - Glass Effect */}
-                        <div className="relative overflow-hidden rounded-b-[2.5rem] md:rounded-[2.5rem] shadow-2xl border-b border-white/10 md:border md:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-xl">
-                           <ProfileHero user={user} onBalanceClick={() => setIsWalletModalOpen(true)} />
-                        </div>
+                        <ProfileHero user={user} onBalanceClick={() => setIsWalletModalOpen(true)} />
 
                         {/* Desktop Only: Quick Actions & Buttons moved here */}
                         <div className="hidden md:flex flex-col gap-6 mt-6">
@@ -237,7 +240,7 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
                            />
 
                            {/* Passport Images (Desktop) */}
-                           <PassportImages images={user.passport_images} />
+                           {isSensitiveVisible && <PassportImages images={user.passport_images} />}
 
                            <div className="space-y-3">
                               <Button
@@ -264,9 +267,9 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
                      </aside>
 
                      {/* RIGHT COLUMN (Desktop): Main Content */}
-                     <main className="w-full md:col-span-7 lg:col-span-8 relative z-20 md:mt-0 px-4 md:px-0">
+                     <main className="relative z-20 w-full px-4 md:col-span-7 md:mt-0 md:px-0 lg:col-span-8">
                         {/* Mobile Negative Margin Wrapper */}
-                        <div className="mt-6 md:mt-0 pb-10 md:pb-0 space-y-5 md:space-y-6">
+                        <div className="mt-3 space-y-5 pb-10 md:mt-0 md:space-y-6 md:pb-0">
 
                            {/* Mobile Only: Quick Actions */}
                            <div className="md:hidden max-w-md mx-auto w-full">
@@ -277,17 +280,23 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
                               />
                            </div>
 
-                           {/* Mobile Only: Passport Images */}
-                           <div className="md:hidden max-w-md mx-auto w-full">
-                              <PassportImages images={user.passport_images} />
-                           </div>
+                           <PersonalInfo
+                              user={user}
+                              isSensitiveVisible={isSensitiveVisible}
+                              onToggleSensitive={() => setIsSensitiveVisible((visible) => !visible)}
+                           />
 
-                           <PersonalInfo user={user} />
+                           {/* Mobile Only: Passport Images */}
+                           {isSensitiveVisible && (
+                              <div className="md:hidden max-w-md mx-auto w-full">
+                                 <PassportImages images={user.passport_images} />
+                              </div>
+                           )}
 
                            <SessionHistory />
 
                            {/* Mobile Only: Buttons */}
-                           <div className="md:hidden max-w-md mx-auto space-y-3 pt-4 px-4">
+                           <div className="md:hidden max-w-md mx-auto space-y-3 px-4">
                               <Button
                                  variant="outline"
                                  className="w-full h-14 rounded-2xl text-lg font-medium shadow-sm border-gray-200 dark:border-white/10 bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 active:scale-95 transition-all text-gray-700 dark:text-gray-200"
@@ -397,8 +406,8 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
 
 const ProfileSkeleton = memo(() => {
    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0d0a04]">
-         <div className="bg-[#1e1a45]/50 pt-25 pb-24 px-6 rounded-b-[3rem] h-80 relative mb-24 overflow-hidden">
+      <div className="min-h-screen bg-[#f6f7f9] dark:bg-[#06080d]">
+         <div className="relative mb-24 h-80 overflow-hidden rounded-b-[3rem] border-b border-orange-200/15 bg-white px-6 pb-24 pt-25 dark:bg-[#0a0e15]">
             <div className="flex flex-col items-center relative z-10">
                <Skeleton className="w-28 h-28 rounded-full mb-4 bg-white/10" />
                <Skeleton className="h-8 w-48 bg-white/10 mb-2 rounded-lg" />

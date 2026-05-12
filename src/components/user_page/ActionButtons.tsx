@@ -1,238 +1,197 @@
-import { memo } from "react";
-import { ChevronRight } from "lucide-react";
+import { memo } from 'react';
+import type { ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react';
 
-// ─────────────────────────────────────────────────────────
-//  WHY NO FREEZE:
-//  • Zero inline style objects for colors — only CSS variables
-//  • dark: class switch = pure CSS recalc, no React re-render
-//  • backdrop-blur stays on its own GPU layer untouched
-//  • willChange: transform set once via className, never changes
-//  • No JS runs on theme toggle — browser handles everything
-// ─────────────────────────────────────────────────────────
+type ActionTheme = 'amber' | 'emerald' | 'sky' | 'rose' | 'violet' | 'cyan';
+type ActionVariant = 'primary' | 'secondary';
 
 interface ActionItemData {
-    id: string;
-    icon: React.ReactNode;
-    bgIcon?: React.ReactNode;
-    label: string;
-    desc: string;
-    badge: string;
-    actionLabel: string;
-    theme: "amber" | "emerald" | "sky" | "rose" | "violet" | "cyan";
+  id: string;
+  icon: ReactNode;
+  bgIcon?: ReactNode;
+  label: string;
+  desc: string;
+  badge: string;
+  actionLabel: string;
+  theme: ActionTheme;
 }
 
-// ─── CSS variable class sets per theme ───────────────────
-// Each theme injects --ab-* variables onto the card element.
-// dark: variants flip the same variables — no JS needed.
-const THEME_VARS: Record<ActionItemData["theme"], string> = {
-    amber: `
-        [--ab-bg:rgba(255,251,235,0.58)]           dark:[--ab-bg:rgba(28,20,5,0.52)]
-        [--ab-border:rgba(245,158,11,0.28)]         dark:[--ab-border:rgba(245,158,11,0.22)]
-        [--ab-shine:rgba(255,255,255,0.75)]         dark:[--ab-shine:rgba(255,255,255,0.07)]
-        [--ab-shadow:rgba(0,0,0,0.05)]              dark:[--ab-shadow:rgba(0,0,0,0.35)]
-        [--ab-icon-bg:rgba(245,158,11,0.15)]        dark:[--ab-icon-bg:rgba(245,158,11,0.18)]
-        [--ab-icon-ring:rgba(255,255,255,0.55)]     dark:[--ab-icon-ring:rgba(255,255,255,0.07)]
-        [--ab-icon-color:#d97706]                   dark:[--ab-icon-color:#fbbf24]
-        [--ab-wm-color:rgba(245,158,11,0.06)]       dark:[--ab-wm-color:rgba(245,158,11,0.06)]
-        [--ab-badge-text:#b45309]                   dark:[--ab-badge-text:#fbbf24]
-        [--ab-badge-bg:rgba(245,158,11,0.12)]       dark:[--ab-badge-bg:rgba(245,158,11,0.15)]
-        [--ab-badge-border:rgba(245,158,11,0.35)]   dark:[--ab-badge-border:rgba(245,158,11,0.28)]
-        [--ab-title:#111827]                        dark:[--ab-title:#f0ece5]
-        [--ab-desc:rgba(120,80,10,0.6)]             dark:[--ab-desc:rgba(255,255,255,0.35)]
-        [--ab-bar-border:rgba(245,158,11,0.22)]     dark:[--ab-bar-border:rgba(245,158,11,0.18)]
-        [--ab-bar-text:#d97706]                     dark:[--ab-bar-text:#fbbf24]
-        [--ab-glow:rgba(245,158,11,0.13)]           dark:[--ab-glow:rgba(245,158,11,0.2)]
-    `,
-    emerald: `
-        [--ab-bg:rgba(236,253,245,0.58)]            dark:[--ab-bg:rgba(5,28,18,0.52)]
-        [--ab-border:rgba(16,185,129,0.28)]          dark:[--ab-border:rgba(16,185,129,0.22)]
-        [--ab-shine:rgba(255,255,255,0.75)]          dark:[--ab-shine:rgba(255,255,255,0.07)]
-        [--ab-shadow:rgba(0,0,0,0.05)]               dark:[--ab-shadow:rgba(0,0,0,0.35)]
-        [--ab-icon-bg:rgba(16,185,129,0.15)]         dark:[--ab-icon-bg:rgba(16,185,129,0.18)]
-        [--ab-icon-ring:rgba(255,255,255,0.55)]      dark:[--ab-icon-ring:rgba(255,255,255,0.07)]
-        [--ab-icon-color:#059669]                    dark:[--ab-icon-color:#34d399]
-        [--ab-wm-color:rgba(16,185,129,0.06)]        dark:[--ab-wm-color:rgba(16,185,129,0.06)]
-        [--ab-badge-text:#047857]                    dark:[--ab-badge-text:#34d399]
-        [--ab-badge-bg:rgba(16,185,129,0.12)]        dark:[--ab-badge-bg:rgba(16,185,129,0.15)]
-        [--ab-badge-border:rgba(16,185,129,0.35)]    dark:[--ab-badge-border:rgba(16,185,129,0.28)]
-        [--ab-title:#111827]                         dark:[--ab-title:#f0ece5]
-        [--ab-desc:rgba(6,78,59,0.6)]                dark:[--ab-desc:rgba(255,255,255,0.35)]
-        [--ab-bar-border:rgba(16,185,129,0.22)]      dark:[--ab-bar-border:rgba(16,185,129,0.18)]
-        [--ab-bar-text:#059669]                      dark:[--ab-bar-text:#34d399]
-        [--ab-glow:rgba(16,185,129,0.13)]            dark:[--ab-glow:rgba(16,185,129,0.2)]
-    `,
-    sky: `
-        [--ab-bg:rgba(240,249,255,0.58)]            dark:[--ab-bg:rgba(5,18,28,0.52)]
-        [--ab-border:rgba(14,165,233,0.28)]          dark:[--ab-border:rgba(14,165,233,0.22)]
-        [--ab-shine:rgba(255,255,255,0.75)]          dark:[--ab-shine:rgba(255,255,255,0.07)]
-        [--ab-shadow:rgba(0,0,0,0.05)]               dark:[--ab-shadow:rgba(0,0,0,0.35)]
-        [--ab-icon-bg:rgba(14,165,233,0.15)]         dark:[--ab-icon-bg:rgba(14,165,233,0.18)]
-        [--ab-icon-ring:rgba(255,255,255,0.55)]      dark:[--ab-icon-ring:rgba(255,255,255,0.07)]
-        [--ab-icon-color:#0284c7]                    dark:[--ab-icon-color:#38bdf8]
-        [--ab-wm-color:rgba(14,165,233,0.06)]        dark:[--ab-wm-color:rgba(14,165,233,0.06)]
-        [--ab-badge-text:#0369a1]                    dark:[--ab-badge-text:#38bdf8]
-        [--ab-badge-bg:rgba(14,165,233,0.12)]        dark:[--ab-badge-bg:rgba(14,165,233,0.15)]
-        [--ab-badge-border:rgba(14,165,233,0.35)]    dark:[--ab-badge-border:rgba(14,165,233,0.28)]
-        [--ab-title:#111827]                         dark:[--ab-title:#f0ece5]
-        [--ab-desc:rgba(7,89,133,0.6)]               dark:[--ab-desc:rgba(255,255,255,0.35)]
-        [--ab-bar-border:rgba(14,165,233,0.22)]      dark:[--ab-bar-border:rgba(14,165,233,0.18)]
-        [--ab-bar-text:#0284c7]                      dark:[--ab-bar-text:#38bdf8]
-        [--ab-glow:rgba(14,165,233,0.13)]            dark:[--ab-glow:rgba(14,165,233,0.2)]
-    `,
-    rose: `
-        [--ab-bg:rgba(255,241,242,0.58)]            dark:[--ab-bg:rgba(28,5,10,0.52)]
-        [--ab-border:rgba(244,63,94,0.28)]           dark:[--ab-border:rgba(244,63,94,0.22)]
-        [--ab-shine:rgba(255,255,255,0.75)]          dark:[--ab-shine:rgba(255,255,255,0.07)]
-        [--ab-shadow:rgba(0,0,0,0.05)]               dark:[--ab-shadow:rgba(0,0,0,0.35)]
-        [--ab-icon-bg:rgba(244,63,94,0.15)]          dark:[--ab-icon-bg:rgba(244,63,94,0.18)]
-        [--ab-icon-ring:rgba(255,255,255,0.55)]      dark:[--ab-icon-ring:rgba(255,255,255,0.07)]
-        [--ab-icon-color:#e11d48]                    dark:[--ab-icon-color:#fb7185]
-        [--ab-wm-color:rgba(244,63,94,0.06)]         dark:[--ab-wm-color:rgba(244,63,94,0.06)]
-        [--ab-badge-text:#be123c]                    dark:[--ab-badge-text:#fb7185]
-        [--ab-badge-bg:rgba(244,63,94,0.12)]         dark:[--ab-badge-bg:rgba(244,63,94,0.15)]
-        [--ab-badge-border:rgba(244,63,94,0.35)]     dark:[--ab-badge-border:rgba(244,63,94,0.28)]
-        [--ab-title:#111827]                         dark:[--ab-title:#f0ece5]
-        [--ab-desc:rgba(136,19,55,0.6)]              dark:[--ab-desc:rgba(255,255,255,0.35)]
-        [--ab-bar-border:rgba(244,63,94,0.22)]       dark:[--ab-bar-border:rgba(244,63,94,0.18)]
-        [--ab-bar-text:#e11d48]                      dark:[--ab-bar-text:#fb7185]
-        [--ab-glow:rgba(244,63,94,0.13)]             dark:[--ab-glow:rgba(244,63,94,0.2)]
-    `,
-    violet: `
-        [--ab-bg:rgba(245,243,255,0.58)]            dark:[--ab-bg:rgba(15,8,28,0.52)]
-        [--ab-border:rgba(139,92,246,0.28)]          dark:[--ab-border:rgba(139,92,246,0.22)]
-        [--ab-shine:rgba(255,255,255,0.75)]          dark:[--ab-shine:rgba(255,255,255,0.07)]
-        [--ab-shadow:rgba(0,0,0,0.05)]               dark:[--ab-shadow:rgba(0,0,0,0.35)]
-        [--ab-icon-bg:rgba(139,92,246,0.15)]         dark:[--ab-icon-bg:rgba(139,92,246,0.18)]
-        [--ab-icon-ring:rgba(255,255,255,0.55)]      dark:[--ab-icon-ring:rgba(255,255,255,0.07)]
-        [--ab-icon-color:#7c3aed]                    dark:[--ab-icon-color:#a78bfa]
-        [--ab-wm-color:rgba(139,92,246,0.06)]        dark:[--ab-wm-color:rgba(139,92,246,0.06)]
-        [--ab-badge-text:#6d28d9]                    dark:[--ab-badge-text:#a78bfa]
-        [--ab-badge-bg:rgba(139,92,246,0.12)]        dark:[--ab-badge-bg:rgba(139,92,246,0.15)]
-        [--ab-badge-border:rgba(139,92,246,0.35)]    dark:[--ab-badge-border:rgba(139,92,246,0.28)]
-        [--ab-title:#111827]                         dark:[--ab-title:#f0ece5]
-        [--ab-desc:rgba(76,29,149,0.6)]              dark:[--ab-desc:rgba(255,255,255,0.35)]
-        [--ab-bar-border:rgba(139,92,246,0.22)]      dark:[--ab-bar-border:rgba(139,92,246,0.18)]
-        [--ab-bar-text:#7c3aed]                      dark:[--ab-bar-text:#a78bfa]
-        [--ab-glow:rgba(139,92,246,0.13)]            dark:[--ab-glow:rgba(139,92,246,0.2)]
-    `,
-    cyan: `
-        [--ab-bg:rgba(236,254,255,0.58)]            dark:[--ab-bg:rgba(4,18,22,0.52)]
-        [--ab-border:rgba(6,182,212,0.28)]           dark:[--ab-border:rgba(6,182,212,0.22)]
-        [--ab-shine:rgba(255,255,255,0.75)]          dark:[--ab-shine:rgba(255,255,255,0.07)]
-        [--ab-shadow:rgba(0,0,0,0.05)]               dark:[--ab-shadow:rgba(0,0,0,0.35)]
-        [--ab-icon-bg:rgba(6,182,212,0.15)]          dark:[--ab-icon-bg:rgba(6,182,212,0.18)]
-        [--ab-icon-ring:rgba(255,255,255,0.55)]      dark:[--ab-icon-ring:rgba(255,255,255,0.07)]
-        [--ab-icon-color:#0891b2]                    dark:[--ab-icon-color:#22d3ee]
-        [--ab-wm-color:rgba(6,182,212,0.06)]         dark:[--ab-wm-color:rgba(6,182,212,0.06)]
-        [--ab-badge-text:#0e7490]                    dark:[--ab-badge-text:#22d3ee]
-        [--ab-badge-bg:rgba(6,182,212,0.12)]         dark:[--ab-badge-bg:rgba(6,182,212,0.15)]
-        [--ab-badge-border:rgba(6,182,212,0.35)]     dark:[--ab-badge-border:rgba(6,182,212,0.28)]
-        [--ab-title:#111827]                         dark:[--ab-title:#f0ece5]
-        [--ab-desc:rgba(14,116,144,0.6)]             dark:[--ab-desc:rgba(255,255,255,0.35)]
-        [--ab-bar-border:rgba(6,182,212,0.22)]       dark:[--ab-bar-border:rgba(6,182,212,0.18)]
-        [--ab-bar-text:#0891b2]                      dark:[--ab-bar-text:#22d3ee]
-        [--ab-glow:rgba(6,182,212,0.13)]             dark:[--ab-glow:rgba(6,182,212,0.2)]
-    `,
+const ACCENT_VARS: Record<ActionTheme, string> = {
+  amber: `
+    [--ab-accent:#d97706] dark:[--ab-accent:#f6c453]
+    [--ab-accent-soft:rgba(245,158,11,0.12)] dark:[--ab-accent-soft:rgba(245,158,11,0.12)]
+    [--ab-badge-bg:rgba(245,158,11,0.08)] dark:[--ab-badge-bg:rgba(245,158,11,0.09)]
+    [--ab-badge-border:rgba(245,158,11,0.18)] dark:[--ab-badge-border:rgba(245,158,11,0.16)]
+  `,
+  emerald: `
+    [--ab-accent:#059669] dark:[--ab-accent:#34d399]
+    [--ab-accent-soft:rgba(16,185,129,0.11)] dark:[--ab-accent-soft:rgba(16,185,129,0.10)]
+    [--ab-badge-bg:rgba(16,185,129,0.08)] dark:[--ab-badge-bg:rgba(16,185,129,0.08)]
+    [--ab-badge-border:rgba(16,185,129,0.16)] dark:[--ab-badge-border:rgba(16,185,129,0.14)]
+  `,
+  sky: `
+    [--ab-accent:#0284c7] dark:[--ab-accent:#7dd3fc]
+    [--ab-accent-soft:rgba(14,165,233,0.11)] dark:[--ab-accent-soft:rgba(125,211,252,0.10)]
+    [--ab-badge-bg:rgba(14,165,233,0.08)] dark:[--ab-badge-bg:rgba(125,211,252,0.08)]
+    [--ab-badge-border:rgba(14,165,233,0.16)] dark:[--ab-badge-border:rgba(125,211,252,0.14)]
+  `,
+  rose: `
+    [--ab-accent:#e11d48] dark:[--ab-accent:#fb7185]
+    [--ab-accent-soft:rgba(244,63,94,0.11)] dark:[--ab-accent-soft:rgba(244,63,94,0.10)]
+    [--ab-badge-bg:rgba(244,63,94,0.08)] dark:[--ab-badge-bg:rgba(244,63,94,0.08)]
+    [--ab-badge-border:rgba(244,63,94,0.16)] dark:[--ab-badge-border:rgba(244,63,94,0.14)]
+  `,
+  violet: `
+    [--ab-accent:#7c3aed] dark:[--ab-accent:#c4b5fd]
+    [--ab-accent-soft:rgba(139,92,246,0.10)] dark:[--ab-accent-soft:rgba(196,181,253,0.09)]
+    [--ab-badge-bg:rgba(139,92,246,0.08)] dark:[--ab-badge-bg:rgba(196,181,253,0.08)]
+    [--ab-badge-border:rgba(139,92,246,0.15)] dark:[--ab-badge-border:rgba(196,181,253,0.13)]
+  `,
+  cyan: `
+    [--ab-accent:#0891b2] dark:[--ab-accent:#22d3ee]
+    [--ab-accent-soft:rgba(6,182,212,0.10)] dark:[--ab-accent-soft:rgba(6,182,212,0.09)]
+    [--ab-badge-bg:rgba(6,182,212,0.08)] dark:[--ab-badge-bg:rgba(6,182,212,0.08)]
+    [--ab-badge-border:rgba(6,182,212,0.15)] dark:[--ab-badge-border:rgba(6,182,212,0.13)]
+  `,
 };
 
-// ─── ActionButton ─────────────────────────────────────────
-export const ActionButton = memo(({ item, onClick }: {
-    item: ActionItemData;
-    onClick?: () => void;
+export const ActionButton = memo(({
+  item,
+  onClick,
+  featured = false,
+  variant = 'primary',
+}: {
+  item: ActionItemData;
+  onClick?: () => void;
+  featured?: boolean;
+  variant?: ActionVariant;
 }) => {
-    return (
+  const isSecondary = variant === 'secondary';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`
+        group relative w-full overflow-hidden text-left select-none
+        border bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.06)]
+        transition-[transform,border-color,background-color,box-shadow] duration-200
+        active:scale-[0.97]
+        dark:bg-[#0a0e15]/95 dark:shadow-[0_10px_28px_rgba(0,0,0,0.22)]
+        ${ACCENT_VARS[item.theme]}
+        ${isSecondary
+          ? 'min-h-[68px] rounded-[1.25rem] p-3 flex items-center gap-3 border-gray-200/80 dark:border-white/[0.075] sm:hover:border-orange-200/80 dark:sm:hover:border-orange-400/20'
+          : 'min-h-[142px] rounded-3xl p-3.5 border-gray-200/80 dark:border-white/[0.085] sm:hover:-translate-y-0.5 sm:hover:border-orange-200/80 sm:hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] dark:sm:hover:border-orange-400/20 dark:sm:hover:bg-[#0d131d]'
+        }
+        ${featured
+          ? 'md:col-span-3 md:min-h-[156px] md:p-5 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:gap-5 md:border-orange-300/40 md:bg-gradient-to-br md:from-white md:via-orange-50/60 md:to-white dark:md:border-orange-400/22 dark:md:bg-[radial-gradient(circle_at_10%_20%,rgba(245,158,11,0.22),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(255,255,255,0.025)),#111824]'
+          : !isSecondary
+            ? 'md:min-h-[92px] md:grid md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:gap-3 md:p-4'
+            : ''
+        }
+      `}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/50 via-transparent to-transparent opacity-70 dark:from-white/[0.06]" />
+      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/10" />
+      {featured && (
+        <div className="pointer-events-none absolute inset-x-5 top-0 hidden h-px bg-gradient-to-r from-transparent via-orange-200/80 to-transparent dark:via-orange-200/70 md:block" />
+      )}
+
+      {item.bgIcon && !isSecondary && (
         <div
-            onClick={onClick}
+          className="pointer-events-none absolute -bottom-4 -right-3 text-[color:var(--ab-accent)] opacity-[0.025] dark:opacity-[0.045]"
+          aria-hidden="true"
+        >
+          {item.bgIcon}
+        </div>
+      )}
+
+      <div
+        className={`
+          relative z-10 flex items-center gap-3
+          ${isSecondary
+            ? 'contents'
+            : 'justify-between md:contents'
+          }
+          ${featured ? 'md:flex md:flex-col md:items-start md:justify-center' : ''}
+        `}
+      >
+        <span
+          className={`
+            flex shrink-0 items-center justify-center
+            bg-gray-100/90 text-[color:var(--ab-accent)] ring-1 ring-black/[0.04]
+            dark:bg-white/[0.055] dark:ring-white/[0.07]
+            ${isSecondary ? 'h-10 w-10 rounded-[14px]' : 'h-11 w-11 rounded-[15px]'}
+            ${featured ? 'md:h-16 md:w-16 md:rounded-[22px] md:bg-[color:var(--ab-accent-soft)] md:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : ''}
+          `}
+        >
+          {item.icon}
+        </span>
+
+        {!isSecondary && (
+          <span
             className={`
-                relative overflow-hidden rounded-3xl p-4
-                flex flex-col justify-between min-h-[130px]
-                cursor-pointer select-none
-                transition-transform duration-200 transform-gpu
-                hover:-translate-y-[3px] active:scale-[0.97]
-                ${THEME_VARS[item.theme]}
+              rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest
+              text-[color:var(--ab-accent)] md:hidden
+              ${featured ? 'md:mt-3 md:inline-flex' : ''}
             `}
             style={{
-                // Only non-color, structural styles here — never changes on theme toggle
-                background:          "var(--ab-bg)",
-                backdropFilter:      "blur(20px) saturate(180%)",
-                WebkitBackdropFilter:"blur(20px) saturate(180%)",
-                border:              "1px solid var(--ab-border)",
-                boxShadow:           "inset 0 1px 0 var(--ab-shine), 0 1px 3px var(--ab-shadow)",
+              backgroundColor: 'var(--ab-badge-bg)',
+              borderColor: 'var(--ab-badge-border)',
             }}
+          >
+            {item.badge}
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`
+          relative z-10 min-w-0
+          ${isSecondary ? 'flex-1' : 'mt-5 md:mt-0'}
+          ${featured ? 'md:mt-0' : ''}
+        `}
+      >
+        <h3
+          className={`
+            font-black leading-tight text-gray-950 dark:text-[#fff8ed]
+            ${isSecondary ? 'text-[13px]' : 'text-[15px]'}
+            ${featured ? 'md:text-[24px]' : ''}
+          `}
         >
-            {/* Glow blob — radial-gradient, no blur filter */}
-            <div
-                className="pointer-events-none absolute -bottom-6 -left-6 w-32 h-32 rounded-full"
-                style={{ background: "radial-gradient(circle, var(--ab-glow) 0%, transparent 70%)" }}
-            />
+          {item.label}
+        </h3>
+        <p
+          className={`
+            mt-1 font-semibold leading-snug text-gray-500 dark:text-white/45
+            ${isSecondary ? 'text-[10.5px]' : 'text-[11.5px]'}
+            ${featured ? 'md:max-w-[340px] md:text-[13px]' : ''}
+          `}
+        >
+          {item.desc}
+        </p>
+      </div>
 
-            {/* Watermark icon — color has opacity baked into rgba, no separate opacity needed */}
-            {item.bgIcon && (
-                <div
-                    className="pointer-events-none absolute -bottom-2 -right-2"
-                    style={{ color: "var(--ab-wm-color)" }}
-                >
-                    {item.bgIcon}
-                </div>
-            )}
-
-            {/* ── Top: icon + badge ── */}
-            <div className="relative z-10 flex items-center justify-between">
-                <div
-                    className="w-11 h-11 rounded-[13px] flex items-center justify-center"
-                    style={{
-                        background: "var(--ab-icon-bg)",
-                        color:      "var(--ab-icon-color)",
-                        boxShadow:  "inset 0 0 0 1px var(--ab-icon-ring)",
-                    }}
-                >
-                    {item.icon}
-                </div>
-
-                <span
-                    className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full"
-                    style={{
-                        color:      "var(--ab-badge-text)",
-                        background: "var(--ab-badge-bg)",
-                        border:     "1px solid var(--ab-badge-border)",
-                    }}
-                >
-                    {item.badge}
-                </span>
-            </div>
-
-            {/* ── Bottom: text + action bar ── */}
-            <div className="relative z-10 mt-3">
-                <h3
-                    className="font-extrabold text-sm leading-snug"
-                    style={{ color: "var(--ab-title)" }}
-                >
-                    {item.label}
-                </h3>
-                <p
-                    className="text-[11px] font-medium mt-0.5"
-                    style={{ color: "var(--ab-desc)" }}
-                >
-                    {item.desc}
-                </p>
-
-                <div
-                    className="flex items-center justify-between mt-3 pt-2.5"
-                    style={{
-                        borderTop: "1px solid var(--ab-bar-border)",
-                        color:     "var(--ab-bar-text)",
-                    }}
-                >
-                    <span className="text-[11px] font-bold tracking-wide">
-                        {item.actionLabel}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                </div>
-            </div>
-        </div>
-    );
+      <div
+        className={`
+          relative z-10 flex items-center justify-between text-[color:var(--ab-accent)]
+          ${isSecondary
+            ? 'ml-auto'
+            : 'mt-3 border-t border-gray-100 pt-2.5 dark:border-white/[0.06] md:m-0 md:border-0 md:p-0'
+          }
+          ${featured ? 'md:min-h-[54px] md:min-w-[154px] md:rounded-[18px] md:bg-gradient-to-br md:from-orange-500 md:to-amber-300 md:px-5 md:text-[#241406] md:shadow-[0_16px_30px_rgba(245,158,11,0.24)]' : ''}
+        `}
+      >
+        {!isSecondary && (
+          <span className={`text-[11px] font-black tracking-wide ${!featured ? 'md:hidden' : ''}`}>
+            {item.actionLabel}
+          </span>
+        )}
+        <ChevronRight className={`${isSecondary ? 'h-4 w-4 text-gray-400 dark:text-white/35' : 'h-3.5 w-3.5'}`} />
+      </div>
+    </button>
+  );
 });
 
-ActionButton.displayName = "ActionButton";
-export type { ActionItemData };
-
+ActionButton.displayName = 'ActionButton';
+export type { ActionItemData, ActionTheme };

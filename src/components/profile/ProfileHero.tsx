@@ -59,111 +59,75 @@ export const ProfileHero = memo(({ user, onBalanceClick }: ProfileHeroProps) => 
     };
 
     return (
-        <div className="relative mb-24 md:mb-20 bg-transparent">
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
+        <div className="mx-auto w-full max-w-md px-4 md:max-w-none md:px-0">
+            <motion.section
+                initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="
-                    bg-gradient-to-br from-[#1e1a45] via-[#2a2356] to-[#0f0c29]
-                    dark:from-[#0f0c29] dark:via-[#1a1638] dark:to-black
-                    pt-25 pb-24 md:pt-12 md:pb-12 px-6
-                    rounded-b-[3rem] md:rounded-[2.5rem]
-                    shadow-xl text-white text-center relative transform-gpu
-                    border-2 border-white/20 dark:border-white/10
-                    overflow-hidden
-                "
+                transition={{ duration: 0.45, ease: "easeOut" }}
+                className="relative overflow-hidden rounded-[28px] border border-gray-100 bg-white p-[18px] shadow-[0_20px_46px_rgba(15,23,42,0.13),inset_0_1px_0_rgba(255,255,255,0.92),inset_0_-1px_0_rgba(15,23,42,0.045)] dark:border-orange-200/16 dark:bg-[#0a0e15] dark:shadow-[0_28px_62px_rgba(0,0,0,0.48),0_0_0_1px_rgba(245,158,11,0.05),inset_0_1px_0_rgba(255,255,255,0.10),inset_0_-1px_0_rgba(0,0,0,0.32)]"
                 style={{ willChange: 'transform, opacity' }}
             >
-                <div
-                    className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-purple-600/20 rounded-full blur-[60px] pointer-events-none"
-                    style={{ willChange: 'transform' }}
-                />
-                <div
-                    className="absolute bottom-[-50px] left-[-50px] w-56 h-56 bg-blue-600/20 rounded-full blur-[60px] pointer-events-none"
-                    style={{ willChange: 'transform' }}
-                />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,#ffffff,#f9fafb)] dark:hidden" />
+                <div className="pointer-events-none absolute inset-0 hidden bg-[linear-gradient(145deg,rgba(255,255,255,0.105),rgba(255,255,255,0.018)_38%,rgba(245,158,11,0.045)),#0a0e15] dark:block" />
+                <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/18" />
+                <div className="pointer-events-none absolute inset-x-8 bottom-0 h-px bg-gradient-to-r from-transparent via-black/10 to-transparent dark:via-black/45" />
+                <div className="pointer-events-none absolute -right-px top-6 h-24 w-px bg-gradient-to-b from-transparent via-orange-300/22 to-transparent" />
 
-                <div className="relative z-10 flex flex-col items-center">
-                    <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.2, type: "spring" }}
-                        className="relative mb-4 group"
-                        style={{ willChange: 'transform, opacity' }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-tr from-orange-400 to-amber-600 rounded-full blur-md opacity-70 transition-opacity"></div>
-                        <Avatar className="w-28 h-28 md:w-24 md:h-24 border-4 border-[#1e1a45] dark:border-black shadow-2xl relative z-10">
-                            <AvatarImage src={user.avatar_url} alt={user.full_name} className="object-cover" />
-                            <AvatarFallback className="text-3xl font-bold bg-gradient-to-br from-orange-400 to-amber-600 text-white">
-                                {user.full_name?.charAt(0) || 'M'}
-                            </AvatarFallback>
-                        </Avatar>
-                    </motion.div>
+                <div className="relative flex items-center gap-3.5">
+                    <Avatar className="h-[76px] w-[76px] shrink-0 rounded-[25px] border border-black/5 shadow-none dark:border-white/[0.075]">
+                        <AvatarImage src={user.avatar_url} alt={user.full_name} className="object-cover" />
+                        <AvatarFallback className="rounded-[25px] bg-gradient-to-br from-orange-500 to-amber-300 text-[30px] font-black text-[#2a1704]">
+                            {user.full_name?.charAt(0) || 'M'}
+                        </AvatarFallback>
+                    </Avatar>
 
-                    <h1 className="text-3xl md:text-2xl font-bold tracking-tight mb-1 text-white">
-                        {user.full_name}
-                    </h1>
-                    <span className="text-white/80 text-xs font-medium tracking-wide">{t('profile.hero.registeredDate', { date: user.created_at })}</span>
-                    <div
-                        className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 cursor-pointer hover:bg-white/20 transition-colors mt-2"
-                        onClick={handleCopyId}
-                    >
-                        <span className="text-white/80 text-sm font-medium tracking-wide">ID: {displayCode}</span>
-                        {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-white/60" />}
+                    <div className="min-w-0 flex-1">
+                        <h1 className="truncate text-[22px] font-black leading-[1.05] tracking-normal text-gray-950 dark:text-[#fff8ed]">
+                            {user.full_name}
+                        </h1>
+                        <p className="mt-1.5 line-clamp-2 text-xs font-bold text-gray-500 dark:text-[#fff8ed]/52 max-[360px]:hidden">
+                            {t('profile.hero.registeredDate', { date: user.created_at })}
+                        </p>
+                        <button
+                            type="button"
+                            className="mt-3 inline-flex h-[30px] items-center gap-1.5 rounded-full border border-orange-200/80 bg-orange-50/80 px-2.5 text-xs font-black text-orange-800 transition-colors hover:bg-orange-100 dark:border-orange-200/15 dark:bg-white/[0.055] dark:text-[#fff8ed]/78 dark:hover:bg-orange-300/[0.10]"
+                            onClick={handleCopyId}
+                        >
+                            <span>ID: {displayCode}</span>
+                            {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} className="text-orange-600 dark:text-white/46" />}
+                        </button>
                     </div>
                 </div>
-            </motion.div>
 
-            {/* Floating Balance Card */}
-            <motion.div
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.4, type: "spring", stiffness: 100 }}
-                className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 w-[90%] max-w-md z-20 pointer-events-none"
-                style={{ willChange: 'transform, opacity' }}
-            >
-                <div
+                <button
+                    type="button"
                     onClick={onBalanceClick}
-                    className="bg-white/80 dark:bg-black/80 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] rounded-2xl p-6 relative overflow-hidden pointer-events-auto cursor-pointer hover:scale-[1.03] active:scale-95 transition-transform duration-200"
+                    className="relative mt-[18px] w-full rounded-[22px] border border-gray-900/[0.07] bg-white/75 p-[15px] text-left transition-transform duration-200 active:scale-[0.98] dark:border-white/[0.075] dark:bg-white/[0.045]"
                 >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-400/20 to-amber-300/20 rounded-bl-[4rem] pointer-events-none"></div>
-
-                    <div className="flex items-center justify-between relative z-10">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">
-                                {hasDebt ? t('profile.hero.debtLabel') : t('profile.hero.balance')}
-                            </p>
-                            <h2 className={`text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${
-                                hasDebt
-                                    ? 'from-rose-500 to-red-500 dark:from-rose-400 dark:to-red-400'
-                                    : 'from-emerald-600 to-green-500 dark:from-emerald-400 dark:to-green-300'
-                            }`}>
-                                {hasDebt && <span>-</span>}
-                                <span ref={balanceRef}>{primaryValue.toLocaleString()}</span>{' '}
-                                <span className="text-lg text-gray-400 font-normal">{t('profile.hero.currency')}</span>
-                            </h2>
-                            {hasDebt ? (
-                                <div className="inline-flex items-center gap-1.5 mt-2 bg-emerald-500/10 rounded-full px-2.5 py-1">
-                                    <Wallet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                                        {t('profile.hero.availableLabel')}: {walletBalance.toLocaleString()} {t('profile.hero.currency')}
-                                    </span>
-                                </div>
-                            ) : null}
-                        </div>
-                        <div className={`
-                            h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition-colors duration-300
-                            ${hasDebt
-                                ? 'bg-gradient-to-br from-rose-500 to-red-500 shadow-rose-500/30'
-                                : 'bg-gradient-to-br from-emerald-500 to-green-500 shadow-emerald-500/30'
-                            }
-                        `}>
-                            <Wallet className="h-6 w-6 text-white" />
+                    <p className="mb-1.5 text-[11px] font-black uppercase text-gray-500 dark:text-[#fff8ed]/52">
+                        {hasDebt ? t('profile.hero.debtLabel') : t('profile.hero.balance')}
+                    </p>
+                    <div className="flex items-end justify-between gap-3">
+                        <h2 className={`text-[27px] font-black leading-none tracking-normal ${hasDebt ? 'text-red-500' : 'text-emerald-500'}`}>
+                            {hasDebt && <span>-</span>}
+                            <span ref={balanceRef}>{primaryValue.toLocaleString()}</span>{' '}
+                            <span className="text-[17px] font-black">{t('profile.hero.currency')}</span>
+                        </h2>
+                        <div className={`grid h-[45px] w-[45px] shrink-0 place-items-center rounded-2xl text-white shadow-lg ${
+                            hasDebt
+                                ? 'bg-gradient-to-br from-red-500 to-orange-500 shadow-red-500/24'
+                                : 'bg-gradient-to-br from-emerald-500 to-green-400 shadow-emerald-500/24'
+                        }`}>
+                            {hasDebt ? <span className="text-xl font-black">!</span> : <Wallet className="h-5 w-5" />}
                         </div>
                     </div>
-                </div>
-            </motion.div>
+                    {hasDebt ? (
+                        <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                            {t('profile.hero.availableLabel')}: {walletBalance.toLocaleString()} {t('profile.hero.currency')}
+                        </p>
+                    ) : null}
+                </button>
+            </motion.section>
         </div>
     );
 });

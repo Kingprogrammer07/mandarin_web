@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Home, ScanBarcode, Calendar } from 'lucide-react';
+import { Calendar, Home, ScanBarcode, ShieldAlert } from 'lucide-react';
 import { useDarkMode } from './useDarkMode';
 
 export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
@@ -70,7 +70,7 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
     : t('dashboard.tabs.track');
 
   return (
-    <div className="relative mt-14 mb-6 z-10">
+    <div className="relative mb-5 z-10">
       <div className="relative flex rounded-2xl p-1 gap-1" style={wrapperStyle}>
         <div style={indicatorStyle} />
 
@@ -99,6 +99,20 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
           {activeTab === 'schedule' ? <Calendar {...iconProps(!isHome)} /> : <ScanBarcode {...iconProps(!isHome)} />}
           <span>{tabLabel}</span>
         </button>
+
+        <span
+          className="
+            pointer-events-none absolute -right-1 -top-2 z-20 inline-flex items-center gap-1
+            rounded-full border border-orange-200/70 bg-white px-2 py-0.5
+            text-[9px] font-black uppercase tracking-wide text-orange-600
+            shadow-[0_8px_18px_rgba(15,23,42,0.08)]
+            dark:border-orange-300/18 dark:bg-[#121824] dark:text-amber-300
+            dark:shadow-[0_10px_24px_rgba(0,0,0,0.24)]
+          "
+        >
+          <ShieldAlert className="h-3 w-3" />
+          Beta
+        </span>
       </div>
 
       {dark && (
