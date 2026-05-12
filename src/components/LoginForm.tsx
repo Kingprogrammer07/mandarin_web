@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Phone, User, LogIn, MapPin } from 'lucide-react';
+import { Phone, LogIn, MapPin } from 'lucide-react';
 import { z } from 'zod';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -163,13 +163,14 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
   };
 
   const inp = [
-    'h-12 rounded-xl',
-    'border border-gray-200 dark:border-white/10',
-    'bg-gray-50 dark:bg-white/5',
-    'text-gray-900 dark:text-white',
+    'h-[54px] rounded-[18px]',
+    'border border-gray-900/[0.07] dark:border-white/[0.085]',
+    'bg-white dark:bg-[#10151f]',
+    'text-gray-950 dark:text-[#fff8ed]',
     'placeholder:text-gray-400 dark:placeholder:text-gray-500',
     'transition-colors duration-150',
-    'focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:ring-offset-0 focus:outline-none',
+    'shadow-[0_8px_18px_rgba(15,23,42,0.045)] dark:shadow-none',
+    'focus:border-orange-500/70 focus:ring-2 focus:ring-orange-500/15 focus:ring-offset-0 focus:outline-none',
   ].join(' ');
 
   return (
@@ -182,117 +183,94 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
         />
       )}
 
-      <div className="w-full max-w-lg mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="relative bg-white dark:bg-[#0d0a04] rounded-3xl border border-orange-100/80 dark:border-orange-500/15 overflow-hidden shadow-xl">
-
-          {/* top accent bar */}
-          <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
-
-          {/* dot-grid texture */}
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.022] dark:opacity-[0.04]"
-            style={{
-              backgroundImage: 'radial-gradient(circle at 1px 1px, rgb(249,115,22) 1px, transparent 0)',
-              backgroundSize: '28px 28px',
-            }}
-          />
-
-          <div className="relative p-6 sm:p-8 lg:p-10">
-
-            {/* Header */}
-            <div className="text-center mb-10">
-              <div className="inline-flex mb-5">
-                <div className="w-18 h-18 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/40">
-                  <LogIn className="w-10 h-10 text-white" />
-                </div>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 bg-clip-text text-transparent">
+      <div className="mx-auto w-full max-w-md px-4 py-5 sm:px-6">
+        <div className="relative overflow-hidden rounded-[30px] border border-orange-500/18 bg-white/92 p-5 shadow-[0_22px_46px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.92)] dark:border-white/[0.085] dark:bg-[#0a0e15] dark:shadow-[0_22px_54px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.07)]">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[17px] border border-orange-500/20 bg-orange-500/10 text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-amber-300">
+              <LogIn className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-[24px] font-black leading-tight tracking-normal text-gray-950 dark:text-[#fff8ed]">
                 {t('login.title')}
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">
+              <p className="mt-1 text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/56">
                 {t('login.subtitle')}
               </p>
-              <div className="mt-3 flex items-center justify-center gap-2">
-                <div className="h-px w-12 bg-gradient-to-r from-transparent to-orange-400 opacity-50" />
-                <div className="w-2 h-2 rounded-full bg-orange-400" />
-                <div className="h-px w-12 bg-gradient-to-l from-transparent to-orange-400 opacity-50" />
-              </div>
             </div>
+          </div>
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-
-                {/* Client Code */}
-                <FormField control={form.control} name="clientCode" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                      <User className="w-4 h-4 text-orange-500" />
-                      {t('login.clientCode')}
-                    </FormLabel>
-                    <FormControl>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="clientCode" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
+                    {t('login.clientCode')}
+                  </FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-[13px] font-black text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                        ID
+                      </div>
                       <Input
                         placeholder={t('login.clientCodePlaceholder')}
                         {...field}
                         onChange={(e) => field.onChange(handleClientCodeInput(e.target.value))}
-                        className={`${inp} uppercase font-mono text-base tracking-widest placeholder:tracking-normal placeholder:font-normal`}
+                        className={`${inp} pl-14 font-mono text-base font-black uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
                       />
-                    </FormControl>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
+                    </div>
+                  </FormControl>
+                  <TranslatedFormMessage />
+                </FormItem>
+              )} />
 
-                {/* Phone */}
-                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-orange-500" />
-                      {t('login.phoneNumber')}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">+998</span>
-                          <div className="w-px h-4 bg-gray-300 dark:bg-white/20" />
-                        </div>
-                        <Input
-                          placeholder={t('login.phoneNumberPlaceholder')}
-                          value={handlePhoneInput(field.value).formatted}
-                          onChange={(e) => field.onChange(handlePhoneInput(e.target.value).raw)}
-                          className={`${inp} pl-[4.5rem] font-mono tracking-wider placeholder:tracking-normal placeholder:font-normal`}
-                        />
+              <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
+                    {t('login.phoneNumber')}
+                  </FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                        <Phone className="h-4 w-4" />
                       </div>
-                    </FormControl>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
+                      <div className="pointer-events-none absolute left-[58px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
+                        <span className="text-[13px] font-black text-gray-600 dark:text-[#fff8ed]/72">+998</span>
+                        <div className="h-4 w-px bg-gray-200 dark:bg-white/10" />
+                      </div>
+                      <Input
+                        placeholder={t('login.phoneNumberPlaceholder')}
+                        value={handlePhoneInput(field.value).formatted}
+                        onChange={(e) => field.onChange(handlePhoneInput(e.target.value).raw)}
+                        className={`${inp} pl-[6.6rem] font-mono text-base font-black tracking-wider placeholder:font-bold placeholder:tracking-normal`}
+                      />
+                    </div>
+                  </FormControl>
+                  <TranslatedFormMessage />
+                </FormItem>
+              )} />
 
-                {/* Submit */}
-                <div className="pt-2">
-                  <Button
-                    type="submit"
-                    disabled={submitStatus === 'loading'}
-                    className="w-full h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:brightness-95 text-white font-bold text-base tracking-wide rounded-xl shadow-md shadow-orange-500/30 transition-opacity duration-150 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+              <Button
+                type="submit"
+                disabled={submitStatus === 'loading'}
+                className="mt-2 h-14 w-full rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[15px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.24)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('login.submit')}
+              </Button>
+
+              <div className="pt-1 text-center">
+                <p className="text-[12px] font-bold text-gray-500 dark:text-[#fff8ed]/52">
+                  {t('login.noAccount')}{' '}
+                  <button
+                    type="button"
+                    onClick={onNavigateToRegister}
+                    className="font-black text-orange-600 transition-colors hover:text-orange-500 dark:text-amber-300 dark:hover:text-amber-200"
                   >
-                    {t('login.submit')}
-                  </Button>
-                </div>
-
-                <div className="text-center pb-1">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('login.noAccount')}{' '}
-                    <button
-                      type="button"
-                      onClick={onNavigateToRegister}
-                      className="text-orange-500 hover:text-orange-400 font-semibold transition-colors underline underline-offset-2 decoration-orange-400/50"
-                    >
-                      {t('login.register')}
-                    </button>
-                  </p>
-                </div>
-
-              </form>
-            </Form>
-          </div>
+                    {t('login.register')}
+                  </button>
+                </p>
+              </div>
+            </form>
+          </Form>
         </div>
       </div>
 
@@ -304,7 +282,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/80 z-[9999] backdrop-blur-sm"
+                className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm"
                 onClick={() => setShowAddressDrawer(false)}
               />
               <motion.div
@@ -312,15 +290,15 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white dark:bg-zinc-950 z-[10000] rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] h-[80vh] overflow-y-auto flex flex-col"
+                className="fixed bottom-0 left-0 right-0 z-[10000] mx-auto flex max-h-[82vh] max-w-md flex-col overflow-y-auto rounded-t-[28px] border border-b-0 border-gray-900/[0.07] bg-white p-5 pb-7 shadow-[0_-20px_54px_rgba(15,23,42,0.18)] dark:border-white/[0.10] dark:bg-[#0a0e15] dark:shadow-[0_-24px_60px_rgba(0,0,0,0.48)]"
               >
-                <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-800 rounded-full mx-auto mb-6" />
-                <div className="text-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {t('login.addressDrawer.title', 'Yashash manzilingizni kiriting')}
+                <div className="mx-auto mb-5 h-1.5 w-11 rounded-full bg-gray-200 dark:bg-white/20" />
+                <div className="mb-5">
+                  <h2 className="text-[21px] font-black leading-tight text-gray-950 dark:text-[#fff8ed]">
+                    {t('login.addressDrawer.title')}
                   </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {t('login.addressDrawer.subtitle', 'Davom etish uchun viloyat va tumaningizni belgilang')}
+                  <p className="mt-1.5 text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/54">
+                    {t('login.addressDrawer.subtitle')}
                   </p>
                 </div>
 
@@ -337,7 +315,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                           addressForm.setValue('district', '');
                         }} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className={`${inp} w-full`}>
+                            <SelectTrigger className={`${inp} w-full px-4 font-bold`}>
                               <SelectValue placeholder={t('form.regionPlaceholder')} />
                             </SelectTrigger>
                           </FormControl>
@@ -369,7 +347,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                           disabled={!addressForm.watch('region')}
                         >
                           <FormControl>
-                            <SelectTrigger className={`${inp} w-full`}>
+                            <SelectTrigger className={`${inp} w-full px-4 font-bold`}>
                               <SelectValue placeholder={t('form.districtPlaceholder')} />
                             </SelectTrigger>
                           </FormControl>
@@ -393,9 +371,9 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                       <Button
                         type="submit"
                         disabled={submitStatus === 'loading'}
-                        className="w-full h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:brightness-95 text-white font-bold text-base tracking-wide rounded-xl shadow-md shadow-orange-500/30 transition-opacity duration-150 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+                        className="h-14 w-full rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[15px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.24)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {t('login.addressDrawer.submit', 'Saqlash va Kirish')}
+                        {t('login.addressDrawer.submit')}
                       </Button>
                     </div>
                   </form>

@@ -1,91 +1,14 @@
-import { useState, useCallback, useId, useMemo, useRef, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  X,
-  Camera,
-  Images,
-  Loader2,
-  Trash2,
-  Truck,
-  CheckCircle2,
-} from "lucide-react";
+import { X, Truck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { markTakenSchema } from "../../schemas/warehouseSchemas";
 import type { MarkTakenFormValues } from "../../schemas/warehouseSchemas";
 import { useWarehouseQueueStore } from "../../store/useWarehouseQueueStore";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Converts a base64 data URL to a File object. */
-async function dataUrlToFile(dataUrl: string, filename?: string): Promise<File> {
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  return new File([blob], filename || `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
-}
-
-/** Compresses an image to max 1920px wide at 92% JPEG quality using canvas API. */
-async function compressImage(file: File): Promise<File> {
-  const MAX_WIDTH = 1920;
-  const QUALITY = 0.92;
-
-  return new Promise((resolve) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-
-      if (img.width <= MAX_WIDTH) {
-        img.src = ""; // Free memory
-        resolve(file);
-        return;
-      }
-
-      const scale = MAX_WIDTH / img.width;
-      const canvas = document.createElement("canvas");
-      canvas.width = MAX_WIDTH;
-      canvas.height = Math.round(img.height * scale);
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { 
-        img.src = ""; 
-        resolve(file); 
-        return; 
-      }
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-        (blob) => {
-          // Aggressive memory cleanup (free RAM)
-          canvas.width = 0;
-          canvas.height = 0;
-          img.src = "";
-
-          if (!blob) { resolve(file); return; }
-          resolve(
-            new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-              type: "image/jpeg",
-              lastModified: Date.now(),
-            }),
-          );
-        },
-        "image/jpeg",
-        QUALITY,
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      img.src = "";
-      resolve(file);
-    };
-
-    img.src = objectUrl;
-  });
-}
+import MultiPhotoUpload from "../MultiPhotoUpload";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -115,17 +38,6 @@ export default function MarkTakenModal({
   onClose,
 }: MarkTakenModalProps) {
   const enqueue = useWarehouseQueueStore((s) => s.enqueue);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [isCompressing, setIsCompressing] = useState(false);
-
-  // Unique ID for gallery input label binding
-  const galleryInputId = useId();
-
-  // Back-camera overlay state
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   const {
     control,
@@ -151,186 +63,15 @@ export default function MarkTakenModal({
     }
   }, [deliveryMethods, setValue, watch, preSelectedDeliveryMethod]);
 
-  const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.load();
-    }
-    setIsCameraOpen(false);
-  }, []);
-
-  // Release camera when modal unmounts or closes externally
+  // Reset form when modal is closed externally
   useEffect(() => {
-    if (!isOpen) stopCamera();
-  }, [isOpen, stopCamera]);
-
-  const openBackCamera = useCallback(async () => {
-    try {
-      // Samsung phones choke on { exact: "environment" } when no back camera is available.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      });
-
-      // Reset zoom to 1x if the device supports zoom controls.
-      // Do this BEFORE attaching to <video> so a failed constraint doesn't break the stream.
-      const [track] = stream.getVideoTracks();
-      try {
-        const capabilities = track.getCapabilities?.() as Record<string, unknown> | undefined;
-        const zoomCap = capabilities?.zoom as { min?: number; max?: number } | undefined;
-        if (zoomCap?.min !== undefined && zoomCap?.max !== undefined) {
-          const targetZoom = Math.max(zoomCap.min, Math.min(zoomCap.max, 1.0));
-          await track.applyConstraints({
-            advanced: [{ zoom: targetZoom } as MediaTrackConstraintSet],
-          });
-        }
-      } catch {
-        // ignore zoom constraint errors — many Samsung devices throw here
-      }
-
-      streamRef.current = stream;
-      setIsCameraOpen(true);
-
-      // Wait for the video element to be mounted before attaching the stream.
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      });
-    } catch {
-      toast.error("Orqa kamera ochilmadi. Brauzer sozlamalarida kameraga ruxsat bering.");
-    }
-  }, []);
-
-  const handleFileChange = useCallback(
-    async (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      setIsCompressing(true);
-      try {
-        const remaining = 10 - photos.length;
-        const toProcess = Array.from(files).slice(0, remaining);
-
-        // Dastur qotib qolmasligi va memory crash (OOM) bo'lmasligi uchun
-        // rasmlarni parallel emas, ketma-ket siqamiz (sequential processing)
-        const compressed: File[] = [];
-        for (const file of toProcess) {
-          compressed.push(await compressImage(file));
-        }
-
-        const combined = [...photos, ...compressed];
-        setValue("photos", combined, { shouldValidate: true });
-        previews.forEach((url) => URL.revokeObjectURL(url));
-        setPreviews(combined.map((f) => URL.createObjectURL(f)));
-      } finally {
-        setIsCompressing(false);
-      }
-    },
-    [photos, previews, setValue],
-  );
-
-  const capturePhoto = useCallback(async () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    // Some Samsung browsers return 0 for videoWidth/Height right after play().
-    const vw = video.videoWidth || video.clientWidth || 1920;
-    const vh = video.videoHeight || video.clientHeight || 1080;
-
-    // ── Prefer ImageCapture API (works better on Samsung Android) ─────────────
-    const stream = streamRef.current;
-    const track = stream?.getVideoTracks()[0];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ImgCaptureCtor = (window as any).ImageCapture;
-    if (track && ImgCaptureCtor) {
-      try {
-        const imgCapture = new ImgCaptureCtor(track) as {
-          takePhoto: (opts?: Record<string, unknown>) => Promise<Blob>;
-        };
-        const blob = await imgCapture.takePhoto();
-        stopCamera();
-        const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        handleFileChange(dt.files);
-        return;
-      } catch {
-        // Fall through to canvas fallback
-      }
-    }
-
-    // ── Canvas fallback ───────────────────────────────────────────────────────
-    canvas.width = vw;
-    canvas.height = vh;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      stopCamera();
-      return;
-    }
-    ctx.drawImage(video, 0, 0, vw, vh);
-    stopCamera();
-
-    // Samsung Internet sometimes returns null from toBlob; use toDataURL fallback.
-    const quality = 0.92;
-    if (canvas.toBlob) {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            // Fallback if toBlob returns null — read data URL BEFORE clearing canvas
-            const dataUrl = canvas.toDataURL("image/jpeg", quality);
-            canvas.width = 0;
-            canvas.height = 0;
-            dataUrlToFile(dataUrl).then((file) => {
-              const dt = new DataTransfer();
-              dt.items.add(file);
-              handleFileChange(dt.files);
-            });
-            return;
-          }
-          canvas.width = 0;
-          canvas.height = 0;
-          const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          handleFileChange(dt.files);
-        },
-        "image/jpeg",
-        quality,
-      );
-    } else {
-      const dataUrl = canvas.toDataURL("image/jpeg", quality);
-      canvas.width = 0;
-      canvas.height = 0;
-      const file = await dataUrlToFile(dataUrl);
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      handleFileChange(dt.files);
-    }
-  }, [stopCamera, handleFileChange]);
+    if (!isOpen) reset();
+  }, [isOpen, reset]);
 
   const handleClose = useCallback(() => {
-    stopCamera();
-    previews.forEach((url) => URL.revokeObjectURL(url));
-    setPreviews([]);
     reset();
     onClose();
-  }, [stopCamera, previews, reset, onClose]);
-
-  const removePhoto = useCallback(
-    (index: number) => {
-      const updated = photos.filter((_, i) => i !== index);
-      setValue("photos", updated, { shouldValidate: true });
-      URL.revokeObjectURL(previews[index]);
-      setPreviews((prev) => prev.filter((_, i) => i !== index));
-    },
-    [photos, previews, setValue],
-  );
+  }, [reset, onClose]);
 
   const onSubmit = useCallback(
     async (data: MarkTakenFormValues) => {
@@ -338,8 +79,6 @@ export default function MarkTakenModal({
         (method) => method.value === data.delivery_method,
       );
 
-      previews.forEach((url) => URL.revokeObjectURL(url));
-      setPreviews([]);
       reset();
       onClose();
 
@@ -359,14 +98,12 @@ export default function MarkTakenModal({
         duration: 3000,
       });
     },
-    [previews, reset, onClose, enqueue, transactionIds, clientCode, flightName, deliveryMethods],
+    [reset, onClose, enqueue, transactionIds, clientCode, flightName, deliveryMethods, isRedelivery],
   );
 
-  const canAddMore = photos.length < 10;
   const hasDeliveryMethods = deliveryMethods.length > 0;
 
   return (
-    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -488,99 +225,22 @@ export default function MarkTakenModal({
                   )}
                 </div>
 
-                {/* ── Photo upload ───────────────────────────────────────── */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                      Isbotlovchi rasmlar
-                      <span className="ml-1.5 normal-case font-normal">
-                        ({photos.length}/10)
-                      </span>
-                    </p>
-                    {isCompressing && (
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-orange-500">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Siqilmoqda...
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Camera + Gallery */}
-                  {canAddMore && (
-                    <div className="grid grid-cols-2 gap-2.5 mb-4">
-                      {/* getUserMedia-based back camera — avoids WebView capture="environment" bug */}
-                      <button
-                        type="button"
-                        onClick={openBackCamera}
-                        className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border-2 border-orange-200 dark:border-orange-500/25 bg-orange-50 dark:bg-orange-500/[0.06] text-orange-600 dark:text-orange-400 cursor-pointer active:scale-[0.97] transition-all select-none"
-                      >
-                        <Camera className="w-6 h-6" strokeWidth={1.8} />
-                        <span className="text-[13px] font-bold">Kameradan</span>
-                      </button>
-
-                      {/* Gallery label — standard file picker */}
-                      <label
-                        htmlFor={galleryInputId}
-                        className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border-2 border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.03] text-gray-600 dark:text-gray-400 cursor-pointer active:scale-[0.97] transition-all select-none"
-                      >
-                        <Images className="w-6 h-6" strokeWidth={1.8} />
-                        <span className="text-[13px] font-bold">Galereadan</span>
-                      </label>
-
-                      <input
-                        id={galleryInputId}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="sr-only"
-                        onChange={(e) => {
-                          handleFileChange(e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
-                    </div>
+                {/* ── Photos via MultiPhotoUpload ────────────────────────── */}
+                <Controller
+                  name="photos"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiPhotoUpload
+                      label={`Isbotlovchi rasmlar (${photos.length}/10)`}
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      maxPhotos={10}
+                      error={errors.photos?.message as string | undefined}
+                    />
                   )}
+                />
 
-                  {/* Previews — 3 cols on mobile, 4 on sm+ */}
-                  {previews.length > 0 && (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {previews.map((url, idx) => (
-                        <motion.div
-                          key={url}
-                          initial={{ opacity: 0, scale: 0.85 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="relative aspect-square rounded-2xl overflow-hidden border border-gray-200 dark:border-white/[0.08]"
-                        >
-                          <img
-                            src={url}
-                            alt={`Rasm ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          {/* Delete overlay */}
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(idx)}
-                            className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 text-white active:scale-90 transition-transform"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="absolute bottom-1.5 left-1.5 bg-black/50 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
-                            {idx + 1}
-                          </span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-
-                  {errors.photos && (
-                    <p className="mt-2 text-[12px] text-red-500 font-medium">
-                      {errors.photos.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* ── Comment (Izoh) ─────────────────────────────────────── */}
+                {/* ── Comment ───────────────────────────────────────────── */}
                 <div>
                   <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
                     Izoh (ixtiyoriy)
@@ -606,7 +266,7 @@ export default function MarkTakenModal({
                 </div>
               </div>
 
-              {/* Sticky submit footer — pb accounts for iPhone home indicator */}
+              {/* Sticky submit footer */}
               <div
                 className="sticky bottom-0 px-5 pt-3 bg-white dark:bg-[#111] border-t border-gray-200 dark:border-white/[0.06]"
                 style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}
@@ -614,20 +274,11 @@ export default function MarkTakenModal({
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   type="submit"
-                  disabled={isCompressing || !hasDeliveryMethods}
+                  disabled={!hasDeliveryMethods}
                   className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-[14px] rounded-2xl shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/35 disabled:opacity-60 flex items-center justify-center gap-2 transition-all"
                 >
-                  {isCompressing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Rasmlar siqilmoqda...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Olib ketildi deb belgilash
-                    </>
-                  )}
+                  <CheckCircle2 className="w-5 h-5" />
+                  Olib ketildi deb belgilash
                 </motion.button>
               </div>
             </form>
@@ -635,43 +286,5 @@ export default function MarkTakenModal({
         </motion.div>
       )}
     </AnimatePresence>
-
-    {/* Back camera overlay — fullscreen, z above modal */}
-    {isCameraOpen && (
-      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          className="flex-1 w-full object-cover"
-        />
-        <canvas ref={canvasRef} className="hidden" />
-        <div
-          className="shrink-0 flex items-center justify-between px-8 py-6 bg-black"
-          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
-        >
-          <button
-            type="button"
-            onClick={stopCamera}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-white/10 text-white active:scale-90 transition-transform"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          {/* Shutter button */}
-          <button
-            type="button"
-            onClick={capturePhoto}
-            className="w-18 h-18 rounded-full border-[5px] border-white bg-white/20 active:scale-90 transition-transform"
-            style={{ width: 72, height: 72 }}
-          />
-
-          {/* Spacer to balance layout */}
-          <div className="w-12 h-12" />
-        </div>
-      </div>
-    )}
-    </>
   );
 }

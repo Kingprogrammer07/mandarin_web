@@ -121,6 +121,9 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   const [modalPreSelectedDeliveryMethod, setModalPreSelectedDeliveryMethod] = useState<string | undefined>(undefined);
   const [modalIsRedelivery, setModalIsRedelivery] = useState(false);
 
+  // When true, clients where every tx has a proof are visible too
+  const [showProved, setShowProved] = useState(false);
+
   // Pickup queue panel state
   const [showQueuePanel, setShowQueuePanel] = useState(false);
   const [queuePickupMethod, setQueuePickupMethod] = useState<PickupMethod | "all">("all");
@@ -550,6 +553,19 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
             </motion.div>
           ) : (
             <div className="space-y-4">
+              {/* Show-proved toggle */}
+              <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={showProved}
+                  onChange={e => setShowProved(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500 dark:border-gray-600 dark:bg-[#222]"
+                />
+                <span className="text-[13px] font-medium text-gray-600 dark:text-gray-400">
+                  Isbot yuborilganlarni ko'rsatish
+                </span>
+              </label>
+
               <GroupedTransactionsList
                 items={activeData?.items ?? []}
                 isLoading={isLoading}
@@ -557,6 +573,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                 onRevertTaken={handleRevertTaken}
                 canMarkTaken={canMarkTaken}
                 onNotifyCashier={handleNotifyCashier}
+                showProved={showProved}
               />
               
               {/* Basic Pagination - if activeData is paginated. Note Grouped doesn't give total_pages yet, but we calculate it */}

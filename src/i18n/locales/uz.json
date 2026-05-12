@@ -120,6 +120,11 @@
             "success": "Xush kelibsiz, {{name}}!",
             "telegramError": "Telegram WebApp ma'lumotlari topilmadi. Iltimos, Telegram botidan ochishni tekshiring.",
             "generalError": "Tizimga kirishda xatolik yuz berdi"
+        },
+        "addressDrawer": {
+            "title": "Yashash manzilingizni kiriting",
+            "subtitle": "Davom etish uchun viloyat va tumaningizni belgilang",
+            "submit": "Saqlash va kirish"
         }
     },
     "import": {

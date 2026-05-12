@@ -67,6 +67,9 @@ interface GroupedTransactionsListProps {
   onRevertTaken?: (transactionId: number, clientCode: string, flightName: string) => void;
   canMarkTaken: boolean;
   onNotifyCashier?: (clientCode: string, flightName: string, amount: number) => void;
+  /** When true, clients where every transaction already has a proof are shown too.
+   *  Default false = hide fully-proved clients. */
+  showProved?: boolean;
 }
 
 export default function GroupedTransactionsList({
@@ -76,6 +79,7 @@ export default function GroupedTransactionsList({
   onRevertTaken,
   canMarkTaken,
   onNotifyCashier,
+  showProved = false,
 }: GroupedTransactionsListProps) {
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
   const [expandedFlights, setExpandedFlights] = useState<Record<string, boolean>>({});
@@ -83,11 +87,11 @@ export default function GroupedTransactionsList({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const toggleClient = (clientCode: string) => {
-    setExpandedClients(prev => ({ ...prev, [clientCode]: prev[clientCode] !== undefined ? !prev[clientCode] : false }));
+    setExpandedClients(prev => ({ ...prev, [clientCode]: !(prev[clientCode] ?? false) }));
   };
 
   const toggleFlight = (flightKey: string) => {
-    setExpandedFlights(prev => ({ ...prev, [flightKey]: prev[flightKey] !== undefined ? !prev[flightKey] : false }));
+    setExpandedFlights(prev => ({ ...prev, [flightKey]: !(prev[flightKey] ?? false) }));
   };
 
   if (isLoading) {
@@ -115,10 +119,16 @@ export default function GroupedTransactionsList({
     );
   }
 
+  const displayItems = showProved
+    ? items
+    : items.filter(client =>
+        client.flights.some(f => f.transactions.some(tx => !tx.has_proof))
+      );
+
   return (
     <div className="space-y-5">
-      {items.map((client) => {
-        const isClientExpanded = expandedClients[client.client_code] ?? true;
+      {displayItems.map((client) => {
+        const isClientExpanded = expandedClients[client.client_code] ?? false;
 
         // Barcha reyslardagi "topshirilmagan" yuklari bor reyslarni ajratamiz
         const pendingFlights = client.flights.filter(f => f.transactions.some(tx => !tx.has_proof));
@@ -174,10 +184,23 @@ export default function GroupedTransactionsList({
                   <span className="text-[18px] font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 font-mono leading-none tracking-tight">
                     {client.client_code}
                   </span>
-                  {client.full_name && (
+                  {isClientExpanded && client.full_name && (
                     <span className="px-2.5 py-0.5 rounded-full bg-gray-100/80 dark:bg-white/[0.08] border border-gray-200/50 dark:border-white/[0.05] text-[12px] text-gray-600 dark:text-gray-300 font-medium backdrop-blur-sm">
                       {client.full_name}
                     </span>
+                  )}
+                  {!isClientExpanded && client.flights.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {client.flights.map(f => (
+                        <span
+                          key={f.flight_name}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold border border-orange-100 dark:border-orange-500/20"
+                        >
+                          <Plane className="w-3 h-3" />
+                          {f.flight_name}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-4 text-[13px] mt-1">
@@ -246,7 +269,7 @@ export default function GroupedTransactionsList({
                 <div className="p-3 sm:p-4 space-y-4">
                   {client.flights.map((flight) => {
                     const flightKey = `${client.client_code}-${flight.flight_name}`;
-                    const isFlightExpanded = expandedFlights[flightKey] ?? true;
+                    const isFlightExpanded = expandedFlights[flightKey] ?? false;
 
                     const pendingTx = flight.transactions.filter(tx => !tx.has_proof);
                     const hasPending = pendingTx.length > 0;
