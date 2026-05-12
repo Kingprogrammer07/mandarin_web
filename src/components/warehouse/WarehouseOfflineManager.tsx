@@ -172,7 +172,7 @@ export default function WarehouseOfflineManager() {
       <button
         onClick={() => setIsOpen(true)}
         aria-label={`Yuklash navbati — ${totalCount} ta element`}
-        className="fixed right-4 z-30 flex items-center gap-2 pl-3.5 pr-4 py-2.5 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/[0.1] rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 hover:shadow-xl transition-all active:scale-[0.97] min-h-[44px]"
+        className="fixed left-4 z-30 flex items-center gap-2 pl-3.5 pr-4 py-2.5 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/[0.1] rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 hover:shadow-xl transition-all active:scale-[0.97] min-h-[44px]"
         style={{ bottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
       >
         <div className="relative">
@@ -214,7 +214,7 @@ export default function WarehouseOfflineManager() {
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
               onClick={(e) => e.stopPropagation()}
-              className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[#f5f5f4] dark:bg-[#0d0d0d] flex flex-col shadow-2xl"
+              className="absolute left-0 top-0 bottom-0 w-full max-w-md bg-[#f5f5f4] dark:bg-[#0d0d0d] flex flex-col shadow-2xl"
             >
               {/* Header */}
               <div className="shrink-0 flex items-center justify-between px-5 py-4 bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/[0.08]">

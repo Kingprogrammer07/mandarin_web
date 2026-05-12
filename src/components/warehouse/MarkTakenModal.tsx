@@ -19,10 +19,10 @@ import type { DeliveryMethodOption } from "../../api/services/warehouse";
 
 // ── Image compression ─────────────────────────────────────────────────────────
 
-/** Compresses an image to max 1280px wide at 82% JPEG quality using canvas API. */
+/** Compresses an image to max 1920px wide at 92% JPEG quality using canvas API. */
 async function compressImage(file: File): Promise<File> {
-  const MAX_WIDTH = 1280;
-  const QUALITY = 0.82;
+  const MAX_WIDTH = 1920;
+  const QUALITY = 0.92;
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -52,7 +52,7 @@ async function compressImage(file: File): Promise<File> {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(
         (blob) => {
-          // Agressiv xotira tozalash (RAM ni bo'shatish)
+          // Aggressive memory cleanup (free RAM)
           canvas.width = 0;
           canvas.height = 0;
           img.src = "";
@@ -134,6 +134,10 @@ export default function MarkTakenModal({
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.load();
+    }
     setIsCameraOpen(false);
   }, []);
 
@@ -191,6 +195,9 @@ export default function MarkTakenModal({
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
+    // Immediately hide camera so user isn't stuck on frozen frame
+    stopCamera();
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
@@ -204,7 +211,6 @@ export default function MarkTakenModal({
       const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
       const dt = new DataTransfer();
       dt.items.add(file);
-      stopCamera();
       handleFileChange(dt.files);
     }, "image/jpeg", 1.0);
   }, [stopCamera, handleFileChange]);
