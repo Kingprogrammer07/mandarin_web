@@ -52,10 +52,12 @@ function LoadingScreen() {
       <div className="fade-in-up relative w-full max-w-[330px] overflow-hidden rounded-[30px] border border-orange-500/16 bg-white/82 p-5 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-[18px] dark:border-white/[0.09] dark:bg-[#0a0e15]/84 dark:shadow-[0_26px_70px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.07)]">
         <div className="pointer-events-none absolute -right-16 -top-14 h-36 w-64 rotate-[-14deg] rounded-[42%] bg-[linear-gradient(90deg,rgba(245,158,11,0.18),rgba(59,130,246,0.08),transparent_72%)] blur-[18px]" />
         {/* Brand mark */}
-        <div className="guard-mark-pulse relative mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[20px] border border-orange-500/20 bg-gradient-to-br from-orange-400 to-orange-600 text-white dark:border-amber-200/15">
-          <span className="select-none text-[24px] font-black leading-none">M</span>
+        {/* <div className="guard-mark-pulse relative mx-auto mb-4 grid h-20 w-20 place-items-center rounded-[20px] border border-orange-200/50 bg
+         -white shadow-[0_8px_20px_rgba(249,115,22,0.14)] dark:border-amber-200/10 dark:bg-white/[0.06]">
+        </div> */}
+        <div className="relative mx-auto mb-4 grid h-20 w-20 place-items-center">
+          <img src="/mandarin.png" alt="Mandarin Cargo" className="h-18 w-18 object-contain" />
         </div>
-
         {/* Brand text */}
         <div className="relative">
           <p className="text-[15px] font-black tracking-normal text-gray-950 dark:text-[#fff8ed]">
@@ -240,6 +242,7 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
   }, [isBrowserRoute]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void checkTelegramWebApp();
   }, [checkTelegramWebApp]);
 
