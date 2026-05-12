@@ -149,8 +149,28 @@ export default function MarkTakenModal({
   const openBackCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: "environment" } },
+        video: {
+          facingMode: { exact: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
       });
+
+      // Reset zoom to 1x if the device supports zoom controls
+      const [track] = stream.getVideoTracks();
+      const capabilities = track.getCapabilities?.() as Record<string, unknown> | undefined;
+      const zoomCap = capabilities?.zoom as { min?: number; max?: number } | undefined;
+      if (zoomCap?.min !== undefined && zoomCap?.max !== undefined) {
+        const targetZoom = Math.max(zoomCap.min, Math.min(zoomCap.max, 1.0));
+        try {
+          await track.applyConstraints({
+            advanced: [{ zoom: targetZoom } as MediaTrackConstraintSet],
+          });
+        } catch {
+          // ignore zoom constraint errors
+        }
+      }
+
       streamRef.current = stream;
       setIsCameraOpen(true);
       requestAnimationFrame(() => {
