@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { regions, DISTRICTS } from '@/lib/validation';
 import TranslatedFormMessage from './TranslatedFormMessage';
+import { triggerSuccessHaptic } from '@/utils/haptics';
 
 const loginSchema = z.object({
   clientCode: z.string().min(1, 'login.validation.clientCodeRequired').regex(/^[A-Z][A-Z0-9-]*$/, 'login.validation.clientCodeInvalid'),
@@ -83,6 +84,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
 
       if (response.access_token) {
         sessionStorage.setItem('access_token', response.access_token);
+        triggerSuccessHaptic();
         setSubmitStatus('success');
         setSubmitMessage(t('login.messages.success', { name: response.full_name }));
         form.reset();
@@ -127,6 +129,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
       if (response.access_token) {
         sessionStorage.setItem('access_token', response.access_token);
         setShowAddressDrawer(false);
+        triggerSuccessHaptic();
         setSubmitStatus('success');
         setSubmitMessage(t('login.messages.success', { name: response.full_name }));
         form.reset();
@@ -154,7 +157,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
   const handleClientCodeInput = (v: string) => v.toUpperCase().replace(/[^A-Z0-9-]/g, '');
 
   const handlePhoneInput = (v: string) => {
-    const c = v.replace(/\D/g, '');
+    const c = v.replace(/\D/g, '').slice(0, 9);
     let f = c.substring(0, 2);
     if (c.length > 2) f += ' ' + c.substring(2, 5);
     if (c.length > 5) f += ' ' + c.substring(5, 7);
@@ -183,9 +186,12 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
         />
       )}
 
-      <div className="mx-auto w-full max-w-md px-4 py-5 sm:px-6">
+      <div className="mx-auto flex min-h-[calc(100svh-72px)] w-full max-w-md items-center px-4 py-6 sm:px-6">
         <div className="relative overflow-hidden rounded-[30px] border border-orange-500/18 bg-white/92 p-5 shadow-[0_22px_46px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.92)] dark:border-white/[0.085] dark:bg-[#0a0e15] dark:shadow-[0_22px_54px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.07)]">
-          <div className="mb-5 flex items-center gap-3">
+          <div className="pointer-events-none absolute -right-20 -top-14 h-44 w-80 rotate-[-14deg] rounded-[42%] bg-[linear-gradient(110deg,rgba(255,255,255,0.08),transparent_28%),linear-gradient(90deg,rgba(245,158,11,0.16),rgba(59,130,246,0.08),transparent_72%)] opacity-75 blur-[18px]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:100%_42px] [mask-image:linear-gradient(to_bottom,transparent,black_18%,transparent_88%)]" />
+
+          <div className="relative z-10 mb-5 flex items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[17px] border border-orange-500/20 bg-orange-500/10 text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-amber-300">
               <LogIn className="h-6 w-6" />
             </div>
@@ -200,7 +206,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
           </div>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="relative z-10 space-y-4">
               <FormField control={form.control} name="clientCode" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
@@ -214,6 +220,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                       <Input
                         placeholder={t('login.clientCodePlaceholder')}
                         {...field}
+                        enterKeyHint="next"
                         onChange={(e) => field.onChange(handleClientCodeInput(e.target.value))}
                         className={`${inp} pl-14 font-mono text-base font-black uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
                       />
@@ -238,6 +245,10 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                         <div className="h-4 w-px bg-gray-200 dark:bg-white/10" />
                       </div>
                       <Input
+                        type="tel"
+                        inputMode="numeric"
+                        enterKeyHint="done"
+                        autoComplete="tel-national"
                         placeholder={t('login.phoneNumberPlaceholder')}
                         value={handlePhoneInput(field.value).formatted}
                         onChange={(e) => field.onChange(handlePhoneInput(e.target.value).raw)}

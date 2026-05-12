@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useNavLoadingStore } from '@/store/navLoadingStore';
+import { triggerSoftHaptic } from '@/utils/haptics';
 
 export interface FloatingNavItem<T> {
     id: string;
@@ -39,6 +40,7 @@ export const FloatingNavbar = <T,>({
 
     const handleNavClick = (item: FloatingNavItem<T>) => {
         if (item.disabled) return;
+        triggerSoftHaptic();
         onNavigate(item.page);
     };
 

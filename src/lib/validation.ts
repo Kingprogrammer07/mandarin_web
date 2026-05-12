@@ -77,7 +77,9 @@ export const formSchema = z.object({
 
   address: z
     .string()
-    .min(1, 'form.validation.addressRequired'),
+    .trim()
+    .min(1, 'form.validation.addressRequired')
+    .min(5, 'form.validation.addressMin'),
 
   phoneNumber: z
     .string()

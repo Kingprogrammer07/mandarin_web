@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Sun, Moon, LayoutDashboard, Globe
+  Sun, Moon, 
+  // LayoutDashboard, 
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -193,9 +195,12 @@ export default function NavigationBar(_props: NavigationBarProps) {
         <div className="flex min-h-[42px] items-center justify-between gap-3 max-[360px]:min-h-[38px] max-[360px]:gap-2">
 
           {/* ── LOGO ── */}
-          <div className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer max-[360px]:gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-gradient-to-br from-amber-300 to-orange-500 text-orange-950 shadow-[0_12px_26px_rgba(245,158,11,0.22),inset_0_1px_0_rgba(255,255,255,0.35)] max-[360px]:h-8 max-[360px]:w-8 max-[360px]:rounded-[13px] sm:h-10 sm:w-10">
-              <LayoutDashboard className="h-5 w-5 max-[360px]:h-4 max-[360px]:w-4" />
+          <div className="flex min-w-0 shrink items-center gap-2.5 max-[360px]:gap-2">
+            {/* <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-gradient-to-br from-amber-300 to-orange-500 text-orange-950 shadow-[0_12px_26px_rgba(245,158,11,0.22),inset_0_1px_0_rgba(255,255,255,0.35)] max-[360px]:h-8 max-[360px]:w-8 max-[360px]:rounded-[13px] sm:h-10 sm:w-10"> */}
+              {/* <LayoutDashboard className="h-5 w-5 max-[360px]:h-4 max-[360px]:w-4" /> */}
+            {/* </div> */}
+            <div className="flex shrink-0 items-center justify-center">
+              <img src="/mandarin.png" alt="Mandarin Cargo" className="h-[32px] w-[32px]" />
             </div>
 
             <div className="flex flex-col min-w-0">

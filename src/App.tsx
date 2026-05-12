@@ -1,6 +1,7 @@
 import "./i18n/config";
 
 import { useState, useEffect, useCallback, lazy, Suspense, useTransition } from "react";
+import { useTranslation } from "react-i18next";
 
 import NavigationBar from "./components/NavigationBar";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -11,6 +12,7 @@ import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
 import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
 import { TopProgressBar } from "./components/ui/TopProgressBar";
+import StatusAnimation from "./components/StatusAnimation";
 import { Skeleton } from "./components/ui/skeleton";
 import MaintenancePage from "./components/MaintenancePage";
 import { useHealthCheck } from "./hooks/useHealthCheck";
@@ -329,9 +331,12 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 function AppContent() {
+  const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<Page>("login");
   const [selectedFlightName, setSelectedFlightName] = useState("");
   const [isTransitioning, startTransition] = useTransition();
+  const [loginBootstrapStatus, setLoginBootstrapStatus] = useState<"idle" | "loading" | "ready">("idle");
+  const [loginBootstrapMessageIndex, setLoginBootstrapMessageIndex] = useState(0);
 
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -545,10 +550,37 @@ function AppContent() {
     [userRole, applyRoute],
   );
 
+  useEffect(() => {
+    if (loginBootstrapStatus !== "loading") return undefined;
+
+    const timer = window.setInterval(() => {
+      setLoginBootstrapMessageIndex((index) => (index + 1) % 2);
+    }, 1500);
+
+    return () => window.clearInterval(timer);
+  }, [loginBootstrapStatus]);
+
+  useEffect(() => {
+    if (loginBootstrapStatus !== "loading") return;
+    if (isTransitioning) return;
+    if (!USER_PAGES.includes(currentPage)) return;
+
+    setLoginBootstrapStatus("ready");
+  }, [currentPage, isTransitioning, loginBootstrapStatus]);
+
   // ── Login success ────────────────────────────────────────────────────────
 
   const handleLoginSuccess = useCallback(
     (role: string) => {
+      const shouldShowLoginBootstrap =
+        currentPage === "login" &&
+        (role === "user" || getDefaultPageForRole(role) === "user-home");
+
+      if (shouldShowLoginBootstrap) {
+        setLoginBootstrapMessageIndex(0);
+        setLoginBootstrapStatus("loading");
+      }
+
       setUserRole(role);
       setIsCheckingAuth(false);
 
@@ -582,7 +614,7 @@ function AppContent() {
 
       applyRoute(finalRoute, role, "replace");
     },
-    [applyRoute],
+    [applyRoute, currentPage],
   );
 
   // ── Derived flags ────────────────────────────────────────────────────────
@@ -646,6 +678,17 @@ function AppContent() {
     {isMaintenanceMode && <MaintenancePage />}
     {/* Fixed progress bar: shows during auth check, lazy-page transitions, and Suspense fallback */}
     {(isTransitioning || isCheckingAuth) && <TopProgressBar />}
+    {loginBootstrapStatus !== "idle" && (
+      <StatusAnimation
+        status={loginBootstrapStatus === "ready" ? "success" : "loading"}
+        message={
+          loginBootstrapStatus === "ready"
+            ? t("login.bootstrap.ready")
+            : t(loginBootstrapMessageIndex === 0 ? "login.bootstrap.loading" : "login.bootstrap.arranging")
+        }
+        onComplete={() => setLoginBootstrapStatus("idle")}
+      />
+    )}
     <div
       className={`min-h-screen relative overflow-hidden transition-colors duration-300 ${
         isAdminArea

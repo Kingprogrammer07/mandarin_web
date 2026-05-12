@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CreditCard, Trash2, Plus, Loader2, ChevronLeft } from 'lucide-react';
+import { CreditCard, Trash2, Plus, Loader2, ChevronLeft, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { walletService } from '@/api/services/walletService';
@@ -128,25 +128,43 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-white/20 overflow-hidden h-[90vh] sm:h-auto flex flex-col">
-                <DialogHeader>
-                    <div className="flex items-center gap-2">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent
+                showCloseButton={false}
+                className="top-auto bottom-0 left-0 flex h-[88svh] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none rounded-t-[30px] border border-gray-900/[0.07] bg-white/96 p-0 shadow-[0_-24px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[30px] sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0 dark:border-white/[0.09] dark:bg-[#0a0e15]/96 dark:shadow-[0_-24px_70px_rgba(0,0,0,0.42)]"
+            >
+                <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-gray-950/10 sm:hidden dark:bg-white/14" />
+                <DialogHeader className="px-5 pb-2 pt-4 text-left sm:px-6">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
                         {isAdding && (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 -ml-2 rounded-full"
+                                    className="-ml-2 h-9 w-9 shrink-0 rounded-full bg-gray-950/[0.04] text-gray-700 hover:bg-gray-950/[0.07] dark:bg-white/[0.06] dark:text-[#fff8ed]/72 dark:hover:bg-white/[0.1]"
                                 onClick={handleBack}
                             >
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
                         )}
-                        <DialogTitle>{isAdding ? t('wallet.cards.newCard', "Yangi karta") : t('wallet.cards.myCards', "Mening Kartalarim")}</DialogTitle>
+                            <DialogTitle className="truncate text-[22px] font-black tracking-normal text-gray-950 dark:text-[#fff8ed]">
+                                {isAdding ? t('wallet.cards.newCard', "Yangi karta") : t('wallet.cards.myCards', "Mening Kartalarim")}
+                            </DialogTitle>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={onClose}
+                            className="h-10 w-10 shrink-0 rounded-full bg-gray-950/[0.04] text-gray-700 hover:bg-gray-950/[0.07] dark:bg-white/[0.06] dark:text-[#fff8ed]/72 dark:hover:bg-white/[0.1]"
+                            aria-label={t('wallet.cards.cancel', "Bekor qilish")}
+                        >
+                            <X className="h-5 w-5" />
+                        </Button>
                     </div>
                 </DialogHeader>
 
-                <div className="py-4 relative flex-1 grid overflow-hidden">
+                <div className="relative grid flex-1 overflow-hidden px-5 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-3 sm:px-6">
                     <AnimatePresence mode="wait" initial={false} custom={isAdding ? 1 : -1}>
                         {isAdding ? (
                             <motion.div
@@ -157,10 +175,10 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 animate="center"
                                 exit="exit"
                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className="space-y-4 col-start-1 row-start-1 w-full h-full bg-transparent px-1 overflow-y-auto"
+                                className="col-start-1 row-start-1 h-full w-full space-y-4 overflow-y-auto bg-transparent px-1"
                             >
                                 <div className="space-y-4 pb-6">
-                                    <div className="p-6 rounded-xl bg-gradient-to-br from-gray-900 to-gray-800 text-white shadow-xl mb-6">
+                                    <div className="mb-6 rounded-[22px] border border-white/8 bg-gradient-to-br from-gray-950 to-gray-800 p-6 text-white shadow-xl">
                                         <div className="flex justify-between items-start mb-8">
                                             <div className="h-8 w-12 rounded bg-white/20" />
                                             <CreditCard className="h-6 w-6 text-gray-400" />
@@ -204,7 +222,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                     <Button
                                         onClick={handleAddCard}
                                         disabled={addCardMutation.isPending}
-                                        className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/20"
+                                            className="h-12 w-full rounded-[16px] bg-orange-500 font-black text-white shadow-[0_12px_24px_rgba(249,115,22,0.22)] hover:bg-orange-600"
                                     >
                                         {addCardMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                                         {addCardMutation.isPending ? t('wallet.cards.saving', "Saqlanmoqda...") : t('wallet.cards.save', "Saqlash")}
@@ -224,11 +242,11 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 animate="center"
                                 exit="exit"
                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className="space-y-4 col-start-1 row-start-1 w-full h-full bg-transparent px-1 overflow-y-auto"
+                                className="col-start-1 row-start-1 h-full w-full space-y-4 overflow-y-auto bg-transparent px-1"
                             >
                                 {isLoading ? (
                                     <div className="flex justify-center p-8">
-                                        <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                                        <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
                                     </div>
                                 ) : cardsData?.cards.length === 0 ? (
                                     <div className="text-center py-12 text-gray-500 flex flex-col items-center">
@@ -239,7 +257,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         <p className="text-sm text-gray-400 mb-6 max-w-xs">{t('wallet.cards.addPrompt', "To'lovlarni tezroq amalga oshirish uchun karta qo'shing")}</p>
                                         <Button
                                             onClick={() => setIsAdding(true)}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6"
+                                            className="rounded-full bg-orange-500 px-6 font-black text-white hover:bg-orange-600"
                                         >
                                             <Plus className="h-4 w-4 mr-2" />
                                             {t('wallet.cards.addCard', "Karta qo'shish")}
@@ -253,11 +271,11 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.1 }}
-                                                className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-900 to-gray-800 p-5 text-white shadow-lg border border-white/5"
+                                                className="group relative overflow-hidden rounded-[22px] border border-white/8 bg-gradient-to-br from-gray-950 to-gray-800 p-5 text-white shadow-lg"
                                             >
                                                 {/* Card Background Patterns */}
                                                 <div className="absolute top-0 right-0 h-32 w-32 translate-x-12 translate-y-[-2rem] rounded-full bg-white/5 blur-3xl" />
-                                                <div className="absolute bottom-0 left-0 h-24 w-24 translate-x-[-2rem] translate-y-12 rounded-full bg-blue-500/10 blur-2xl" />
+                                                <div className="absolute bottom-0 left-0 h-24 w-24 translate-x-[-2rem] translate-y-12 rounded-full bg-orange-500/10 blur-2xl" />
 
                                                 <div className="relative z-10 flex justify-between items-start">
                                                     <div>
@@ -272,7 +290,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 <Button
                                                     variant="destructive"
                                                     size="icon"
-                                                    className="absolute top-2 right-2 h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 dark:bg-red-900/50 dark:hover:bg-red-900 backdrop-blur-sm"
+                                                    className="absolute right-2 top-2 h-8 w-8 opacity-100 backdrop-blur-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100 dark:bg-red-900/50 dark:hover:bg-red-900"
                                                     onClick={() => handleDeleteCard(card.id)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -282,7 +300,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
 
                                         <Button
                                             variant="outline"
-                                            className="w-full border-dashed border-2 py-6 text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors mt-4"
+                                            className="mt-4 w-full rounded-[18px] border-2 border-dashed py-6 text-gray-500 transition-colors hover:border-orange-500 hover:bg-orange-50 hover:text-orange-600 dark:border-white/10 dark:text-[#fff8ed]/58 dark:hover:bg-orange-500/10 dark:hover:text-amber-300"
                                             onClick={() => setIsAdding(true)}
                                         >
                                             <Plus className="h-4 w-4 mr-2" />

@@ -7,6 +7,12 @@
         "history": "Tarix",
         "profile": "Profil"
     },
+    "telegramGuard": {
+        "loading": {
+            "telegram": "Telegram bilan ulanish tekshirilmoqda...",
+            "app": "Ilova tayyorlanmoqda..."
+        }
+    },
     "form": {
         "title": "Ro'yxatdan o'tish",
         "subtitle": "Ma'lumotlarni bosqichma-bosqich kiriting. Pasport rasmlari yuborishdan oldin yengillashtiriladi.",
@@ -63,6 +69,7 @@
             "dateOfBirthAge": "Yoshingiz kamida 16 dan oshgan bo'lishi kerak",
             "regionRequired": "Viloyat tanlanishi shart",
             "addressRequired": "Aniq manzil kiritilishi shart",
+            "addressMin": "Aniq manzil kamida 5 ta belgidan iborat bo'lishi kerak",
             "phoneNumberRequired": "Telefon raqam kiritilishi shart",
             "phoneNumberInvalid": "Telefon raqam noto'g'ri formatda",
             "passportImagesRequired": "Kamida bitta passport rasmi yuklanishi shart",
@@ -120,6 +127,11 @@
             "success": "Xush kelibsiz, {{name}}!",
             "telegramError": "Telegram WebApp ma'lumotlari topilmadi. Iltimos, Telegram botidan ochishni tekshiring.",
             "generalError": "Tizimga kirishda xatolik yuz berdi"
+        },
+        "bootstrap": {
+            "loading": "Tizim yuklanmoqda...",
+            "arranging": "Ma'lumotlaringiz joylashtirilmoqda...",
+            "ready": "Bosh sahifa tayyor"
         },
         "addressDrawer": {
             "title": "Yashash manzilingizni kiriting",

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { triggerSoftHaptic } from '@/utils/haptics';
 
 type ActionTheme = 'amber' | 'emerald' | 'sky' | 'rose' | 'violet' | 'cyan';
 type ActionVariant = 'primary' | 'secondary';
@@ -67,11 +68,15 @@ export const ActionButton = memo(({
   variant?: ActionVariant;
 }) => {
   const isSecondary = variant === 'secondary';
+  const handleClick = () => {
+    triggerSoftHaptic();
+    onClick?.();
+  };
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       className={`
         group relative w-full overflow-hidden text-left select-none
         border bg-white/90 shadow-[0_1px_2px_rgba(15,23,42,0.06)]

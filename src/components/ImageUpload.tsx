@@ -11,6 +11,7 @@ interface ImageUploadProps {
   onChange: (file: File | null) => void;
   error?: string;
   isLoading?: boolean;
+  variant?: 'default' | 'compact';
 }
 
 type UploadStatus = 'idle' | 'compressing' | 'ready' | 'error';
@@ -29,6 +30,7 @@ export default function ImageUpload({
   onChange,
   error,
   isLoading = false,
+  variant = 'default',
 }: ImageUploadProps) {
   const { t } = useTranslation();
   const [preview, setPreview] = useState<string | null>(null);
@@ -113,6 +115,7 @@ export default function ImageUpload({
   const openFilePicker = () => fileInputRef.current?.click();
   const hasError = Boolean(error) || status === 'error';
   const showReadyState = Boolean(preview);
+  const isCompact = variant === 'compact';
 
   return (
     <div className="space-y-2.5">
@@ -124,7 +127,7 @@ export default function ImageUpload({
       </label>
 
       {isLoading ? (
-        <div className="relative h-[184px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className={`${isCompact ? 'h-[88px]' : 'h-[184px]'} relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#10151f]`}>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/60 to-transparent dark:via-orange-400/10" />
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="size-9 animate-spin text-orange-500" />
@@ -138,16 +141,19 @@ export default function ImageUpload({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           className={[
-            'relative flex min-h-[184px] w-full flex-col items-center justify-center gap-4 rounded-2xl border p-5 text-center',
-            'bg-white shadow-sm transition active:scale-[0.99]',
-            'dark:bg-white/[0.035] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
+            'relative w-full rounded-2xl border text-left transition active:scale-[0.99]',
+            isCompact
+              ? 'flex min-h-[88px] items-center gap-3 p-3'
+              : 'flex min-h-[184px] flex-col items-center justify-center gap-4 p-5 text-center',
+            'bg-white shadow-sm',
+            'dark:bg-[#10151f] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]',
             isDragging
               ? 'border-orange-400 ring-4 ring-orange-500/15 dark:border-orange-300/60'
               : 'border-dashed border-slate-200 dark:border-white/12',
             hasError ? 'border-red-400 ring-4 ring-red-500/10 dark:border-red-400/60' : '',
           ].join(' ')}
         >
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25">
+          <span className={`${isCompact ? 'size-14 shrink-0' : 'size-14'} flex items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500 shadow-none dark:bg-white/[0.055] dark:text-amber-300`}>
             {status === 'compressing' ? <Loader2 className="size-6 animate-spin" /> : <Upload className="size-6" />}
           </span>
 
@@ -161,8 +167,8 @@ export default function ImageUpload({
           </span>
         </button>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/12 dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_24px_rgba(0,0,0,0.22)]">
-          <div className="relative h-[184px] overflow-hidden bg-slate-100 dark:bg-black/20">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/12 dark:bg-[#10151f] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]">
+          <div className={`${isCompact ? 'h-[112px]' : 'h-[184px]'} relative overflow-hidden bg-slate-100 dark:bg-black/20`}>
             <img src={preview ?? undefined} alt={label} className="size-full object-cover" />
             <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
               <CheckCircle2 className="size-3.5" />

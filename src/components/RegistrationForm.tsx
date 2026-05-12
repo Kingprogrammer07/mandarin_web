@@ -1,41 +1,48 @@
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Calendar as CalendarIcon, MapPin, Phone, Sparkles } from 'lucide-react';
-import { format, parse, isValid } from 'date-fns';
-import { useState, useEffect } from 'react';
+import { format, isValid, parse } from 'date-fns';
+import { Calendar as CalendarIcon, Hash, IdCard, MapPin, Phone, UserRound } from 'lucide-react';
 import { register as registerApi, getTelegramWebAppData } from '@/api/services/auth';
 import StatusAnimation from './StatusAnimation';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUpload from './ImageUpload';
 import TranslatedFormMessage from './TranslatedFormMessage';
-import { formSchema, regions, DISTRICTS, type RegistrationFormData } from '@/lib/validation';
+import { DISTRICTS, formSchema, regions, type RegistrationFormData } from '@/lib/validation';
 
 interface RegistrationFormProps {
   onNavigateToLogin?: () => void;
 }
 
+type RegisterStep = 1 | 2 | 3;
+
+const STEP_FIELDS: Record<RegisterStep, Array<keyof RegistrationFormData>> = {
+  1: ['fullName', 'passportSeries', 'pinfl', 'dateOfBirth'],
+  2: ['region', 'district', 'address', 'phoneNumber'],
+  3: ['passportImages'],
+};
+
 export default function RegistrationForm({ onNavigateToLogin }: RegistrationFormProps) {
   const { t } = useTranslation();
-
-  // Reverse Auth Guard fallback: redirect if already authenticated
-  useEffect(() => {
-    if (sessionStorage.getItem('access_token') && onNavigateToLogin) {
-      onNavigateToLogin();
-    }
-  }, [onNavigateToLogin]);
-
+  const [currentStep, setCurrentStep] = useState<RegisterStep>(1);
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [dateInputValue, setDateInputValue] = useState('');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
+
+  useEffect(() => {
+    if (sessionStorage.getItem('access_token') && onNavigateToLogin) {
+      onNavigateToLogin();
+    }
+  }, [onNavigateToLogin]);
 
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(formSchema),
@@ -51,13 +58,35 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
     },
   });
 
-  // Keep text input in sync with form date value so backspace works
+  const selectedRegion = form.watch('region');
   const dateOfBirthValue = form.watch('dateOfBirth');
+
   useEffect(() => {
     if (dateOfBirthValue) {
       setDateInputValue(format(dateOfBirthValue, 'dd/MM/yyyy'));
     }
   }, [dateOfBirthValue]);
+
+  const steps = useMemo(
+    () => [
+      {
+        id: 1 as const,
+        title: t('form.steps.identity'),
+        description: t('form.stepDescriptions.identity'),
+      },
+      {
+        id: 2 as const,
+        title: t('form.steps.contact'),
+        description: t('form.stepDescriptions.contact'),
+      },
+      {
+        id: 3 as const,
+        title: t('form.steps.documents'),
+        description: t('form.stepDescriptions.documents'),
+      },
+    ],
+    [t],
+  );
 
   const onSubmit = async (data: RegistrationFormData) => {
     setSubmitStatus('loading');
@@ -65,6 +94,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
     try {
       const telegramData = getTelegramWebAppData();
       if (!telegramData?.user) throw new Error(t('form.messages.telegramError'));
+
       const registerData = {
         full_name: data.fullName,
         passport_series: data.passportSeries,
@@ -77,6 +107,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
         telegram_id: telegramData.user.id,
         passport_images: data.passportImages,
       };
+
       const response = await registerApi(registerData);
       setSubmitStatus('success');
       setSubmitMessage(response.message || t('form.messages.success'));
@@ -84,6 +115,8 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
       setFrontImage(null);
       setBackImage(null);
       setDateInputValue('');
+      setCurrentStep(1);
+
       setTimeout(() => {
         if (onNavigateToLogin) {
           onNavigateToLogin();
@@ -91,9 +124,11 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
       }, 1500);
     } catch (error: unknown) {
       setSubmitStatus('error');
-      const message = typeof error === 'object' && error !== null && 'message' in (error as object) ? (error as { message?: string }).message : undefined;
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error
+          ? (error as { message?: string }).message
+          : undefined;
       setSubmitMessage(message || t('form.messages.generalError'));
-
     }
   };
 
@@ -102,44 +137,73 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
     setSubmitMessage('');
   };
 
-  const handlePassportInput = (v: string) => {
-    const c = v.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    return c.substring(0, 2) + (c.length > 2 ? c.substring(2, 9) : '');
+  const goToNext = async () => {
+    const isValidStep = await form.trigger(STEP_FIELDS[currentStep], { shouldFocus: true });
+    if (!isValidStep) return;
+    setCurrentStep((step) => Math.min(step + 1, 3) as RegisterStep);
   };
 
-  const handlePhoneInput = (v: string) => {
-    const c = v.replace(/\D/g, '');
-    let f = c.substring(0, 2);
-    if (c.length > 2) f += ' ' + c.substring(2, 5);
-    if (c.length > 5) f += ' ' + c.substring(5, 7);
-    if (c.length > 7) f += ' ' + c.substring(7, 9);
-    return { formatted: f, raw: c };
+  const goBack = () => {
+    setCurrentStep((step) => Math.max(step - 1, 1) as RegisterStep);
   };
 
-  const handleDateInput = (v: string, onChange: (d?: Date) => void) => {
-    const c = v.replace(/[^\d/]/g, '');
-    let f = c;
-    if (c.length >= 2 && !c.includes('/')) f = c.substring(0, 2) + '/' + c.substring(2);
-    if (c.length >= 5 && c.split('/').length === 2) {
-      const p = c.split('/');
-      f = p[0] + '/' + p[1].substring(0, 2) + '/' + p[1].substring(2);
-    }
-    setDateInputValue(f);
-    if (f.length === 10) {
-      const d = parse(f, 'dd/MM/yyyy', new Date());
-      if (isValid(d)) onChange(d);
+  const handleFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'TEXTAREA') return;
+
+    if (currentStep < 3) {
+      event.preventDefault();
+      void goToNext();
     }
   };
 
-  const inp = [
-    'h-12 rounded-xl',
-    'border border-gray-200 dark:border-white/10',
-    'bg-gray-50 dark:bg-white/5',
-    'text-gray-900 dark:text-white',
-    'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+  const handlePassportInput = (value: string) => {
+    const cleanValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return cleanValue.substring(0, 2) + (cleanValue.length > 2 ? cleanValue.substring(2, 9) : '');
+  };
+
+  const handlePhoneInput = (value: string) => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 9);
+    let formatted = cleanValue.substring(0, 2);
+    if (cleanValue.length > 2) formatted += ` ${cleanValue.substring(2, 5)}`;
+    if (cleanValue.length > 5) formatted += ` ${cleanValue.substring(5, 7)}`;
+    if (cleanValue.length > 7) formatted += ` ${cleanValue.substring(7, 9)}`;
+    return { formatted, raw: cleanValue };
+  };
+
+  const handleDateInput = (value: string, onChange: (date?: Date) => void) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    const formatted = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)]
+      .filter(Boolean)
+      .join('/');
+
+    setDateInputValue(formatted);
+    if (digits.length < 8) {
+      onChange(undefined);
+      return;
+    }
+
+    const parsedDate = parse(formatted, 'dd/MM/yyyy', new Date());
+    if (isValid(parsedDate)) onChange(parsedDate);
+  };
+
+  const inputClass = [
+    'h-[54px] rounded-[18px]',
+    'border border-gray-900/[0.07] dark:border-white/[0.095]',
+    'bg-white dark:bg-[#10151f]',
+    'text-gray-950 dark:text-[#fff8ed]',
+    'placeholder:text-gray-400 dark:placeholder:text-[#fff8ed]/42',
     'transition-colors duration-150',
-    'focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:ring-offset-0 focus:outline-none',
+    'shadow-[0_8px_18px_rgba(15,23,42,0.045)]',
+    'dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.36),inset_0_-1px_0_rgba(255,255,255,0.055),0_1px_0_rgba(255,255,255,0.045)]',
+    'focus:border-orange-500/70 focus:ring-2 focus:ring-orange-500/15 focus:ring-offset-0 focus:outline-none',
   ].join(' ');
+
+  const labelClass = 'ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76';
+  const iconBoxClass =
+    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300';
 
   return (
     <>
@@ -151,71 +215,108 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
         />
       )}
 
-      <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="relative bg-white dark:bg-[#0d0a04] rounded-3xl border border-orange-100/80 dark:border-orange-500/15 overflow-hidden shadow-xl">
-
-          {/* top accent bar */}
-          <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
-
-          {/* dot-grid texture */}
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.022] dark:opacity-[0.04]"
-            style={{
-              backgroundImage: 'radial-gradient(circle at 1px 1px, rgb(249,115,22) 1px, transparent 0)',
-              backgroundSize: '28px 28px',
-            }}
-          />
-
-          <div className="relative p-6 sm:p-8 lg:p-10">
-
-            {/* Header */}
-            <div className="text-center mb-10">
-              <div className="inline-flex mb-5">
-                <div className="w-18 h-18 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/40">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
+      <div className="mx-auto flex min-h-[calc(100svh-96px)] w-full max-w-md items-center px-4 py-6 sm:px-6">
+        <div className="w-full space-y-4">
+          <div className="px-1">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[17px] border border-orange-500/20 bg-orange-500/10 text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-amber-300">
+                <IdCard className="h-6 w-6" />
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 bg-clip-text text-transparent">
-                {t('form.title')}
-              </h1>
-              <div className="mt-3 flex items-center justify-center gap-2">
-                <div className="h-px w-16 bg-gradient-to-r from-transparent to-orange-400 opacity-50" />
-                <div className="w-2 h-2 rounded-full bg-orange-400" />
-                <div className="h-px w-16 bg-gradient-to-l from-transparent to-orange-400 opacity-50" />
+              <div>
+                <h1 className="text-[24px] font-black leading-tight tracking-normal text-gray-950 dark:text-[#fff8ed]">
+                  {t('form.title')}
+                </h1>
+                <p className="mt-1 text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/56">
+                  {steps[currentStep - 1].description}
+                </p>
               </div>
             </div>
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <div className="grid grid-cols-3 gap-2">
+              {steps.map((step) => {
+                const isActive = currentStep === step.id;
+                const isDone = currentStep > step.id;
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => {
+                      if (step.id < currentStep) setCurrentStep(step.id);
+                    }}
+                    className={[
+                      'min-w-0 rounded-[18px] border px-2 py-2.5 text-left transition',
+                      isActive
+                        ? 'border-orange-500/35 bg-orange-500/10 dark:border-amber-300/22 dark:bg-white/[0.055]'
+                        : 'border-gray-900/[0.06] bg-white/60 dark:border-white/[0.07] dark:bg-white/[0.03]',
+                      isDone ? 'opacity-90' : '',
+                    ].join(' ')}
+                  >
+                    <span
+                      className={[
+                        'mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-black',
+                        isActive || isDone
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-[#fff8ed]/48',
+                      ].join(' ')}
+                    >
+                      {step.id}
+                    </span>
+                    <span className="block min-h-[24px] text-[10px] font-black leading-[1.15] text-gray-900 dark:text-[#fff8ed] sm:text-[11px]">
+                      {step.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-                {/* Full Name */}
-                <FormField control={form.control} name="fullName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
-                      {t('form.fullName')}
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder={t('form.fullNamePlaceholder')} {...field} className={inp} />
-                    </FormControl>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
+          <div className="relative w-full overflow-hidden rounded-[30px] border border-orange-500/18 bg-white/92 p-5 shadow-[0_22px_46px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.92)] dark:border-white/[0.085] dark:bg-[#0a0e15] dark:shadow-[0_22px_54px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.07)]">
+            <div className="pointer-events-none absolute -right-20 -top-14 h-44 w-80 rotate-[-14deg] rounded-[42%] bg-[linear-gradient(110deg,rgba(255,255,255,0.08),transparent_28%),linear-gradient(90deg,rgba(245,158,11,0.16),rgba(59,130,246,0.08),transparent_72%)] opacity-75 blur-[18px]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:100%_42px] [mask-image:linear-gradient(to_bottom,transparent,black_18%,transparent_88%)]" />
 
-                {/* Passport + PINFL */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              onKeyDown={handleFormKeyDown}
+              className="relative z-10 space-y-4"
+            >
+              {currentStep === 1 && (
+                <>
+                  <FormField control={form.control} name="fullName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={labelClass}>{t('form.fullName')}</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className={iconBoxClass}>
+                            <UserRound className="h-4 w-4" />
+                          </div>
+                          <Input
+                            placeholder={t('form.fullNamePlaceholder')}
+                            {...field}
+                            enterKeyHint="next"
+                            className={`${inputClass} pl-14 font-bold placeholder:font-bold`}
+                          />
+                        </div>
+                      </FormControl>
+                      <TranslatedFormMessage />
+                    </FormItem>
+                  )} />
+
                   <FormField control={form.control} name="passportSeries" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
-                        {t('form.passportSeries')}
-                      </FormLabel>
+                      <FormLabel className={labelClass}>{t('form.passportSeries')}</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder={t('form.passportSeriesPlaceholder')}
-                          {...field}
-                          onChange={(e) => field.onChange(handlePassportInput(e.target.value))}
-                          maxLength={9}
-                          className={`${inp} uppercase font-mono tracking-widest placeholder:tracking-normal placeholder:font-normal`}
-                        />
+                        <div className="relative">
+                          <div className={`${iconBoxClass} text-[13px] font-black`}>ID</div>
+                          <Input
+                            placeholder={t('form.passportSeriesPlaceholder')}
+                            {...field}
+                            enterKeyHint="next"
+                            onChange={(event) => field.onChange(handlePassportInput(event.target.value))}
+                            maxLength={9}
+                            className={`${inputClass} pl-14 font-mono text-base font-black uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
+                          />
+                        </div>
                       </FormControl>
                       <TranslatedFormMessage />
                     </FormItem>
@@ -223,99 +324,105 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
 
                   <FormField control={form.control} name="pinfl" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
-                        {t('form.pinfl')}
-                      </FormLabel>
+                      <FormLabel className={labelClass}>{t('form.pinfl')}</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder={t('form.pinflPlaceholder')}
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
-                          maxLength={14}
-                          className={`${inp} font-mono tracking-wider placeholder:tracking-normal placeholder:font-normal`}
-                        />
+                        <div className="relative">
+                          <div className={iconBoxClass}>
+                            <Hash className="h-4 w-4" />
+                          </div>
+                          <Input
+                            type="tel"
+                            inputMode="numeric"
+                            enterKeyHint="next"
+                            placeholder={t('form.pinflPlaceholder')}
+                            {...field}
+                            onChange={(event) => field.onChange(event.target.value.replace(/\D/g, ''))}
+                            maxLength={14}
+                            className={`${inputClass} pl-14 font-mono text-base font-black tracking-wider placeholder:font-bold placeholder:tracking-normal`}
+                          />
+                        </div>
                       </FormControl>
                       <TranslatedFormMessage />
                     </FormItem>
                   )} />
-                </div>
 
-                {/* Date of Birth */}
-                <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
-                      {t('form.dateOfBirth')}
-                    </FormLabel>
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                      <div className="relative">
-                        <Input
-                          placeholder="DD/MM/YYYY"
-                          value={dateInputValue}
-                          onChange={(e) => handleDateInput(e.target.value, field.onChange)}
-                          onFocus={() => { if (!dateInputValue && !field.value) setDateInputValue(''); }}
-                          className={`${inp} pr-12 font-mono tracking-widest placeholder:tracking-normal placeholder:font-normal`}
-                        />
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-500/10"
-                          >
-                            <CalendarIcon className="h-4 w-4 text-orange-400" />
-                          </Button>
-                        </PopoverTrigger>
-                      </div>
-                      <PopoverContent
-                        align="start"
-                        className="w-auto p-0 dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl"
-                      >
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            field.onChange(date);
-                            if (date) {
-                              setDateInputValue(format(date, 'dd/MM/yyyy'));
-                              setIsCalendarOpen(false);
-                            }
-                          }}
-                          disabled={(d) => d > new Date() || d < new Date('1900-01-01')}
-                          captionLayout="dropdown"
-                          fromYear={1900}
-                          toYear={new Date().getFullYear()}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
+                  <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className={labelClass}>{t('form.dateOfBirth')}</FormLabel>
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <div className="relative">
+                          <Input
+                            type="tel"
+                            inputMode="numeric"
+                            enterKeyHint="next"
+                            placeholder="DD/MM/YYYY"
+                            value={dateInputValue}
+                            onChange={(event) => handleDateInput(event.target.value, field.onChange)}
+                            className={`${inputClass} pr-12 font-mono text-base font-black tracking-widest placeholder:font-bold placeholder:tracking-normal`}
+                          />
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-orange-600 hover:bg-orange-500/10 dark:text-amber-300"
+                            >
+                              <CalendarIcon className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                        </div>
+                        <PopoverContent
+                          align="start"
+                          className="w-auto overflow-hidden rounded-2xl border-orange-500/20 p-0 shadow-xl dark:border-white/10 dark:bg-[#111827]"
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={(date) => {
+                              field.onChange(date);
+                              if (date) {
+                                setDateInputValue(format(date, 'dd/MM/yyyy'));
+                                setIsCalendarOpen(false);
+                              }
+                            }}
+                            disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                            captionLayout="dropdown"
+                            fromYear={1900}
+                            toYear={new Date().getFullYear()}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <TranslatedFormMessage />
+                    </FormItem>
+                  )} />
+                </>
+              )}
 
-                {/* Region & District */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {currentStep === 2 && (
+                <>
                   <FormField control={form.control} name="region" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-orange-500" />
-                        {t('form.region')}
-                      </FormLabel>
-                      <Select onValueChange={(value) => {
-                        field.onChange(value);
-                        form.setValue('district', '');
-                      }} value={field.value}>
+                      <FormLabel className={labelClass}>{t('form.region')}</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue('district', '');
+                        }}
+                        value={field.value}
+                      >
                         <FormControl>
-                          <SelectTrigger className={`${inp} w-full`}>
+                          <SelectTrigger className={`${inputClass} w-full px-4 font-bold`}>
                             <SelectValue placeholder={t('form.regionPlaceholder')} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
-                          {regions.map((r) => (
+                        <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-orange-500/20 shadow-xl dark:border-white/10 dark:bg-[#111827]">
+                          {regions.map((region) => (
                             <SelectItem
-                              key={r.value}
-                              value={r.value}
-                              className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
+                              key={region.value}
+                              value={region.value}
+                              className="cursor-pointer rounded-lg dark:text-gray-200 dark:hover:bg-orange-500/10"
                             >
-                              {t(r.label)}
+                              {t(region.label)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -326,84 +433,93 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
 
                   <FormField control={form.control} name="district" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-orange-500 opacity-50" />
-                        {t('form.district')}
-                      </FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!form.watch('region')}>
+                      <FormLabel className={labelClass}>{t('form.district')}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!selectedRegion}>
                         <FormControl>
-                          <SelectTrigger className={`${inp} w-full`}>
+                          <SelectTrigger className={`${inputClass} w-full px-4 font-bold`}>
                             <SelectValue placeholder={t('form.districtPlaceholder')} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
-                          {form.watch('region') && DISTRICTS[form.watch('region')]?.map((d) => (
-                            <SelectItem
-                              key={d.value}
-                              value={d.value}
-                              className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
-                            >
-                              {t(d.label)}
-                            </SelectItem>
-                          ))}
+                        <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-orange-500/20 shadow-xl dark:border-white/10 dark:bg-[#111827]">
+                          {selectedRegion &&
+                            DISTRICTS[selectedRegion]?.map((district) => (
+                              <SelectItem
+                                key={district.value}
+                                value={district.value}
+                                className="cursor-pointer rounded-lg dark:text-gray-200 dark:hover:bg-orange-500/10"
+                              >
+                                {t(district.label)}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <TranslatedFormMessage />
                     </FormItem>
                   )} />
-                </div>
 
-                {/* Address */}
-                <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
-                      {t('form.address')}
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder={t('form.addressPlaceholder')} {...field} className={inp} />
-                    </FormControl>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
-
-                {/* Phone */}
-                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-orange-500" />
-                      {t('form.phoneNumber')}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">+998</span>
-                          <div className="w-px h-4 bg-gray-300 dark:bg-white/20" />
+                  <FormField control={form.control} name="address" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={labelClass}>{t('form.address')}</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                            <MapPin className="h-4 w-4" />
+                          </div>
+                          <textarea
+                            placeholder={t('form.addressPlaceholder')}
+                            {...field}
+                            enterKeyHint="next"
+                            rows={3}
+                            className={`${inputClass} min-h-[96px] w-full resize-none px-4 py-4 pl-14 font-bold placeholder:font-bold`}
+                          />
                         </div>
-                        <Input
-                          placeholder={t('form.phoneNumberPlaceholder')}
-                          value={handlePhoneInput(field.value).formatted}
-                          onChange={(e) => field.onChange(handlePhoneInput(e.target.value).raw)}
-                          className={`${inp} pl-[4.5rem] font-mono tracking-wider placeholder:tracking-normal placeholder:font-normal`}
-                        />
-                      </div>
-                    </FormControl>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
+                      </FormControl>
+                      <TranslatedFormMessage />
+                    </FormItem>
+                  )} />
 
-                {/* Passport Images */}
+                  <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={labelClass}>{t('form.phoneNumber')}</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className={iconBoxClass}>
+                            <Phone className="h-4 w-4" />
+                          </div>
+                          <div className="pointer-events-none absolute left-[58px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
+                            <span className="text-[13px] font-black text-gray-600 dark:text-[#fff8ed]/72">+998</span>
+                            <div className="h-4 w-px bg-gray-200 dark:bg-white/10" />
+                          </div>
+                          <Input
+                            type="tel"
+                            inputMode="numeric"
+                            enterKeyHint="next"
+                            autoComplete="tel-national"
+                            placeholder={t('form.phoneNumberPlaceholder')}
+                            value={handlePhoneInput(field.value).formatted}
+                            onChange={(event) => field.onChange(handlePhoneInput(event.target.value).raw)}
+                            className={`${inputClass} pl-[6.6rem] font-mono text-base font-black tracking-wider placeholder:font-bold placeholder:tracking-normal`}
+                          />
+                        </div>
+                      </FormControl>
+                      <TranslatedFormMessage />
+                    </FormItem>
+                  )} />
+                </>
+              )}
+
+              {currentStep === 3 && (
                 <FormField control={form.control} name="passportImages" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-semibold text-base text-gray-700 dark:text-gray-200">
-                      {t('form.passportImages')}
-                    </FormLabel>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <FormLabel className={labelClass}>{t('form.passportImages')}</FormLabel>
+                    <div className="space-y-3">
                       <ImageUpload
                         label={t('form.passportImagesFront')}
                         value={frontImage}
+                        variant="compact"
                         onChange={(file) => {
                           setFrontImage(file);
-                          field.onChange([file, backImage].filter((f): f is File => f !== null));
+                          field.onChange([file, backImage].filter((item): item is File => item !== null));
                         }}
                         error={
                           form.formState.errors.passportImages?.message
@@ -414,42 +530,70 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                       <ImageUpload
                         label={t('form.passportImagesBack')}
                         value={backImage}
+                        variant="compact"
                         onChange={(file) => {
                           setBackImage(file);
-                          field.onChange([frontImage, file].filter((f): f is File => f !== null));
+                          field.onChange([frontImage, file].filter((item): item is File => item !== null));
                         }}
                       />
                     </div>
                     <TranslatedFormMessage />
                   </FormItem>
                 )} />
+              )}
 
-                {/* Submit */}
-                <div className="pt-2">
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {currentStep === 1 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onNavigateToLogin}
+                    className="h-13 rounded-[18px] border-gray-900/[0.07] bg-white/70 text-[14px] font-black text-gray-700 active:scale-[0.99] dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-[#fff8ed]/70"
+                  >
+                    {t('form.login')}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={goBack}
+                    className="h-13 rounded-[18px] border-gray-900/[0.07] bg-white/70 text-[14px] font-black text-gray-700 active:scale-[0.99] dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-[#fff8ed]/70"
+                  >
+                    {t('form.back')}
+                  </Button>
+                )}
+
+                {currentStep < 3 ? (
+                  <Button
+                    type="button"
+                    onClick={() => void goToNext()}
+                    className="h-13 rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[14px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.22)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99]"
+                  >
+                    {t('form.next')}
+                  </Button>
+                ) : (
                   <Button
                     type="submit"
                     disabled={submitStatus === 'loading'}
-                    className="w-full h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:brightness-95 text-white font-bold text-base tracking-wide rounded-xl shadow-md shadow-orange-500/30 transition-opacity duration-150 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+                    className="h-13 rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[14px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.22)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t('form.submit')}
                   </Button>
-                </div>
+                )}
+              </div>
 
-                <div className="text-center pb-1">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('form.haveAccount')}{' '}
-                    <button
-                      type="button"
-                      onClick={onNavigateToLogin}
-                      className="text-orange-500 hover:text-orange-400 font-semibold transition-colors underline underline-offset-2 decoration-orange-400/50"
-                    >
-                      {t('form.login')}
-                    </button>
-                  </p>
-                </div>
-
-              </form>
-            </Form>
+              <p className="pt-1 text-center text-[12px] font-bold text-gray-500 dark:text-[#fff8ed]/52">
+                {t('form.haveAccount')}{' '}
+                <button
+                  type="button"
+                  onClick={onNavigateToLogin}
+                  className="font-black text-orange-600 transition-colors hover:text-orange-500 dark:text-amber-300 dark:hover:text-amber-200"
+                >
+                  {t('form.login')}
+                </button>
+              </p>
+            </form>
+          </Form>
           </div>
         </div>
       </div>

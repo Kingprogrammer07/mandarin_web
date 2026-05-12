@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Calendar, Home, ScanBarcode, ShieldAlert } from 'lucide-react';
 import { useDarkMode } from './useDarkMode';
+import { triggerSoftHaptic } from '@/utils/haptics';
 
 export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
   const isHome = activeTab === 'home';
@@ -69,13 +70,18 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
     : activeTab === 'delivery_history' ? t('dashboard.tabs.history')
     : t('dashboard.tabs.track');
 
+  const handleTabClick = (tab: string) => {
+    triggerSoftHaptic();
+    setActiveTab(tab);
+  };
+
   return (
     <div className="relative mb-5 z-10">
       <div className="relative flex rounded-2xl p-1 gap-1" style={wrapperStyle}>
         <div style={indicatorStyle} />
 
         <button
-          onClick={() => setActiveTab('home')}
+          onClick={() => handleTabClick('home')}
           className={`
             relative z-10 flex-1 flex items-center justify-center gap-2
             py-[11px] px-4 rounded-[10px] text-sm font-semibold
@@ -88,7 +94,7 @@ export const HeaderTabs = memo(({ activeTab, setActiveTab }: { activeTab: string
         </button>
 
         <button
-          onClick={() => setActiveTab('track')}
+          onClick={() => handleTabClick('track')}
           className={`
             relative z-10 flex-1 flex items-center justify-center gap-2
             py-[11px] px-4 rounded-[10px] text-sm font-semibold

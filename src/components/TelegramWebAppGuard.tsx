@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, Package, WifiOff, RefreshCw } from 'lucide-react';
 import { getTelegramWebAppData, validateInitData, telegramAutoLogin } from '@/api/services/auth';
 import { TopProgressBar } from '@/components/ui/TopProgressBar';
@@ -12,6 +13,10 @@ const STYLES = `
     0%   { opacity: 0; transform: translateY(12px); }
     100% { opacity: 1; transform: translateY(0);    }
   }
+  @keyframes guard-mark-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 18px 36px rgba(249,115,22,.18); }
+    50% { transform: scale(1.035); box-shadow: 0 22px 44px rgba(249,115,22,.25); }
+  }
   @keyframes progress-bar {
     0%   { width: 0%;  }
     40%  { width: 60%; }
@@ -19,35 +24,51 @@ const STYLES = `
     100% { width: 95%; }
   }
   .fade-in-up       { animation: fade-in-up   0.5s ease-out both;    }
+  .guard-mark-pulse { animation: guard-mark-pulse 1.9s ease-in-out infinite; }
   .progress-animate { animation: progress-bar 2.8s ease-out forwards; }
 `;
 
 /* ─────────────── LOADING SCREEN ─────────────── */
 function LoadingScreen() {
+  const { t } = useTranslation();
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setMessageIndex((index) => (index + 1) % 2);
+    }, 1500);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#f8fafc] px-4 dark:bg-[#06080d]">
       <style>{STYLES}</style>
       <TopProgressBar />
 
-      <div className="fade-in-up flex flex-col items-center gap-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.18),rgba(249,115,22,0.07)_38%,transparent_72%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.20),rgba(249,115,22,0.08)_38%,transparent_72%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-300/70 to-transparent dark:via-orange-200/55" />
+
+      <div className="fade-in-up relative w-full max-w-[330px] overflow-hidden rounded-[30px] border border-orange-500/16 bg-white/82 p-5 text-center shadow-[0_24px_60px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-[18px] dark:border-white/[0.09] dark:bg-[#0a0e15]/84 dark:shadow-[0_26px_70px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.07)]">
+        <div className="pointer-events-none absolute -right-16 -top-14 h-36 w-64 rotate-[-14deg] rounded-[42%] bg-[linear-gradient(90deg,rgba(245,158,11,0.18),rgba(59,130,246,0.08),transparent_72%)] blur-[18px]" />
         {/* Brand mark */}
-        <div className="w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/25">
-          <span className="text-white text-xl font-black select-none">M</span>
+        <div className="guard-mark-pulse relative mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[20px] border border-orange-500/20 bg-gradient-to-br from-orange-400 to-orange-600 text-white dark:border-amber-200/15">
+          <span className="select-none text-[24px] font-black leading-none">M</span>
         </div>
 
         {/* Brand text */}
-        <div className="text-center space-y-1">
-          <p className="text-sm font-bold text-gray-800 dark:text-white tracking-wide">
+        <div className="relative">
+          <p className="text-[15px] font-black tracking-normal text-gray-950 dark:text-[#fff8ed]">
             Mandarin Cargo
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 tracking-[0.2em] uppercase">
-            System
+          <p className="mt-1 min-h-[18px] text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/58">
+            {t(messageIndex === 0 ? 'telegramGuard.loading.telegram' : 'telegramGuard.loading.app')}
           </p>
         </div>
 
         {/* Determinate progress bar — fills over ~2.8s */}
-        <div className="w-48 h-[3px] bg-gray-100 dark:bg-white/[0.06] rounded-full overflow-hidden">
-          <div className="progress-animate h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full" />
+        <div className="relative mt-5 h-1.5 overflow-hidden rounded-full bg-gray-950/7 dark:bg-white/8">
+          <div className="progress-animate h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400" />
         </div>
       </div>
     </div>

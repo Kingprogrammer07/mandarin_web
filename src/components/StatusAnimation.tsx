@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
 interface StatusAnimationProps {
   status: 'loading' | 'success' | 'error';
@@ -8,144 +9,93 @@ interface StatusAnimationProps {
 }
 
 const STYLES = `
-  @keyframes modal-in {
-    0%   { transform: scale(.8) translateY(24px); opacity: 0; }
-    100% { transform: scale(1) translateY(0);     opacity: 1; }
-  }
-  @keyframes bounce-in {
-    0%   { transform: scale(0);   opacity: 0; }
-    60%  { transform: scale(1.25); }
-    100% { transform: scale(1);   opacity: 1; }
-  }
-  @keyframes shake-x {
-    0%,100% { transform: translateX(0);  }
-    20%,60% { transform: translateX(-9px); }
-    40%,80% { transform: translateX(9px);  }
-  }
-  @keyframes ring-expand {
-    0%   { transform: scale(1);   opacity: .55; }
-    100% { transform: scale(1.9); opacity: 0;   }
-  }
-  @keyframes glow-pulse {
-    0%,100% { opacity: .35; }
-    50%     { opacity: .75; }
-  }
-  @keyframes bounce-dot {
-    0%,100% { transform: translateY(0);    }
-    50%     { transform: translateY(-12px); }
-  }
-  @keyframes backdrop-in {
-    0%   { opacity: 0; }
-    100% { opacity: 1; }
+  @keyframes status-card-in {
+    0% { transform: translateY(18px) scale(.96); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
   }
 
-  .anim-modal    { animation: modal-in  .45s cubic-bezier(.34,1.56,.64,1) forwards; }
-  .anim-bounce   { animation: bounce-in .65s cubic-bezier(.68,-.55,.265,1.55) forwards; }
-  .anim-shake    { animation: shake-x   .65s cubic-bezier(.36,.07,.19,.97); }
-  .ring-expand   { animation: ring-expand 1.6s ease-out infinite; }
-  .glow-pulse    { animation: glow-pulse  2.2s ease-in-out infinite; }
-  .backdrop-in   { animation: backdrop-in .3s ease forwards; }
-  .dot-0 { animation: bounce-dot 1s ease-in-out infinite; animation-delay:  0s; }
-  .dot-1 { animation: bounce-dot 1s ease-in-out infinite; animation-delay: .2s; }
-  .dot-2 { animation: bounce-dot 1s ease-in-out infinite; animation-delay: .4s; }
+  @keyframes status-sheen {
+    0% { transform: translateX(-120%) rotate(18deg); }
+    100% { transform: translateX(150%) rotate(18deg); }
+  }
+
+  .status-card-in { animation: status-card-in .32s cubic-bezier(.2,.8,.2,1) both; }
+  .status-sheen { animation: status-sheen 1.65s ease-in-out infinite; }
 `;
 
-const GLOW: Record<string, string> = {
-  loading: 'rgba(249,115,22,0.28)',
-  success: 'rgba(34,197,94,0.28)',
-  error:   'rgba(239,68,68,0.28)',
-};
-
-const BAR_GRADIENT: Record<string, string> = {
-  loading: 'linear-gradient(90deg, transparent, rgb(249,115,22), transparent)',
-  success: 'linear-gradient(90deg, transparent, rgb(34,197,94),  transparent)',
-  error:   'linear-gradient(90deg, transparent, rgb(239,68,68),  transparent)',
-};
-
-const RING_COLOR: Record<string, string> = {
-  loading: 'border-orange-300',
-  success: 'border-green-300',
-  error:   'border-red-300',
-};
+const STATUS_CONFIG = {
+  loading: {
+    icon: <Loader2 className="h-5 w-5 animate-spin" />,
+    iconClass: 'bg-orange-500/14 text-orange-500 dark:bg-amber-300/10 dark:text-amber-300',
+    textClass: 'text-gray-950 dark:text-[#fff8ed]',
+    accentClass: 'bg-orange-500',
+  },
+  success: {
+    icon: <CheckCircle2 className="h-5 w-5" />,
+    iconClass: 'bg-emerald-500/12 text-emerald-600 dark:bg-emerald-300/10 dark:text-emerald-300',
+    textClass: 'text-emerald-700 dark:text-emerald-300',
+    accentClass: 'bg-emerald-500',
+  },
+  error: {
+    icon: <XCircle className="h-5 w-5" />,
+    iconClass: 'bg-red-500/12 text-red-600 dark:bg-red-300/10 dark:text-red-300',
+    textClass: 'text-red-700 dark:text-red-300',
+    accentClass: 'bg-red-500',
+  },
+} satisfies Record<
+  StatusAnimationProps['status'],
+  { icon: ReactNode; iconClass: string; textClass: string; accentClass: string }
+>;
 
 export default function StatusAnimation({ status, message, onComplete }: StatusAnimationProps) {
   const [show, setShow] = useState(false);
+  const config = STATUS_CONFIG[status];
 
   useEffect(() => {
     queueMicrotask(() => setShow(true));
     if (status !== 'loading' && onComplete) {
-      const t = setTimeout(() => onComplete(), 2000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => onComplete(), 1800);
+      return () => clearTimeout(timer);
     }
+    return undefined;
   }, [status, onComplete]);
 
   return (
     <>
       <style>{STYLES}</style>
 
-      <div className={`backdrop-in fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ${show ? 'opacity-100' : 'opacity-0'}`}>
+      <div
+        className={[
+          'fixed inset-0 z-50 flex items-center justify-center px-4 transition-opacity duration-200',
+          show ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
+      >
+        <div className="absolute inset-0 bg-black/48 backdrop-blur-[6px]" />
 
-        {/* backdrop */}
-        <div className="absolute inset-0 bg-black/65 backdrop-blur-md" />
-
-        {/* card */}
         <div
-          className="anim-modal relative bg-white dark:bg-[#0d0a04] rounded-3xl p-10 border border-gray-100 dark:border-white/10 flex flex-col items-center gap-6 min-w-[300px] max-w-sm mx-4"
-          style={{ boxShadow: `0 0 70px ${GLOW[status]}, 0 30px 60px rgba(0,0,0,.35)` }}
+          className="status-card-in relative flex w-full max-w-[350px] items-center gap-3 overflow-hidden rounded-[24px] border border-white/18 bg-white/76 p-3.5 shadow-[0_24px_70px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.35)] backdrop-blur-[18px] dark:border-white/[0.105] dark:bg-[#10151f]/82 dark:shadow-[0_24px_70px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
+          style={{ fontFamily: 'Arial, sans-serif' }}
         >
-          {/* top accent bar */}
-          <div className="absolute top-0 inset-x-0 h-[3px] rounded-t-3xl" style={{ background: BAR_GRADIENT[status] }} />
+          {status === 'loading' && (
+            <span className="status-sheen pointer-events-none absolute inset-y-[-30%] left-0 w-20 bg-white/18 blur-md dark:bg-amber-200/8" />
+          )}
 
-          {/* dot-grid */}
-          <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-[0.025]"
-            style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[18px] ${config.iconClass}`}>
+            {config.icon}
+          </span>
 
-          {/* ── Icon section ── */}
-          <div className="relative flex items-center justify-center w-28 h-28">
-            {/* ping ring */}
-            <div className={`ring-expand absolute w-24 h-24 rounded-full border-2 ${RING_COLOR[status]}`} />
-
+          <div className="min-w-0 flex-1">
+            {message && (
+              <p className={`line-clamp-3 text-[13px] font-bold leading-snug ${config.textClass}`}>
+                {message}
+              </p>
+            )}
             {status === 'loading' && (
-              <>
-                <Loader2 className="w-20 h-20 text-orange-500 animate-spin relative z-10 drop-shadow-lg" />
-                <div className="glow-pulse absolute w-20 h-20 rounded-full bg-orange-500/20 blur-xl" />
-              </>
-            )}
-
-            {status === 'success' && (
-              <div className="anim-bounce relative z-10">
-                <CheckCircle2 className="w-20 h-20 text-green-500 drop-shadow-lg" />
-                <div className="glow-pulse absolute inset-0 w-20 h-20 rounded-full bg-green-500/25 blur-xl" />
-              </div>
-            )}
-
-            {status === 'error' && (
-              <div className="anim-shake relative z-10">
-                <XCircle className="w-20 h-20 text-red-500 drop-shadow-lg" />
-                <div className="glow-pulse absolute inset-0 w-20 h-20 rounded-full bg-red-500/25 blur-xl" />
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-950/7 dark:bg-white/8">
+                <div className={`h-full w-1/2 rounded-full ${config.accentClass} opacity-90`} />
               </div>
             )}
           </div>
-
-          {/* message */}
-          {message && (
-            <p className={`text-base font-semibold text-center max-w-xs leading-relaxed ${
-              status === 'loading' ? 'text-gray-700 dark:text-gray-200'
-              : status === 'success' ? 'text-green-700 dark:text-green-400'
-              : 'text-red-700 dark:text-red-400'
-            }`}>
-              {message}
-            </p>
-          )}
-
-          {/* loading dots */}
-          {status === 'loading' && (
-            <div className="flex gap-2.5">
-              <div className="dot-0 w-3 h-3 rounded-full bg-orange-500 shadow-md shadow-orange-500/50" />
-              <div className="dot-1 w-3 h-3 rounded-full bg-orange-500 shadow-md shadow-orange-500/50" />
-              <div className="dot-2 w-3 h-3 rounded-full bg-orange-500 shadow-md shadow-orange-500/50" />
-            </div>
-          )}
         </div>
       </div>
     </>
