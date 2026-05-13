@@ -42,6 +42,7 @@ interface Props {
   readIds: Set<number>;
   onClientClick: (clientCode: string) => void;
   isLoading: boolean;
+  mode?: "drawer" | "inline";
 }
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -95,14 +96,14 @@ function formatSum(n: number): string {
 
 // ─── Receipt Preview Modal ────────────────────────────────────────────────────
 
-function ReceiptPreview({ url, contentType, onClose }: { url: string; contentType: string; onClose: () => void }) {
+function ReceiptPreview({ url, contentType, onClose, position = "absolute" }: { url: string; contentType: string; onClose: () => void; position?: "absolute" | "fixed" }) {
   const isPdf = contentType === "application/pdf" || url.endsWith(".pdf");
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-[80] flex items-center justify-center bg-black/80 p-3 sm:p-4"
+      className={`${position === "fixed" ? "fixed" : "absolute"} inset-0 z-[80] flex items-center justify-center bg-black/80 p-3 sm:p-4`}
       onClick={onClose}
     >
       <button
@@ -863,6 +864,7 @@ export function PaymentNotificationDrawer({
   readIds,
   onClientClick,
   isLoading,
+  mode = "drawer",
 }: Props) {
   const [receiptPreview, setReceiptPreview] = useState<{ url: string; contentType: string } | null>(null);
   const [isReceiptLoading, setIsReceiptLoading] = useState(false);
@@ -904,6 +906,150 @@ export function PaymentNotificationDrawer({
     return { total, paid, remaining };
   }, [uniqueNotifications]);
 
+  const header = (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        {mode === "drawer" ? (
+          <DrawerTitle className="text-base font-bold text-gray-900 dark:text-white truncate">
+            To&apos;lov bildirishnomalari
+          </DrawerTitle>
+        ) : (
+          <span className="text-base font-bold text-gray-900 dark:text-white truncate">
+            To&apos;lov bildirishnomalari
+          </span>
+        )}
+        {total > 0 && (
+          <Badge variant="secondary" className="text-[10px] font-bold bg-gray-100 dark:bg-white/[0.08] text-gray-500 dark:text-gray-400 shrink-0">
+            {total}
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {unreadCount > 0 && (
+          <Button variant="ghost" size="sm" className="h-8 text-[11px] font-bold" onClick={markAllRead}>
+            Barchasini o&apos;qildi
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-[11px] font-bold text-orange-600 dark:text-orange-400"
+          onClick={() => setExpandAll((v) => !v)}
+        >
+          {expandAll ? "Yopish" : "Batafsil"}
+        </Button>
+        {mode === "drawer" && (
+          <DrawerClose asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+              <X className="w-4 h-4" />
+            </Button>
+          </DrawerClose>
+        )}
+      </div>
+    </div>
+  );
+
+  const body = (
+    <>
+      {mode === "drawer" ? (
+        <DrawerHeader className="border-b border-gray-100 dark:border-white/[0.06] pb-3 shrink-0">
+          {header}
+        </DrawerHeader>
+      ) : (
+        <div className="border-b border-gray-100 dark:border-white/[0.06] pb-3 shrink-0 px-4 pt-4">
+          {header}
+        </div>
+      )}
+
+      {/* Filters */}
+      <FilterBar filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} onReset={resetFilters} />
+
+      {/* Cargo stats summary */}
+      {cargoStats.total > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02]">
+          <span className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.06] text-[11px] font-medium text-gray-600 dark:text-gray-400">
+            {cargoStats.total} ta yuk
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-green-50 dark:bg-green-500/10 text-[11px] font-medium text-green-600 dark:text-green-400">
+            {cargoStats.paid} to&apos;langan
+          </span>
+          {cargoStats.remaining > 0 && (
+            <span className="px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-500/10 text-[11px] font-medium text-red-600 dark:text-red-400">
+              {cargoStats.remaining} qoldi
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Notification list */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+        {isLoading && uniqueNotifications.length === 0 ? (
+          <div className="space-y-3 py-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 bg-gray-50 dark:bg-white/[0.04] rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        ) : uniqueNotifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <FileText className="w-10 h-10 text-gray-200 dark:text-gray-700 mb-3" strokeWidth={1.5} />
+            <p className="text-[13px] font-medium text-gray-400 dark:text-gray-500">
+              Bildirishnomalar yo&apos;q
+            </p>
+            <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">
+              Filterni o&apos;zgartiring yoki keyinroq qayta tekshiring
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {uniqueNotifications.map((n) => (
+              <NotificationBubble
+                key={n.id}
+                n={n}
+                isUnread={!readIds.has(n.id) && n.payment_status !== "paid"}
+                onClientClick={onClientClick}
+                onReceiptClick={handleReceiptClick}
+                expandAll={expandAll}
+              />
+            ))}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Pagination */}
+      <Pagination page={page} perPage={perPage} total={total} onPageChange={setPage} />
+
+      {/* Receipt preview modal lives inside DrawerContent so Vaul's modal trap keeps it clickable. */}
+      <AnimatePresence>
+        {receiptPreview && (
+          <ReceiptPreview
+            url={receiptPreview.url}
+            contentType={receiptPreview.contentType}
+            onClose={() => setReceiptPreview(null)}
+            position={mode === "inline" ? "fixed" : "absolute"}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Receipt loading overlay */}
+      {isReceiptLoading && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 shadow-xl flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Chek yuklanmoqda...</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  if (mode === "inline") {
+    return (
+      <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden relative flex flex-col h-[calc(100dvh-7rem)]">
+        {body}
+      </div>
+    );
+  }
+
   return (
     <>
       <Drawer direction="right">
@@ -932,119 +1078,7 @@ export function PaymentNotificationDrawer({
             flex flex-col
           "
         >
-          {/* Header */}
-          <DrawerHeader className="border-b border-gray-100 dark:border-white/[0.06] pb-3 shrink-0">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <DrawerTitle className="text-base font-bold text-gray-900 dark:text-white truncate">
-                  To&apos;lov bildirishnomalari
-                </DrawerTitle>
-                {total > 0 && (
-                  <Badge variant="secondary" className="text-[10px] font-bold bg-gray-100 dark:bg-white/[0.08] text-gray-500 dark:text-gray-400 shrink-0">
-                    {total}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" className="h-8 text-[11px] font-bold" onClick={markAllRead}>
-                    Barchasini o&apos;qildi
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-[11px] font-bold text-orange-600 dark:text-orange-400"
-                  onClick={() => setExpandAll((v) => !v)}
-                >
-                  {expandAll ? "Yopish" : "Batafsil"}
-                </Button>
-                <DrawerClose asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </DrawerClose>
-              </div>
-            </div>
-          </DrawerHeader>
-
-          {/* Filters */}
-          <FilterBar filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} onReset={resetFilters} />
-
-          {/* Cargo stats summary */}
-          {cargoStats.total > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02]">
-              <span className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.06] text-[11px] font-medium text-gray-600 dark:text-gray-400">
-                {cargoStats.total} ta yuk
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-green-50 dark:bg-green-500/10 text-[11px] font-medium text-green-600 dark:text-green-400">
-                {cargoStats.paid} to&apos;langan
-              </span>
-              {cargoStats.remaining > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-500/10 text-[11px] font-medium text-red-600 dark:text-red-400">
-                  {cargoStats.remaining} qoldi
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Notification list */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-            {isLoading && uniqueNotifications.length === 0 ? (
-              <div className="space-y-3 py-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-32 bg-gray-50 dark:bg-white/[0.04] rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : uniqueNotifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <FileText className="w-10 h-10 text-gray-200 dark:text-gray-700 mb-3" strokeWidth={1.5} />
-                <p className="text-[13px] font-medium text-gray-400 dark:text-gray-500">
-                  Bildirishnomalar yo&apos;q
-                </p>
-                <p className="text-[11px] text-gray-300 dark:text-gray-600 mt-1">
-                  Filterni o&apos;zgartiring yoki keyinroq qayta tekshiring
-                </p>
-              </div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {uniqueNotifications.map((n) => (
-                  <NotificationBubble
-                    key={n.id}
-                    n={n}
-                    isUnread={!readIds.has(n.id) && n.payment_status !== "paid"}
-                    onClientClick={onClientClick}
-                    onReceiptClick={handleReceiptClick}
-                    expandAll={expandAll}
-                  />
-                ))}
-              </AnimatePresence>
-            )}
-          </div>
-
-          {/* Pagination */}
-          <Pagination page={page} perPage={perPage} total={total} onPageChange={setPage} />
-
-          {/* Receipt preview modal lives inside DrawerContent so Vaul's modal trap keeps it clickable. */}
-          <AnimatePresence>
-            {receiptPreview && (
-              <ReceiptPreview
-                url={receiptPreview.url}
-                contentType={receiptPreview.contentType}
-                onClose={() => setReceiptPreview(null)}
-              />
-            )}
-          </AnimatePresence>
-
-          {/* Receipt loading overlay */}
-          {isReceiptLoading && (
-            <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/40">
-              <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 shadow-xl flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Chek yuklanmoqda...</span>
-              </div>
-            </div>
-          )}
+          {body}
         </DrawerContent>
       </Drawer>
     </>

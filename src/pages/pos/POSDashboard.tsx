@@ -77,6 +77,7 @@ import { CargoRow } from "./components/CargoRow";
 import { ClientProfileDrawer } from "./components/ClientProfileDrawer";
 import { ConfirmModal } from "./components/ConfirmModal";
 import type { ConfirmPayload } from "./components/ConfirmModal";
+import { ResizeHandle } from "./components/ResizeHandle";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -88,6 +89,24 @@ interface POSDashboardProps {
 export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps) {
   const queryClient = useQueryClient();
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // ── Resizable column widths (persisted in localStorage) ───────────────────
+  const [leftWidth, setLeftWidth] = useState(() => {
+    const saved = localStorage.getItem("pos_left_width");
+    return saved ? Math.max(200, Math.min(480, parseInt(saved, 10))) : 288;
+  });
+  const [centerWidth, setCenterWidth] = useState(() => {
+    const saved = localStorage.getItem("pos_center_width");
+    return saved ? Math.max(320, Math.min(800, parseInt(saved, 10))) : 480;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("pos_left_width", String(leftWidth));
+  }, [leftWidth]);
+
+  useEffect(() => {
+    localStorage.setItem("pos_center_width", String(centerWidth));
+  }, [centerWidth]);
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -609,7 +628,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-6 bg-[#f5f3ef] dark:bg-[#0c0c0c] min-h-screen">
+      <div className="px-3 sm:px-4 pb-6 bg-[#f5f3ef] dark:bg-[#0c0c0c] min-h-screen">
         {/* Dashboard header */}
         <div className="flex items-center justify-between py-3 mb-1">
           <div className="flex items-center gap-2">
@@ -660,22 +679,24 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
               )}
             </button>
 
-            {/* Payment notifications */}
-            <PaymentNotificationDrawer
-              notifications={paymentNotifications}
-              total={paymentTotal}
-              page={paymentPage}
-              perPage={paymentPerPage}
-              unreadCount={paymentUnreadCount}
-              filters={paymentFilters}
-              setPage={setPaymentPage}
-              setFilters={setPaymentFilters}
-              resetFilters={resetPaymentFilters}
-              markAllRead={markPaymentNotificationsRead}
-              readIds={paymentReadIds}
-              onClientClick={handleSearch}
-              isLoading={paymentLoading}
-            />
+            {/* Payment notifications (mobile drawer) */}
+            <div className="lg:hidden">
+              <PaymentNotificationDrawer
+                notifications={paymentNotifications}
+                total={paymentTotal}
+                page={paymentPage}
+                perPage={paymentPerPage}
+                unreadCount={paymentUnreadCount}
+                filters={paymentFilters}
+                setPage={setPaymentPage}
+                setFilters={setPaymentFilters}
+                resetFilters={resetPaymentFilters}
+                markAllRead={markPaymentNotificationsRead}
+                readIds={paymentReadIds}
+                onClientClick={handleSearch}
+                isLoading={paymentLoading}
+              />
+            </div>
 
             <button
               onClick={() => {onNavigate("admin-profile")}}
@@ -701,11 +722,19 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-4">
+        <div
+          className="flex flex-col lg:flex-row gap-4 lg:gap-0"
+          style={
+            {
+              "--pos-left-w": `${leftWidth}px`,
+              "--pos-center-w": `${centerWidth}px`,
+            } as React.CSSProperties
+          }
+        >
           {/* ── Left column: Cashier Log ───────────────────────────────────
                Always rendered so the layout stays consistent.
                Content is gated behind pos:read; otherwise shows a lock panel. */}
-          <div className="lg:w-72 xl:w-80 shrink-0 space-y-3">
+          <div className="shrink-0 space-y-3 lg:px-1.5 lg:w-[var(--pos-left-w)]">
             {canRead ? (
               <>
                 <TodayTotal
@@ -738,8 +767,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
             )}
           </div>
 
-          {/* ── Right column: Search & Payment ────────────────────────────── */}
-          <div className="flex-1 min-w-0 space-y-3">
+          <ResizeHandle onResize={(d) => setLeftWidth((w) => Math.max(200, Math.min(480, w + d)))} />
+
+          {/* ── Center column: Search & Payment ───────────────────────────── */}
+          <div className="shrink-0 space-y-3 lg:px-1.5 lg:w-[var(--pos-center-w)]">
             {/* Search bar */}
             <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-3">
               <div className="flex gap-2">
@@ -1306,6 +1337,28 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          <ResizeHandle onResize={(d) => setCenterWidth((w) => Math.max(320, Math.min(800, w + d)))} />
+
+          {/* ── Right column: Payment Notifications (desktop only) ───────────── */}
+          <div className="hidden lg:block flex-1 min-w-[200px] space-y-3 lg:px-1.5">
+            <PaymentNotificationDrawer
+              mode="inline"
+              notifications={paymentNotifications}
+              total={paymentTotal}
+              page={paymentPage}
+              perPage={paymentPerPage}
+              unreadCount={paymentUnreadCount}
+              filters={paymentFilters}
+              setPage={setPaymentPage}
+              setFilters={setPaymentFilters}
+              resetFilters={resetPaymentFilters}
+              markAllRead={markPaymentNotificationsRead}
+              readIds={paymentReadIds}
+              onClientClick={handleSearch}
+              isLoading={paymentLoading}
+            />
           </div>
         </div>
       </div>
