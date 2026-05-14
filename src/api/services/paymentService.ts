@@ -23,6 +23,12 @@ export interface CargoPriceItem {
   total_usd: number;
 }
 
+export interface PaymentLinkItem {
+  name: string;
+  slug: string;
+  url: string;
+}
+
 export interface FlightPaymentDetailsResponse {
   flight_name: string;
   client_code: string;
@@ -40,6 +46,7 @@ export interface FlightPaymentDetailsResponse {
   card_number: string | null;
   card_owner: string | null;
   cargo_prices: CargoPriceItem[];
+  payment_links: PaymentLinkItem[];
 }
 
 export interface WalletOnlyPaymentRequest {

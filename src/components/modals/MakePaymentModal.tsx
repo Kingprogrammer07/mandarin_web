@@ -39,10 +39,12 @@ import {
   ChevronDown,
   WalletCards,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 import {
   paymentService,
   type AvailableFlightItem,
+  type PaymentLinkItem,
 } from '@/api/services/paymentService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
@@ -74,6 +76,62 @@ function isValidReceiptFile(file: File): boolean {
   ];
   return allowed.includes(file.type);
 }
+
+// ============================================================================
+// Payment link brand helpers
+// ============================================================================
+
+interface LinkBrand {
+  bg: string;       // CSS gradient / solid color
+  label: string;    // short label shown inside the icon badge
+  textColor: string;
+}
+
+const LINK_BRANDS: Record<string, LinkBrand> = {
+  click:  { bg: 'linear-gradient(135deg,#00B9F1,#0088CC)', label: 'C',  textColor: '#fff' },
+  payme:  { bg: 'linear-gradient(135deg,#1AC47D,#14A868)', label: 'P',  textColor: '#fff' },
+  uzum:   { bg: 'linear-gradient(135deg,#9B27AF,#7B1FA2)', label: 'U',  textColor: '#fff' },
+  apelsin:{ bg: 'linear-gradient(135deg,#FF6B35,#E55A2B)', label: 'A',  textColor: '#fff' },
+};
+
+function getLinkBrand(slug: string): LinkBrand {
+  return (
+    LINK_BRANDS[slug.toLowerCase()] ?? {
+      bg: 'linear-gradient(135deg,#F59E0B,#D97706)',
+      label: slug[0]?.toUpperCase() ?? '?',
+      textColor: '#fff',
+    }
+  );
+}
+
+/** Single payment link button — opens URL in new tab */
+const PaymentLinkButton = ({ link }: { link: PaymentLinkItem }) => {
+  const brand = getLinkBrand(link.slug);
+  return (
+    <a
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-white/10
+        bg-white dark:bg-white/[0.03]
+        hover:border-amber-300 dark:hover:border-amber-500/30
+        hover:shadow-sm
+        active:scale-[0.97] transition-all duration-150"
+    >
+      {/* Brand badge */}
+      <div
+        className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-base shadow-sm"
+        style={{ background: brand.bg, color: brand.textColor }}
+      >
+        {brand.label}
+      </div>
+      <span className="flex-1 font-bold text-sm text-gray-900 dark:text-white">
+        {link.name}
+      </span>
+      <ExternalLink className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+    </a>
+  );
+};
 
 // ============================================================================
 // Sub-components
@@ -1186,9 +1244,13 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       );
     }
 
-    // ---- Online Payment — Card + Upload ----
+    // ---- Online Payment — Card + Links + Upload ----
     if (paymentMethod === 'online') {
-      if (!details?.card_number) {
+      const hasCard = !!details?.card_number;
+      const paymentLinks: PaymentLinkItem[] = details?.payment_links ?? [];
+      const hasLinks = paymentLinks.length > 0;
+
+      if (!hasCard && !hasLinks) {
         return (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
             <AlertCircle className="w-12 h-12 text-amber-400" />
@@ -1222,31 +1284,65 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           </div>
 
           {/* Card info */}
-          <div className="rounded-2xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white/[0.06] dark:to-white/[0.03] border border-gray-700 dark:border-white/10">
-            <p className="text-xs font-medium text-gray-400 mb-1">
-              {t('makePayment.transferTo')}
-            </p>
-            <div className="flex items-center justify-between">
-              <p className="text-2xl font-black tracking-wider text-white">
-                {details.card_number}
+          {hasCard && (
+            <div className="rounded-2xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white/[0.06] dark:to-white/[0.03] border border-gray-700 dark:border-white/10">
+              <p className="text-xs font-medium text-gray-400 mb-1">
+                {t('makePayment.transferTo')}
               </p>
-              <button
-                onClick={handleCopyCard}
-                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 transition-all"
-              >
-                {copied ? (
-                  <Check className="w-5 h-5 text-emerald-400" />
-                ) : (
-                  <Copy className="w-5 h-5 text-white/70" />
-                )}
-              </button>
+              <div className="flex items-center justify-between">
+                <p className="text-2xl font-black tracking-wider text-white">
+                  {details!.card_number}
+                </p>
+                <button
+                  onClick={handleCopyCard}
+                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 transition-all"
+                >
+                  {copied ? (
+                    <Check className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-5 h-5 text-white/70" />
+                  )}
+                </button>
+              </div>
+              {details!.card_owner && (
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {t('makePayment.cardOwner')}: {details!.card_owner}
+                </p>
+              )}
             </div>
-            {details.card_owner && (
-              <p className="text-xs text-gray-400 mt-1.5">
-                {t('makePayment.cardOwner')}: {details.card_owner}
+          )}
+
+          {/* Payment Links */}
+          {hasLinks && (
+            <div className="space-y-2">
+              {hasCard && (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                  <span className="text-xs font-medium text-gray-400 dark:text-gray-500 px-1">
+                    yoki
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                </div>
+              )}
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                {hasCard ? "Online to'lov tizimi orqali" : "To'lov tizimini tanlang"}
               </p>
-            )}
-          </div>
+              {paymentLinks.map((link) => (
+                <PaymentLinkButton key={link.slug} link={link} />
+              ))}
+            </div>
+          )}
+
+          {/* Divider before upload */}
+          {(hasCard || hasLinks) && (
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+              <span className="text-xs font-medium text-gray-400 dark:text-gray-500 px-1">
+                To'lov chekini yuboring
+              </span>
+              <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+            </div>
+          )}
 
           {/* File Upload Area */}
           <div
