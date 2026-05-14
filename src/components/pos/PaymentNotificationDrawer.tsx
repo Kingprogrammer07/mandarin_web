@@ -253,9 +253,14 @@ function SummaryView({
       <div className="flex items-start justify-between gap-2 pr-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-sm text-gray-900 dark:text-white">
-              {n.client_name || n.client_code}
+            <span className="font-bold text-sm text-gray-900 dark:text-white font-mono">
+              {n.client_code}
             </span>
+            {n.client_name && (
+              <span className="font-bold text-sm text-gray-900 dark:text-white">
+                · {n.client_name}
+              </span>
+            )}
             <Badge
               variant="secondary"
               className="text-[10px] font-bold shrink-0 flex items-center gap-1 bg-gray-100 dark:bg-white/[0.08] text-gray-600 dark:text-gray-400"
@@ -394,9 +399,14 @@ function DetailView({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-base text-gray-900 dark:text-white">
-              {n.client_name || n.client_code}
+            <span className="font-bold text-base text-gray-900 dark:text-white font-mono">
+              {n.client_code}
             </span>
+            {n.client_name && (
+              <span className="font-bold text-base text-gray-900 dark:text-white">
+                · {n.client_name}
+              </span>
+            )}
             <Badge
               variant="secondary"
               className="text-[10px] font-bold shrink-0 flex items-center gap-1 bg-gray-100 dark:bg-white/[0.08] text-gray-600 dark:text-gray-400"
