@@ -20,6 +20,21 @@ const queryClient = new QueryClient({
   },
 })
 
+// After a new Vercel deploy, old chunk hashes no longer exist on the CDN.
+// Users with the old app open will get 404s on dynamic imports — force a
+// hard reload so they pick up the new bundle automatically.
+window.addEventListener('vite:preloadError', () => {
+  window.location.reload();
+});
+window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+  if (
+    event.reason instanceof TypeError &&
+    event.reason.message.includes('dynamically imported module')
+  ) {
+    window.location.reload();
+  }
+});
+
 // Register service worker in production only — enables PWA install prompt
 // and offline shell caching without disrupting the Vite dev HMR workflow.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
