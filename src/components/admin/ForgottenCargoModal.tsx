@@ -84,13 +84,13 @@ export default function ForgottenCargoModal({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-white/[0.06] shrink-0">
-          <div>
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">{flightName}</p>
-            <h2 className="text-base font-black text-gray-800 dark:text-white">Unutilgan yuk qo'shish</h2>
+          <div className="min-w-0 flex-1 mr-3">
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium truncate">{flightName}</p>
+            <h2 className="text-base font-black text-gray-800 dark:text-white truncate">Unutilgan yuk qo'shish</h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
