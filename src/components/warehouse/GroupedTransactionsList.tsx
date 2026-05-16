@@ -128,7 +128,7 @@ export default function GroupedTransactionsList({
   return (
     <div className="space-y-5">
       {displayItems.map((client) => {
-        const isClientExpanded = expandedClients[client.client_code] ?? false;
+        const isClientExpanded = expandedClients[client.client_code] ?? true;
 
         // Barcha reyslardagi "topshirilmagan" yuklari bor reyslarni ajratamiz
         const pendingFlights = client.flights.filter(f => f.transactions.some(tx => !tx.has_proof));
@@ -269,7 +269,7 @@ export default function GroupedTransactionsList({
                 <div className="p-3 sm:p-4 space-y-4">
                   {client.flights.map((flight) => {
                     const flightKey = `${client.client_code}-${flight.flight_name}`;
-                    const isFlightExpanded = expandedFlights[flightKey] ?? false;
+                    const isFlightExpanded = expandedFlights[flightKey] ?? true;
 
                     const pendingTx = flight.transactions.filter(tx => !tx.has_proof);
                     const hasPending = pendingTx.length > 0;
