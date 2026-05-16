@@ -6,17 +6,13 @@ import {
   Search,
   User,
   Wallet,
-  CreditCard,
-  Banknote,
-  Smartphone,
   CheckCheck,
-  Square,
-  CheckSquare,
+  CheckCircle2,
+  Phone,
   Loader2,
   AlertCircle,
   Package,
   X,
-  ChevronRight,
   ArrowLeft,
   Sun,
   Moon,
@@ -27,24 +23,25 @@ import {
   VolumeX,
   Zap,
   Calculator,
+  ChevronDown,
 } from "lucide-react";
 import CalculatorModal from "@/components/modals/CalculatorModal";
 
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
 import { refreshAdminToken } from "@/api/services/adminAuth";
+import { posNotificationService, type PosNotificationItem } from "@/api/services/posNotificationService";
 import {
   getCashierLog,
   processBulkPayment,
 } from "@/api/pos";
-import { PICKUP_METHOD_LABELS, PICKUP_PRIORITY_LABELS } from "@/api/pickupQueue";
 import { getPaymentCards } from "@/api/pos";
-import type { PickupMethod, PickupQueuePriority } from "@/api/pickupQueue";
 import {
   useBroadcastChannel,
   type BroadcastMessage,
 } from "@/hooks/useBroadcastChannel";
 import { usePaymentNotifications } from "@/hooks/usePaymentNotifications";
 import { PaymentNotificationDrawer } from "@/components/pos/PaymentNotificationDrawer";
+import { formatDateTime } from "@/components/pos/PaymentNotificationDrawer";
 import type {
   PaymentProvider,
   CashierLogProvider,
@@ -57,6 +54,7 @@ import {
 import type { ClientSearchResult, UnpaidCargoItem } from "@/api/verification";
 import { formatCurrencySum } from "@/lib/format";
 import { normalizeNumber } from "@/utils/numberFormat";
+import { cn } from "@/lib/utils";
 import {
   loadPendingNotifs,
   persistPendingNotifs,
@@ -71,13 +69,12 @@ import {
   maskCard,
 } from "./components/utils";
 import type { PendingNotif } from "./components/utils";
-import { TodayTotal } from "./components/TodayTotal";
 import { CashierLogPanel } from "./components/CashierLogPanel";
-import { CargoRow } from "./components/CargoRow";
 import { ClientProfileDrawer } from "./components/ClientProfileDrawer";
 import { ConfirmModal } from "./components/ConfirmModal";
 import type { ConfirmPayload } from "./components/ConfirmModal";
 import { ResizeHandle } from "./components/ResizeHandle";
+import { WarehouseRequestCard } from "./components/WarehouseRequestCard";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -135,11 +132,36 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     filters: paymentFilters,
     setPage: setPaymentPage,
     setFilters: setPaymentFilters,
-    resetFilters: resetPaymentFilters,
+    resetFilters: _resetPaymentFilters,
     markAllRead: markPaymentNotificationsRead,
     readIds: paymentReadIds,
     isLoading: paymentLoading,
   } = usePaymentNotifications();
+
+  // ── Notification tabs (Reys / Zayafka) ────────────────────────────────────
+  const [notifTab, setNotifTab] = useState<'flight' | 'zayafka'>('flight');
+
+  const handleNotifTabChange = useCallback((tab: 'flight' | 'zayafka') => {
+    setNotifTab(tab);
+    setPaymentFilters(prev => ({ ...prev, source: tab }));
+    setPaymentPage(1);
+  }, [setPaymentFilters, setPaymentPage]);
+
+  // Override resetFilters to keep the current tab's source after reset
+  const handleResetNotifFilters = useCallback(() => {
+    setPaymentFilters({ sort: "created_desc", source: notifTab });
+    setPaymentPage(1);
+  }, [setPaymentFilters, setPaymentPage, notifTab]);
+
+  const refetchNotifications = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['pos-notifications'] });
+  }, [queryClient]);
+
+  const { data: tabCounts } = useQuery({
+    queryKey: ['pos-tab-counts'],
+    queryFn: () => posNotificationService.getTabCounts(),
+    refetchInterval: 30_000,
+  });
 
   // ── Permissions ───────────────────────────────────────────────────────────
   // State (not memo) so the UI re-renders automatically after a silent token refresh.
@@ -301,6 +323,21 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [logDateFrom, setLogDateFrom] = useState("");
   const [logDateTo, setLogDateTo] = useState("");
   const [logProvider, setLogProvider] = useState<CashierLogProvider | "all">("all");
+  const [logPage, setLogPage] = useState(1);
+
+  // ── Collapsible left column ───────────────────────────────────────────────
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem("pos_left_collapsed");
+    return saved === "true";
+  });
+
+  const toggleLeftColumn = useCallback(() => {
+    setLeftCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("pos_left_collapsed", String(next));
+      return next;
+    });
+  }, []);
 
   // Live balance updated after successful balance adjustments without re-fetching client
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
@@ -312,14 +349,20 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [receivedInput, setReceivedInput] = useState("");
+  const [flightDropdownOpen, setFlightDropdownOpen] = useState(false);
 
-  // ── Pickup queue state ──────────────────────────────────────────────────────
-  const [createPickupQueue, setCreatePickupQueue] = useState(false);
-  const [pickupMethod, setPickupMethod] = useState<PickupMethod>("self_pickup");
-  const [pickupPriority, setPickupPriority] = useState<PickupQueuePriority>("normal");
-  const [pickupNote, setPickupNote] = useState("");
+  // ── Notification-driven flight auto-select & info card ─────────────────────
+  const pendingFlightRef = useRef<{ flight: string; clientCode: string } | null>(null);
+  const [activeNotifData, setActiveNotifData] = useState<PosNotificationItem | null>(null);
+
+  // ── Pickup queue state (now handled by WarehouseRequestCard) ───────────────
 
   // ── UI overlays ───────────────────────────────────────────────────────────
+  const TYPE_LABEL: Record<string, string> = {
+    wallet: "Hamyon", cash: "Naqd", online: "Online",
+    click: "Click", payme: "Payme", card: "Karta",
+  };
+
   const [showProfile, setShowProfile] = useState(false);
   const [confirmPayload, setConfirmPayload] = useState<ConfirmPayload | null>(
     null,
@@ -329,15 +372,20 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     searchRef.current?.focus();
   }, []);
 
+  // Reset to page 1 whenever any cashier log filter changes
+  useEffect(() => {
+    setLogPage(1);
+  }, [logDateFrom, logDateTo, logProvider]);
+
   const cashierLogParams = useMemo(
     () => ({
-      page: 1,
+      page: logPage,
       size: 30,
       date_from: toIsoDateBound(logDateFrom, "start"),
       date_to: toIsoDateBound(logDateTo, "end"),
       payment_provider: logProvider === "all" ? undefined : logProvider,
     }),
-    [logDateFrom, logDateTo, logProvider],
+    [logPage, logDateFrom, logDateTo, logProvider],
   );
   // ── Queries ───────────────────────────────────────────────────────────────
   const {
@@ -384,27 +432,30 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     () => cargoData?.items ?? [],
     [cargoData?.items],
   );
-  const allSelected = useMemo(
-    () => cargos.length > 0 && cargos.every((c) => selectedIds.has(c.cargo_id)),
-    [cargos, selectedIds],
-  );
-  const someSelected = selectedIds.size > 0;
 
+  const flightGroups = useMemo(() => {
+    const map = new Map<string, UnpaidCargoItem[]>();
+    for (const cargo of cargos) {
+      if (!map.has(cargo.flight_name)) map.set(cargo.flight_name, []);
+      map.get(cargo.flight_name)!.push(cargo);
+    }
+    return Array.from(map.entries()).map(([flightName, items]) => ({
+      flightName,
+      items,
+      totalWeight: items.reduce((s, c) => s + c.weight, 0),
+      totalAmount: items.reduce((s, c) => s + c.total_payment, 0),
+    }));
+  }, [cargos]);
   // ── Bulk payment mutation ─────────────────────────────────────────────────
   const payMut = useMutation({
     mutationFn: processBulkPayment,
     onSuccess: (result) => {
-      const msg = createPickupQueue
-        ? `${result.processed_count} ta yuk to'lovi qabul qilindi va warehousega yuborildi! Jami: ${formatCurrencySum(result.total_paid)}`
-        : `${result.processed_count} ta yuk to'lovi qabul qilindi! Jami: ${formatCurrencySum(result.total_paid)}`;
+      const msg = `${result.processed_count} ta yuk to'lovi qabul qilindi! Jami: ${formatCurrencySum(result.total_paid)}`;
       toast.success(msg);
       setSelectedIds(new Set());
       setReceivedInput("");
       setConfirmPayload(null);
-      setCreatePickupQueue(false);
-      setPickupMethod("self_pickup");
-      setPickupPriority("normal");
-      setPickupNote("");
+
       // Aggressively invalidate all POS-related query keys
       queryClient.invalidateQueries({ queryKey: ["pos-unpaid"] });
       queryClient.invalidateQueries({ queryKey: ["cashier-log"] });
@@ -533,27 +584,56 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     setSelectedIds(new Set());
     setUseWallet(false);
     setLiveBalance(null);
-    setCreatePickupQueue(false);
-    setPickupMethod("self_pickup");
-    setPickupNote("");
+    setActiveNotifData(null);
+    pendingFlightRef.current = null;
+
     setTimeout(() => searchRef.current?.focus(), 50);
   };
 
-  // ── Cargo selection ───────────────────────────────────────────────────────
-  const toggleAll = useCallback(() => {
-    setSelectedIds(
-      allSelected ? new Set() : new Set(cargos.map((c) => c.cargo_id)),
-    );
-  }, [allSelected, cargos]);
+  const handleClientAndFlightClick = useCallback(
+    async (code: string, flightName: string, notif: PosNotificationItem) => {
+      pendingFlightRef.current = { flight: flightName, clientCode: code };
+      setActiveNotifData(notif);
+      await handleSearch(code);
+    },
+    [handleSearch],
+  );
 
-  const toggleCargo = useCallback((id: number) => {
-    setSelectedIds((prev) => {
+  // ── Cargo selection ───────────────────────────────────────────────────────
+  // Auto-select all cargos when data loads (unless a pending flight select is queued)
+  useEffect(() => {
+    if (pendingFlightRef.current) return;
+    if (cargoData?.items && cargoData.items.length > 0) {
+      setSelectedIds(new Set(cargoData.items.map((c) => c.cargo_id)));
+    }
+  }, [cargoData?.items]);
+
+  // Auto-select specific flight cargos when triggered from notification "Ko'rish"
+  useEffect(() => {
+    if (!pendingFlightRef.current || !cargoData?.items || !clientInfo) return;
+    const { flight, clientCode } = pendingFlightRef.current;
+    if (clientInfo.client_code.toUpperCase() !== clientCode.toUpperCase()) return;
+    const flightItems = cargoData.items.filter(
+      (c) => c.flight_name.toUpperCase() === flight.toUpperCase()
+    );
+    if (flightItems.length > 0) {
+      setSelectedIds(new Set(flightItems.map((c) => c.cargo_id)));
+    }
+    pendingFlightRef.current = null;
+  }, [cargoData?.items, clientInfo]);
+
+  const toggleFlight = useCallback((flightName: string) => {
+    const flightItems = flightGroups.find(g => g.flightName === flightName)?.items ?? [];
+    const allSelected = flightItems.every(c => selectedIds.has(c.cargo_id));
+    setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      for (const item of flightItems) {
+        if (allSelected) next.delete(item.cargo_id);
+        else next.add(item.cargo_id);
+      }
       return next;
     });
-  }, []);
+  }, [flightGroups, selectedIds]);
 
   // ── Confirmation flow ─────────────────────────────────────────────────────
   const handleOpenConfirm = () => {
@@ -576,7 +656,6 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   const handleConfirmPay = () => {
     if (!confirmPayload || !clientInfo) return;
-    const idempotencyKey = crypto.randomUUID();
     payMut.mutate({
       items: confirmPayload.cargos.map((cargo, i) => ({
         cargo_id: cargo.cargo_id,
@@ -588,11 +667,11 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         card_id: confirmPayload.selectedCard?.id ?? null,
       })),
       cashier_note: null,
-      create_pickup_queue: createPickupQueue || undefined,
-      pickup_method: createPickupQueue ? pickupMethod : null,
-      pickup_priority: createPickupQueue ? pickupPriority : undefined,
-      pickup_note: createPickupQueue ? (pickupNote.trim() || null) : null,
-      pickup_idempotency_key: createPickupQueue ? idempotencyKey : null,
+      create_pickup_queue: undefined,
+      pickup_method: null,
+      pickup_priority: undefined,
+      pickup_note: null,
+      pickup_idempotency_key: null,
     });
   };
 
@@ -690,11 +769,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 filters={paymentFilters}
                 setPage={setPaymentPage}
                 setFilters={setPaymentFilters}
-                resetFilters={resetPaymentFilters}
+                resetFilters={handleResetNotifFilters}
                 markAllRead={markPaymentNotificationsRead}
                 readIds={paymentReadIds}
                 onClientClick={handleSearch}
                 isLoading={paymentLoading}
+                activeTab={notifTab}
+                onTabChange={handleNotifTabChange}
+                tabCounts={tabCounts ?? { flight: 0, zayafka: 0 }}
+                onRefresh={refetchNotifications}
+                onClientAndFlightClick={handleClientAndFlightClick}
               />
             </div>
 
@@ -732,15 +816,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
           }
         >
           {/* ── Left column: Cashier Log ───────────────────────────────────
-               Always rendered so the layout stays consistent.
-               Content is gated behind pos:read; otherwise shows a lock panel. */}
-          <div className="shrink-0 space-y-3 lg:px-1.5 lg:w-[var(--pos-left-w)]">
-            {canRead ? (
-              <>
-                <TodayTotal
-                  total={logData?.today_total ?? 0}
-                  loading={logLoading}
-                />
+               Collapsible on desktop. Content gated behind pos:read. */}
+          {!leftCollapsed ? (
+            <div className="shrink-0 flex flex-col gap-3 lg:px-1.5 lg:w-[var(--pos-left-w)] lg:h-[calc(100dvh-5rem)]">
+              {canRead ? (
                 <CashierLogPanel
                   logData={logData}
                   logLoading={logLoading}
@@ -753,21 +832,31 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                   setLogDateTo={setLogDateTo}
                   logProvider={logProvider}
                   setLogProvider={setLogProvider}
+                  page={logPage}
+                  onPageChange={setLogPage}
                 />
-              </>
-            ) : (
-              <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[160px]">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
-                  <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+              ) : (
+                <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[160px]">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-[12px] text-gray-400 dark:text-gray-500 max-w-[180px]">
+                    Sizda kassa tarixini ko'rish huquqi yo'q
+                  </p>
                 </div>
-                <p className="text-[12px] text-gray-400 dark:text-gray-500 max-w-[180px]">
-                  Sizda kassa tarixini ko'rish huquqi yo'q
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : (
+            /* Collapsed strip — only visible on desktop */
+            <div className="hidden lg:block" />
+          )}
 
-          <ResizeHandle onResize={(d) => setLeftWidth((w) => Math.max(200, Math.min(480, w + d)))} />
+          <ResizeHandle
+            onResize={(d) => setLeftWidth((w) => Math.max(200, Math.min(480, w + d)))}
+            showToggle
+            isCollapsed={leftCollapsed}
+            onToggle={toggleLeftColumn}
+          />
 
           {/* ── Center column: Search & Payment ───────────────────────────── */}
           <div className="shrink-0 space-y-3 lg:px-1.5 lg:w-[var(--pos-center-w)]">
@@ -851,165 +940,420 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
               )}
             </AnimatePresence>
 
-            {/* Client card — clicking opens the profile drawer */}
+            {/* Merged client + cargo + payment card */}
             <AnimatePresence>
               {clientInfo && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  onClick={() => setShowProfile(true)}
-                  className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-4 cursor-pointer hover:border-orange-200/80 dark:hover:border-orange-500/20 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-500/[0.1] flex items-center justify-center">
-                        <User
-                          className="w-5 h-5 text-orange-500"
-                          strokeWidth={1.8}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[15px] font-bold text-gray-900 dark:text-white">
-                          {clientInfo.full_name}
-                        </p>
-                        <p className="text-[12px] font-mono text-gray-500 dark:text-gray-400">
-                          {clientInfo.client_code}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">
-                          Hamyon
-                        </p>
-                        <p
-                          className={`text-[13px] font-bold ${
-                            displayBalance > 0
-                              ? "text-green-600 dark:text-green-400"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          {formatCurrencySum(displayBalance)}
-                        </p>
-                      </div>
-                      {/* stopPropagation prevents the card click from firing when clearing */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleClearClient();
-                        }}
-                        className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/[0.08] transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Inline lock — shown when a client is found but the admin cannot process payments */}
-            <AnimatePresence>
-              {!canProcess && clientInfo && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm p-6 flex flex-col items-center justify-center gap-3 text-center"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
-                  </div>
-                  <p className="text-[12px] text-gray-400 dark:text-gray-500 max-w-[220px]">
-                    Sizda to'lov qabul qilish huquqi yo'q
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Cargo list — only visible to users who can process payments */}
-            <AnimatePresence>
-              {canProcess && clientInfo && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
                   className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-white/[0.05] sticky top-0 bg-white dark:bg-[#161616] z-10">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <div
-                        onClick={toggleAll}
-                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                          allSelected
-                            ? "bg-orange-500 border-orange-500"
-                            : someSelected
-                              ? "bg-orange-200 border-orange-300 dark:bg-orange-500/20 dark:border-orange-500/40"
-                              : "border-gray-300 dark:border-gray-600"
-                        }`}
-                      >
-                        {allSelected ? (
-                          <CheckCheck
-                            className="w-3 h-3 text-white"
-                            strokeWidth={3}
-                          />
-                        ) : someSelected ? (
-                          <Square
-                            className="w-3 h-3 text-orange-500"
-                            strokeWidth={3}
-                          />
-                        ) : (
-                          <CheckSquare className="w-3 h-3 text-transparent" />
-                        )}
+                  {/* Client header */}
+                  <div
+                    onClick={() => setShowProfile(true)}
+                    className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-500/[0.1] flex items-center justify-center shrink-0">
+                          <User className="w-4 h-4 text-orange-500" strokeWidth={1.8} />
+                        </div>
+                        <div className="flex items-center min-w-0">
+                          <span className="text-[13px] font-bold font-mono text-gray-900 dark:text-white">
+                            {clientInfo.client_code}
+                          </span>
+                          <span className="text-gray-300 dark:text-gray-600 mx-1">·</span>
+                          <span className="text-[13px] text-gray-600 dark:text-gray-400 truncate">
+                            {clientInfo.full_name}
+                          </span>
+                          {clientInfo.phone && (
+                            <>
+                              <span className="text-gray-300 dark:text-gray-600 mx-1">·</span>
+                              <span className="flex items-center gap-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                                <Phone className="w-3 h-3" />
+                                {clientInfo.phone}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-[12px] font-semibold text-gray-600 dark:text-gray-400">
-                        Barchasini tanlash
-                      </span>
-                    </label>
-                    {cargos.length > 0 && (
-                      <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {cargoData?.total_count ?? cargos.length} ta yuk
-                      </span>
-                    )}
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <div className="text-right">
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">
+                            Hamyon
+                          </p>
+                          <p
+                            className={`text-[13px] font-bold ${
+                              displayBalance > 0
+                                ? "text-green-600 dark:text-green-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {formatCurrencySum(displayBalance)}
+                          </p>
+                        </div>
+                        {/* stopPropagation prevents the card click from firing when clearing */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClearClient();
+                          }}
+                          className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/[0.08] transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-3 space-y-2">
-                    {cargoLoading ? (
-                      <div className="space-y-2 py-2">
-                        {[1, 2, 3].map((i) => (
-                          <div
-                            key={i}
-                            className="h-16 bg-gray-50 dark:bg-white/[0.04] rounded-xl animate-pulse"
-                          />
-                        ))}
+                  {!canProcess ? (
+                    <div className="p-6 flex flex-col items-center justify-center gap-3 text-center border-t border-gray-100 dark:border-white/[0.06]">
+                      <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
+                        <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
                       </div>
-                    ) : cargos.length === 0 ? (
-                      <div className="py-10 text-center">
-                        <Package
-                          className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600"
-                          strokeWidth={1.5}
-                        />
-                        <p className="text-[14px] font-medium text-gray-500 dark:text-gray-400">
-                          Qarzdorlik yo'q
-                        </p>
-                        <p className="text-[12px] text-gray-400 dark:text-gray-600 mt-1">
-                          Barcha yuklar uchun to'lov qilingan
-                        </p>
-                      </div>
-                    ) : (
-                      cargos.map((cargo) => (
-                        <CargoRow
-                          key={cargo.cargo_id}
-                          cargo={cargo}
-                          isSelected={selectedIds.has(cargo.cargo_id)}
-                          onToggle={() => toggleCargo(cargo.cargo_id)}
-                        />
-                      ))
-                    )}
-                  </div>
+                      <p className="text-[12px] text-gray-400 dark:text-gray-500 max-w-[220px]">
+                        Sizda to'lov qabul qilish huquqi yo'q
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {cargoLoading ? (
+                        <div className="p-3 space-y-2">
+                          <div className="space-y-2 py-2">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="h-16 bg-gray-50 dark:bg-white/[0.04] rounded-xl animate-pulse" />
+                            ))}
+                          </div>
+                        </div>
+                      ) : cargos.length === 0 ? (
+                        <div className="p-6 text-center">
+                          <Package className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+                          <p className="text-[14px] font-medium text-gray-500 dark:text-gray-400">Qarzdorlik yo'q</p>
+                          <p className="text-[12px] text-gray-400 dark:text-gray-600 mt-1">Barcha yuklar uchun to'lov qilingan</p>
+                        </div>
+                      ) : null}
+
+                      {/* ── Payment section ── */}
+                      <div className="p-4 border-t border-gray-100 dark:border-white/[0.06] space-y-3">
+                          {/* Section title */}
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                              To'lovni tekshirish va tasdiqlash
+                            </p>
+                            {activeNotifData && (
+                              <button
+                                onClick={() => setActiveNotifData(null)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Total amount display */}
+                          <div className="relative flex items-center justify-between px-4 py-3 bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 rounded-xl">
+                            <div className="flex flex-col gap-1 min-w-0">
+                              <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
+                                Jami to'lov summasi
+                              </span>
+                              {activeNotifData && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={cn(
+                                    "px-1.5 py-0.5 rounded-md text-[10px] font-bold",
+                                    activeNotifData.payment_type === "cash" && "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+                                    activeNotifData.payment_type === "click" && "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
+                                    activeNotifData.payment_type === "payme" && "bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400",
+                                    activeNotifData.payment_type === "card" && "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
+                                    !["cash","click","payme","card"].includes(activeNotifData.payment_type ?? "") && "bg-gray-100 dark:bg-white/[0.08] text-gray-600 dark:text-gray-400",
+                                  )}>
+                                    {TYPE_LABEL[activeNotifData.payment_type ?? ""] ?? activeNotifData.payment_type ?? "—"}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                    {formatDateTime(activeNotifData.created_at)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[18px] font-black text-orange-700 dark:text-orange-300 shrink-0 ml-3">
+                              {(() => {
+                                if (!activeNotifData) {
+                                  return formatCurrencySum(totalOwed);
+                                }
+                                // Notification mode: try multiple fallbacks for the correct amount
+                                const notif = activeNotifData;
+                                const fromItems = notif.flight_items.reduce((s, i) => s + (i.total_amount || 0), 0);
+                                const amount =
+                                  notif.total_amount > 0 ? notif.total_amount :
+                                  fromItems > 0 ? fromItems :
+                                  notif.amount_paid > 0 ? notif.amount_paid :
+                                  notif.remaining_amount > 0 ? notif.remaining_amount :
+                                  null;
+                                return amount !== null ? formatCurrencySum(amount) : "—";
+                              })()}
+                            </span>
+                          </div>
+
+                          {/* 4 inputs in a row */}
+                          <div className="flex gap-2 flex-wrap">
+                            {/* Received amount */}
+                            <div className="flex-1 min-w-[140px]">
+                              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+                                Qabul qilingan summa
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={receivedInput.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\s/g, "");
+                                  const normalized = normalizeNumber(raw);
+                                  if (normalized !== null) setReceivedInput(normalized);
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                placeholder={String(Math.round(netAfterWallet)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
+                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white"
+                              />
+                            </div>
+
+                            {/* Payment type */}
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+                                To'lov turi
+                              </label>
+                              <select
+                                value={paymentType}
+                                onChange={(e) => setPaymentType(e.target.value as PaymentProvider)}
+                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-900 dark:text-white"
+                              >
+                                {PAYMENT_TYPES.map(({ id, label }) => (
+                                  <option key={id} value={id}>{label}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Flight dropdown */}
+                            <div className="flex-1 min-w-[200px] relative">
+                              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+                                Reys
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setFlightDropdownOpen((p) => !p)}
+                                className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-left transition-all hover:border-gray-300 dark:hover:border-white/[0.15]"
+                              >
+                                <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 truncate">
+                                  {selectedIds.size === 0
+                                    ? "Reys tanlang"
+                                    : selectedIds.size === cargos.length
+                                      ? "Barcha reyslar"
+                                      : `${selectedIds.size} ta yuk`}
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${flightDropdownOpen ? "rotate-180" : ""}`} />
+                              </button>
+                              <AnimatePresence>
+                                {flightDropdownOpen && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -4 }}
+                                    className="absolute z-10 left-0 mt-1 min-w-[320px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-lg overflow-hidden"
+                                  >
+                                    <div className="p-2 border-b border-gray-100 dark:border-white/[0.06]">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedIds(new Set(cargos.map(c => c.cargo_id)));
+                                        }}
+                                        className="w-full text-[12px] font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-lg px-2 py-1.5 transition-colors text-left"
+                                      >
+                                        Hammasini tanlash
+                                      </button>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+                                      {flightGroups.map(({ flightName, items, totalWeight, totalAmount }) => {
+                                        const allSelected = items.every(c => selectedIds.has(c.cargo_id));
+                                        return (
+                                          <button
+                                            key={flightName}
+                                            type="button"
+                                            onClick={() => toggleFlight(flightName)}
+                                            className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors text-left"
+                                          >
+                                            <div className="flex items-center gap-2.5">
+                                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${allSelected ? "bg-orange-500 border-orange-500" : "border-gray-300 dark:border-gray-600"}`}>
+                                                {allSelected && <CheckCheck className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                                              </div>
+                                              <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{flightName}</span>
+                                            </div>
+                                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                              {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(2)} kg · {formatCurrencySum(totalAmount)}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+
+                            {/* Note */}
+                            <div className="flex-1 min-w-[140px]">
+                              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+                                Izoh (ixtiyoriy)
+                              </label>
+                              <textarea
+                                rows={1}
+                                placeholder="Izoh..."
+                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white placeholder:text-gray-400 resize-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Card selector — shown when paymentType === "card" */}
+                          <AnimatePresence>
+                            {paymentType === "card" && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                                  Kartani tanlang
+                                </p>
+                                <div className="space-y-1.5">
+                                  {activeCards.length === 0 ? (
+                                    <p className="text-[12px] text-gray-400 dark:text-gray-500 text-center py-2">
+                                      Faol kartalar yo'q
+                                    </p>
+                                  ) : (
+                                    activeCards.map((card) => {
+                                      const isSelected = selectedCardId === card.id;
+                                      return (
+                                        <button
+                                          key={card.id}
+                                          type="button"
+                                          onClick={() => setSelectedCardId(card.id)}
+                                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 text-left transition-all ${
+                                            isSelected
+                                              ? "border-blue-500 bg-blue-50 dark:bg-blue-500/[0.1]"
+                                              : "border-gray-200 dark:border-white/[0.08] hover:border-blue-300 dark:hover:border-blue-500/40 bg-gray-50 dark:bg-white/[0.03]"
+                                          }`}
+                                        >
+                                          <div className="min-w-0">
+                                            <p className="text-[13px] font-black text-gray-900 dark:text-white font-mono tracking-wider leading-tight">
+                                              {maskCard(card.card_number)}
+                                            </p>
+                                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                              {card.full_name}
+                                              <span className="ml-1.5 text-gray-400 dark:text-gray-500">
+                                                · {formatCurrencySum(card.total_collected)}
+                                              </span>
+                                            </p>
+                                          </div>
+                                          <div
+                                            className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ml-3 transition-colors ${
+                                              isSelected
+                                                ? "border-blue-500 bg-blue-500"
+                                                : "border-gray-300 dark:border-gray-600"
+                                            }`}
+                                          />
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {/* Wallet toggle — keep but smaller */}
+                          {displayBalance > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setUseWallet((p) => !p)}
+                              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
+                                useWallet
+                                  ? "bg-green-50 dark:bg-green-500/[0.1] border-green-400 dark:border-green-500/50 shadow-sm shadow-green-500/10"
+                                  : "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.15]"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                                    useWallet ? "bg-green-500 shadow-sm shadow-green-500/30" : "bg-gray-200 dark:bg-white/[0.1]"
+                                  }`}
+                                >
+                                  <Wallet className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="text-left">
+                                  <p className={`text-[12px] font-bold transition-colors ${useWallet ? "text-green-700 dark:text-green-400" : "text-gray-500 dark:text-gray-400"}`}>
+                                    Hamyon ishlatish
+                                  </p>
+                                  <p className={`text-[13px] font-black transition-colors ${useWallet ? "text-green-600 dark:text-green-300" : "text-gray-700 dark:text-gray-300"}`}>
+                                    {formatCurrencySum(displayBalance)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div
+                                className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
+                                  useWallet ? "bg-green-500" : "bg-gray-300 dark:bg-white/20"
+                                }`}
+                              >
+                                <span
+                                  className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                    useWallet ? "translate-x-5" : "translate-x-0"
+                                  }`}
+                                />
+                              </div>
+                            </button>
+                          )}
+
+                          {/* Amount breakdown */}
+                          <div className="pt-1 border-t border-gray-100 dark:border-white/[0.06] space-y-1">
+                            <div className="flex items-center justify-between text-[12px]">
+                              <span className="text-gray-500 dark:text-gray-400">{selectedIds.size} ta yuk jami:</span>
+                              <span className="font-semibold text-gray-800 dark:text-gray-200">{formatCurrencySum(totalOwed)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                              <span className="text-gray-500 dark:text-gray-400">Umumiy hajm:</span>
+                              <span className="font-semibold text-gray-800 dark:text-gray-200">
+                                {totalSelectedWeight % 1 === 0 ? totalSelectedWeight : totalSelectedWeight.toFixed(2)} kg
+                              </span>
+                            </div>
+                            {walletDeduction > 0 && (
+                              <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-green-600 dark:text-green-400">Hamyon:</span>
+                                <span className="font-semibold text-green-600 dark:text-green-400">−{formatCurrencySum(walletDeduction)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between text-[13px] pt-1 border-t border-gray-100 dark:border-white/[0.06]">
+                              <span className="font-bold text-gray-700 dark:text-gray-300">To'lash:</span>
+                              <span className="font-black text-orange-600 dark:text-orange-400">{formatCurrencySum(netAfterWallet)}</span>
+                            </div>
+                          </div>
+
+                          {/* Green confirm button with CheckCircle2 icon */}
+                          <motion.button
+                            onClick={handleOpenConfirm}
+                            disabled={payMut.isPending || selectedIds.size === 0}
+                            whileTap={{ scale: selectedIds.size === 0 ? 1 : 0.97 }}
+                            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-black text-[15px] rounded-2xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                          >
+                            <CheckCircle2 className="w-5 h-5" />
+                            {selectedIds.size === 0 ? "Yuk tanlang" : `TASDIQLASH (${selectedIds.size} ta · ${formatCurrencySum(netAfterWallet)})`}
+                          </motion.button>
+                        </div>
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Warehouse pickup request card — always visible */}
+            <WarehouseRequestCard canProcess={canProcess} activeClientCode={clientInfo?.client_code} />
 
             {/* Empty state */}
             {!clientInfo && !searchError && !isSearching && (
@@ -1026,317 +1370,6 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 </p>
               </div>
             )}
-
-            {/* ── Sticky payment footer (pos:process required) ───────────── */}
-            <AnimatePresence>
-              {canProcess && someSelected && clientInfo && (
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 24 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 28 }}
-                  className="sticky bottom-4 z-30"
-                >
-                  <div className="bg-white/95 dark:bg-[#161616]/95 backdrop-blur-xl rounded-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-2xl shadow-black/10 dark:shadow-black/40 p-4 space-y-3">
-                    {/* Payment type pills */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider shrink-0">
-                        To'lov:
-                      </span>
-                      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-white/[0.06] rounded-xl flex-wrap">
-                        {PAYMENT_TYPES.map(({ id, label }) => (
-                          <button
-                            key={id}
-                            onClick={() => setPaymentType(id)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
-                              paymentType === id
-                                ? "bg-white dark:bg-[#222] text-gray-900 dark:text-white shadow-sm"
-                                : "text-gray-500 dark:text-gray-400"
-                            }`}
-                          >
-                            {id === "cash" && (
-                              <Banknote className="w-3.5 h-3.5" />
-                            )}
-                            {id === "card" && (
-                              <CreditCard className="w-3.5 h-3.5" />
-                            )}
-                            {(id === "click" || id === "payme") && (
-                              <Smartphone className="w-3.5 h-3.5" />
-                            )}
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Card selector — shown when paymentType === "card" */}
-                    <AnimatePresence>
-                      {paymentType === "card" && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-                            Kartani tanlang
-                          </p>
-                          <div className="space-y-1.5">
-                            {activeCards.length === 0 ? (
-                              <p className="text-[12px] text-gray-400 dark:text-gray-500 text-center py-2">
-                                Faol kartalar yo'q
-                              </p>
-                            ) : (
-                              activeCards.map((card) => {
-                                const isSelected = selectedCardId === card.id;
-                                return (
-                                  <button
-                                    key={card.id}
-                                    type="button"
-                                    onClick={() => setSelectedCardId(card.id)}
-                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 text-left transition-all ${
-                                      isSelected
-                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-500/[0.1]"
-                                        : "border-gray-200 dark:border-white/[0.08] hover:border-blue-300 dark:hover:border-blue-500/40 bg-gray-50 dark:bg-white/[0.03]"
-                                    }`}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="text-[13px] font-black text-gray-900 dark:text-white font-mono tracking-wider leading-tight">
-                                        {maskCard(card.card_number)}
-                                      </p>
-                                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                                        {card.full_name}
-                                        <span className="ml-1.5 text-gray-400 dark:text-gray-500">
-                                          · {formatCurrencySum(card.total_collected)}
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div
-                                      className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ml-3 transition-colors ${
-                                        isSelected
-                                          ? "border-blue-500 bg-blue-500"
-                                          : "border-gray-300 dark:border-gray-600"
-                                      }`}
-                                    />
-                                  </button>
-                                );
-                              })
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Wallet toggle — large, prominent block */}
-                    {displayBalance > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setUseWallet((p) => !p)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
-                          useWallet
-                            ? "bg-green-50 dark:bg-green-500/[0.1] border-green-400 dark:border-green-500/50 shadow-sm shadow-green-500/10"
-                            : "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.15]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-                              useWallet
-                                ? "bg-green-500 shadow-sm shadow-green-500/30"
-                                : "bg-gray-200 dark:bg-white/[0.1]"
-                            }`}
-                          >
-                            <Wallet className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="text-left">
-                            <p
-                              className={`text-[12px] font-bold transition-colors ${
-                                useWallet
-                                  ? "text-green-700 dark:text-green-400"
-                                  : "text-gray-500 dark:text-gray-400"
-                              }`}
-                            >
-                              Hamyon ishlatish
-                            </p>
-                            <p
-                              className={`text-[14px] font-black transition-colors ${
-                                useWallet
-                                  ? "text-green-600 dark:text-green-300"
-                                  : "text-gray-700 dark:text-gray-300"
-                              }`}
-                            >
-                              {formatCurrencySum(displayBalance)}
-                            </p>
-                          </div>
-                        </div>
-                        <div
-                          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
-                            useWallet
-                              ? "bg-green-500"
-                              : "bg-gray-300 dark:bg-white/20"
-                          }`}
-                        >
-                          <span
-                            className={`absolute top-[2px] left-[2px] w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                              useWallet ? "translate-x-5" : "translate-x-0"
-                            }`}
-                          />
-                        </div>
-                      </button>
-                    )}
-
-                    {/* Received amount input */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
-                        Qabul qilingan summa (UZS)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={receivedInput}
-                        onChange={(e) => {
-                          const normalized = normalizeNumber(e.target.value);
-                          if (normalized !== null) setReceivedInput(normalized);
-                        }}
-                        onFocus={(e) => e.target.select()}
-                        placeholder={String(Math.round(netAfterWallet))}
-                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[15px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white"
-                      />
-                    </div>
-
-                    {/* Amount breakdown */}
-                    <div className="pt-1 border-t border-gray-100 dark:border-white/[0.06] space-y-1">
-                      <div className="flex items-center justify-between text-[12px]">
-                        <span className="text-gray-500 dark:text-gray-400">
-                          {selectedIds.size} ta yuk jami:
-                        </span>
-                        <span className="font-semibold text-gray-800 dark:text-gray-200">
-                          {formatCurrencySum(totalOwed)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[12px]">
-                        <span className="text-gray-500 dark:text-gray-400">
-                          Umumiy hajm:
-                        </span>
-                        <span className="font-semibold text-gray-800 dark:text-gray-200">
-                          {totalSelectedWeight % 1 === 0
-                            ? totalSelectedWeight
-                            : totalSelectedWeight.toFixed(2)}{" "}
-                          kg
-                        </span>
-                      </div>
-                      {walletDeduction > 0 && (
-                        <div className="flex items-center justify-between text-[12px]">
-                          <span className="text-green-600 dark:text-green-400">
-                            Hamyon:
-                          </span>
-                          <span className="font-semibold text-green-600 dark:text-green-400">
-                            −{formatCurrencySum(walletDeduction)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between text-[13px] pt-1 border-t border-gray-100 dark:border-white/[0.06]">
-                        <span className="font-bold text-gray-700 dark:text-gray-300">
-                          To'lash:
-                        </span>
-                        <span className="font-black text-orange-600 dark:text-orange-400">
-                          {formatCurrencySum(netAfterWallet)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Pickup queue toggle */}
-                    <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-white/[0.06]">
-                      <button
-                        type="button"
-                        onClick={() => setCreatePickupQueue((p) => !p)}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border-2 transition-all ${
-                          createPickupQueue
-                            ? "bg-blue-50 dark:bg-blue-500/[0.1] border-blue-400 dark:border-blue-500/50"
-                            : "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/[0.08]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                              createPickupQueue ? "bg-blue-500" : "bg-gray-200 dark:bg-white/[0.1]"
-                            }`}
-                          >
-                            <Package className="w-4 h-4 text-white" />
-                          </div>
-                          <span
-                            className={`text-[12px] font-bold ${
-                              createPickupQueue
-                                ? "text-blue-700 dark:text-blue-400"
-                                : "text-gray-500 dark:text-gray-400"
-                            }`}
-                          >
-                            Warehousega yuborish
-                          </span>
-                        </div>
-                        <div
-                          className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-                            createPickupQueue ? "bg-blue-500" : "bg-gray-300 dark:bg-white/20"
-                          }`}
-                        >
-                          <span
-                            className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                              createPickupQueue ? "translate-x-5" : "translate-x-0"
-                            }`}
-                          />
-                        </div>
-                      </button>
-
-                      {createPickupQueue && (
-                        <div className="space-y-2">
-                          <select
-                            value={pickupMethod}
-                            onChange={(e) => setPickupMethod(e.target.value as PickupMethod)}
-                            className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 text-gray-700 dark:text-gray-200"
-                          >
-                            {(Object.keys(PICKUP_METHOD_LABELS) as PickupMethod[]).map((m) => (
-                              <option key={m} value={m}>
-                                {PICKUP_METHOD_LABELS[m]}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            value={pickupPriority}
-                            onChange={(e) => setPickupPriority(e.target.value as PickupQueuePriority)}
-                            className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 text-gray-700 dark:text-gray-200"
-                          >
-                            {(Object.keys(PICKUP_PRIORITY_LABELS) as PickupQueuePriority[]).map((p) => (
-                              <option key={p} value={p}>
-                                {PICKUP_PRIORITY_LABELS[p]}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            value={pickupNote}
-                            onChange={(e) => setPickupNote(e.target.value.slice(0, 200))}
-                            placeholder="Izoh (ixtiyoriy)"
-                            className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 text-gray-900 dark:text-white placeholder:text-gray-400"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Pay button */}
-                    <motion.button
-                      onClick={handleOpenConfirm}
-                      disabled={payMut.isPending}
-                      whileTap={{ scale: 0.97 }}
-                      className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-[16px] rounded-2xl shadow-lg shadow-orange-500/25 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                      TO'LASH ({selectedIds.size} ta ·{" "}
-                      {formatCurrencySum(netAfterWallet)})
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <ResizeHandle onResize={(d) => setCenterWidth((w) => Math.max(320, Math.min(800, w + d)))} />
@@ -1353,11 +1386,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
               filters={paymentFilters}
               setPage={setPaymentPage}
               setFilters={setPaymentFilters}
-              resetFilters={resetPaymentFilters}
+              resetFilters={handleResetNotifFilters}
               markAllRead={markPaymentNotificationsRead}
               readIds={paymentReadIds}
               onClientClick={handleSearch}
               isLoading={paymentLoading}
+              activeTab={notifTab}
+              onTabChange={handleNotifTabChange}
+              tabCounts={tabCounts ?? { flight: 0, zayafka: 0 }}
+              onRefresh={refetchNotifications}
+              onClientAndFlightClick={handleClientAndFlightClick}
             />
           </div>
         </div>

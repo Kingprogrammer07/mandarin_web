@@ -28,7 +28,7 @@ export interface PosNotificationItem {
   amount_paid: number;
   total_amount: number;
   remaining_amount: number;
-  payment_status: 'pending' | 'partial' | 'paid';
+  payment_status: 'pending' | 'partial' | 'paid' | 'rejected';
   payment_type: string | null;
   receipt_s3_key: string | null;
   telegram_message_id: number | null;
@@ -38,6 +38,9 @@ export interface PosNotificationItem {
   created_at: string;
   payment_history: PaymentHistoryItem[];
   flight_items: FlightItem[];
+  source: 'flight' | 'zayafka';
+  delivery_request_id: number | null;
+  admin_comment: string | null;
 }
 
 export interface PosNotificationListResponse {
@@ -67,6 +70,35 @@ export interface NotificationFilters {
   time_to?: string;         // HH:MM
   strict?: boolean;
   sort?: string;            // created_desc | created_asc | status_asc | amount_desc
+  source?: 'flight' | 'zayafka';
+}
+
+export interface ZayafkaConfirmRequest {
+  delivery_request_id: number;
+  amount: number;
+}
+
+export interface ZayafkaRejectRequest {
+  delivery_request_id: number;
+  comment?: string | null;
+}
+
+export interface ZayafkaEditAmountRequest {
+  delivery_request_id: number;
+  amount: number;
+}
+
+export interface FlightConfirmRequest {
+  client_code: string;
+  flight_name: string;
+  amount: number;
+  payment_type: string;
+}
+
+export interface FlightRejectRequest {
+  client_code: string;
+  flight_name: string;
+  comment?: string | null;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -115,5 +147,48 @@ export const posNotificationService = {
   getStats: async (): Promise<PosNotificationStatsResponse> => {
     const response = await apiClient.get<PosNotificationStatsResponse>(`${BASE}/stats`);
     return response.data;
+  },
+
+  /**
+   * Fetch count of visible notifications per source tab.
+   */
+  getTabCounts: async (): Promise<{ flight: number; zayafka: number }> => {
+    const response = await apiClient.get<{ flight: number; zayafka: number }>(`${BASE}/tab-counts`);
+    return response.data;
+  },
+
+  /**
+   * Confirm a zayafka (UzPost) payment from the web POS.
+   */
+  confirmZayafka: async (data: ZayafkaConfirmRequest): Promise<void> => {
+    await apiClient.post(`${BASE}/zayafka/confirm`, data);
+  },
+
+  /**
+   * Reject a zayafka (UzPost) payment from the web POS.
+   */
+  rejectZayafka: async (data: ZayafkaRejectRequest): Promise<void> => {
+    await apiClient.post(`${BASE}/zayafka/reject`, data);
+  },
+
+  /**
+   * Edit the confirmed amount of a zayafka payment.
+   */
+  editZayafkaAmount: async (data: ZayafkaEditAmountRequest): Promise<void> => {
+    await apiClient.patch(`${BASE}/zayafka/amount`, data);
+  },
+
+  /**
+   * Confirm a flight payment from the notification bubble.
+   */
+  confirmFlightNotification: async (data: FlightConfirmRequest): Promise<void> => {
+    await apiClient.post(`${BASE}/confirm`, data);
+  },
+
+  /**
+   * Reject a flight payment notification from the web POS.
+   */
+  rejectFlightNotification: async (data: FlightRejectRequest): Promise<void> => {
+    await apiClient.post(`${BASE}/reject`, data);
   },
 };

@@ -17,7 +17,10 @@ import {
   RotateCcw,
   FileText,
   CheckCheck,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { QuickDatePresets } from "@/components/ui/QuickDatePresets";
 import { posNotificationService, type PosNotificationItem, type NotificationFilters } from "@/api/services/posNotificationService";
+import { ZayafkaNotificationBubble } from "./ZayafkaNotificationBubble";
 
 
 interface Props {
@@ -43,11 +47,16 @@ interface Props {
   onClientClick: (clientCode: string) => void;
   isLoading: boolean;
   mode?: "drawer" | "inline";
+  activeTab?: 'flight' | 'zayafka';
+  onTabChange?: (tab: 'flight' | 'zayafka') => void;
+  tabCounts?: { flight: number; zayafka: number };
+  onRefresh?: () => void;
+  onClientAndFlightClick?: (code: string, flightName: string, notif: PosNotificationItem) => void;
 }
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
-const STATUS_META: Record<string, { label: string; bg: string; text: string; dot: string; border: string }> = {
+export const STATUS_META: Record<string, { label: string; bg: string; text: string; dot: string; border: string }> = {
   pending: {
     label: "Kutilmoqda",
     bg: "bg-red-50 dark:bg-red-500/10",
@@ -69,6 +78,13 @@ const STATUS_META: Record<string, { label: string; bg: string; text: string; dot
     dot: "bg-green-500",
     border: "border-green-200 dark:border-green-500/30",
   },
+  rejected: {
+    label: "Rad etildi",
+    bg: "bg-gray-50 dark:bg-gray-500/10",
+    text: "text-gray-600 dark:text-gray-400",
+    dot: "bg-gray-400",
+    border: "border-gray-200 dark:border-gray-500/20",
+  },
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -80,7 +96,7 @@ const TYPE_LABEL: Record<string, string> = {
   card: "Karta",
 };
 
-function formatDateTime(iso: string): string {
+export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("uz-UZ", {
     day: "2-digit",
@@ -90,7 +106,7 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function formatSum(n: number): string {
+export function formatSum(n: number): string {
   return `${n.toLocaleString("uz-UZ")} so'm`;
 }
 
@@ -172,22 +188,102 @@ function ReceiptPreview({ url, contentType, onClose, position = "absolute" }: { 
 
 // ─── Notification Bubble (Telegram chat style) ────────────────────────────────
 
+const PAYMENT_TYPE_BADGE: Record<string, { label: string; bg: string; text: string }> = {
+  cash:    { label: "Naqd",    bg: "bg-green-100 dark:bg-green-500/20",    text: "text-green-700 dark:text-green-400" },
+  click:   { label: "Click",   bg: "bg-purple-100 dark:bg-purple-500/20",  text: "text-purple-700 dark:text-purple-400" },
+  payme:   { label: "Payme",   bg: "bg-cyan-100 dark:bg-cyan-500/20",      text: "text-cyan-700 dark:text-cyan-400" },
+  card:    { label: "Karta",   bg: "bg-blue-100 dark:bg-blue-500/20",      text: "text-blue-700 dark:text-blue-400" },
+  wallet:  { label: "Hamyon",  bg: "bg-amber-100 dark:bg-amber-500/20",    text: "text-amber-700 dark:text-amber-400" },
+  online:  { label: "Online",  bg: "bg-gray-100 dark:bg-white/[0.08]",     text: "text-gray-600 dark:text-gray-400" },
+};
+
 function NotificationBubble({
   n,
   isUnread,
   onClientClick,
+  onClientAndFlightClick,
   onReceiptClick,
+  onRefresh,
   expandAll,
 }: {
   n: PosNotificationItem;
   isUnread: boolean;
   onClientClick: (code: string) => void;
+  onClientAndFlightClick?: (code: string, flightName: string, notif: PosNotificationItem) => void;
   onReceiptClick: (id: number) => void;
+  onRefresh: () => void;
   expandAll: boolean;
 }) {
   const meta = STATUS_META[n.payment_status] ?? STATUS_META.pending;
   const hasReceipt = Boolean(n.receipt_s3_key);
   const [viewMode, setViewMode] = useState<'summary' | 'detail'>(() => expandAll ? 'detail' : 'summary');
+
+  const [confirmMode, setConfirmMode] = useState(false);
+  const [confirmAmount, setConfirmAmount] = useState<string>("");
+  const [confirmPayType, setConfirmPayType] = useState<string>("cash");
+  const [showWarning, setShowWarning] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [rejectMode, setRejectMode] = useState(false);
+  const [rejectComment, setRejectComment] = useState("");
+  const [loadingReject, setLoadingReject] = useState(false);
+
+  const handleFlightConfirm = async () => {
+    const parsedAmount = parseFloat(confirmAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Summani to'g'ri kiriting");
+      return;
+    }
+    setLoading(true);
+    try {
+      await posNotificationService.confirmFlightNotification({
+        client_code: n.client_code,
+        flight_name: n.flight_name,
+        amount: parsedAmount,
+        payment_type: confirmPayType,
+      });
+      toast.success("To'lov tasdiqlandi");
+      setConfirmMode(false);
+      setShowWarning(false);
+      onRefresh();
+    } catch {
+      toast.error("Tasdiqlashda xatolik yuz berdi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFlightReject = async () => {
+    setLoadingReject(true);
+    try {
+      await posNotificationService.rejectFlightNotification({
+        client_code: n.client_code,
+        flight_name: n.flight_name,
+        comment: rejectComment.trim() || null,
+      });
+      toast.success("To'lov rad etildi");
+      setRejectMode(false);
+      onRefresh();
+    } catch {
+      toast.error("Rad etishda xatolik yuz berdi");
+    } finally {
+      setLoadingReject(false);
+    }
+  };
+
+  const typeBadge = PAYMENT_TYPE_BADGE[n.payment_type ?? ""] ?? PAYMENT_TYPE_BADGE.online;
+
+  // Fallback chain: total_amount → flight_items sum → amount_paid → remaining_amount
+  const fromItemsTotal = n.flight_items.reduce((s, i) => s + (i.total_amount || 0), 0);
+  const fromItemsPaid = n.flight_items.reduce((s, i) => s + (i.paid_amount || 0), 0);
+  const effectiveTotal =
+    n.total_amount > 0 ? n.total_amount :
+    fromItemsTotal > 0 ? fromItemsTotal :
+    n.amount_paid > 0 ? n.amount_paid :
+    n.remaining_amount > 0 ? n.remaining_amount :
+    0;
+  const effectivePaid = n.amount_paid > 0 ? n.amount_paid : fromItemsPaid;
+  const effectiveRemaining = n.remaining_amount > 0 ? n.remaining_amount : Math.max(0, effectiveTotal - effectivePaid);
 
   return (
     <motion.div
@@ -207,14 +303,191 @@ function NotificationBubble({
         <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-orange-500" />
       )}
 
-      {viewMode === 'summary' ? (
+      {rejectMode ? (
+        <div className="space-y-3">
+          <button
+            onClick={() => setRejectMode(false)}
+            className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Orqaga
+          </button>
+          <p className="text-[13px] font-bold text-gray-800 dark:text-white">
+            To'lovni bekor qilish
+          </p>
+          <div className="text-[12px] text-gray-500 dark:text-gray-400">
+            <span className="font-mono font-bold text-gray-700 dark:text-gray-300">{n.client_code}</span>
+            {" · "}{n.flight_name}
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+              Sabab (ixtiyoriy)
+            </label>
+            <textarea
+              value={rejectComment}
+              onChange={(e) => setRejectComment(e.target.value)}
+              placeholder="Rad etish sababi..."
+              rows={2}
+              className="w-full px-3 py-2 bg-red-50/50 dark:bg-red-500/[0.04] border border-red-200 dark:border-red-500/25 rounded-xl text-[12px] outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 resize-none placeholder:text-red-300 dark:placeholder:text-red-500/40"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleFlightReject}
+              disabled={loadingReject}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-[12px] font-black bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 disabled:opacity-50 active:scale-[0.97] transition-all shadow-lg shadow-red-500/25"
+            >
+              {loadingReject ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+              Ha, bekor qilish
+            </button>
+            <button
+              onClick={() => setRejectMode(false)}
+              disabled={loadingReject}
+              className="px-4 py-2.5 rounded-xl text-[12px] font-bold bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] active:scale-95 transition-all"
+            >
+              Bekor
+            </button>
+          </div>
+        </div>
+      ) : confirmMode ? (
+        <div className="space-y-3">
+          {/* Back button */}
+          <button
+            onClick={() => setConfirmMode(false)}
+            className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Orqaga
+          </button>
+
+          {/* User payment info row */}
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">To'lov summasi</p>
+              <p className="text-[13px] font-black text-gray-800 dark:text-gray-100">{formatSum(effectiveTotal)}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">To'lov turi</p>
+              <span className={cn("inline-block px-2 py-0.5 rounded-md text-[10px] font-bold", typeBadge.bg, typeBadge.text)}>
+                {typeBadge.label}
+              </span>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">To'lov vaqti</p>
+              <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-400">{formatDateTime(n.created_at)}</p>
+            </div>
+          </div>
+
+          {/* Amount input */}
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+              To'langan summa (so'm)
+            </label>
+            <input
+              type="number"
+              value={confirmAmount}
+              onChange={(e) => setConfirmAmount(e.target.value)}
+              placeholder="Summani kiriting"
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500/50 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          {/* Payment type select */}
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+              To'lov turi
+            </label>
+            <select
+              value={confirmPayType}
+              onChange={(e) => setConfirmPayType(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-semibold outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500/50 text-gray-900 dark:text-white"
+            >
+              <option value="cash">Naqd</option>
+              <option value="click">Click</option>
+              <option value="payme">Payme</option>
+              <option value="card">Karta</option>
+            </select>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setShowWarning(true)}
+              disabled={loading}
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[12px] font-black bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 disabled:opacity-50 active:scale-[0.97] transition-all shadow-lg shadow-green-500/25"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Tasdiqlash
+            </button>
+            {hasReceipt && (
+              <button
+                onClick={() => onReceiptClick(n.id)}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-bold bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500/30 active:scale-95 transition-all"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                Chek
+              </button>
+            )}
+            <button
+              onClick={() => setConfirmMode(false)}
+              className="px-3 py-2 rounded-xl text-[11px] font-bold bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] active:scale-95 transition-all"
+            >
+              Bekor
+            </button>
+          </div>
+
+          {/* Warning overlay */}
+          {showWarning && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 dark:bg-[#1a1a1a]/90 rounded-2xl backdrop-blur-sm">
+              <div className="p-4 text-center space-y-3">
+                <p className="text-[13px] font-bold text-gray-800 dark:text-white">To'lovni tasdiqlash</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {n.client_code} · {n.flight_name}<br/>
+                  {formatSum(parseFloat(confirmAmount) || 0)} · {TYPE_LABEL[confirmPayType] ?? confirmPayType}
+                </p>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                  ⚠️ Chekni tekshirganingizni tasdiqlang
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleFlightConfirm}
+                    disabled={loading}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[12px] font-bold bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 disabled:opacity-50 active:scale-[0.97] transition-all shadow-lg shadow-green-500/25"
+                  >
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCheck className="w-3.5 h-3.5" />}
+                    Ha, tasdiqlash
+                  </button>
+                  <button
+                    onClick={() => setShowWarning(false)}
+                    disabled={loading}
+                    className="px-3 py-2 rounded-xl text-[12px] font-bold bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] active:scale-95 transition-all"
+                  >
+                    Bekor
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : viewMode === 'summary' ? (
         <SummaryView
           n={n}
           meta={meta}
           hasReceipt={hasReceipt}
           onClientClick={onClientClick}
+          onClientAndFlightClick={onClientAndFlightClick}
           onReceiptClick={onReceiptClick}
           onDetail={() => setViewMode('detail')}
+          onConfirmMode={() => {
+            setConfirmAmount(String(effectiveRemaining > 0 ? effectiveRemaining : effectiveTotal));
+            setConfirmPayType(
+              ["cash", "click", "payme", "card", "wallet"].includes(n.payment_type ?? "")
+                ? (n.payment_type ?? "click")
+                : "click"
+            );
+            setConfirmMode(true);
+          }}
+          onRejectMode={() => setRejectMode(true)}
         />
       ) : (
         <DetailView
@@ -222,8 +495,19 @@ function NotificationBubble({
           meta={meta}
           hasReceipt={hasReceipt}
           onClientClick={onClientClick}
+          onClientAndFlightClick={onClientAndFlightClick}
           onReceiptClick={onReceiptClick}
           onBack={() => setViewMode('summary')}
+          onConfirmMode={() => {
+            setConfirmAmount(String(effectiveRemaining > 0 ? effectiveRemaining : effectiveTotal));
+            setConfirmPayType(
+              ["cash", "click", "payme", "card", "wallet"].includes(n.payment_type ?? "")
+                ? (n.payment_type ?? "click")
+                : "click"
+            );
+            setConfirmMode(true);
+          }}
+          onRejectMode={() => setRejectMode(true)}
         />
       )}
     </motion.div>
@@ -237,15 +521,21 @@ function SummaryView({
   meta,
   hasReceipt,
   onClientClick,
+  onClientAndFlightClick,
   onReceiptClick,
   onDetail,
+  onConfirmMode,
+  onRejectMode,
 }: {
   n: PosNotificationItem;
   meta: (typeof STATUS_META)["pending"];
   hasReceipt: boolean;
   onClientClick: (code: string) => void;
+  onClientAndFlightClick?: (code: string, flightName: string, notif: PosNotificationItem) => void;
   onReceiptClick: (id: number) => void;
   onDetail: () => void;
+  onConfirmMode: () => void;
+  onRejectMode: () => void;
 }) {
   return (
     <>
@@ -339,6 +629,24 @@ function SummaryView({
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {n.payment_status !== "paid" && (
+            <>
+              <button
+                onClick={onConfirmMode}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 active:scale-[0.97] transition-all shadow-lg shadow-green-500/25"
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                To'lash
+              </button>
+              <button
+                onClick={onRejectMode}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 hover:bg-red-100 dark:hover:bg-red-500/20 hover:border-red-300 dark:hover:border-red-500/30 active:scale-95 transition-all"
+              >
+                <X className="w-3 h-3" />
+                Bekor qilish
+              </button>
+            </>
+          )}
           {hasReceipt && (
             <button
               onClick={(e) => { e.stopPropagation(); onReceiptClick(n.id); }}
@@ -349,7 +657,7 @@ function SummaryView({
             </button>
           )}
           <button
-            onClick={() => onClientClick(n.client_code)}
+            onClick={() => onClientAndFlightClick?.(n.client_code, n.flight_name, n) ?? onClientClick(n.client_code)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-sm"
           >
             <Eye className="w-3 h-3" />
@@ -374,15 +682,21 @@ function DetailView({
   meta,
   hasReceipt,
   onClientClick,
+  onClientAndFlightClick,
   onReceiptClick,
   onBack,
+  onConfirmMode,
+  onRejectMode,
 }: {
   n: PosNotificationItem;
   meta: (typeof STATUS_META)["pending"];
   hasReceipt: boolean;
   onClientClick: (code: string) => void;
+  onClientAndFlightClick?: (code: string, flightName: string, notif: PosNotificationItem) => void;
   onReceiptClick: (id: number) => void;
   onBack: () => void;
+  onConfirmMode: () => void;
+  onRejectMode: () => void;
 }) {
   return (
     <>
@@ -571,6 +885,24 @@ function DetailView({
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {n.payment_status !== "paid" && (
+            <>
+              <button
+                onClick={onConfirmMode}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 active:scale-[0.97] transition-all shadow-lg shadow-green-500/25"
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                To'lash
+              </button>
+              <button
+                onClick={onRejectMode}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 hover:bg-red-100 dark:hover:bg-red-500/20 hover:border-red-300 dark:hover:border-red-500/30 active:scale-95 transition-all"
+              >
+                <X className="w-3 h-3" />
+                Bekor qilish
+              </button>
+            </>
+          )}
           {hasReceipt && (
             <button
               onClick={() => onReceiptClick(n.id)}
@@ -581,7 +913,7 @@ function DetailView({
             </button>
           )}
           <button
-            onClick={() => onClientClick(n.client_code)}
+            onClick={() => onClientAndFlightClick?.(n.client_code, n.flight_name, n) ?? onClientClick(n.client_code)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-sm"
           >
             <Eye className="w-3 h-3" />
@@ -605,10 +937,7 @@ function FilterBar({
   onReset: () => void;
 }) {
   const [localClientCode, setLocalClientCode] = useState(filters.client_code ?? "");
-  const [showFilters, setShowFilters] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.innerWidth >= 640;
-  });
+  const [showFilters, setShowFilters] = useState(false);
   const hasFilters = Boolean(
     filters.status || filters.flight || filters.client_code || filters.date_from || filters.date_to || filters.time_from || filters.time_to || filters.strict
   );
@@ -875,6 +1204,11 @@ export function PaymentNotificationDrawer({
   onClientClick,
   isLoading,
   mode = "drawer",
+  activeTab = 'flight',
+  onTabChange,
+  tabCounts = { flight: 0, zayafka: 0 },
+  onRefresh,
+  onClientAndFlightClick,
 }: Props) {
   const [receiptPreview, setReceiptPreview] = useState<{ url: string; contentType: string } | null>(null);
   const [isReceiptLoading, setIsReceiptLoading] = useState(false);
@@ -959,6 +1293,35 @@ export function PaymentNotificationDrawer({
     </div>
   );
 
+  const tabSwitcher = onTabChange ? (
+    <div className="flex gap-1 p-1 bg-gray-100 dark:bg-white/[0.06] rounded-xl mx-4 mb-2 mt-1 shrink-0">
+      {(['flight', 'zayafka'] as const).map((tab) => (
+        <button
+          key={tab}
+          onClick={() => onTabChange(tab)}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all",
+            activeTab === tab
+              ? "bg-white dark:bg-white/[0.12] text-gray-900 dark:text-white shadow-sm"
+              : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          )}
+        >
+          <span>{tab === 'flight' ? "Reys to'lovlari" : "Zayafka to'lovlari"}</span>
+          {tabCounts[tab] > 0 && (
+            <span className={cn(
+              "px-1.5 py-0.5 rounded-md text-[10px] font-bold",
+              activeTab === tab
+                ? "bg-orange-500 text-white"
+                : "bg-gray-200 dark:bg-white/[0.10] text-gray-500 dark:text-gray-400"
+            )}>
+              {tabCounts[tab]}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   const body = (
     <>
       {mode === "drawer" ? (
@@ -970,6 +1333,9 @@ export function PaymentNotificationDrawer({
           {header}
         </div>
       )}
+
+      {/* Tab switcher */}
+      {tabSwitcher}
 
       {/* Filters */}
       <FilterBar filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} onReset={resetFilters} />
@@ -1011,16 +1377,28 @@ export function PaymentNotificationDrawer({
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            {uniqueNotifications.map((n) => (
-              <NotificationBubble
-                key={n.id}
-                n={n}
-                isUnread={!readIds.has(n.id) && n.payment_status !== "paid"}
-                onClientClick={onClientClick}
-                onReceiptClick={handleReceiptClick}
-                expandAll={expandAll}
-              />
-            ))}
+            {activeTab === 'zayafka'
+              ? uniqueNotifications.map((n) => (
+                  <ZayafkaNotificationBubble
+                    key={n.id}
+                    n={n}
+                    onClientClick={onClientClick}
+                    onRefresh={onRefresh ?? (() => {})}
+                  />
+                ))
+              : uniqueNotifications.map((n) => (
+                  <NotificationBubble
+                    key={n.id}
+                    n={n}
+                    isUnread={!readIds.has(n.id) && n.payment_status !== "paid"}
+                    onClientClick={onClientClick}
+                    onClientAndFlightClick={onClientAndFlightClick}
+                    onReceiptClick={handleReceiptClick}
+                    onRefresh={onRefresh ?? (() => {})}
+                    expandAll={expandAll}
+                  />
+                ))
+            }
           </AnimatePresence>
         )}
       </div>

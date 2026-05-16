@@ -106,6 +106,12 @@ export interface CashierLogResponse {
   total_pages: number;
   /** Sum of all amounts processed today (UTC calendar day). */
   today_total: number;
+  /** Sum of cash amounts processed today (UTC calendar day). */
+  today_cash_total: number;
+  /** Sum of all amounts processed yesterday (UTC calendar day). */
+  yesterday_total: number;
+  /** Percentage change from yesterday to today. Null when yesterday had no payments. */
+  today_change_percent: number | null;
   summary: CashierLogSummary;
 }
 

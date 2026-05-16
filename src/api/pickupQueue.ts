@@ -46,6 +46,13 @@ export interface PickupQueueCreateRequest {
   idempotency_key?: string | null;
 }
 
+export interface PickupQueueByClientCodeRequest {
+  client_code: string;
+  pickup_method: PickupMethod;
+  priority?: PickupQueuePriority;
+  note?: string | null;
+}
+
 export interface PickupQueueCancelRequest {
   reason?: string | null;
 }
@@ -155,6 +162,13 @@ export interface PickupQueueTVItem {
 
 export async function createPosPickupQueue(data: PickupQueueCreateRequest): Promise<unknown> {
   const res = await apiClient.post<unknown>('/api/v1/pos/pickup-queue', data, {
+    headers: getAdminHeaders(),
+  });
+  return res.data;
+}
+
+export async function createPosPickupQueueByClientCode(data: PickupQueueByClientCodeRequest): Promise<unknown> {
+  const res = await apiClient.post<unknown>('/api/v1/pos/pickup-queue/by-client-code', data, {
     headers: getAdminHeaders(),
   });
   return res.data;

@@ -1,4 +1,5 @@
 
+import { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Package,
@@ -35,6 +36,20 @@ export function ConfirmModal({
   isPending: boolean;
 }) {
   const netCash = payload.received - payload.walletDeduction;
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Enter" && !isPending) {
+      onConfirm();
+    }
+    if (e.key === "Escape") {
+      onCancel();
+    }
+  }, [isPending, onConfirm, onCancel]);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   return (
     <motion.div
@@ -134,7 +149,7 @@ export function ConfirmModal({
               whileTap={{ scale: 0.97 }}
               onClick={onConfirm}
               disabled={isPending}
-              className="flex-[2] py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-[14px] rounded-2xl shadow-lg shadow-orange-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-[2] py-3 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-black text-[14px] rounded-2xl shadow-lg shadow-emerald-500/25 disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
