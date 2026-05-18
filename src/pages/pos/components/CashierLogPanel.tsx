@@ -60,18 +60,25 @@ export function CashierLogPanel({
   const entryCount = logData?.items.length ?? 0;
   const totalPages = logData?.total_pages ?? 1;
 
-  // Re-evaluate on resize (optional, but keeps state sane if user rotates device)
+  // Re-evaluate on resize (debounced, keeps state sane if user rotates device)
   useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
     const onResize = () => {
-      const isDesktop = window.innerWidth >= 1024;
-      setIsExpanded((prev) => {
-        // Only auto-expand when crossing into desktop; never auto-collapse
-        if (isDesktop && !prev) return true;
-        return prev;
-      });
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        const isDesktop = window.innerWidth >= 1024;
+        setIsExpanded((prev) => {
+          // Only auto-expand when crossing into desktop; never auto-collapse
+          if (isDesktop && !prev) return true;
+          return prev;
+        });
+      }, 150);
     };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener("resize", onResize);
+    };
   }, []);
 
   const handlePresetChange = (from: string, to: string) => {
@@ -204,7 +211,6 @@ export function CashierLogPanel({
                         onChange={handlePresetChange}
                       />
 
-                      {/* Provider select -->
                       <select
                         value={logProvider}
                         onChange={(e) =>

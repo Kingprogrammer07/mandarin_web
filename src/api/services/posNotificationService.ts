@@ -191,4 +191,15 @@ export const posNotificationService = {
   rejectFlightNotification: async (data: FlightRejectRequest): Promise<void> => {
     await apiClient.post(`${BASE}/reject`, data);
   },
+
+  /**
+   * Sync a notification's financials from actual transaction data.
+   * Fixes stale amount_paid / total_amount before showing in the POS panel.
+   */
+  syncNotification: async (notificationId: number): Promise<PosNotificationItem> => {
+    const response = await apiClient.post<PosNotificationItem>(
+      `${BASE}/${notificationId}/sync`,
+    );
+    return response.data;
+  },
 };

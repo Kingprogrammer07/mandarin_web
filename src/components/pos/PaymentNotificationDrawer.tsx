@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, memo } from "react";
 import {
   Wallet,
   Plane,
@@ -47,6 +47,8 @@ interface Props {
   onClientClick: (clientCode: string) => void;
   isLoading: boolean;
   mode?: "drawer" | "inline";
+  /** Additional classes for the inline-mode container (useful for flex height control). */
+  containerClassName?: string;
   activeTab?: 'flight' | 'zayafka';
   onTabChange?: (tab: 'flight' | 'zayafka') => void;
   tabCounts?: { flight: number; zayafka: number };
@@ -58,7 +60,7 @@ interface Props {
 
 export const STATUS_META: Record<string, { label: string; bg: string; text: string; dot: string; border: string }> = {
   pending: {
-    label: "Kutilmoqda",
+    label: "To'lanmagan",
     bg: "bg-red-50 dark:bg-red-500/10",
     text: "text-red-700 dark:text-red-400",
     dot: "bg-red-500",
@@ -197,7 +199,7 @@ const PAYMENT_TYPE_BADGE: Record<string, { label: string; bg: string; text: stri
   online:  { label: "Online",  bg: "bg-gray-100 dark:bg-white/[0.08]",     text: "text-gray-600 dark:text-gray-400" },
 };
 
-function NotificationBubble({
+const NotificationBubble = memo(function NotificationBubble({
   n,
   isUnread,
   onClientClick,
@@ -274,20 +276,22 @@ function NotificationBubble({
   const typeBadge = PAYMENT_TYPE_BADGE[n.payment_type ?? ""] ?? PAYMENT_TYPE_BADGE.online;
 
   // Fallback chain: total_amount → flight_items sum → amount_paid → remaining_amount
-  const fromItemsTotal = n.flight_items.reduce((s, i) => s + (i.total_amount || 0), 0);
-  const fromItemsPaid = n.flight_items.reduce((s, i) => s + (i.paid_amount || 0), 0);
-  const effectiveTotal =
-    n.total_amount > 0 ? n.total_amount :
-    fromItemsTotal > 0 ? fromItemsTotal :
-    n.amount_paid > 0 ? n.amount_paid :
-    n.remaining_amount > 0 ? n.remaining_amount :
-    0;
-  const effectivePaid = n.amount_paid > 0 ? n.amount_paid : fromItemsPaid;
-  const effectiveRemaining = n.remaining_amount > 0 ? n.remaining_amount : Math.max(0, effectiveTotal - effectivePaid);
+  const { effectiveTotal, effectiveRemaining } = useMemo(() => {
+    const fromItemsTotal = n.flight_items.reduce((s, i) => s + (i.total_amount || 0), 0);
+    const fromItemsPaid = n.flight_items.reduce((s, i) => s + (i.paid_amount || 0), 0);
+    const total =
+      n.total_amount > 0 ? n.total_amount :
+      fromItemsTotal > 0 ? fromItemsTotal :
+      n.amount_paid > 0 ? n.amount_paid :
+      n.remaining_amount > 0 ? n.remaining_amount :
+      0;
+    const paid = n.amount_paid > 0 ? n.amount_paid : fromItemsPaid;
+    const remaining = n.remaining_amount > 0 ? n.remaining_amount : Math.max(0, total - paid);
+    return { effectiveTotal: total, effectivePaid: paid, effectiveRemaining: remaining };
+  }, [n.total_amount, n.amount_paid, n.remaining_amount, n.flight_items]);
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
@@ -512,7 +516,7 @@ function NotificationBubble({
       )}
     </motion.div>
   );
-}
+});
 
 // ─── Summary View (compact) ───────────────────────────────────────────────────
 
@@ -537,6 +541,15 @@ function SummaryView({
   onConfirmMode: () => void;
   onRejectMode: () => void;
 }) {
+  const { paidCount, unpaidCount } = useMemo(() => {
+    let paid = 0;
+    let unpaid = 0;
+    for (const item of n.flight_items) {
+      if (item.payment_status === "paid") paid++;
+      else unpaid++;
+    }
+    return { paidCount: paid, unpaidCount: unpaid };
+  }, [n.flight_items]);
   return (
     <>
       {/* Header: client + flight */}
@@ -604,11 +617,11 @@ function SummaryView({
             {n.flight_items.length} ta yuk
           </span>
           <span className="px-2 py-0.5 rounded-md bg-green-50 dark:bg-green-500/10 text-[11px] font-medium text-green-600 dark:text-green-400">
-            {n.flight_items.filter((i) => i.payment_status === "paid").length} to'langan
+            {paidCount} to'langan
           </span>
-          {n.flight_items.filter((i) => i.payment_status !== "paid").length > 0 && (
+          {unpaidCount > 0 && (
             <span className="px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-500/10 text-[11px] font-medium text-red-600 dark:text-red-400">
-              {n.flight_items.filter((i) => i.payment_status !== "paid").length} qoldi
+              {unpaidCount} qoldi
             </span>
           )}
         </div>
@@ -1021,7 +1034,7 @@ function FilterBar({
               <div className="flex gap-1.5 flex-wrap">
                 {[
                   { value: undefined, label: "Barchasi" },
-                  { value: "pending", label: "Kutilmoqda" },
+                  { value: "pending", label: "To'lanmagan" },
                   { value: "partial", label: "Qisman" },
                   { value: "paid", label: "To'langan" },
                 ].map((opt) => (
@@ -1204,6 +1217,7 @@ export function PaymentNotificationDrawer({
   onClientClick,
   isLoading,
   mode = "drawer",
+  containerClassName = "",
   activeTab = 'flight',
   onTabChange,
   tabCounts = { flight: 0, zayafka: 0 },
@@ -1432,7 +1446,10 @@ export function PaymentNotificationDrawer({
 
   if (mode === "inline") {
     return (
-      <div className="bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden relative flex flex-col h-[calc(100dvh-7rem)]">
+      <div className={cn(
+        "bg-white dark:bg-[#161616] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-sm overflow-hidden relative flex flex-col",
+        containerClassName || "h-[calc(100dvh-7rem)]"
+      )}>
         {body}
       </div>
     );

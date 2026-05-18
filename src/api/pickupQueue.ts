@@ -158,6 +158,29 @@ export interface PickupQueueTVItem {
   ready_at: string | null;
 }
 
+// ── POS preview card ─────────────────────────────────────────────────────────
+
+export interface PosPickupQueueItem {
+  id: number;
+  display_number: number;
+  client_code: string;
+  pickup_method: PickupMethod;
+  priority: PickupQueuePriority;
+  status: PickupQueueStatus;
+  note: string | null;
+  created_at: string;
+}
+
+export interface PosPickupQueueListResponse {
+  items: PosPickupQueueItem[];
+}
+
+export interface PosPickupQueueUpdateRequest {
+  note?: string | null;
+  pickup_method?: PickupMethod;
+  priority?: PickupQueuePriority;
+}
+
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 export async function createPosPickupQueue(data: PickupQueueCreateRequest): Promise<unknown> {
@@ -237,6 +260,35 @@ export async function getPickupQueueTV(
     headers: {
       'X-TV-Token': token,
     },
+  });
+  return res.data;
+}
+
+export async function getPosPickupQueueList(): Promise<PosPickupQueueListResponse> {
+  const res = await apiClient.get<PosPickupQueueListResponse>('/api/v1/pos/pickup-queue', {
+    headers: getAdminHeaders(),
+  });
+  return res.data;
+}
+
+export async function updatePosPickupQueue(
+  queueId: number,
+  data: PosPickupQueueUpdateRequest,
+): Promise<PosPickupQueueItem> {
+  const res = await apiClient.patch<PosPickupQueueItem>(`/api/v1/pos/pickup-queue/${queueId}`, data, {
+    headers: getAdminHeaders(),
+  });
+  return res.data;
+}
+
+export async function cancelPosPickupQueue(
+  queueId: number,
+  reason?: string | null,
+): Promise<unknown> {
+  const res = await apiClient.post<unknown>(`/api/v1/pos/pickup-queue/${queueId}/cancel`, {
+    reason: reason || null,
+  }, {
+    headers: getAdminHeaders(),
   });
   return res.data;
 }

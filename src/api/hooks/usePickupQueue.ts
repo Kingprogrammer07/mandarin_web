@@ -8,12 +8,16 @@ import {
   cancelPickupQueue,
   activatePickupQueueTV,
   getPickupQueueTV,
+  getPosPickupQueueList,
+  updatePosPickupQueue,
+  cancelPosPickupQueue,
 } from '../pickupQueue';
 import type {
   PickupQueueCreateRequest,
   PickupQueueCancelRequest,
   WarehousePickupQueueListParams,
   PickupQueueTVParams,
+  PosPickupQueueUpdateRequest,
 } from '../pickupQueue';
 
 export const pickupQueueKeys = {
@@ -33,6 +37,7 @@ export const useWarehousePickupQueueCount = (params: {
   return useQuery({
     queryKey: pickupQueueKeys.count(params),
     queryFn: () => getWarehousePickupQueueCount(params),
+    staleTime: 3_000,
     refetchInterval: 3_000,
     placeholderData: (previousData) => previousData,
   });
@@ -42,6 +47,7 @@ export const useWarehousePickupQueueList = (params: WarehousePickupQueueListPara
   return useQuery({
     queryKey: pickupQueueKeys.warehouseList(params),
     queryFn: () => getWarehousePickupQueueList(params),
+    staleTime: 5_000,
     refetchInterval: 5_000,
     placeholderData: (previousData) => previousData,
   });
@@ -101,7 +107,9 @@ export const useCancelPickupQueue = () => {
       cancelPickupQueue(queueId, data),
     onSuccess: () => {
       toast.success("Navbat bekor qilindi");
-      queryClient.invalidateQueries({ queryKey: ['pickup_queue'] });
+      queryClient.invalidateQueries({ queryKey: pickupQueueKeys.count({ status: 'preparing' }) });
+      queryClient.invalidateQueries({ queryKey: ['pickup_queue', 'warehouse_list'] });
+      queryClient.invalidateQueries({ queryKey: ['pos_pickup_queue', 'list'] });
     },
     onError: (err: unknown) => {
       const e = err as { message?: string };
@@ -133,7 +141,52 @@ export const usePickupQueueTV = (params: PickupQueueTVParams, token: string | nu
       return getPickupQueueTV(params, token);
     },
     enabled: !!token,
+    staleTime: 3_000,
     refetchInterval: 3_000,
     placeholderData: (previousData) => previousData,
+  });
+};
+
+export const usePosPickupQueueList = () => {
+  return useQuery({
+    queryKey: ['pos_pickup_queue', 'list'] as const,
+    queryFn: () => getPosPickupQueueList(),
+    staleTime: 5_000,
+    refetchInterval: 5_000,
+    placeholderData: (previousData) => previousData,
+  });
+};
+
+export const useUpdatePosPickupQueue = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ queueId, data }: { queueId: number; data: PosPickupQueueUpdateRequest }) =>
+      updatePosPickupQueue(queueId, data),
+    onSuccess: () => {
+      toast.success('Navbat yangilandi');
+      queryClient.invalidateQueries({ queryKey: ['pos_pickup_queue'] });
+      queryClient.invalidateQueries({ queryKey: ['pickup_queue'] });
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string };
+      toast.error(e.message ?? 'Yangilashda xatolik');
+    },
+  });
+};
+
+export const useCancelPosPickupQueue = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ queueId, reason }: { queueId: number; reason?: string | null }) =>
+      cancelPosPickupQueue(queueId, reason),
+    onSuccess: () => {
+      toast.success('Navbat bekor qilindi');
+      queryClient.invalidateQueries({ queryKey: ['pos_pickup_queue'] });
+      queryClient.invalidateQueries({ queryKey: ['pickup_queue'] });
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string };
+      toast.error(e.message ?? 'Bekor qilishda xatolik');
+    },
   });
 };

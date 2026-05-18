@@ -24,6 +24,7 @@ import {
   Zap,
   Calculator,
   ChevronDown,
+  MessageSquare,
 } from "lucide-react";
 import CalculatorModal from "@/components/modals/CalculatorModal";
 
@@ -36,9 +37,9 @@ import {
 } from "@/api/pos";
 import { getPaymentCards } from "@/api/pos";
 import {
-  useBroadcastChannel,
+  useEventSource,
   type BroadcastMessage,
-} from "@/hooks/useBroadcastChannel";
+} from "@/hooks/useEventSource";
 import { usePaymentNotifications } from "@/hooks/usePaymentNotifications";
 import { PaymentNotificationDrawer } from "@/components/pos/PaymentNotificationDrawer";
 import { formatDateTime } from "@/components/pos/PaymentNotificationDrawer";
@@ -73,8 +74,10 @@ import { CashierLogPanel } from "./components/CashierLogPanel";
 import { ClientProfileDrawer } from "./components/ClientProfileDrawer";
 import { ConfirmModal } from "./components/ConfirmModal";
 import type { ConfirmPayload } from "./components/ConfirmModal";
+import { RejectConfirmModal } from "./components/RejectConfirmModal";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { WarehouseRequestCard } from "./components/WarehouseRequestCard";
+import { PosPickupQueuePreviewCard } from "./components/PosPickupQueuePreviewCard";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -132,7 +135,6 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     filters: paymentFilters,
     setPage: setPaymentPage,
     setFilters: setPaymentFilters,
-    resetFilters: _resetPaymentFilters,
     markAllRead: markPaymentNotificationsRead,
     readIds: paymentReadIds,
     isLoading: paymentLoading,
@@ -284,7 +286,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   }, []); // only on mount
 
   // ── Warehouse → Cashier notifications via BroadcastChannel ──────────────
-  const { sendMessage } = useBroadcastChannel(
+  const { sendMessage } = useEventSource(
     useCallback(
       (msg: BroadcastMessage) => {
         if (msg.type !== "POS_NOTIFY") return;
@@ -352,8 +354,14 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [flightDropdownOpen, setFlightDropdownOpen] = useState(false);
 
   // ── Notification-driven flight auto-select & info card ─────────────────────
-  const pendingFlightRef = useRef<{ flight: string; clientCode: string } | null>(null);
+  const pendingFlightRef = useRef<{ flight: string; clientCode: string; source: 'flight' | 'zayafka' } | null>(null);
   const [activeNotifData, setActiveNotifData] = useState<PosNotificationItem | null>(null);
+  const activeNotifRef = useRef<PosNotificationItem | null>(null);
+  useEffect(() => { activeNotifRef.current = activeNotifData; }, [activeNotifData]);
+
+  // ── Notification reject state ──────────────────────────────────────────────
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectModalWithComment, setRejectModalWithComment] = useState(false);
 
   // ── Pickup queue state (now handled by WarehouseRequestCard) ───────────────
 
@@ -367,6 +375,43 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [confirmPayload, setConfirmPayload] = useState<ConfirmPayload | null>(
     null,
   );
+
+  // ── Notification reject mutation ───────────────────────────────────────────
+  const rejectMut = useMutation({
+    mutationFn: async (comment: string | null) => {
+      const notif = activeNotifRef.current;
+      if (!notif) throw new Error("Bildirishnoma yo'q");
+      if (notif.source === 'zayafka') {
+        if (!notif.delivery_request_id) throw new Error("delivery_request_id yo'q");
+        await posNotificationService.rejectZayafka({
+          delivery_request_id: notif.delivery_request_id,
+          comment: comment || null,
+        });
+      } else {
+        await posNotificationService.rejectFlightNotification({
+          client_code: notif.client_code,
+          flight_name: notif.flight_name,
+          comment: comment || null,
+        });
+      }
+    },
+    onSuccess: () => {
+      toast.success("To'lov rad etildi");
+      setRejectModalOpen(false);
+      setRejectModalWithComment(false);
+      setActiveNotifData(null);
+      queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-notification-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-notification-tab-counts"] });
+      if (clientInfo) {
+        void handleSearch(clientInfo.client_code);
+      }
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string };
+      toast.error(e.message ?? "Rad etishda xatolik");
+    },
+  });
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -397,6 +442,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     queryFn: () => getCashierLog(cashierLogParams),
     // Poll every 10 s so all cashiers see each other's entries in near-real-time
     // without requiring a manual refresh.
+    staleTime: 10_000,
     refetchInterval: 10_000,
     // Only fire if the admin actually has pos:read — prevents a 403 for adjust-only roles
     enabled: canRead,
@@ -414,6 +460,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       }),
     // Cargo list is only meaningful when the admin can process payments
     enabled: canProcess && !!clientInfo,
+    staleTime: 30_000,
   });
 
   const { data: cardsData } = useQuery({
@@ -449,7 +496,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   // ── Bulk payment mutation ─────────────────────────────────────────────────
   const payMut = useMutation({
     mutationFn: processBulkPayment,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       const msg = `${result.processed_count} ta yuk to'lovi qabul qilindi! Jami: ${formatCurrencySum(result.total_paid)}`;
       toast.success(msg);
       setSelectedIds(new Set());
@@ -461,11 +508,23 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       queryClient.invalidateQueries({ queryKey: ["cashier-log"] });
       queryClient.invalidateQueries({ queryKey: ["pos-txn"] });
       queryClient.invalidateQueries({ queryKey: ["client-info"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
       // Refresh client wallet balance in the background
       if (clientInfo) {
         void handleSearch(clientInfo.client_code);
       }
-      refetchLog();
+      // refetchLog() is redundant — invalidateQueries above already triggers refetch
+
+      // Refresh the active notification card to reflect the just-processed payment
+      const currentNotif = activeNotifRef.current;
+      if (currentNotif) {
+        try {
+          const synced = await posNotificationService.syncNotification(currentNotif.id);
+          setActiveNotifData(synced);
+        } catch {
+          // non-critical: card will be stale until next Ko'rish click
+        }
+      }
     },
     onError: (err: unknown) => {
       type PosError = {
@@ -514,23 +573,29 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const walletDeduction = useWallet ? Math.min(displayBalance, totalOwed) : 0;
   const netAfterWallet = totalOwed - walletDeduction;
 
-  // Auto-fill received input when selection/wallet changes (only if user hasn't manually edited)
+  // Auto-fill received input when selection/wallet/notification changes
   const userEditedRef = useRef(false);
   const prevNetRef = useRef(0);
   useEffect(() => {
     const net = totalOwed - (useWallet ? Math.min(displayBalance, totalOwed) : 0);
-    if (!userEditedRef.current || net !== prevNetRef.current) {
-      setReceivedInput(net > 0 ? String(Math.round(net)) : "");
-      prevNetRef.current = net;
+    const notifFallback = activeNotifData?.remaining_amount ?? 0;
+    const effective = net > 0 ? net : notifFallback;
+    if (!userEditedRef.current || effective !== prevNetRef.current) {
+      setReceivedInput(effective > 0 ? String(Math.round(effective)) : "");
+      prevNetRef.current = effective;
     }
-  }, [totalOwed, useWallet, displayBalance]);
+  }, [totalOwed, useWallet, displayBalance, activeNotifData]);
 
   const receivedAmount = parseFloat(receivedInput) || netAfterWallet;
 
   // ── Search ────────────────────────────────────────────────────────────────
+  // Keep a ref to searchInput so handleSearch doesn't re-create on every keystroke.
+  const searchInputRef = useRef(searchInput);
+  useEffect(() => { searchInputRef.current = searchInput; }, [searchInput]);
+
   const handleSearch = useCallback(
     async (overrideCode?: string) => {
-      const query = (overrideCode ?? searchInput).trim().toUpperCase();
+      const query = (overrideCode ?? searchInputRef.current).trim().toUpperCase();
       if (!query) return;
 
       setIsSearching(true);
@@ -553,7 +618,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         setIsSearching(false);
       }
     },
-    [searchInput],
+    [], // stable: reads searchInput via ref
   );
 
   // Keep the ref in sync so the BroadcastChannel notification callback always
@@ -569,6 +634,15 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const handleRefreshClient = useCallback(
     () => handleSearch(clientInfo?.client_code),
     [handleSearch, clientInfo?.client_code],
+  );
+
+  const handleLeftResize = useCallback(
+    (d: number) => setLeftWidth((w) => Math.max(200, Math.min(480, w + d))),
+    [],
+  );
+  const handleCenterResize = useCallback(
+    (d: number) => setCenterWidth((w) => Math.max(320, Math.min(800, w + d))),
+    [],
   );
 
   const handleRemoveRecent = (code: string, e: React.MouseEvent) => {
@@ -592,8 +666,18 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   const handleClientAndFlightClick = useCallback(
     async (code: string, flightName: string, notif: PosNotificationItem) => {
-      pendingFlightRef.current = { flight: flightName, clientCode: code };
-      setActiveNotifData(notif);
+      pendingFlightRef.current = { flight: flightName, clientCode: code, source: notif.source };
+      // Sync with actual transaction data before displaying — fixes stale amount_paid/total_amount
+      let freshNotif = notif;
+      try {
+        freshNotif = await posNotificationService.syncNotification(notif.id);
+      } catch {
+        // Non-critical: fall back to cached notification data if sync fails
+      }
+      setActiveNotifData(freshNotif);
+      const matchedType = PAYMENT_TYPES.find((t) => t.id === freshNotif.payment_type);
+      // "online" (Telegram bot payments) has no POS equivalent — default to click
+      setPaymentType(matchedType ? matchedType.id : "click");
       await handleSearch(code);
     },
     [handleSearch],
@@ -608,16 +692,22 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     }
   }, [cargoData?.items]);
 
-  // Auto-select specific flight cargos when triggered from notification "Ko'rish"
+  // Auto-select specific flight cargos when triggered from notification "Ko'rish".
+  // clientCode check removed: search may return primary_code while notification stores actual_code,
+  // causing a mismatch that prevents selection. clientInfo dependency already guarantees correct client.
   useEffect(() => {
     if (!pendingFlightRef.current || !cargoData?.items || !clientInfo) return;
-    const { flight, clientCode } = pendingFlightRef.current;
-    if (clientInfo.client_code.toUpperCase() !== clientCode.toUpperCase()) return;
+    const { flight, source } = pendingFlightRef.current;
     const flightItems = cargoData.items.filter(
       (c) => c.flight_name.toUpperCase() === flight.toUpperCase()
     );
     if (flightItems.length > 0) {
       setSelectedIds(new Set(flightItems.map((c) => c.cargo_id)));
+    } else if (source === "flight") {
+      // No unpaid cargo for this flight despite a "pending" notification —
+      // the notification is stale (cargo was already paid via a different code path).
+      setActiveNotifData(null);
+      toast.info("Bu to'lov allaqachon amalga oshirilgan ko'rinadi", { duration: 5000 });
     }
     pendingFlightRef.current = null;
   }, [cargoData?.items, clientInfo]);
@@ -852,7 +942,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
           )}
 
           <ResizeHandle
-            onResize={(d) => setLeftWidth((w) => Math.max(200, Math.min(480, w + d)))}
+            onResize={handleLeftResize}
             showToggle
             isCollapsed={leftCollapsed}
             onToggle={toggleLeftColumn}
@@ -1055,42 +1145,54 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                           <div className="relative flex items-center justify-between px-4 py-3 bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 rounded-xl">
                             <div className="flex flex-col gap-1 min-w-0">
                               <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
-                                Jami to'lov summasi
+                                {activeNotifData
+                                  ? activeNotifData.payment_status === "paid"
+                                    ? "To'langan ✓"
+                                    : activeNotifData.payment_status === "partial"
+                                      ? "Qoldiq (qisman to'langan)"
+                                      : "To'lanishi kerak"
+                                  : "Jami to'lov summasi"}
                               </span>
                               {activeNotifData && (
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={cn(
-                                    "px-1.5 py-0.5 rounded-md text-[10px] font-bold",
-                                    activeNotifData.payment_type === "cash" && "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
-                                    activeNotifData.payment_type === "click" && "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
-                                    activeNotifData.payment_type === "payme" && "bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400",
-                                    activeNotifData.payment_type === "card" && "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
-                                    !["cash","click","payme","card"].includes(activeNotifData.payment_type ?? "") && "bg-gray-100 dark:bg-white/[0.08] text-gray-600 dark:text-gray-400",
-                                  )}>
-                                    {TYPE_LABEL[activeNotifData.payment_type ?? ""] ?? activeNotifData.payment_type ?? "—"}
-                                  </span>
-                                  <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                                    {formatDateTime(activeNotifData.created_at)}
-                                  </span>
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className={cn(
+                                      "px-1.5 py-0.5 rounded-md text-[10px] font-bold",
+                                      activeNotifData.payment_type === "cash" && "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+                                      activeNotifData.payment_type === "click" && "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400",
+                                      activeNotifData.payment_type === "payme" && "bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400",
+                                      activeNotifData.payment_type === "card" && "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400",
+                                      !["cash","click","payme","card"].includes(activeNotifData.payment_type ?? "") && "bg-gray-100 dark:bg-white/[0.08] text-gray-600 dark:text-gray-400",
+                                    )}>
+                                      {TYPE_LABEL[activeNotifData.payment_type ?? ""] ?? activeNotifData.payment_type ?? "—"}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                      {formatDateTime(activeNotifData.created_at)}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col gap-0.5 mt-0.5">
+                                    <span className="text-[12px] text-gray-500 dark:text-gray-400">Jami: <span className="font-bold text-[13px] text-gray-700 dark:text-gray-300">{formatCurrencySum(activeNotifData.total_amount)}</span></span>
+                                    {activeNotifData.amount_paid > 0 && (
+                                      <span className="text-[12px] text-gray-500 dark:text-gray-400">To'langan: <span className="font-bold text-[13px] text-green-600 dark:text-green-400">{formatCurrencySum(activeNotifData.amount_paid)}</span></span>
+                                    )}
+                                  </div>
                                 </div>
                               )}
                             </div>
                             <span className="text-[18px] font-black text-orange-700 dark:text-orange-300 shrink-0 ml-3">
-                              {(() => {
-                                if (!activeNotifData) {
-                                  return formatCurrencySum(totalOwed);
-                                }
-                                // Notification mode: try multiple fallbacks for the correct amount
-                                const notif = activeNotifData;
-                                const fromItems = notif.flight_items.reduce((s, i) => s + (i.total_amount || 0), 0);
-                                const amount =
-                                  notif.total_amount > 0 ? notif.total_amount :
-                                  fromItems > 0 ? fromItems :
-                                  notif.amount_paid > 0 ? notif.amount_paid :
-                                  notif.remaining_amount > 0 ? notif.remaining_amount :
-                                  null;
-                                return amount !== null ? formatCurrencySum(amount) : "—";
-                              })()}
+                              {activeNotifData
+                                ? (() => {
+                                    const n = activeNotifData;
+                                    // "paid" → no remaining debt, never fall back to amount_paid
+                                    if (n.payment_status === "paid") return formatCurrencySum(0);
+                                    // partial/pending → show remaining, then total, then 0
+                                    const amt = n.remaining_amount > 0 ? n.remaining_amount
+                                              : n.total_amount > 0    ? n.total_amount
+                                              : 0;
+                                    return formatCurrencySum(amt);
+                                  })()
+                                : formatCurrencySum(totalOwed)
+                              }
                             </span>
                           </div>
 
@@ -1143,11 +1245,14 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                 className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-left transition-all hover:border-gray-300 dark:hover:border-white/[0.15]"
                               >
                                 <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                                  {selectedIds.size === 0
-                                    ? "Reys tanlang"
-                                    : selectedIds.size === cargos.length
-                                      ? "Barcha reyslar"
-                                      : `${selectedIds.size} ta yuk`}
+                                  {(() => {
+                                    if (selectedIds.size === 0) return "Reys tanlang";
+                                    const selectedArr = cargos.filter((c) => selectedIds.has(c.cargo_id));
+                                    const uniqueFlights = [...new Set(selectedArr.map((c) => c.flight_name))];
+                                    if (uniqueFlights.length === 1) return uniqueFlights[0];
+                                    if (selectedIds.size === cargos.length) return "Barcha reyslar";
+                                    return `${selectedIds.size} ta yuk`;
+                                  })()}
                                 </span>
                                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${flightDropdownOpen ? "rotate-180" : ""}`} />
                               </button>
@@ -1335,16 +1440,56 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                             </div>
                           </div>
 
-                          {/* Green confirm button with CheckCircle2 icon */}
-                          <motion.button
-                            onClick={handleOpenConfirm}
-                            disabled={payMut.isPending || selectedIds.size === 0}
-                            whileTap={{ scale: selectedIds.size === 0 ? 1 : 0.97 }}
-                            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-black text-[15px] rounded-2xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-                          >
-                            <CheckCircle2 className="w-5 h-5" />
-                            {selectedIds.size === 0 ? "Yuk tanlang" : `TASDIQLASH (${selectedIds.size} ta · ${formatCurrencySum(netAfterWallet)})`}
-                          </motion.button>
+                          {/* Confirm + Reject row */}
+                          {activeNotifData ? (
+                            <div className="flex gap-2">
+                              <motion.button
+                                onClick={handleOpenConfirm}
+                                disabled={payMut.isPending || selectedIds.size === 0}
+                                whileTap={{ scale: selectedIds.size === 0 ? 1 : 0.97 }}
+                                className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-black text-[15px] rounded-2xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                              >
+                                <CheckCircle2 className="w-5 h-5" />
+                                {selectedIds.size === 0 ? "Yuk tanlang" : `TASDIQLASH (${selectedIds.size} ta · ${formatCurrencySum(receivedAmount)})`}
+                              </motion.button>
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                onClick={() => { setRejectModalWithComment(false); setRejectModalOpen(true); }}
+                                disabled={rejectMut.isPending}
+                                title="Bekor qilish"
+                                className="shrink-0 w-14 py-3.5 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white shadow-red-500/25 rounded-2xl shadow-lg transition-all disabled:opacity-40 flex items-center justify-center"
+                              >
+                                {rejectMut.isPending && !rejectModalWithComment ? (
+                                  <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  <X className="w-5 h-5" />
+                                )}
+                              </motion.button>
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                onClick={() => { setRejectModalWithComment(true); setRejectModalOpen(true); }}
+                                disabled={rejectMut.isPending}
+                                title="Izoh bilan bekor qilish"
+                                className="shrink-0 w-14 py-3.5 border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/10 rounded-2xl shadow-lg transition-all disabled:opacity-40 flex items-center justify-center"
+                              >
+                                {rejectMut.isPending && rejectModalWithComment ? (
+                                  <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  <MessageSquare className="w-5 h-5" />
+                                )}
+                              </motion.button>
+                            </div>
+                          ) : (
+                            <motion.button
+                              onClick={handleOpenConfirm}
+                              disabled={payMut.isPending || selectedIds.size === 0}
+                              whileTap={{ scale: selectedIds.size === 0 ? 1 : 0.97 }}
+                              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-black text-[15px] rounded-2xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle2 className="w-5 h-5" />
+                              {selectedIds.size === 0 ? "Yuk tanlang" : `TASDIQLASH (${selectedIds.size} ta · ${formatCurrencySum(receivedAmount)})`}
+                            </motion.button>
+                          )}
                         </div>
                     </>
                   )}
@@ -1372,31 +1517,35 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
             )}
           </div>
 
-          <ResizeHandle onResize={(d) => setCenterWidth((w) => Math.max(320, Math.min(800, w + d)))} />
+          <ResizeHandle onResize={handleCenterResize} />
 
-          {/* ── Right column: Payment Notifications (desktop only) ───────────── */}
-          <div className="hidden lg:block flex-1 min-w-[200px] space-y-3 lg:px-1.5">
-            <PaymentNotificationDrawer
-              mode="inline"
-              notifications={paymentNotifications}
-              total={paymentTotal}
-              page={paymentPage}
-              perPage={paymentPerPage}
-              unreadCount={paymentUnreadCount}
-              filters={paymentFilters}
-              setPage={setPaymentPage}
-              setFilters={setPaymentFilters}
-              resetFilters={handleResetNotifFilters}
-              markAllRead={markPaymentNotificationsRead}
-              readIds={paymentReadIds}
-              onClientClick={handleSearch}
-              isLoading={paymentLoading}
-              activeTab={notifTab}
-              onTabChange={handleNotifTabChange}
-              tabCounts={tabCounts ?? { flight: 0, zayafka: 0 }}
-              onRefresh={refetchNotifications}
-              onClientAndFlightClick={handleClientAndFlightClick}
-            />
+          {/* ── Right column: Payment Notifications + Pickup Preview (desktop only) ───────────── */}
+          <div className="hidden lg:flex flex-col flex-1 min-w-[200px] h-[calc(100dvh-5rem)] gap-3 lg:px-1.5">
+            <div className="flex-1 min-h-0">
+              <PaymentNotificationDrawer
+                mode="inline"
+                containerClassName="h-full"
+                notifications={paymentNotifications}
+                total={paymentTotal}
+                page={paymentPage}
+                perPage={paymentPerPage}
+                unreadCount={paymentUnreadCount}
+                filters={paymentFilters}
+                setPage={setPaymentPage}
+                setFilters={setPaymentFilters}
+                resetFilters={handleResetNotifFilters}
+                markAllRead={markPaymentNotificationsRead}
+                readIds={paymentReadIds}
+                onClientClick={handleSearch}
+                isLoading={paymentLoading}
+                activeTab={notifTab}
+                onTabChange={handleNotifTabChange}
+                tabCounts={tabCounts ?? { flight: 0, zayafka: 0 }}
+                onRefresh={refetchNotifications}
+                onClientAndFlightClick={handleClientAndFlightClick}
+              />
+            </div>
+            <PosPickupQueuePreviewCard />
           </div>
         </div>
       </div>
@@ -1427,6 +1576,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
           />
         )}
       </AnimatePresence>
+
+      <RejectConfirmModal
+        isOpen={rejectModalOpen}
+        onConfirm={(comment) => rejectMut.mutate(comment)}
+        onCancel={() => setRejectModalOpen(false)}
+        isPending={rejectMut.isPending}
+        clientCode={activeNotifData?.client_code ?? ""}
+        flightName={activeNotifData?.flight_name ?? ""}
+        showComment={rejectModalWithComment}
+      />
 
       <CalculatorModal
         isOpen={isCalculatorOpen}

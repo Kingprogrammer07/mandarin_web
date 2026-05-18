@@ -34,7 +34,7 @@ import MarkTakenModal from "../../components/warehouse/MarkTakenModal";
 import WarehouseOfflineManager from "../../components/warehouse/WarehouseOfflineManager";
 import UzPostOrdersPanel from "../../components/warehouse/UzPostOrdersPanel";
 import PickupQueuePanel from "../../components/warehouse/PickupQueuePanel";
-import { useBroadcastChannel, type BroadcastMessage, type PosNotificationPayload } from "../../hooks/useBroadcastChannel";
+import { useEventSource, type BroadcastMessage, type PosNotificationPayload } from "../../hooks/useEventSource";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
 import { revertTakenStatus } from "../../api/services/warehouse";
 import type { PickupMethod, PickupQueuePriority } from "../../api/pickupQueue";
@@ -320,7 +320,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     [setPage],
   );
 
-  const { sendMessage } = useBroadcastChannel(
+  const { sendMessage } = useEventSource(
     useCallback((msg: BroadcastMessage) => {
       if (msg.type !== "CASHIER_ACK") return;
       const { clientCode, flightName } = msg.payload;

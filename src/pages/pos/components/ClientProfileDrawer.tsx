@@ -67,11 +67,18 @@ export function ClientProfileDrawer({
       const res = await getClientProfile(clientCode);
       return normalizeClientProfile(res.client);
     },
+    enabled: !!clientCode,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: txData, isLoading: txLoading } = useQuery({
     queryKey: ["pos-txn", clientCode, txFilter],
     queryFn: () => getPOSClientTransactions(clientCode, txFilter, 20, 0),
+    enabled: !!clientCode,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   });
 
   const transactions = useMemo(() => txData?.transactions ?? [], [txData?.transactions]);

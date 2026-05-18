@@ -7,9 +7,9 @@ import {
   type NotificationFilters,
 } from "@/api/services/posNotificationService";
 import {
-  useBroadcastChannel,
+  useEventSource,
   type BroadcastMessage,
-} from "./useBroadcastChannel";
+} from "./useEventSource";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,14 +106,19 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
   const total = data?.total ?? 0;
 
   // ── BroadcastChannel: real-time updates from other devices ─────────────────
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleBroadcast = useCallback((msg: BroadcastMessage) => {
     if (msg.type === "POS_NOTIFY") {
       const payload = msg.payload;
       if (seenBroadcastIdsRef.current.has(payload.id)) return;
       seenBroadcastIdsRef.current.add(payload.id);
 
-      // Invalidate so the next poll picks it up
-      queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
+      // Debounced invalidate so simultaneous multi-channel deliveries
+      // don't double-refetch.
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
+      }, 1_000);
 
       // Show a toast for truly new pending notifications
       if (payload.paymentStatus === "pending") {
@@ -124,11 +129,14 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
       }
     } else if (msg.type === "CASHIER_ACK") {
       // Another cashier acted — just refresh the list
-      queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
+      }, 1_000);
     }
   }, [queryClient]);
 
-  useBroadcastChannel(handleBroadcast);
+  useEventSource(handleBroadcast);
 
   // ── Persist read IDs ────────────────────────────────────────────────────────
   useEffect(() => {

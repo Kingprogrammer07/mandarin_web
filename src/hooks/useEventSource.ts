@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
+import { API_BASE_URL } from "@/config/config";
 
 export interface PosNotificationPayload {
   id: string;
@@ -38,25 +38,6 @@ export type BroadcastMessage =
  *  processed twice when multiple channels deliver it simultaneously. */
 type WireMessage = BroadcastMessage & { _id: string };
 
-// ── Supabase client ────────────────────────────────────────────────────────────
-// Configure in .env (and Vercel env vars):
-//   VITE_SUPABASE_URL      — Project URL from supabase.com → Settings → API
-//   VITE_SUPABASE_ANON_KEY — anon/public key from the same page
-//
-// If the vars are absent the hook falls back to same-device channels only.
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-const supabase =
-  SUPABASE_URL && SUPABASE_ANON_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        realtime: { params: { eventsPerSecond: 10 } },
-      })
-    : null;
-
-// Supabase Broadcast channel name (arbitrary — just needs to match on all clients).
-const REALTIME_CHANNEL = "pos_cashier_notifications";
-
 // Same-device fallbacks
 const BC_CHANNEL_NAME = "pos_notifications";
 const STORAGE_KEY = "pos_notification_last";
@@ -65,18 +46,32 @@ function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getAdminToken(): string | null {
+  try {
+    return localStorage.getItem("access_token");
+  } catch {
+    return null;
+  }
+}
+
+function buildSseUrl(): string | null {
+  const token = getAdminToken();
+  if (!token) return null;
+  const base = API_BASE_URL.replace(/\/$/, "");
+  return `${base}/api/v1/pos/notifications/stream?access_token=${encodeURIComponent(token)}`;
+}
+
 /**
  * Cross-device cashier notification hub.
  *
  * Three delivery layers, in priority order:
  *
- * 1. **Supabase Realtime Broadcast** — WebSocket pub/sub that works across
- *    different devices, browsers, and networks.  Free tier is generous enough
- *    for typical cashier workloads.  Requires `VITE_SUPABASE_URL` and
- *    `VITE_SUPABASE_ANON_KEY` to be set in the environment.
+ * 1. **SSE (Server-Sent Events)** — HTTP-based server→client stream that
+ *    works across different devices, browsers, and networks. Connects to
+ *    /api/v1/pos/notifications/stream and auto-reconnects on error.
  *
  * 2. **BroadcastChannel API** — same browser, different tabs (no server
- *    needed).  Used as a same-device fallback when the user has both pages
+ *    needed). Used as a same-device fallback when the user has both pages
  *    open in the same browser.
  *
  * 3. **localStorage `storage` event** — same browser, different tabs.
@@ -86,14 +81,15 @@ function makeId(): string {
  * All three channels share deduplication via `_id` so a message received on
  * multiple channels is dispatched to the consumer exactly once.
  */
-export function useBroadcastChannel(
+export function useEventSource(
   onMessage?: (msg: BroadcastMessage) => void,
 ): { sendMessage: (msg: BroadcastMessage) => void } {
-  const realtimeRef = useRef<RealtimeChannel | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
+  const esRef = useRef<EventSource | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
 
   // Always points to the latest callback without causing the effect to re-run.
-  // Synced in useLayoutEffect (not during render) to satisfy the react-hooks/refs rule.
   const onMessageRef = useRef(onMessage);
   useLayoutEffect(() => {
     onMessageRef.current = onMessage;
@@ -119,37 +115,63 @@ export function useBroadcastChannel(
   }, []);
 
   useEffect(() => {
-    // ── Layer 1: Supabase Realtime Broadcast (cross-device) ─────────────────
-    if (supabase) {
-      const channel = supabase.channel(REALTIME_CHANNEL, {
-        config: {
-          broadcast: {
-            // ack: false  →  fire-and-forget (lower latency, fine for notifications)
-            ack: false,
-            // self: false →  the sender does NOT receive its own message via Supabase;
-            //                same-device delivery is handled by BroadcastChannel below.
-            self: false,
-          },
-        },
-      });
-
-      // Wildcard catches both "POS_NOTIFY" and "CASHIER_ACK" (and any future types).
-      channel.on(
-        "broadcast",
-        { event: "*" },
-        ({ payload }: { payload: WireMessage }) => {
-          dispatch(payload);
-        },
-      );
-
-      channel.subscribe((status) => {
+    const connect = () => {
+      const url = buildSseUrl();
+      if (!url) {
         if (import.meta.env.DEV) {
-          console.debug("[POS] Supabase Realtime status:", status);
+          console.debug("[POS] SSE: no admin token, skipping connection");
         }
-      });
+        return;
+      }
 
-      realtimeRef.current = channel;
-    }
+      if (esRef.current) {
+        esRef.current.close();
+      }
+
+      const es = new EventSource(url);
+      esRef.current = es;
+
+      es.onopen = () => {
+        reconnectAttemptRef.current = 0;
+        if (import.meta.env.DEV) {
+          console.debug("[POS] SSE connected");
+        }
+      };
+
+      es.onmessage = (event) => {
+        // Keep-alive messages start with ":"
+        if (event.data.startsWith(":")) return;
+
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload._id) {
+            dispatch(payload as WireMessage);
+          } else {
+            // Server may send payload without _id — wrap it.
+            dispatch({ ...payload, _id: makeId() } as WireMessage);
+          }
+        } catch {
+          // Ignore malformed SSE data.
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        esRef.current = null;
+
+        // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+        const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30_000);
+        reconnectAttemptRef.current += 1;
+
+        if (import.meta.env.DEV) {
+          console.debug(`[POS] SSE error, reconnecting in ${delay}ms`);
+        }
+
+        reconnectTimerRef.current = setTimeout(connect, delay);
+      };
+    };
+
+    connect();
 
     // ── Layer 2: BroadcastChannel (same browser, different tabs) ────────────
     let bc: BroadcastChannel | null = null;
@@ -171,10 +193,11 @@ export function useBroadcastChannel(
     window.addEventListener("storage", handleStorage);
 
     return () => {
-      if (supabase && realtimeRef.current) {
-        void supabase.removeChannel(realtimeRef.current);
-        realtimeRef.current = null;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
       }
+      esRef.current?.close();
+      esRef.current = null;
       bc?.close();
       bcRef.current = null;
       window.removeEventListener("storage", handleStorage);
@@ -183,15 +206,6 @@ export function useBroadcastChannel(
 
   const sendMessage = useCallback((msg: BroadcastMessage) => {
     const wire: WireMessage = { ...msg, _id: makeId() };
-
-    // ── Layer 1: Supabase (cross-device) ────────────────────────────────────
-    // Use wire.type as the Supabase event name so the wildcard subscriber
-    // can route "POS_NOTIFY" and "CASHIER_ACK" without extra filtering.
-    void realtimeRef.current?.send({
-      type: "broadcast",
-      event: wire.type,
-      payload: wire,
-    });
 
     // ── Layer 2 & 3: same-device same-browser ───────────────────────────────
     bcRef.current?.postMessage(wire);
