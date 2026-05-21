@@ -696,8 +696,15 @@ function AppContent() {
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin;
-  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin;
+  const isAdminRoute =
+    window.location.pathname.startsWith('/admin') ||
+    window.location.pathname === '/pos' ||
+    window.location.pathname.startsWith('/flights') ||
+    window.location.pathname.startsWith('/statistics') ||
+    window.location.pathname === '/pickup-tv';
+
+  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && !isAdminRoute;
+  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && !isAdminRoute;
 
   if (showMaintenanceOverlay) {
     return (
