@@ -45,6 +45,7 @@ const ExpectedCargoPage = lazy(() => import("./pages/admin/ExpectedCargoPage"));
 const PickupQueueTVPage = lazy(() => import("./pages/shared/PickupQueueTVPage"));
 const AdminDeliveryRequestPage = lazy(() => import("./pages/admin/AdminDeliveryRequestPage"));
 const FlightNotificationPage = lazy(() => import("./pages/admin/FlightNotificationPage"));
+const ExpensesPage = lazy(() => import("./pages/admin/ExpensesPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,8 @@ type Page =
   | "flight-schedule-admin"
   | "pickup-tv"
   | "admin-delivery-request"
-  | "admin-flight-notifications";
+  | "admin-flight-notifications"
+  | "admin-expenses";
 
 interface RouteInfo {
   page: Page;
@@ -101,6 +103,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "pos-dashboard",
       "admin-profile",
       "passkey-page",
+      "admin-expenses",
     ],
   },
   admin: {
@@ -131,6 +134,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "pickup-tv",
       "admin-delivery-request",
       "admin-flight-notifications",
+      "admin-expenses",
     ],
   },
   "super-admin": {
@@ -161,6 +165,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "pickup-tv",
       "admin-delivery-request",
       "admin-flight-notifications",
+      "admin-expenses",
     ],
   },
   manager: {
@@ -273,6 +278,7 @@ function getPathForPage(
   if (page === "flight-schedule-admin") return "/admin/flight-schedule";
   if (page === "admin-delivery-request") return "/admin/delivery-request";
   if (page === "pickup-tv") return "/pickup-tv";
+  if (page === "admin-expenses") return "/admin/expenses";
   if (page === "admin-flight-notifications" && flightName)
     return `/flights/${encodeURIComponent(flightName)}/notifications`;
   return "/auth/login";
@@ -323,6 +329,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/admin/expected-cargo") return { page: "expected-cargo" };
   if (path === "/admin/flight-schedule") return { page: "flight-schedule-admin" };
   if (path === "/pos") return { page: "pos-dashboard" };
+  if (path === "/admin/expenses") return { page: "admin-expenses" };
   if (path === "/pickup-tv") return { page: "pickup-tv" };
 
   return { page: "login" };
@@ -636,6 +643,7 @@ function AppContent() {
     "admin-carousel",
     "flight-schedule-admin",
     "admin-delivery-request",
+    "admin-expenses",
   ].includes(currentPage);
 
   // Only roles with admin-accounts (admin, super-admin) get the full AdminLayout shell.
@@ -745,6 +753,7 @@ function AppContent() {
           {currentPage === "admin-carousel" && <AdminCarouselPage />}
           {currentPage === "flight-schedule-admin" && <FlightScheduleAdminPage />}
           {currentPage === "admin-delivery-request" && <AdminDeliveryRequestPage />}
+          {currentPage === "admin-expenses" && <ExpensesPage />}
         </AdminLayout>
       ) : isPOSPage ? (
         <POSDashboard
@@ -772,6 +781,9 @@ function AppContent() {
           )}
           {currentPage === "admin-delivery-request" && (
             <AdminDeliveryRequestPage />
+          )}
+          {currentPage === "admin-expenses" && (
+            <ExpensesPage />
           )}
         </>
       ) : isManagerPage && canAccessManagerPage ? (

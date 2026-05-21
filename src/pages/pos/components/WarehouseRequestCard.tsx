@@ -41,7 +41,7 @@ export function WarehouseRequestCard({ canProcess, activeClientCode }: Warehouse
       const detail = (err as ApiErr)?.response?.data?.detail;
 
       if (status === 400) {
-        toast.error("Mijozning reysiga hali to'lov qilinmagan. Avval to'lovini tasdiqlang, keyin so'rov yuboring.");
+        toast.error(typeof detail === "string" ? detail : "Mijozning skladga chiqariladigan yuklari yo'q");
       } else {
         toast.error(typeof detail === "string" ? detail : "So'rov yuborishda xatolik");
       }

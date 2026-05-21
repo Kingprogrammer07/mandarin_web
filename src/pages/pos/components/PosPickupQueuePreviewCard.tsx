@@ -22,7 +22,7 @@ import {
   PICKUP_PRIORITY_LABELS,
   PICKUP_STATUS_LABELS,
 } from "@/api/pickupQueue";
-import type { PosPickupQueueItem, PickupMethod, PickupQueuePriority } from "@/api/pickupQueue";
+import type { PosPickupQueueItem, PickupMethod, PickupQueuePriority, PickupQueueStatus } from "@/api/pickupQueue";
 
 const EXPANDED_KEY = "pos_pickup_preview_expanded";
 
@@ -66,7 +66,7 @@ function StatusBadge({ status }: { status: PosPickupQueueItem["status"] }) {
 
 interface EditableRowProps {
   item: PosPickupQueueItem;
-  onSave: (id: number, data: { note: string | null; pickup_method: PickupMethod; priority: PickupQueuePriority }) => void;
+  onSave: (id: number, data: { note: string | null; pickup_method: PickupMethod; priority: PickupQueuePriority; status: PickupQueueStatus }) => void;
   onCancel: () => void;
   isPending: boolean;
 }
@@ -75,6 +75,7 @@ const EditableRow = memo(function EditableRow({ item, onSave, onCancel, isPendin
   const [note, setNote] = useState(item.note ?? "");
   const [method, setMethod] = useState<PickupMethod>(item.pickup_method);
   const [priority, setPriority] = useState<PickupQueuePriority>(item.priority);
+  const [queueStatus, setQueueStatus] = useState<PickupQueueStatus>(item.status);
   const noteRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -86,8 +87,9 @@ const EditableRow = memo(function EditableRow({ item, onSave, onCancel, isPendin
       note: note.trim() || null,
       pickup_method: method,
       priority,
+      status: queueStatus,
     });
-  }, [item.id, note, method, priority, onSave]);
+  }, [item.id, note, method, priority, queueStatus, onSave]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -141,10 +143,20 @@ const EditableRow = memo(function EditableRow({ item, onSave, onCancel, isPendin
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
+          <select
+            value={queueStatus}
+            onChange={(e) => setQueueStatus(e.target.value as PickupQueueStatus)}
+            onKeyDown={handleKeyDown}
+            className="px-2 py-1.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg text-[11px] font-semibold outline-none text-gray-900 dark:text-white"
+          >
+            {Object.entries(PICKUP_STATUS_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
         </div>
       </td>
       <td className="px-3 py-2">
-        <StatusBadge status={item.status} />
+        <StatusBadge status={queueStatus} />
       </td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-1">
@@ -251,7 +263,7 @@ export function PosPickupQueuePreviewCard() {
   }, []);
 
   const handleSave = useCallback(
-    (id: number, data: { note: string | null; pickup_method: PickupMethod; priority: PickupQueuePriority }) => {
+    (id: number, data: { note: string | null; pickup_method: PickupMethod; priority: PickupQueuePriority; status: PickupQueueStatus }) => {
       updateMut.mutate(
         { queueId: id, data },
         { onSuccess: () => setEditingId(null) }

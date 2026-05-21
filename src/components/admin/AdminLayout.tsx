@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3, CalendarDays,
   LayoutGrid, Plane, Monitor, UserCheck, Warehouse, PackageSearch,
-  Upload, X, ChevronDown, Truck,
+  Upload, X, ChevronDown, Truck, TrendingDown,
 } from 'lucide-react';
 import RoleSwitcher from './RoleSwitcher';
 
@@ -20,6 +20,7 @@ const navItems = [
   { id: 'admin-roles',           label: 'Rollar',     icon: Shield,        description: 'Huquqlar tizimi' },
   { id: 'admin-carousel',        label: 'Karusel',    icon: Layers,        description: 'Banner & reklama' },
   { id: 'admin-audit',           label: 'Audit',      icon: Clock,         description: 'Faoliyat tarixi' },
+  { id: 'admin-expenses',        label: 'Rasxodlar',  icon: TrendingDown,  description: 'Chiqimlar hisoboti' },
   { id: 'statistics',            label: 'Statistika', icon: BarChart3,     description: "Ko'rsatkichlar tahlili" },
   { id: 'flight-schedule-admin', label: 'Jadval',     icon: CalendarDays,  description: 'Reys jadvali' },
   { id: 'admin-profile',         label: 'Profil',     icon: User,          description: 'Shaxsiy sozlamalar' },

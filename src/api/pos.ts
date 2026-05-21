@@ -165,6 +165,24 @@ export interface PosTransactionUpdateResponse {
   message: string;
 }
 
+export interface EditPaymentRequest {
+  client_code: string;
+  flight_name: string;
+  payment_type: PaymentProvider;
+  note: string | null;
+  notification_id: number;
+}
+
+export interface EditPaymentResponse {
+  success: boolean;
+  notification_id: number;
+  client_code: string;
+  flight_name: string;
+  payment_type: string;
+  edited_count: number;
+  message: string;
+}
+
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 /**
@@ -303,6 +321,21 @@ export async function posUpdateDeliveryProofMethod(
   const res = await apiClient.patch<PosTransactionUpdateResponse>(
     `/api/v1/payments/transactions/${transactionId}/proof-delivery-method`,
     { delivery_proof_method: deliveryProofMethod, reason },
+    { headers: getAdminHeaders() },
+  );
+  return res.data;
+}
+
+/**
+ * POST /api/v1/payments/edit
+ *
+ * Edit payment type of an already-processed POS payment.
+ * Requires `pos:process` permission.
+ */
+export async function editPayment(data: EditPaymentRequest): Promise<EditPaymentResponse> {
+  const res = await apiClient.post<EditPaymentResponse>(
+    '/api/v1/payments/edit',
+    data,
     { headers: getAdminHeaders() },
   );
   return res.data;

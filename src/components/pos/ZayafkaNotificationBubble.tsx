@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, Receipt, CheckCheck, Loader2, Plane, Calendar, X, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -70,20 +71,45 @@ interface Props {
 }
 
 export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props) {
-  const [amount, setAmount] = useState<string>(
-    n.total_amount > 0 ? String(n.total_amount) : ""
-  );
+  const isPending = n.payment_status === "pending";
+  const isPaid = n.payment_status === "paid";
+  const isRejected = n.payment_status === "rejected";
+  const hasReceipt = Boolean(n.receipt_s3_key);
+  const meta = STATUS_META[n.payment_status] ?? STATUS_META.pending;
+
+  // Live UzPost price lookup — guarantees the pre-fill is the actual UzPost
+  // delivery fee for this delivery request, not whatever stale value happens
+  // to be cached in pos_notifications.total_amount.
+  const { data: livePrice } = useQuery({
+    queryKey: ["zayafka-uzpost-price", n.delivery_request_id],
+    queryFn: () => posNotificationService.getZayafkaUzpostPrice(n.delivery_request_id!),
+    enabled: isPending && n.delivery_request_id != null,
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const prefillAmount =
+    livePrice?.uzpost_price && livePrice.uzpost_price > 0
+      ? String(livePrice.uzpost_price)
+      : n.total_amount > 0
+        ? String(n.total_amount)
+        : "";
+
+  const [amount, setAmount] = useState<string>(prefillAmount);
   const [rejectComment, setRejectComment] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [receiptPreview, setReceiptPreview] = useState<{ url: string; contentType: string } | null>(null);
   const [loading, setLoading] = useState<"confirm" | "reject" | "edit" | "receipt" | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  const isPending = n.payment_status === "pending";
-  const isPaid = n.payment_status === "paid";
-  const isRejected = n.payment_status === "rejected";
-  const hasReceipt = Boolean(n.receipt_s3_key);
-  const meta = STATUS_META[n.payment_status] ?? STATUS_META.pending;
+  // Sync local amount state when the notification data or live UzPost price changes.
+  // Live price wins over stored total_amount so a drifted DB row can't fool the operator.
+  useEffect(() => {
+    if (!editMode) {
+      setAmount(prefillAmount);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillAmount, n.id, editMode]);
 
   const handleReceiptClick = async () => {
     if (loading === "receipt") return;

@@ -202,4 +202,19 @@ export const posNotificationService = {
     );
     return response.data;
   },
+
+  /**
+   * Fetch the live UzPost delivery price for a zayafka request.
+   * Used to pre-fill the ZayafkaNotificationBubble amount input so the
+   * operator always sees the true UzPost fee even if pos_notifications
+   * total_amount has drifted in production data.
+   */
+  getZayafkaUzpostPrice: async (
+    deliveryRequestId: number,
+  ): Promise<{ uzpost_price: number; currency: string }> => {
+    const response = await apiClient.get<{ uzpost_price: number; currency: string }>(
+      `${BASE}/zayafka/${deliveryRequestId}/uzpost-price`,
+    );
+    return response.data;
+  },
 };

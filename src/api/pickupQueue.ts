@@ -179,6 +179,7 @@ export interface PosPickupQueueUpdateRequest {
   note?: string | null;
   pickup_method?: PickupMethod;
   priority?: PickupQueuePriority;
+  status?: PickupQueueStatus;
 }
 
 // ─── API Functions ────────────────────────────────────────────────────────────

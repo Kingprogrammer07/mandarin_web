@@ -25,6 +25,7 @@ import {
   Calculator,
   ChevronDown,
   MessageSquare,
+  DollarSign,
 } from "lucide-react";
 import CalculatorModal from "@/components/modals/CalculatorModal";
 
@@ -34,8 +35,9 @@ import { posNotificationService, type PosNotificationItem } from "@/api/services
 import {
   getCashierLog,
   processBulkPayment,
+  getPaymentCards,
+  editPayment,
 } from "@/api/pos";
-import { getPaymentCards } from "@/api/pos";
 import {
   useEventSource,
   type BroadcastMessage,
@@ -46,6 +48,7 @@ import { formatDateTime } from "@/components/pos/PaymentNotificationDrawer";
 import type {
   PaymentProvider,
   CashierLogProvider,
+  EditPaymentRequest,
 } from "@/api/pos";
 import {
   searchClients,
@@ -352,6 +355,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [useWallet, setUseWallet] = useState(false);
   const [receivedInput, setReceivedInput] = useState("");
   const [flightDropdownOpen, setFlightDropdownOpen] = useState(false);
+  const [editNote, setEditNote] = useState("");
 
   // ── Notification-driven flight auto-select & info card ─────────────────────
   const pendingFlightRef = useRef<{ flight: string; clientCode: string; source: 'flight' | 'zayafka' } | null>(null);
@@ -410,6 +414,34 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     onError: (err: unknown) => {
       const e = err as { message?: string };
       toast.error(e.message ?? "Rad etishda xatolik");
+    },
+  });
+
+  // ── Edit payment mutation ─────────────────────────────────────────────────
+  const editMut = useMutation({
+    mutationFn: async (payload: EditPaymentRequest) => {
+      return editPayment(payload);
+    },
+    onSuccess: (result) => {
+      toast.success(result.message || "To'lov o'zgartirildi");
+      queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-notification-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-notification-tab-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["cashier-log"] });
+      // Refresh active notification to show updated values
+      if (clientInfo) {
+        void handleSearch(clientInfo.client_code);
+      }
+    },
+    onError: (err: unknown) => {
+      type PosError = { message?: string; data?: { detail?: { error?: string } | string } };
+      const apiErr = err as PosError;
+      const detail = apiErr?.data?.detail;
+      if (detail && typeof detail === "object" && detail.error) {
+        toast.error(detail.error);
+      } else {
+        toast.error(apiErr.message ?? "O'zgartirishda xatolik yuz berdi");
+      }
     },
   });
 
@@ -659,6 +691,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     setUseWallet(false);
     setLiveBalance(null);
     setActiveNotifData(null);
+    setEditNote("");
     pendingFlightRef.current = null;
 
     setTimeout(() => searchRef.current?.focus(), 50);
@@ -704,10 +737,19 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     if (flightItems.length > 0) {
       setSelectedIds(new Set(flightItems.map((c) => c.cargo_id)));
     } else if (source === "flight") {
-      // No unpaid cargo for this flight despite a "pending" notification —
-      // the notification is stale (cargo was already paid via a different code path).
-      setActiveNotifData(null);
-      toast.info("Bu to'lov allaqachon amalga oshirilgan ko'rinadi", { duration: 5000 });
+      // No unpaid cargo for this flight — check if we're in edit mode (paid notification)
+      const currentNotif = activeNotifRef.current;
+      if (currentNotif?.payment_status === "paid") {
+        // Edit mode: keep the notification active, pre-fill inputs, clear selections
+        setSelectedIds(new Set());
+        setReceivedInput(String(Math.round(currentNotif.amount_paid || 0)));
+        setEditNote("");
+      } else {
+        // No unpaid cargo for this flight despite a "pending" notification —
+        // the notification is stale (cargo was already paid via a different code path).
+        setActiveNotifData(null);
+        toast.info("Bu to'lov allaqachon amalga oshirilgan ko'rinadi", { duration: 5000 });
+      }
     }
     pendingFlightRef.current = null;
   }, [cargoData?.items, clientInfo]);
@@ -762,6 +804,22 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       pickup_priority: undefined,
       pickup_note: null,
       pickup_idempotency_key: null,
+    });
+  };
+
+  const handleEditSave = () => {
+    const notif = activeNotifRef.current;
+    if (!notif || !clientInfo) return;
+    if (!["cash", "click", "payme", "card"].includes(paymentType)) {
+      toast.error("Noto'g'ri to'lov turi");
+      return;
+    }
+    editMut.mutate({
+      client_code: clientInfo.client_code,
+      flight_name: notif.flight_name,
+      payment_type: paymentType,
+      note: editNote.trim() || null,
+      notification_id: notif.id,
     });
   };
 
@@ -872,6 +930,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
               />
             </div>
 
+            <button
+              onClick={() => onNavigate("admin-expenses")}
+              title="Rasxodlar"
+              className="p-2 rounded-xl text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/[0.08] transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+            </button>
             <button
               onClick={() => {onNavigate("admin-profile")}}
               title="Profil va Xavfsizlik"
@@ -1116,7 +1181,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                             ))}
                           </div>
                         </div>
-                      ) : cargos.length === 0 ? (
+                      ) : cargos.length === 0 && activeNotifData?.payment_status !== "paid" ? (
                         <div className="p-6 text-center">
                           <Package className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
                           <p className="text-[14px] font-medium text-gray-500 dark:text-gray-400">Qarzdorlik yo'q</p>
@@ -1129,7 +1194,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                           {/* Section title */}
                           <div className="flex items-center justify-between">
                             <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                              To'lovni tekshirish va tasdiqlash
+                              {activeNotifData?.payment_status === "paid"
+                                ? "To'lovni o'zgartirish (faqat to'lov turi va izoh)"
+                                : "To'lovni tekshirish va tasdiqlash"}
                             </p>
                             {activeNotifData && (
                               <button
@@ -1201,7 +1268,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                             {/* Received amount */}
                             <div className="flex-1 min-w-[140px]">
                               <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
-                                Qabul qilingan summa
+                                {activeNotifData?.payment_status === "paid" ? "To'langan summa" : "Qabul qilingan summa"}
                               </label>
                               <input
                                 type="text"
@@ -1214,7 +1281,8 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                 }}
                                 onFocus={(e) => e.target.select()}
                                 placeholder={String(Math.round(netAfterWallet)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
-                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white"
+                                disabled={activeNotifData?.payment_status === "paid"}
+                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                               />
                             </div>
 
@@ -1234,73 +1302,81 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                               </select>
                             </div>
 
-                            {/* Flight dropdown */}
+                            {/* Flight dropdown (or read-only flight name in edit mode) */}
                             <div className="flex-1 min-w-[200px] relative">
                               <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
                                 Reys
                               </label>
-                              <button
-                                type="button"
-                                onClick={() => setFlightDropdownOpen((p) => !p)}
-                                className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-left transition-all hover:border-gray-300 dark:hover:border-white/[0.15]"
-                              >
-                                <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                                  {(() => {
-                                    if (selectedIds.size === 0) return "Reys tanlang";
-                                    const selectedArr = cargos.filter((c) => selectedIds.has(c.cargo_id));
-                                    const uniqueFlights = [...new Set(selectedArr.map((c) => c.flight_name))];
-                                    if (uniqueFlights.length === 1) return uniqueFlights[0];
-                                    if (selectedIds.size === cargos.length) return "Barcha reyslar";
-                                    return `${selectedIds.size} ta yuk`;
-                                  })()}
-                                </span>
-                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${flightDropdownOpen ? "rotate-180" : ""}`} />
-                              </button>
-                              <AnimatePresence>
-                                {flightDropdownOpen && (
-                                  <motion.div
-                                    initial={{ opacity: 0, y: -4 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -4 }}
-                                    className="absolute z-10 left-0 mt-1 min-w-[320px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-lg overflow-hidden"
+                              {activeNotifData?.payment_status === "paid" ? (
+                                <div className="w-full px-3 py-2.5 bg-gray-100 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-semibold text-gray-700 dark:text-gray-300">
+                                  {activeNotifData.flight_name}
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFlightDropdownOpen((p) => !p)}
+                                    className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-left transition-all hover:border-gray-300 dark:hover:border-white/[0.15]"
                                   >
-                                    <div className="p-2 border-b border-gray-100 dark:border-white/[0.06]">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedIds(new Set(cargos.map(c => c.cargo_id)));
-                                        }}
-                                        className="w-full text-[12px] font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-lg px-2 py-1.5 transition-colors text-left"
+                                    <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 truncate">
+                                      {(() => {
+                                        if (selectedIds.size === 0) return "Reys tanlang";
+                                        const selectedArr = cargos.filter((c) => selectedIds.has(c.cargo_id));
+                                        const uniqueFlights = [...new Set(selectedArr.map((c) => c.flight_name))];
+                                        if (uniqueFlights.length === 1) return uniqueFlights[0];
+                                        if (selectedIds.size === cargos.length) return "Barcha reyslar";
+                                        return `${selectedIds.size} ta yuk`;
+                                      })()}
+                                    </span>
+                                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${flightDropdownOpen ? "rotate-180" : ""}`} />
+                                  </button>
+                                  <AnimatePresence>
+                                    {flightDropdownOpen && (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: -4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -4 }}
+                                        className="absolute z-10 left-0 mt-1 min-w-[320px] bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-lg overflow-hidden"
                                       >
-                                        Hammasini tanlash
-                                      </button>
-                                    </div>
-                                    <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
-                                      {flightGroups.map(({ flightName, items, totalWeight, totalAmount }) => {
-                                        const allSelected = items.every(c => selectedIds.has(c.cargo_id));
-                                        return (
+                                        <div className="p-2 border-b border-gray-100 dark:border-white/[0.06]">
                                           <button
-                                            key={flightName}
                                             type="button"
-                                            onClick={() => toggleFlight(flightName)}
-                                            className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors text-left"
+                                            onClick={() => {
+                                              setSelectedIds(new Set(cargos.map(c => c.cargo_id)));
+                                            }}
+                                            className="w-full text-[12px] font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-lg px-2 py-1.5 transition-colors text-left"
                                           >
-                                            <div className="flex items-center gap-2.5">
-                                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${allSelected ? "bg-orange-500 border-orange-500" : "border-gray-300 dark:border-gray-600"}`}>
-                                                {allSelected && <CheckCheck className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
-                                              </div>
-                                              <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{flightName}</span>
-                                            </div>
-                                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                              {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(2)} kg · {formatCurrencySum(totalAmount)}
-                                            </span>
+                                            Hammasini tanlash
                                           </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
+                                        </div>
+                                        <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+                                          {flightGroups.map(({ flightName, items, totalWeight, totalAmount }) => {
+                                            const allSelected = items.every(c => selectedIds.has(c.cargo_id));
+                                            return (
+                                              <button
+                                                key={flightName}
+                                                type="button"
+                                                onClick={() => toggleFlight(flightName)}
+                                                className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors text-left"
+                                              >
+                                                <div className="flex items-center gap-2.5">
+                                                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${allSelected ? "bg-orange-500 border-orange-500" : "border-gray-300 dark:border-gray-600"}`}>
+                                                    {allSelected && <CheckCheck className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                                                  </div>
+                                                  <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{flightName}</span>
+                                                </div>
+                                                <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                                  {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(2)} kg · {formatCurrencySum(totalAmount)}
+                                                </span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </>
+                              )}
                             </div>
 
                             {/* Note */}
@@ -1311,14 +1387,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                               <textarea
                                 rows={1}
                                 placeholder="Izoh..."
+                                value={editNote}
+                                onChange={(e) => setEditNote(e.target.value)}
                                 className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white placeholder:text-gray-400 resize-none"
                               />
                             </div>
                           </div>
 
-                          {/* Card selector — shown when paymentType === "card" */}
+                          {/* Card selector — shown when paymentType === "card" (hide in edit mode) */}
                           <AnimatePresence>
-                            {paymentType === "card" && (
+                            {paymentType === "card" && activeNotifData?.payment_status !== "paid" && (
                               <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
@@ -1374,8 +1452,8 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                             )}
                           </AnimatePresence>
 
-                          {/* Wallet toggle — keep but smaller */}
-                          {displayBalance > 0 && (
+                          {/* Wallet toggle — hide in edit mode */}
+                          {displayBalance > 0 && activeNotifData?.payment_status !== "paid" && (
                             <button
                               type="button"
                               onClick={() => setUseWallet((p) => !p)}
@@ -1416,7 +1494,8 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                             </button>
                           )}
 
-                          {/* Amount breakdown */}
+                          {/* Amount breakdown — hide in edit mode */}
+                          {activeNotifData?.payment_status !== "paid" && (
                           <div className="pt-1 border-t border-gray-100 dark:border-white/[0.06] space-y-1">
                             <div className="flex items-center justify-between text-[12px]">
                               <span className="text-gray-500 dark:text-gray-400">{selectedIds.size} ta yuk jami:</span>
@@ -1439,9 +1518,24 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                               <span className="font-black text-orange-600 dark:text-orange-400">{formatCurrencySum(netAfterWallet)}</span>
                             </div>
                           </div>
+                          )}
 
-                          {/* Confirm + Reject row */}
-                          {activeNotifData ? (
+                          {/* Confirm / Edit / Reject row */}
+                          {activeNotifData?.payment_status === "paid" ? (
+                            <motion.button
+                              onClick={handleEditSave}
+                              disabled={editMut.isPending}
+                              whileTap={{ scale: 0.97 }}
+                              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[15px] rounded-2xl shadow-lg shadow-amber-500/25 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                            >
+                              {editMut.isPending ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-5 h-5" />
+                              )}
+                              O'ZGARTIRISH
+                            </motion.button>
+                          ) : activeNotifData ? (
                             <div className="flex gap-2">
                               <motion.button
                                 onClick={handleOpenConfirm}
