@@ -40,6 +40,8 @@ import {
   WalletCards,
   Search,
   ExternalLink,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import {
   paymentService,
@@ -306,6 +308,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isNbuInitiating, setIsNbuInitiating] = useState(false);
+  const [chargingCardId, setChargingCardId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Detect mobile (≤ 768px) for drawer vs modal
@@ -409,6 +412,97 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     enabled: isOpen,
   });
   const nbuEnabled = nbuStatus?.enabled === true;
+
+  // Saved cards list
+  const { data: nbuCardsData } = useQuery({
+    queryKey: ['nbu-cards'],
+    queryFn: nbuPaymentService.listCards,
+    staleTime: 60_000,
+    enabled: isOpen && nbuEnabled,
+  });
+
+  const nbuChargeMutation = useMutation({
+    mutationFn: nbuPaymentService.chargeSavedCard,
+    onSuccess: (data) => {
+      if (data.status === 'SUCCESS') {
+        toast.success(t('nbu.cards.chargeSuccess'));
+        queryClient.invalidateQueries({ queryKey: ['payment-history'] });
+        queryClient.invalidateQueries({ queryKey: ['payment-available-flights'] });
+        handleClose();
+      } else {
+        toast.error(data.error || t('nbu.cards.chargeFailed'));
+      }
+      setChargingCardId(null);
+    },
+    onError: (err: unknown) => {
+      const error = err as { status?: number; data?: { detail?: string | { message?: string } }; message?: string };
+      const status = error?.status ?? 0;
+      let msg: string;
+      switch (status) {
+        case 400:
+          msg = t('nbu.error.400');
+          break;
+        case 404:
+          msg = t('nbu.error.404');
+          break;
+        case 409:
+          msg = t('nbu.error.409');
+          break;
+        case 422: {
+          const detail = error?.data?.detail;
+          if (typeof detail === 'object' && detail?.message) {
+            msg = detail.message;
+          } else if (typeof detail === 'string' && detail) {
+            msg = detail;
+          } else {
+            msg = t('nbu.error.422');
+          }
+          break;
+        }
+        case 429:
+          msg = t('nbu.error.429');
+          break;
+        case 502:
+          msg = t('nbu.error.502');
+          break;
+        case 503:
+          msg = t('nbu.error.503');
+          break;
+        default:
+          msg = error?.message || t('makePayment.errorOccurred');
+      }
+      toast.error(msg);
+      setChargingCardId(null);
+    },
+  });
+
+  const nbuBindCardMutation = useMutation({
+    mutationFn: nbuPaymentService.bindCard,
+    onSuccess: (data) => {
+      const paymentUrl = data.payment_url;
+      if (paymentUrl) {
+        if (window.Telegram?.WebApp?.openLink) {
+          window.Telegram.WebApp.openLink(paymentUrl);
+        } else {
+          window.location.href = paymentUrl;
+        }
+      }
+    },
+    onError: () => {
+      toast.error(t('makePayment.errorOccurred'));
+    },
+  });
+
+  const nbuDeleteCardMutation = useMutation({
+    mutationFn: nbuPaymentService.deleteCard,
+    onSuccess: () => {
+      toast.success(t('nbu.cards.deleteSuccess'));
+      queryClient.invalidateQueries({ queryKey: ['nbu-cards'] });
+    },
+    onError: () => {
+      toast.error(t('makePayment.errorOccurred'));
+    },
+  });
 
   // ---- Computed amounts ----
   const payableAmount = useMemo(() => {
@@ -611,6 +705,28 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     }
   }, [selectedFlightName, t]);
 
+  const handleChargeCard = useCallback(
+    (cardId: number) => {
+      if (!selectedFlightName) return;
+      setChargingCardId(cardId);
+      nbuChargeMutation.mutate({ card_id: cardId, flight_name: selectedFlightName });
+    },
+    [selectedFlightName, nbuChargeMutation],
+  );
+
+  const handleBindCard = useCallback(() => {
+    nbuBindCardMutation.mutate();
+  }, [nbuBindCardMutation]);
+
+  const handleDeleteCard = useCallback(
+    (cardId: number) => {
+      if (window.confirm(t('nbu.cards.deleteConfirm'))) {
+        nbuDeleteCardMutation.mutate(cardId);
+      }
+    },
+    [nbuDeleteCardMutation, t],
+  );
+
   const handleConfirm = useCallback(() => {
     if (!selectedFlightName) return;
 
@@ -799,8 +915,93 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
     const walletCoversAll = details.wallet_balance >= payableAmount && payableAmount > 0;
 
+    const savedCards = nbuCardsData?.items ?? [];
+    const hasSavedCards = savedCards.length > 0;
+
     return (
       <div className="space-y-5">
+        {/* ---- Saved Cards Section ---- */}
+        {nbuEnabled && (
+          <div className="space-y-3">
+            {hasSavedCards && (
+              <>
+                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                  {t('nbu.cards.title')}
+                </p>
+                {savedCards.map((card) => (
+                  <div
+                    key={card.id}
+                    className="flex items-center gap-3 p-3.5 rounded-xl
+                      bg-white dark:bg-white/[0.04]
+                      border border-gray-200 dark:border-white/10
+                      shadow-sm"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-500/10 flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                        {card.card_masked ?? t('nbu.cards.unknown')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleChargeCard(card.id)}
+                        disabled={chargingCardId === card.id || nbuChargeMutation.isPending}
+                        className="px-3 py-2 rounded-lg text-xs font-bold
+                          bg-sky-500 hover:bg-sky-600 text-white
+                          active:scale-95 transition-all
+                          disabled:opacity-60 disabled:cursor-not-allowed
+                          whitespace-nowrap"
+                      >
+                        {chargingCardId === card.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin inline" />
+                        ) : (
+                          t('nbu.cards.payWithCard')
+                        )}
+                      </motion.button>
+                      <button
+                        onClick={() => handleDeleteCard(card.id)}
+                        disabled={nbuDeleteCardMutation.isPending}
+                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10
+                          text-gray-400 dark:text-gray-500
+                          hover:text-red-500 dark:hover:text-red-400
+                          active:scale-90 transition-all
+                          disabled:opacity-60"
+                        aria-label={t('nbu.cards.deleteConfirm')}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleBindCard}
+              disabled={nbuBindCardMutation.isPending}
+              className="w-full flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-sm
+                bg-white dark:bg-white/[0.04]
+                border border-dashed border-gray-300 dark:border-white/15
+                text-gray-700 dark:text-gray-300
+                hover:border-amber-400 dark:hover:border-amber-500/40
+                hover:bg-amber-50 dark:hover:bg-amber-500/5
+                active:scale-[0.97] transition-all
+                disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {nbuBindCardMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {t('nbu.cards.bindNew')}
+            </motion.button>
+          </div>
+        )}
+
         {/* ---- Big Amount Display ---- */}
         <div className="text-center py-5 px-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/[0.08] dark:to-orange-500/[0.05] border border-amber-300/70 dark:border-amber-500/25 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-amber-700/80 dark:text-amber-400/70 mb-1.5">

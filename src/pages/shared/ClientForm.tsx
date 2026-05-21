@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import StatusAnimation from '@/components/StatusAnimation';
 import {
   createClient, updateClient, deleteClient as deleteClientApi,
+  getClient, getPassportImagesMetadata,
   type Client, type ClientCreateRequest, previewClientCode,
 } from '@/api/services/client';
 import { regions, DISTRICTS } from '@/lib/validation';
@@ -127,7 +128,6 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
         setSubmitMessage(t('client.messages.loadingEdit'));
         setIsLoadingImages(true);
 
-        const { getClient, getPassportImagesMetadata } = await import('@/api/services/client');
         const [clientRes, imagesMetadataRes] = await Promise.allSettled([
           getClient(clientId),
           getPassportImagesMetadata(clientId, true),

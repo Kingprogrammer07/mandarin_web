@@ -50,6 +50,7 @@ const FlightNotificationPage = lazy(() => import("./pages/admin/FlightNotificati
 const ExpensesPage = lazy(() => import("./pages/admin/ExpensesPage"));
 const PaymentNbuSuccess = lazy(() => import("./pages/payment/PaymentNbuSuccess"));
 const PaymentNbuFailure = lazy(() => import("./pages/payment/PaymentNbuFailure"));
+const SavedCardsPage = lazy(() => import("./pages/payment/SavedCardsPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,8 @@ type Page =
   | "admin-flight-notifications"
   | "admin-expenses"
   | "payment_nbu_success"
-  | "payment_nbu_failure";
+  | "payment_nbu_failure"
+  | "saved_cards";
 
 interface RouteInfo {
   page: Page;
@@ -97,7 +99,7 @@ interface RouteInfo {
 const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   user: {
     default: "user-home",
-    allowed: ["user-home", "user-profile", "user-history", "user-reports"],
+    allowed: ["user-home", "user-profile", "user-history", "user-reports", "saved_cards"],
   },
   worker: {
     default: "flights",
@@ -141,6 +143,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-delivery-request",
       "admin-flight-notifications",
       "admin-expenses",
+      "saved_cards",
     ],
   },
   "super-admin": {
@@ -172,6 +175,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-delivery-request",
       "admin-flight-notifications",
       "admin-expenses",
+      "saved_cards",
     ],
   },
   manager: {
@@ -339,6 +343,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/pickup-tv") return { page: "pickup-tv" };
   if (path === "/payment/nbu/success") return { page: "payment_nbu_success" };
   if (path === "/payment/nbu/failure") return { page: "payment_nbu_failure" };
+  if (path === "/payment/nbu/cards") return { page: "saved_cards" };
 
   return { page: "login" };
 }
@@ -957,6 +962,10 @@ function AppContent() {
               onNavigateHome={() => navigateToPage("user-home")}
               onRetry={() => navigateToPage("user-home")}
             />
+          )}
+
+          {currentPage === "saved_cards" && (
+            <SavedCardsPage onBack={() => navigateToPage("user-home")} />
           )}
         </main>
       )}
