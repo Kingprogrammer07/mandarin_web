@@ -182,7 +182,8 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
     window.location.pathname === '/pos' ||
     window.location.pathname.startsWith('/flights') ||
     window.location.pathname.startsWith('/statistics') ||
-    window.location.pathname === '/pickup-tv';
+    window.location.pathname === '/pickup-tv' ||
+    window.location.pathname.startsWith('/payment/nbu');
 
   const [isValidating, setIsValidating] = useState(!isBrowserRoute);
   const [isValid, setIsValid] = useState(isBrowserRoute);
