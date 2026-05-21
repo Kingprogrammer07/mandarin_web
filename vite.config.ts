@@ -32,7 +32,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     allowedHosts: [
-      "landscape-slam-boneless.ngrok-free.dev"
+      "huff-nape-expiring.ngrok-free.dev"
     ],
   },
 })

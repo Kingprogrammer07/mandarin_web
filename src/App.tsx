@@ -15,7 +15,9 @@ import { TopProgressBar } from "./components/ui/TopProgressBar";
 import StatusAnimation from "./components/StatusAnimation";
 import { Skeleton } from "./components/ui/skeleton";
 import MaintenancePage from "./components/MaintenancePage";
+import MaintenanceOverlay from "./components/system/MaintenanceOverlay";
 import { useHealthCheck } from "./hooks/useHealthCheck";
+import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
 
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
@@ -46,6 +48,8 @@ const PickupQueueTVPage = lazy(() => import("./pages/shared/PickupQueueTVPage"))
 const AdminDeliveryRequestPage = lazy(() => import("./pages/admin/AdminDeliveryRequestPage"));
 const FlightNotificationPage = lazy(() => import("./pages/admin/FlightNotificationPage"));
 const ExpensesPage = lazy(() => import("./pages/admin/ExpensesPage"));
+const PaymentNbuSuccess = lazy(() => import("./pages/payment/PaymentNbuSuccess"));
+const PaymentNbuFailure = lazy(() => import("./pages/payment/PaymentNbuFailure"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +82,9 @@ type Page =
   | "pickup-tv"
   | "admin-delivery-request"
   | "admin-flight-notifications"
-  | "admin-expenses";
+  | "admin-expenses"
+  | "payment_nbu_success"
+  | "payment_nbu_failure";
 
 interface RouteInfo {
   page: Page;
@@ -189,7 +195,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
 
 const GUEST_PAGES: Page[] = ["login", "admin-login", "register"];
 const USER_PAGES: Page[] = ["user-profile", "user-home", "user-reports", "user-history"];
-const PUBLIC_PAGES: Page[] = ["pickup-tv"];
+const PUBLIC_PAGES: Page[] = ["pickup-tv", "payment_nbu_success", "payment_nbu_failure"];
 
 function isGuestPage(page: Page): boolean {
   return GUEST_PAGES.includes(page);
@@ -331,6 +337,8 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/pos") return { page: "pos-dashboard" };
   if (path === "/admin/expenses") return { page: "admin-expenses" };
   if (path === "/pickup-tv") return { page: "pickup-tv" };
+  if (path === "/payment/nbu/success") return { page: "payment_nbu_success" };
+  if (path === "/payment/nbu/failure") return { page: "payment_nbu_failure" };
 
   return { page: "login" };
 }
@@ -350,6 +358,8 @@ function AppContent() {
 
   const isMaintenanceMode = useMaintenanceStore((s) => s.isMaintenanceMode);
   useHealthCheck();
+
+  const { isMaintenance, isAdmin: isMaintenanceAdmin } = useMaintenanceWatcher();
 
   // ── Core routing ─────────────────────────────────────────────────────────
 
@@ -681,9 +691,27 @@ function AppContent() {
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin;
+  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin;
+
+  if (showMaintenanceOverlay) {
+    return (
+      <>
+        {isMaintenanceMode && <MaintenancePage />}
+        <MaintenanceOverlay />
+        <Toaster position="top-center" richColors />
+      </>
+    );
+  }
+
   return (
     <>
     {isMaintenanceMode && <MaintenancePage />}
+    {showAdminMaintenanceBanner && (
+      <div className="fixed top-0 left-0 right-0 z-[9998] h-9 flex items-center justify-center bg-amber-500/90 text-white text-xs font-bold px-4 shadow-md">
+        {t('maintenance.adminBanner')}
+      </div>
+    )}
     {/* Fixed progress bar: shows during auth check, lazy-page transitions, and Suspense fallback */}
     {(isTransitioning || isCheckingAuth) && <TopProgressBar />}
     {loginBootstrapStatus !== "idle" && (
@@ -699,6 +727,8 @@ function AppContent() {
     )}
     <div
       className={`min-h-screen relative overflow-hidden transition-colors duration-300 ${
+        showAdminMaintenanceBanner ? 'pt-9' : ''
+      } ${
         isAdminArea
           ? "bg-[#f5f5f4] dark:bg-[#09090b]"
           : "bg-[#f8fafc] dark:bg-[#06080d]"
@@ -914,6 +944,19 @@ function AppContent() {
 
           {currentPage === "user-history" && (
             <UserHistoryPage onBack={() => navigateToPage("user-home")} />
+          )}
+
+          {currentPage === "payment_nbu_success" && (
+            <PaymentNbuSuccess
+              onNavigateHome={() => navigateToPage("user-home")}
+            />
+          )}
+
+          {currentPage === "payment_nbu_failure" && (
+            <PaymentNbuFailure
+              onNavigateHome={() => navigateToPage("user-home")}
+              onRetry={() => navigateToPage("user-home")}
+            />
           )}
         </main>
       )}

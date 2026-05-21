@@ -46,6 +46,7 @@ import {
   type AvailableFlightItem,
   type PaymentLinkItem,
 } from '@/api/services/paymentService';
+import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
@@ -304,6 +305,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [selectedTrackCode, setSelectedTrackCode] = useState<string | null>(null);
   const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
+  const [isNbuInitiating, setIsNbuInitiating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Detect mobile (≤ 768px) for drawer vs modal
@@ -398,6 +400,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   });
   
   const partialAllowed = details?.partial_allowed !== false;
+
+  // NBU status probe
+  const { data: nbuStatus } = useQuery({
+    queryKey: ['nbu-status'],
+    queryFn: nbuPaymentService.getStatus,
+    staleTime: 5 * 60_000,
+    enabled: isOpen,
+  });
+  const nbuEnabled = nbuStatus?.enabled === true;
 
   // ---- Computed amounts ----
   const payableAmount = useMemo(() => {
@@ -545,6 +556,60 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     },
     [handleFileSelect],
   );
+
+  const handleNbuPayment = useCallback(async () => {
+    if (!selectedFlightName) return;
+    setIsNbuInitiating(true);
+    try {
+      const response = await nbuPaymentService.init({ flight_name: selectedFlightName });
+      const paymentUrl = response.payment_url;
+      if (window.Telegram?.WebApp?.openLink) {
+        window.Telegram.WebApp.openLink(paymentUrl);
+      } else {
+        window.location.href = paymentUrl;
+      }
+    } catch (err: unknown) {
+      const error = err as { status?: number; data?: { detail?: string | { message?: string } }; message?: string };
+      const status = error?.status ?? 0;
+      let msg: string;
+      switch (status) {
+        case 400:
+          msg = t('nbu.error.400');
+          break;
+        case 404:
+          msg = t('nbu.error.404');
+          break;
+        case 409:
+          msg = t('nbu.error.409');
+          break;
+        case 422: {
+          const detail = error?.data?.detail;
+          if (typeof detail === 'object' && detail?.message) {
+            msg = detail.message;
+          } else if (typeof detail === 'string' && detail) {
+            msg = detail;
+          } else {
+            msg = t('nbu.error.422');
+          }
+          break;
+        }
+        case 429:
+          msg = t('nbu.error.429');
+          break;
+        case 502:
+          msg = t('nbu.error.502');
+          break;
+        case 503:
+          msg = t('nbu.error.503');
+          break;
+        default:
+          msg = error?.message || t('makePayment.errorOccurred');
+      }
+      toast.error(msg);
+    } finally {
+      setIsNbuInitiating(false);
+    }
+  }, [selectedFlightName, t]);
 
   const handleConfirm = useCallback(() => {
     if (!selectedFlightName) return;
@@ -1065,6 +1130,28 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           >
             <Wallet className="w-5 h-5" />
             {t('makePayment.payWallet')}
+          </motion.button>
+        )}
+
+        {/* ---- NBU Online Payment (primary CTA when enabled) ---- */}
+        {nbuEnabled && (
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleNbuPayment}
+            disabled={isNbuInitiating}
+            className="w-full h-16 rounded-2xl font-black text-[16px]
+              bg-gradient-to-r from-sky-500 to-cyan-500
+              hover:from-sky-600 hover:to-cyan-600
+              text-white shadow-lg shadow-sky-500/20
+              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
+              disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isNbuInitiating ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <CreditCard className="w-5 h-5" />
+            )}
+            {t('nbu.payOnlineNbu')}
           </motion.button>
         )}
 

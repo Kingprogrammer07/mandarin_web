@@ -74,6 +74,7 @@ export interface PaymentBreakdown {
   payme: number;
   cash: number;
   card: number;
+  nbu: number;
 }
 
 export interface TransactionHistoryItem {

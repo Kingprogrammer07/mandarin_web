@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Landmark,
 } from 'lucide-react';
 import { paymentService, type TransactionHistoryItem } from '@/api/services/paymentService';
 import { formatTashkentDateTime } from '@/lib/format';
@@ -66,9 +67,12 @@ const getPaymentTypeLabel = (type: string | null | undefined, t: TFunction) => {
   return t('paymentHistory.paymentTypes.unknown', { type });
 };
 
-const BreakdownBadge = ({ label, value }: { label: string; value: number }) => (
+const BreakdownBadge = ({ label, value, icon: Icon }: { label: string; value: number; icon?: typeof Landmark }) => (
   <div className="flex items-center justify-between rounded-2xl bg-white/70 dark:bg-white/5 border border-white/30 dark:border-white/10 px-2.5 sm:px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200">
-    <span className="truncate mr-1">{label}</span>
+    <span className="truncate mr-1 flex items-center gap-1">
+      {Icon && <Icon className="w-3 h-3 text-gray-400 dark:text-gray-500" />}
+      {label}
+    </span>
     <span className="text-xs sm:text-sm text-gray-900 dark:text-white whitespace-nowrap">{value.toLocaleString('uz-UZ')}</span>
   </div>
 );
@@ -86,8 +90,9 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
       { key: 'payme', label: t('paymentHistory.breakdownTypes.payme'), value: item.breakdown.payme },
       { key: 'cash', label: t('paymentHistory.breakdownTypes.cash'), value: item.breakdown.cash },
       { key: 'card', label: t('paymentHistory.breakdownTypes.card'), value: item.breakdown.card },
-    ],
-    [item.breakdown.click, item.breakdown.payme, item.breakdown.cash, item.breakdown.card, t],
+      { key: 'nbu', label: t('paymentHistory.breakdownTypes.nbu'), value: item.breakdown.nbu, icon: Landmark },
+    ].filter((entry) => entry.value > 0),
+    [item.breakdown.click, item.breakdown.payme, item.breakdown.cash, item.breakdown.card, item.breakdown.nbu, t],
   );
 
   return (
@@ -159,7 +164,7 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
           </div>
           <div className="grid grid-cols-2 gap-2">
             {breakdownEntries.map((entry) => (
-              <BreakdownBadge key={entry.key} label={entry.label} value={entry.value} />
+              <BreakdownBadge key={entry.key} label={entry.label} value={entry.value} icon={entry.icon} />
             ))}
           </div>
         </div>

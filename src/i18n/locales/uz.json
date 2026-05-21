@@ -1409,7 +1409,8 @@
             "click": "Click",
             "payme": "Payme",
             "cash": "Naqd",
-            "card": "Karta"
+            "card": "Karta",
+            "nbu": "NBU"
         },
         "paymentTypes": {
             "cash": "Naqd",
@@ -1637,6 +1638,35 @@
             "continue": "Davom etish",
             "changeClient": "Boshqa mijoz"
         }
+    },
+    "nbu": {
+        "success": {
+            "title": "To'lov muvaffaqiyatli amalga oshirildi",
+            "body": "To'lovingiz tasdiqlandi. Hisobingizga 1–2 daqiqada tushadi. Ortga qaytishingiz mumkin.",
+            "homeButton": "Bosh sahifa"
+        },
+        "failure": {
+            "title": "To'lov amalga oshmadi",
+            "body": "To'lovingiz qabul qilinmadi yoki bekor qilindi. Qayta urinib ko'rishingiz mumkin.",
+            "retryButton": "Qayta urinish",
+            "homeButton": "Bosh sahifa"
+        },
+        "payOnlineNbu": "Onlayn to'lov (NBU)",
+        "error": {
+            "400": "Mijoz kodi tayinlanmagan",
+            "404": "Bu reys uchun yuk topilmadi",
+            "409": "Bu reys uchun to'lov allaqachon to'langan",
+            "422": "Summa juda kichik (min 1000 UZS)",
+            "429": "Tizim band, biroz kutib turing",
+            "502": "Bank xizmati hozir mavjud emas, keyinroq urinib ko'ring",
+            "503": "Onlayn to'lov vaqtincha o'chirilgan"
+        }
+    },
+    "maintenance": {
+        "title": "Texnik ishlar olib borilmoqda",
+        "body": "Hozir tizimda texnik xizmat ko'rsatilyapti. Iltimos biroz vaqtdan keyin qayta urinib ko'ring. Vaqt ko'p ketmaydi — rahmat sabringiz uchun.",
+        "autoRecheck": "Holatni har 30 sekundda avtomatik tekshiramiz",
+        "adminBanner": "⚠️ Texnik rejim yoqilgan — siz admin sifatida ko'ryapsiz"
     },
     "beta": {
         "badge": "Beta",
