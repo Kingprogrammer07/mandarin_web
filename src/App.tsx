@@ -696,15 +696,17 @@ function AppContent() {
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  const isAdminRoute =
+  const isExemptFromMaintenance =
     window.location.pathname.startsWith('/admin') ||
     window.location.pathname === '/pos' ||
     window.location.pathname.startsWith('/flights') ||
     window.location.pathname.startsWith('/statistics') ||
-    window.location.pathname === '/pickup-tv';
+    window.location.pathname === '/pickup-tv' ||
+    window.location.pathname === '/payment/nbu/success' ||
+    window.location.pathname === '/payment/nbu/failure';
 
-  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && !isAdminRoute;
-  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && !isAdminRoute;
+  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && !isExemptFromMaintenance;
+  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && !isExemptFromMaintenance;
 
   if (showMaintenanceOverlay) {
     return (

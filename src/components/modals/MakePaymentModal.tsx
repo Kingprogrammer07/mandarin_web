@@ -52,6 +52,7 @@ import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
+import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
 
 // ============================================================================
 // Helpers
@@ -310,6 +311,16 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [isNbuInitiating, setIsNbuInitiating] = useState(false);
   const [chargingCardId, setChargingCardId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { isMaintenance } = useMaintenanceWatcher();
+
+  // Close modal if maintenance kicks in while it's open (prevents stuck payments)
+  useEffect(() => {
+    if (isOpen && isMaintenance) {
+      handleClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMaintenance]);
 
   // Detect mobile (≤ 768px) for drawer vs modal
   const [isMobile, setIsMobile] = useState(
