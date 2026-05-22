@@ -51,6 +51,7 @@ const ExpensesPage = lazy(() => import("./pages/admin/ExpensesPage"));
 const PaymentNbuSuccess = lazy(() => import("./pages/payment/PaymentNbuSuccess"));
 const PaymentNbuFailure = lazy(() => import("./pages/payment/PaymentNbuFailure"));
 const SavedCardsPage = lazy(() => import("./pages/payment/SavedCardsPage"));
+const SystemSettingsPage = lazy(() => import("./pages/admin/SystemSettingsPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,8 @@ type Page =
   | "admin-expenses"
   | "payment_nbu_success"
   | "payment_nbu_failure"
-  | "saved_cards";
+  | "saved_cards"
+  | "system-settings";
 
 interface RouteInfo {
   page: Page;
@@ -144,6 +146,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-flight-notifications",
       "admin-expenses",
       "saved_cards",
+      "system-settings",
     ],
   },
   "super-admin": {
@@ -176,6 +179,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-flight-notifications",
       "admin-expenses",
       "saved_cards",
+      "system-settings",
     ],
   },
   manager: {
@@ -289,6 +293,7 @@ function getPathForPage(
   if (page === "admin-delivery-request") return "/admin/delivery-request";
   if (page === "pickup-tv") return "/pickup-tv";
   if (page === "admin-expenses") return "/admin/expenses";
+  if (page === "system-settings") return "/admin/system-settings";
   if (page === "admin-flight-notifications" && flightName)
     return `/flights/${encodeURIComponent(flightName)}/notifications`;
   return "/auth/login";
@@ -344,6 +349,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/payment/nbu/success") return { page: "payment_nbu_success" };
   if (path === "/payment/nbu/failure") return { page: "payment_nbu_failure" };
   if (path === "/payment/nbu/cards") return { page: "saved_cards" };
+  if (path === "/admin/system-settings") return { page: "system-settings" };
 
   return { page: "login" };
 }
@@ -798,6 +804,7 @@ function AppContent() {
           {currentPage === "flight-schedule-admin" && <FlightScheduleAdminPage />}
           {currentPage === "admin-delivery-request" && <AdminDeliveryRequestPage />}
           {currentPage === "admin-expenses" && <ExpensesPage />}
+          {currentPage === "system-settings" && <SystemSettingsPage />}
         </AdminLayout>
       ) : isPOSPage ? (
         <POSDashboard

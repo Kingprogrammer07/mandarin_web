@@ -5,9 +5,54 @@ export interface MaintenanceStatusResponse {
   is_admin: boolean;
 }
 
+export interface MaintenanceToggleRequest {
+  active: boolean;
+}
+
+export interface NbuStatusResponse {
+  enabled: boolean;
+}
+
+export interface NbuToggleRequest {
+  active: boolean;
+}
+
+export interface RedisInfoResponse {
+  info: string;
+}
+
+export interface RedisClientsResponse {
+  clients: string;
+}
+
 export const systemService = {
   async getMaintenanceStatus(): Promise<MaintenanceStatusResponse> {
     const { data } = await apiClient.get<MaintenanceStatusResponse>('/api/v1/system/maintenance-status');
+    return data;
+  },
+
+  async toggleMaintenance(body: MaintenanceToggleRequest): Promise<MaintenanceStatusResponse> {
+    const { data } = await apiClient.post<MaintenanceStatusResponse>('/api/v1/system/maintenance', body);
+    return data;
+  },
+
+  async getNbuStatus(): Promise<NbuStatusResponse> {
+    const { data } = await apiClient.get<NbuStatusResponse>('/api/v1/system/nbu-status');
+    return data;
+  },
+
+  async toggleNbu(body: NbuToggleRequest): Promise<NbuStatusResponse> {
+    const { data } = await apiClient.post<NbuStatusResponse>('/api/v1/system/nbu', body);
+    return data;
+  },
+
+  async getRedisInfo(): Promise<RedisInfoResponse> {
+    const { data } = await apiClient.get<RedisInfoResponse>('/api/v1/system/redis-info');
+    return data;
+  },
+
+  async getRedisClients(): Promise<RedisClientsResponse> {
+    const { data } = await apiClient.get<RedisClientsResponse>('/api/v1/system/redis-clients');
     return data;
   },
 };
