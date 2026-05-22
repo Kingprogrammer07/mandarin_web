@@ -665,6 +665,7 @@ function AppContent() {
     "flight-schedule-admin",
     "admin-delivery-request",
     "admin-expenses",
+    "system-settings",
   ].includes(currentPage);
 
   // Only roles with admin-accounts (admin, super-admin) get the full AdminLayout shell.
@@ -982,6 +983,10 @@ function AppContent() {
 
           {currentPage === "saved_cards" && (
             <SavedCardsPage onBack={() => navigateToPage("user-home")} />
+          )}
+
+          {currentPage === "system-settings" && (
+            <SystemSettingsPage />
           )}
         </main>
       )}
