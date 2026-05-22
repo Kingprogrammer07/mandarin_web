@@ -40,8 +40,6 @@ import {
   WalletCards,
   Search,
   ExternalLink,
-  Trash2,
-  Plus,
 } from 'lucide-react';
 import {
   paymentService,
@@ -487,33 +485,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     },
   });
 
-  const nbuBindCardMutation = useMutation({
-    mutationFn: nbuPaymentService.bindCard,
-    onSuccess: (data) => {
-      const paymentUrl = data.payment_url;
-      if (paymentUrl) {
-        if (window.Telegram?.WebApp?.openLink) {
-          window.Telegram.WebApp.openLink(paymentUrl);
-        } else {
-          window.location.href = paymentUrl;
-        }
-      }
-    },
-    onError: () => {
-      toast.error(t('makePayment.errorOccurred'));
-    },
-  });
-
-  const nbuDeleteCardMutation = useMutation({
-    mutationFn: nbuPaymentService.deleteCard,
-    onSuccess: () => {
-      toast.success(t('nbu.cards.deleteSuccess'));
-      queryClient.invalidateQueries({ queryKey: ['nbu-cards'] });
-    },
-    onError: () => {
-      toast.error(t('makePayment.errorOccurred'));
-    },
-  });
+  // Bind + delete saved cards live in `CardsManagerModal` (profile) — the
+  // payment surface intentionally focuses on completing the current payment
+  // rather than long-lived card management.
 
   // ---- Computed amounts ----
   const payableAmount = useMemo(() => {
@@ -725,19 +699,6 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     [selectedFlightName, nbuChargeMutation],
   );
 
-  const handleBindCard = useCallback(() => {
-    nbuBindCardMutation.mutate();
-  }, [nbuBindCardMutation]);
-
-  const handleDeleteCard = useCallback(
-    (cardId: number) => {
-      if (window.confirm(t('nbu.cards.deleteConfirm'))) {
-        nbuDeleteCardMutation.mutate(cardId);
-      }
-    },
-    [nbuDeleteCardMutation, t],
-  );
-
   const handleConfirm = useCallback(() => {
     if (!selectedFlightName) return;
 
@@ -931,85 +892,57 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
     return (
       <div className="space-y-5">
-        {/* ---- Saved Cards Section ---- */}
-        {nbuEnabled && (
+        {/* ---- Saved Cards Section ----
+            Only renders when the user already has at least one tokenised
+            card. Binding a new card is intentionally NOT offered inside the
+            payment flow — users add cards from `CardsManagerModal` (profile)
+            so this surface stays focused on completing the current payment.
+            Each row offers one-tap charge for the resolved payable amount. */}
+        {nbuEnabled && hasSavedCards && (
           <div className="space-y-3">
-            {hasSavedCards && (
-              <>
-                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                  {t('nbu.cards.title')}
-                </p>
-                {savedCards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="flex items-center gap-3 p-3.5 rounded-xl
-                      bg-white dark:bg-white/[0.04]
-                      border border-gray-200 dark:border-white/10
-                      shadow-sm"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-500/10 flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
-                        {card.card_masked ?? t('nbu.cards.unknown')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleChargeCard(card.id)}
-                        disabled={chargingCardId === card.id || nbuChargeMutation.isPending}
-                        className="px-3 py-2 rounded-lg text-xs font-bold
-                          bg-sky-500 hover:bg-sky-600 text-white
-                          active:scale-95 transition-all
-                          disabled:opacity-60 disabled:cursor-not-allowed
-                          whitespace-nowrap"
-                      >
-                        {chargingCardId === card.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin inline" />
-                        ) : (
-                          t('nbu.cards.payWithCard')
-                        )}
-                      </motion.button>
-                      <button
-                        onClick={() => handleDeleteCard(card.id)}
-                        disabled={nbuDeleteCardMutation.isPending}
-                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10
-                          text-gray-400 dark:text-gray-500
-                          hover:text-red-500 dark:hover:text-red-400
-                          active:scale-90 transition-all
-                          disabled:opacity-60"
-                        aria-label={t('nbu.cards.deleteConfirm')}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={handleBindCard}
-              disabled={nbuBindCardMutation.isPending}
-              className="w-full flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-sm
-                bg-white dark:bg-white/[0.04]
-                border border-dashed border-gray-300 dark:border-white/15
-                text-gray-700 dark:text-gray-300
-                hover:border-amber-400 dark:hover:border-amber-500/40
-                hover:bg-amber-50 dark:hover:bg-amber-500/5
-                active:scale-[0.97] transition-all
-                disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {nbuBindCardMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-              {t('nbu.cards.bindNew')}
-            </motion.button>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                {t('nbu.cards.title')}
+              </p>
+              <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                {t('nbu.cards.tapToPay', "Bir bosishda to'lash")}
+              </span>
+            </div>
+            {savedCards.map((card) => (
+              <div
+                key={card.id}
+                className="flex items-center gap-3 p-3.5 rounded-xl
+                  bg-gradient-to-br from-sky-50 to-cyan-50
+                  dark:from-sky-500/10 dark:to-cyan-500/5
+                  border border-sky-200/60 dark:border-sky-500/20
+                  shadow-sm"
+              >
+                <div className="w-10 h-10 rounded-lg bg-white/80 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono font-bold text-sm text-gray-900 dark:text-white truncate">
+                    {card.card_masked ?? t('nbu.cards.unknown')}
+                  </p>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleChargeCard(card.id)}
+                  disabled={chargingCardId === card.id || nbuChargeMutation.isPending}
+                  className="px-3.5 py-2 rounded-lg text-xs font-bold
+                    bg-sky-500 hover:bg-sky-600 text-white
+                    active:scale-95 transition-all
+                    disabled:opacity-60 disabled:cursor-not-allowed
+                    whitespace-nowrap"
+                >
+                  {chargingCardId === card.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin inline" />
+                  ) : (
+                    t('nbu.cards.payWithCard')
+                  )}
+                </motion.button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1367,20 +1300,25 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           </motion.button>
         )}
 
-        {/* ---- Payment Method Buttons ---- */}
-        <div className={`grid gap-3 ${walletCoversAll ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => handleChooseMethod('online')}
-            className="h-16 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-blue-500 to-indigo-500
-              hover:from-blue-600 hover:to-indigo-600
-              text-white shadow-lg shadow-blue-500/20
-              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
-          >
-            <CreditCard className="w-5 h-5" />
-            {t('makePayment.payOnline')}
-          </motion.button>
+        {/* ---- Payment Method Buttons ----
+            When NBU is enabled the gateway button above is the canonical
+            online path, so we drop the manual receipt-upload variant to
+            keep the wizard focused. Cash still always shows. */}
+        <div className={`grid gap-3 ${nbuEnabled ? 'grid-cols-1' : walletCoversAll ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
+          {!nbuEnabled && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => handleChooseMethod('online')}
+              className="h-16 rounded-2xl font-black text-[16px]
+                bg-gradient-to-r from-blue-500 to-indigo-500
+                hover:from-blue-600 hover:to-indigo-600
+                text-white shadow-lg shadow-blue-500/20
+                active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
+            >
+              <CreditCard className="w-5 h-5" />
+              {t('makePayment.payOnline')}
+            </motion.button>
+          )}
 
           <motion.button
             whileTap={{ scale: 0.97 }}

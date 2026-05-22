@@ -7,6 +7,7 @@ import { CreditCard, Trash2, Plus, Loader2, ChevronLeft, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { walletService } from '@/api/services/walletService';
+import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
@@ -39,12 +40,70 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
     const [cardNumber, setCardNumber] = useState('');
     const [cardHolder, setCardHolder] = useState('');
 
-    // Fetch cards
+    // Fetch refund cards (manual entry — used for refund payouts only)
     const { data: cardsData, isLoading } = useQuery({
         queryKey: ['walletCards'],
         queryFn: walletService.getWalletCards,
         enabled: isOpen,
     });
+
+    // NBU integration probe — only render the saved-payment-cards section
+    // when the gateway is actually enabled server-side.
+    const { data: nbuStatus } = useQuery({
+        queryKey: ['nbu-status'],
+        queryFn: nbuPaymentService.getStatus,
+        staleTime: 5 * 60_000,
+        enabled: isOpen,
+    });
+    const nbuEnabled = nbuStatus?.enabled === true;
+
+    // NBU saved cards (tokenised — for one-tap payments)
+    const { data: nbuCardsData, isLoading: nbuCardsLoading } = useQuery({
+        queryKey: ['nbu-cards'],
+        queryFn: nbuPaymentService.listCards,
+        staleTime: 60_000,
+        enabled: isOpen && nbuEnabled,
+    });
+
+    const nbuBindMutation = useMutation({
+        mutationFn: nbuPaymentService.bindCard,
+        onSuccess: (data) => {
+            const paymentUrl = data.payment_url;
+            if (!paymentUrl) {
+                toast.error(t('makePayment.errorOccurred', "Xatolik yuz berdi"));
+                return;
+            }
+            if (window.Telegram?.WebApp?.openLink) {
+                window.Telegram.WebApp.openLink(paymentUrl);
+            } else {
+                window.location.href = paymentUrl;
+            }
+        },
+        onError: () => {
+            toast.error(t('makePayment.errorOccurred', "Xatolik yuz berdi"));
+        },
+    });
+
+    const nbuDeleteMutation = useMutation({
+        mutationFn: nbuPaymentService.deleteCard,
+        onSuccess: () => {
+            toast.success(t('nbu.cards.deleteSuccess', "Karta o'chirildi"));
+            queryClient.invalidateQueries({ queryKey: ['nbu-cards'] });
+        },
+        onError: () => {
+            toast.error(t('wallet.cards.errorDelete', "Karta o'chirishda xatolik"));
+        },
+    });
+
+    const handleNbuBind = () => {
+        nbuBindMutation.mutate();
+    };
+
+    const handleNbuDelete = (cardId: number) => {
+        if (confirm(t('nbu.cards.deleteConfirm', "Kartani o'chirasizmi?"))) {
+            nbuDeleteMutation.mutate(cardId);
+        }
+    };
 
     // Mutations
     const addCardMutation = useMutation({
@@ -242,19 +301,108 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 animate="center"
                                 exit="exit"
                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className="col-start-1 row-start-1 h-full w-full space-y-4 overflow-y-auto bg-transparent px-1"
+                                className="col-start-1 row-start-1 h-full w-full space-y-6 overflow-y-auto bg-transparent px-1 pb-20"
                             >
-                                {isLoading ? (
+                                {/* ── Section 1: NBU saved cards (one-tap payment) ── */}
+                                {nbuEnabled && (
+                                    <section className="space-y-3">
+                                        <div className="space-y-0.5">
+                                            <h3 className="text-[15px] font-black text-gray-950 dark:text-[#fff8ed]">
+                                                {t('nbu.cards.title', "Saqlangan kartalar")}
+                                            </h3>
+                                            <p className="text-xs text-gray-500 dark:text-[#fff8ed]/55">
+                                                {t('nbu.cards.sectionHint', "Tezkor to'lov uchun")}
+                                            </p>
+                                        </div>
+
+                                        {nbuCardsLoading ? (
+                                            <div className="flex justify-center py-6">
+                                                <Loader2 className="h-5 w-5 animate-spin text-sky-500" />
+                                            </div>
+                                        ) : (nbuCardsData?.items ?? []).length === 0 ? (
+                                            <Button
+                                                variant="outline"
+                                                disabled={nbuBindMutation.isPending}
+                                                onClick={handleNbuBind}
+                                                className="w-full rounded-[18px] border-2 border-dashed border-sky-300 py-6 text-sky-700 hover:border-sky-500 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
+                                            >
+                                                {nbuBindMutation.isPending ? (
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                ) : (
+                                                    <Plus className="h-4 w-4 mr-2" />
+                                                )}
+                                                {t('nbu.cards.bindNew', "Yangi karta saqlash")}
+                                            </Button>
+                                        ) : (
+                                            <div className="space-y-2.5">
+                                                {(nbuCardsData?.items ?? []).map((card) => (
+                                                    <div
+                                                        key={card.id}
+                                                        className="flex items-center gap-3 rounded-[18px] border border-sky-200/60 bg-gradient-to-br from-sky-50 to-cyan-50 p-3.5 dark:border-sky-500/20 dark:from-sky-500/10 dark:to-cyan-500/5"
+                                                    >
+                                                        <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-white/80 dark:bg-white/10 flex items-center justify-center">
+                                                            <CreditCard className="h-5 w-5 text-sky-600 dark:text-sky-300" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-mono text-sm font-bold text-gray-950 truncate dark:text-[#fff8ed]">
+                                                                {card.card_masked ?? t('nbu.cards.unknown', "Saqlangan karta")}
+                                                            </p>
+                                                            <p className="text-[11px] text-gray-500 dark:text-[#fff8ed]/55">
+                                                                {t('nbu.cards.tokenized', "Tokenlangan — xavfsiz")}
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={nbuDeleteMutation.isPending}
+                                                            onClick={() => handleNbuDelete(card.id)}
+                                                            className="h-9 w-9 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                                                            aria-label={t('nbu.cards.deleteConfirm', "Kartani o'chirasizmi?")}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                                <Button
+                                                    variant="outline"
+                                                    disabled={nbuBindMutation.isPending}
+                                                    onClick={handleNbuBind}
+                                                    className="w-full rounded-[18px] border-2 border-dashed border-sky-300 py-4 text-sky-700 hover:border-sky-500 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
+                                                >
+                                                    {nbuBindMutation.isPending ? (
+                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    ) : (
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                    )}
+                                                    {t('nbu.cards.bindNew', "Yangi karta saqlash")}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
+
+                                {/* ── Section 2: Refund cards (manual entry, refund payouts) ── */}
+                                <section className="space-y-3">
+                                    <div className="space-y-0.5">
+                                        <h3 className="text-[15px] font-black text-gray-950 dark:text-[#fff8ed]">
+                                            {t('wallet.cards.refundTitle', "Qaytarish kartasi")}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 dark:text-[#fff8ed]/55">
+                                            {t('wallet.cards.refundHint', "Pul qaytarish uchun ishlatiladi")}
+                                        </p>
+                                    </div>
+
+                                    {isLoading ? (
                                     <div className="flex justify-center p-8">
                                         <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
                                     </div>
                                 ) : cardsData?.cards.length === 0 ? (
-                                    <div className="text-center py-12 text-gray-500 flex flex-col items-center">
-                                        <div className="h-16 w-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                                            <CreditCard className="h-8 w-8 text-gray-400" />
+                                    <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                                        <div className="h-14 w-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-3">
+                                            <CreditCard className="h-7 w-7 text-gray-400" />
                                         </div>
-                                        <p className="font-medium mb-1">{t('wallet.cards.noCards', "Hozircha kartalar yo'q")}</p>
-                                        <p className="text-sm text-gray-400 mb-6 max-w-xs">{t('wallet.cards.addPrompt', "To'lovlarni tezroq amalga oshirish uchun karta qo'shing")}</p>
+                                        <p className="font-medium mb-1 text-sm">{t('wallet.cards.noCards', "Hozircha kartalar yo'q")}</p>
+                                        <p className="text-xs text-gray-400 mb-5 max-w-xs">{t('wallet.cards.addPrompt', "To'lovlarni tezroq amalga oshirish uchun karta qo'shing")}</p>
                                         <Button
                                             onClick={() => setIsAdding(true)}
                                             className="rounded-full bg-orange-500 px-6 font-black text-white hover:bg-orange-600"
@@ -264,7 +412,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3 pb-20">
+                                    <div className="space-y-3">
                                         {cardsData?.cards.map((card, index) => (
                                             <motion.div
                                                 key={card.id}
@@ -308,6 +456,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         </Button>
                                     </div>
                                 )}
+                                </section>
                             </motion.div>
                         )}
                     </AnimatePresence>

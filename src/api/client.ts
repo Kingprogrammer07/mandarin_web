@@ -113,6 +113,7 @@ apiClient.interceptors.response.use(
         // the backend permission gate is stricter than needed for read access.
         const isSilent401 =
           requestUrl.includes('/admin/auth/refresh') ||
+          requestUrl.includes('/payments/nbu/payment-status-public/') ||
           (requestUrl.includes('/flight-schedule') && requestMethod === 'get');
         if (!isSilent401) {
           localStorage.removeItem('access_token');
@@ -275,6 +276,7 @@ apiClientFormData.interceptors.response.use(
         const requestMethod: string = error.config?.method ?? '';
         const isSilent401 =
           requestUrl.includes('/admin/auth/refresh') ||
+          requestUrl.includes('/payments/nbu/payment-status-public/') ||
           (requestUrl.includes('/flight-schedule') && requestMethod === 'get');
         if (!isSilent401) {
           localStorage.removeItem('access_token');

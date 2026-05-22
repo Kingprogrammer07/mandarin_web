@@ -53,6 +53,29 @@ export interface ChargeSavedCardResponse {
   error: string | null;
 }
 
+export type NbuPurpose =
+  | 'ONE_TIME_PAYMENT'
+  | 'RECURRING_PAYMENT'
+  | 'SUBSCRIPTION'
+  | 'CARD_BINDING';
+
+export type NbuStatus =
+  | 'PENDING'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'EXPIRED'
+  | 'REFUNDED';
+
+export interface PublicNbuPaymentStatus {
+  order_id: string;
+  status: NbuStatus | string;
+  purpose: NbuPurpose | string;
+  amount_uzs: number;
+  currency: number;
+  flight_name: string | null;
+  is_terminal: boolean;
+}
+
 const BASE = '/api/v1/payments/nbu';
 
 export const nbuPaymentService = {
@@ -83,5 +106,12 @@ export const nbuPaymentService = {
 
   async deleteCard(cardId: number): Promise<void> {
     await apiClient.delete(`${BASE}/cards/${cardId}`);
+  },
+
+  async getPublicStatus(orderId: string): Promise<PublicNbuPaymentStatus> {
+    const response = await apiClient.get<PublicNbuPaymentStatus>(
+      `${BASE}/payment-status-public/${orderId}`,
+    );
+    return response.data;
   },
 };

@@ -1,26 +1,22 @@
 import { apiClient } from '../client';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Legacy types & functions (used by FlightSchedulePage & FlightScheduleAdminPage) ──
 
 export interface FlightScheduleItem {
   id: number;
-  /** Human-readable flight or event name, e.g. "MC-1044" or "Navro'z bayrami". */
   flight_name: string;
-  /** ISO date string, e.g. "2025-04-15". */
   flight_date: string;
-  /** "avia" = regular cargo flight; "aksiya" = promotional/holiday event. */
   type: 'avia' | 'aksiya';
   status: 'arrived' | 'scheduled' | 'delayed';
-  /** Optional description for aksiya events; null for regular flights. */
   notes: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface FlightScheduleResponse {
+export interface FlightScheduleListResponse {
   year: number;
-  items: FlightScheduleItem[];
   total: number;
+  items: FlightScheduleItem[];
 }
 
 export interface CreateFlightScheduleRequest {
@@ -39,56 +35,118 @@ export interface UpdateFlightScheduleRequest {
   notes?: string | null;
 }
 
-export interface DeleteFlightScheduleResponse {
-  deleted_id: number;
-  message: string;
-}
-
-// ── API ────────────────────────────────────────────────────────────────────────
-
-/**
- * Fetch the flight schedule for a given year.
- * Backend: GET /api/v1/flight-schedule?year=YYYY
- */
-export const getFlightSchedule = async (year?: number): Promise<FlightScheduleResponse> => {
-  const response = await apiClient.get<FlightScheduleResponse>('/api/v1/flight-schedule', {
-    params: { year: year ?? new Date().getFullYear() },
+export const getFlightSchedule = async (year?: number): Promise<FlightScheduleListResponse> => {
+  const response = await apiClient.get<FlightScheduleListResponse>('/api/v1/flight-schedule', {
+    params: year ? { year } : undefined,
   });
   return response.data;
 };
 
-/**
- * Create a new flight schedule entry.
- * Backend: POST /api/v1/flight-schedule
- */
 export const createFlightSchedule = async (
-  body: CreateFlightScheduleRequest,
+  data: CreateFlightScheduleRequest
 ): Promise<FlightScheduleItem> => {
-  const response = await apiClient.post<FlightScheduleItem>('/api/v1/flight-schedule', body);
+  const response = await apiClient.post<FlightScheduleItem>('/api/v1/flight-schedule', data);
   return response.data;
 };
 
-/**
- * Partially update an existing entry.
- * Backend: PUT /api/v1/flight-schedule/{id}
- */
 export const updateFlightSchedule = async (
   id: number,
-  body: UpdateFlightScheduleRequest,
+  data: UpdateFlightScheduleRequest
 ): Promise<FlightScheduleItem> => {
-  const response = await apiClient.put<FlightScheduleItem>(`/api/v1/flight-schedule/${id}`, body);
+  const response = await apiClient.put<FlightScheduleItem>(`/api/v1/flight-schedule/${id}`, data);
   return response.data;
 };
 
-/**
- * Delete a flight schedule entry.
- * Backend: DELETE /api/v1/flight-schedule/{id}
- */
-export const deleteFlightSchedule = async (
-  id: number,
-): Promise<DeleteFlightScheduleResponse> => {
-  const response = await apiClient.delete<DeleteFlightScheduleResponse>(
-    `/api/v1/flight-schedule/${id}`,
-  );
+export const deleteFlightSchedule = async (id: number): Promise<{ deleted_id: number; message: string }> => {
+  const response = await apiClient.delete(`/api/v1/flight-schedule/${id}`);
+  return response.data;
+};
+
+// ── New types & functions (used by FlightsPage) ──
+
+export interface FlightStats {
+  cargo_count: number;
+  client_count: number;
+  total_weight_kg: number;
+  remaining_cargos: number;
+  remaining_clients: number;
+  remaining_weight_kg: number;
+}
+
+export interface FlightWithStats {
+  name: string;
+  stats: FlightStats;
+}
+
+export interface FlightWithStatsListResponse {
+  items: FlightWithStats[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export interface FlightListParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+}
+
+export interface FlightDashboardStats {
+  cargo_count: number;
+  client_count: number;
+  total_weight_kg: number;
+  remaining_cargos: number;
+  remaining_clients: number;
+  remaining_weight_kg: number;
+  expected_clients: number;
+  expected_track_codes: number;
+}
+
+export type FlightDashboardType = 'avia' | 'ostatka' | 'custom';
+export type FlightDashboardStatus = 'new' | 'active' | 'completed';
+
+export interface FlightDashboardItem {
+  name: string;
+  type: FlightDashboardType;
+  status: FlightDashboardStatus;
+  source: 'flight_cargos' | 'expected_cargo';
+  is_new: boolean;
+  last_activity_at: string | null;
+  stats: FlightDashboardStats;
+}
+
+export interface FlightDashboardResponse {
+  items: FlightDashboardItem[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export interface FlightDashboardParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  type?: 'all' | FlightDashboardType;
+  status?: 'active' | 'new' | 'completed' | 'all';
+  sort?: 'newest' | 'remaining_desc' | 'name_asc';
+}
+
+export const getFlightsWithStats = async (
+  params: FlightListParams = {}
+): Promise<FlightWithStatsListResponse> => {
+  const response = await apiClient.get<FlightWithStatsListResponse>('/api/v1/flights/with-stats', {
+    params,
+  });
+  return response.data;
+};
+
+export const getFlightsDashboard = async (
+  params: FlightDashboardParams = {},
+): Promise<FlightDashboardResponse> => {
+  const response = await apiClient.get<FlightDashboardResponse>('/api/v1/flights/dashboard', {
+    params,
+  });
   return response.data;
 };

@@ -875,7 +875,9 @@
       "errorDelete": "Karta o'chirishda xatolik",
       "errorIncomplete": "Ma'lumotlarni to'liq kiriting",
       "errorLength": "Karta raqami 16 ta raqamdan iborat bo'lishi kerak",
-      "confirmDelete": "Kartani o'chirishni tasdiqlaysizmi?"
+      "confirmDelete": "Kartani o'chirishni tasdiqlaysizmi?",
+      "refundTitle": "Qaytarish kartasi",
+      "refundHint": "Bu karta orqali siz pul qaytarib olasiz"
     },
     "tabs": {
       "reminders": "Eslatmalar",
@@ -1643,7 +1645,9 @@
     "success": {
       "title": "To'lov muvaffaqiyatli amalga oshirildi",
       "body": "To'lovingiz tasdiqlandi. Hisobingizga 1–2 daqiqada tushadi. Ortga qaytishingiz mumkin.",
-      "homeButton": "Bosh sahifa"
+      "homeButton": "Bosh sahifa",
+      "amountLabel": "To'langan summa",
+      "flightLabel": "Reys"
     },
     "failure": {
       "title": "To'lov amalga oshmadi",
@@ -1651,7 +1655,16 @@
       "retryButton": "Qayta urinish",
       "homeButton": "Bosh sahifa"
     },
-    "payOnlineNbu": "Onlayn to'lov (NBU)",
+    "pending": {
+      "title": "To'lov tasdiqlanmoqda",
+      "body": "Bank to'lovni tasdiqlashi kutilmoqda. Bu odatda bir necha soniya oladi. Sahifani yopmang."
+    },
+    "cardBound": {
+      "title": "Karta saqlandi",
+      "body": "Karta muvaffaqiyatli saqlandi. Endi kelgusi to'lovlarni qayta kirita olmasdan amalga oshirishingiz mumkin.",
+      "homeButton": "Davom etish"
+    },
+    "payOnlineNbu": "Bank kartasi orqali to'lash",
     "error": {
       "400": "Mijoz kodi tayinlanmagan",
       "404": "Bu reys uchun yuk topilmadi",
@@ -1662,7 +1675,10 @@
       "503": "Onlayn to'lov vaqtincha o'chirilgan"
     },
     "cards": {
-      "title": "Saqlangan kartalar",
+      "title": "To'lov kartalari",
+      "sectionHint": "Saqlangan karta bilan bir bosishda to'lang",
+      "tokenized": "Tokenlangan — xavfsiz saqlanadi",
+      "tapToPay": "Bir bosishda to'lash",
       "unknown": "Saqlangan karta",
       "payWithCard": "Bu karta bilan to'lash",
       "bindNew": "Yangi karta saqlash",

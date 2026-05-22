@@ -81,11 +81,27 @@ function detectContinuation(
 
 interface QueueItemRowProps {
   item: FastEntryQueueItem;
+  rowNumber: number;
+  clientScanCount: number;
+  isSplitGroup: boolean;
+  splitSegmentCount: number;
   onRemove: (id: string) => void;
   onSetClientCode: (id: string, code: string) => void;
+  onAcceptConflictOwner: (id: string) => void;
+  onMergeClientGroup: (clientCode: string) => void;
 }
 
-function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
+function QueueItemRow({
+  item,
+  rowNumber,
+  clientScanCount,
+  isSplitGroup,
+  splitSegmentCount,
+  onRemove,
+  onSetClientCode,
+  onAcceptConflictOwner,
+  onMergeClientGroup,
+}: QueueItemRowProps) {
   // Auto-open edit mode for items that need manual input (not-found or no client code yet).
   const [isEditingCode, setIsEditingCode] = useState(
     item.notFound || (!item.isResolved && !item.clientCode && !item.isWrongClient),
@@ -138,6 +154,156 @@ function QueueItemRow({ item, onRemove, onSetClientCode }: QueueItemRowProps) {
         : item.clientCode
           ? 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
           : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700';
+
+  const sheetRowStyle = item.isWrongClient || item.notFound
+    ? 'bg-red-50/90 dark:bg-red-950/25 border-red-300 dark:border-red-800 text-red-950 dark:text-red-100'
+    : item.isAlreadySent
+      ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800 text-orange-950 dark:text-orange-100'
+      : isSplitGroup
+        ? 'bg-violet-50/95 dark:bg-violet-950/25 border-violet-300 dark:border-violet-800 text-violet-950 dark:text-violet-100 ring-1 ring-violet-200 dark:ring-violet-800/60'
+      : item.isContinuation
+        ? 'bg-amber-50/90 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-100'
+        : item.isResolved
+          ? 'bg-emerald-50/70 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/70 text-zinc-900 dark:text-zinc-100'
+          : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100';
+
+  const sheetStatusLabel = item.isWrongClient
+    ? `Boshqa mijoz: ${item.conflictClientCode ?? '-'}`
+    : item.isAlreadySent
+      ? item.alreadySentFlight
+        ? `Yuborilgan: ${item.alreadySentFlight}`
+        : 'Allaqachon yuborilgan'
+      : item.notFound
+        ? 'Mijoz topilmadi'
+        : isSplitGroup
+          ? `Ajralgan guruh: ${splitSegmentCount} joyda, jami ${clientScanCount} ta`
+        : item.isContinuation
+          ? `Davomi: +${item.priorCountForClient} avval`
+          : item.isResolved
+            ? item.resolvedClientName ?? 'Aniqlandi'
+            : item.clientCode
+              ? 'Qo\'lda kiritilgan'
+              : 'Tekshirilmoqda';
+
+  const commitClientCode = () => {
+    const normalized = tempCode.trim().toUpperCase();
+    if (normalized) onSetClientCode(item.id, normalized);
+    setIsEditingCode(false);
+  };
+
+  return (
+    <div
+      className={cn(
+        'grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b text-sm transition-colors',
+        sheetRowStyle,
+      )}
+    >
+      <div className="flex h-11 items-center justify-center border-r border-inherit bg-black/[0.02] font-mono text-[12px] text-zinc-400 dark:bg-white/[0.03]">
+        {rowNumber}
+      </div>
+
+      <div className="flex h-11 min-w-0 items-center border-r border-inherit px-2">
+        {item.isAlreadySent ? (
+          <span className="truncate font-mono font-bold text-orange-700 dark:text-orange-300">
+            {item.clientCode || '-'}
+          </span>
+        ) : isEditingCode ? (
+          <Input
+            value={tempCode}
+            onChange={(e) => setTempCode(e.target.value.toUpperCase())}
+            onBlur={commitClientCode}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                commitClientCode();
+                document.getElementById('main-track-input')?.focus();
+              } else if (e.key === 'Escape') {
+                setTempCode(item.clientCode);
+                setIsEditingCode(false);
+              }
+            }}
+            className="h-8 w-full rounded-none border-0 bg-white/70 px-2 font-mono text-sm shadow-none focus-visible:ring-1 focus-visible:ring-orange-500 dark:bg-black/20"
+            placeholder="Mijoz kodi"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={enterEditMode}
+            className={cn(
+              'flex min-w-0 items-center gap-1.5 text-left font-mono font-bold',
+              item.clientCode ? 'text-zinc-900 dark:text-zinc-100' : 'italic text-zinc-400',
+            )}
+          >
+            <span className="truncate">{item.clientCode || 'AUTO'}</span>
+            {!item.isWrongClient && !item.isAlreadySent && (
+              <Pencil className="size-3 shrink-0 opacity-40" />
+            )}
+          </button>
+        )}
+      </div>
+
+      <div className="flex h-11 min-w-0 items-center border-r border-inherit px-3">
+        <span className="truncate font-mono font-semibold tracking-wide">
+          {item.trackCode}
+        </span>
+      </div>
+
+      <div className="flex h-11 items-center justify-center border-r border-inherit px-2">
+        <span className="rounded-full border border-current/15 bg-white/60 px-2 py-0.5 font-mono text-[12px] font-black dark:bg-black/20">
+          {clientScanCount || '-'}
+        </span>
+      </div>
+
+      <div className="flex h-11 min-w-0 items-center gap-2 border-r border-inherit px-3">
+        {item.isWrongClient ? (
+          <AlertCircle className="size-4 shrink-0 text-red-500" />
+        ) : item.isAlreadySent ? (
+          <Ban className="size-4 shrink-0 text-orange-500" />
+        ) : item.notFound ? (
+          <XCircle className="size-4 shrink-0 text-red-500" />
+        ) : isSplitGroup ? (
+          <AlertTriangle className="size-4 shrink-0 text-violet-500" />
+        ) : item.isContinuation ? (
+          <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+        ) : item.isResolved ? (
+          <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+        ) : (
+          <Loader2 className="size-4 shrink-0 animate-spin text-orange-400" />
+        )}
+        <span className="truncate text-[12px] font-semibold">
+          {sheetStatusLabel}
+        </span>
+      </div>
+
+      <div className="flex h-11 items-center justify-end gap-1 px-2">
+        {isSplitGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
+          <button
+            type="button"
+            onClick={() => onMergeClientGroup(item.clientCode)}
+            className="h-7 rounded-md bg-violet-600 px-2 text-[11px] font-bold text-white hover:bg-violet-700"
+          >
+            Birlashtir
+          </button>
+        )}
+        {item.isWrongClient && item.conflictClientCode && (
+          <button
+            type="button"
+            onClick={() => onAcceptConflictOwner(item.id)}
+            className="h-7 rounded-md bg-red-600 px-2 text-[11px] font-bold text-white hover:bg-red-700"
+          >
+            Shu userga
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/40"
+          title="O'chirish"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="relative">
@@ -346,6 +512,8 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     resolveQueueItemClient,
     markQueueItemNotFound,
     markQueueItemAlreadySent,
+    acceptQueueItemConflictOwner,
+    mergeClientQueueGroup,
     setQueueItemClientCode,
     removeFromQueue,
     setSearchQuery,
@@ -433,7 +601,6 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
     };
   // intentionally exclude validationMap — codesToCheck is derived from parsedCodes + ref
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parsedCodes, clientCodeInput, isAutoFill, flightName]);
 
   // ── Camera lifecycle ──────────────────────────────────────────────────────
@@ -733,7 +900,56 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   );
 
   const resolvedCount = entryQueue.filter((i) => i.isResolved || i.clientCode).length;
-  const notFoundCount = entryQueue.filter((i) => i.notFound).length;
+  const blockedCount = entryQueue.filter((i) => i.isWrongClient || i.isAlreadySent || i.notFound || !i.clientCode.trim()).length;
+  const clientScanCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of entryQueue) {
+      const code = item.clientCode.trim().toUpperCase();
+      if (!code) continue;
+      counts.set(code, (counts.get(code) ?? 0) + 1);
+    }
+    return counts;
+  }, [entryQueue]);
+  const visibleQueue = useMemo(
+    () =>
+      [...entryQueue].sort((a, b) => {
+        const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
+        const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
+        return bTime - aTime;
+      }),
+    [entryQueue],
+  );
+  const splitClientSegments = useMemo(() => {
+    const segments = new Map<string, { segmentCount: number; totalCount: number }>();
+    let previousClientCode: string | null = null;
+
+    for (const item of visibleQueue) {
+      if (item.isWrongClient || item.isAlreadySent || item.notFound) {
+        previousClientCode = null;
+        continue;
+      }
+
+      const clientCode = item.clientCode.trim().toUpperCase();
+      if (!clientCode) {
+        previousClientCode = null;
+        continue;
+      }
+
+      const current = segments.get(clientCode) ?? { segmentCount: 0, totalCount: 0 };
+      current.totalCount += 1;
+      if (clientCode !== previousClientCode) {
+        current.segmentCount += 1;
+      }
+      segments.set(clientCode, current);
+      previousClientCode = clientCode;
+    }
+
+    return segments;
+  }, [visibleQueue]);
+  const splitGroupCount = useMemo(
+    () => [...splitClientSegments.values()].filter((segment) => segment.segmentCount > 1).length,
+    [splitClientSegments],
+  );
 
   return (
     <div className={cn(
@@ -746,7 +962,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           <div className="flex items-center gap-1.5">
             <ScanLine className="size-4 text-orange-500 flex-shrink-0" />
             <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Barcode kiritish
+              Barcode jadvali
               {flightName && (
                 <span className="ml-1 font-normal text-orange-500">· {flightName}</span>
               )}
@@ -770,17 +986,23 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           {entryQueue.length > 0 && (
             <span className={cn(
               'text-xs',
-              notFoundCount > 0 ? 'text-red-500 font-semibold' : 'text-zinc-400',
+              blockedCount > 0
+                ? 'text-red-500 font-semibold'
+                : splitGroupCount > 0
+                  ? 'text-violet-500 font-semibold'
+                  : 'text-zinc-400',
             )}>
-              {notFoundCount > 0
-                ? `${notFoundCount} topilmadi`
+              {blockedCount > 0
+                ? `${blockedCount} tekshirish kerak`
+                : splitGroupCount > 0
+                  ? `${splitGroupCount} ajralgan guruh`
                 : `${resolvedCount}/${entryQueue.length} tayyor`}
             </span>
           )}
 
           <button
             onClick={() => setClientListHidden(!isClientListHidden)}
-            title={isClientListHidden ? "Mijozlar ro'yxatini ko'rsatish" : "Mijozlar ro'yxatini yashirish"}
+            title={isClientListHidden ? "Preview ro'yxatini ko'rsatish" : "Preview ro'yxatini yashirish"}
             className={cn(
               'p-1.5 rounded-md transition-colors',
               isClientListHidden
@@ -791,6 +1013,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             {isClientListHidden
               ? <PanelBottomOpen className="size-4" />
               : <PanelBottomClose className="size-4" />}
+            <span className="sr-only">
+              {isClientListHidden ? "Preview ko'rsatish" : "Preview yashirish"}
+            </span>
           </button>
 
           <button
@@ -803,7 +1028,193 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       </div>
 
       {/* ── Input area ────────────────────────────────────────────────────────── */}
-      <div className="px-3 py-2 space-y-2 flex-shrink-0">
+      <div
+        className={cn(
+          'px-3 py-3 overflow-y-auto',
+          isQueueExpanded ? 'flex-1 min-h-0' : 'max-h-72',
+        )}
+      >
+        <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            <div className="flex h-9 items-center justify-center border-r border-inherit font-mono">#</div>
+            <div className="flex h-9 items-center border-r border-inherit px-2">A · Mijoz kodi</div>
+            <div className="flex h-9 items-center border-r border-inherit px-3">B · Track code</div>
+            <div className="flex h-9 items-center justify-center border-r border-inherit px-2">C · Soni</div>
+            <div className="flex h-9 items-center border-r border-inherit px-3">Holat</div>
+            <div className="flex h-9 items-center justify-center px-2">Amal</div>
+          </div>
+
+          <div className="grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20">
+            <div className="flex min-h-12 items-center justify-center border-r border-inherit font-mono text-[12px] font-bold text-orange-500">+</div>
+            <div className="flex min-h-12 items-center border-r border-inherit px-2">
+              {isAutoFill ? (
+                <span className="font-mono text-sm font-bold text-zinc-400">AUTO</span>
+              ) : (
+                <Input
+                  ref={clientInputRef}
+                  value={clientCodeInput}
+                  onChange={(e) => setClientCodeInput(e.target.value.toUpperCase())}
+                  placeholder="Mijoz kodi"
+                  className="h-9 rounded-none border-0 bg-transparent px-0 font-mono text-sm shadow-none focus-visible:ring-0"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              )}
+            </div>
+            <div className="relative flex min-h-12 items-center border-r border-inherit px-2">
+              {isAutoFill ? (
+                <>
+                  <Input
+                    id="main-track-input"
+                    ref={trackInputRef}
+                    value={trackCodeInput}
+                    onChange={(e) => setTrackCodeInput(e.target.value.toUpperCase())}
+                    onKeyDown={handleTrackKeyDown}
+                    placeholder="Barcode skanerlang yoki yozing, Enter"
+                    className="h-10 rounded-none border-0 bg-transparent pr-9 font-mono text-sm shadow-none focus-visible:ring-0"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    {resolveMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin text-orange-400" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleCameraScan}
+                        title={isScanning ? "Kamerani yopish" : "Kamera orqali skanerlash"}
+                        className={cn(
+                          'rounded p-1 transition-colors',
+                          isScanning
+                            ? 'bg-orange-100 text-orange-600 dark:bg-orange-950/50'
+                            : 'text-zinc-400 hover:text-orange-500',
+                        )}
+                      >
+                        <Camera className="size-4" />
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <textarea
+                  value={trackCodesText}
+                  onChange={(e) => {
+                    const upper = e.target.value.toUpperCase();
+                    setTrackCodesText(upper);
+                    const lines = new Set(
+                      upper.split('\n').map((line) => line.trim()).filter(Boolean),
+                    );
+                    validatedCodesRef.current = new Set(
+                      [...validatedCodesRef.current].filter((code) => lines.has(code)),
+                    );
+                  }}
+                  placeholder="Track codelar, har qatorda bitta"
+                  rows={2}
+                  className="min-h-12 w-full resize-none bg-transparent py-2 font-mono text-sm outline-none placeholder:text-zinc-400"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+              )}
+            </div>
+            <div className="flex min-h-12 items-center justify-center border-r border-inherit px-2 font-mono text-sm font-black text-zinc-600 dark:text-zinc-300">
+              {isAutoFill ? entryQueue.length : parsedCodes.length}
+            </div>
+            <div className="flex min-h-12 min-w-0 items-center gap-2 border-r border-inherit px-3 text-[12px] font-semibold text-zinc-500 dark:text-zinc-400">
+              {isAutoFill ? (
+                <span className="truncate">B ustun aktiv, scanner Enter yuboradi</span>
+              ) : isValidating ? (
+                <>
+                  <Loader2 className="size-3.5 shrink-0 animate-spin text-orange-400" />
+                  <span>Tekshirilmoqda...</span>
+                </>
+              ) : (
+                <span className="truncate">
+                  {validationCounts.conflict > 0 || validationCounts.alreadySent > 0
+                    ? `${validationCounts.conflict + validationCounts.alreadySent} ta muammo`
+                    : parsedCodes.length > 0
+                      ? `${parsedCodes.length} ta kod tayyor`
+                      : 'Manual kiritish'}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={isAutoFill ? handleAutoFillScan : handleClientFirstAdd}
+              disabled={
+                isAutoFill
+                  ? !trackCodeInput.trim()
+                  : !clientCodeInput.trim() || parsedCodes.length === 0
+              }
+              className="min-h-12 bg-orange-500 px-2 text-[12px] font-bold text-white transition-colors hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800"
+            >
+              Qo'sh
+            </button>
+          </div>
+
+          {scannerReady && (
+            <>
+              <style>{`
+                #${SCANNER_CONTAINER_ID}__scan_region > img { display: none !important; }
+                #${SCANNER_CONTAINER_ID}__scan_region video { width: 100% !important; height: auto !important; border-radius: 0.75rem; }
+                #${SCANNER_CONTAINER_ID}__dashboard { display: none !important; }
+              `}</style>
+              <div
+                className={isScanning ? 'relative border-b border-zinc-200 dark:border-zinc-800' : ''}
+                style={isScanning ? undefined : {
+                  position: 'fixed',
+                  left: '-9999px',
+                  top: '-9999px',
+                  width: '320px',
+                  height: '240px',
+                }}
+              >
+                <div id={SCANNER_CONTAINER_ID} className="w-full" />
+                {isScanning && (
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="absolute right-2 top-2 z-10 rounded-full bg-black/50 p-1.5 text-white transition-colors hover:bg-black/70"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {visibleQueue.length === 0 ? (
+            <div className="flex h-12 min-w-[980px] items-center justify-center border-t border-zinc-100 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
+              Jadvalga birinchi track codeni kiriting
+            </div>
+          ) : (
+            visibleQueue.map((item, index) => (
+              (() => {
+                const clientCode = item.clientCode.trim().toUpperCase();
+                const splitSegment = clientCode ? splitClientSegments.get(clientCode) : undefined;
+                return (
+                  <QueueItemRow
+                    key={item.id}
+                    item={item}
+                    rowNumber={visibleQueue.length - index}
+                    clientScanCount={clientScanCounts.get(clientCode) ?? 0}
+                    isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
+                    splitSegmentCount={splitSegment?.segmentCount ?? 0}
+                    onRemove={removeFromQueue}
+                    onSetClientCode={setQueueItemClientCode}
+                    onAcceptConflictOwner={acceptQueueItemConflictOwner}
+                    onMergeClientGroup={mergeClientQueueGroup}
+                  />
+                );
+              })()
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="hidden">
         {isAutoFill ? (
           /* ── AUTO-FILL MODE: single barcode input ── */
           <>
@@ -1023,22 +1434,38 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       </div>
 
       {/* ── Queue list ────────────────────────────────────────────────────────── */}
-      {entryQueue.length > 0 ? (
+      {false && entryQueue.length > 0 ? (
         <div className={cn(
-          'px-3 pb-3 space-y-1.5 overflow-y-auto',
+          'px-3 pb-3 overflow-y-auto',
           isQueueExpanded ? 'flex-1 min-h-0' : 'max-h-40',
         )}>
-          {entryQueue.map((item) => (
-            <QueueItemRow
-              key={item.id}
-              item={item}
-              onRemove={removeFromQueue}
-              onSetClientCode={setQueueItemClientCode}
-            />
-          ))}
+          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+              <div className="flex h-9 items-center justify-center border-r border-inherit font-mono">#</div>
+              <div className="flex h-9 items-center border-r border-inherit px-2">A · Mijoz kodi</div>
+              <div className="flex h-9 items-center border-r border-inherit px-3">B · Track code</div>
+              <div className="flex h-9 items-center justify-center border-r border-inherit px-2">C · Soni</div>
+              <div className="flex h-9 items-center border-r border-inherit px-3">Holat</div>
+              <div className="flex h-9 items-center justify-center px-2">Amal</div>
+            </div>
+            {entryQueue.map((item, index) => (
+              <QueueItemRow
+                key={item.id}
+                item={item}
+                rowNumber={entryQueue.length - index}
+                clientScanCount={clientScanCounts.get(item.clientCode.trim().toUpperCase()) ?? 0}
+                isSplitGroup={false}
+                splitSegmentCount={0}
+                onRemove={removeFromQueue}
+                onSetClientCode={setQueueItemClientCode}
+                onAcceptConflictOwner={acceptQueueItemConflictOwner}
+                onMergeClientGroup={mergeClientQueueGroup}
+              />
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="px-3 pb-3 text-center text-xs text-zinc-400 dark:text-zinc-500 flex-shrink-0">
+        <div className="hidden">
           {isAutoFill
             ? "Barkodni skanerlang — avtomatik mijozga biriktiriladi"
             : "Mijoz kodini kiriting, keyin trek kodlarni yozing yoki paste qiling"}

@@ -1,16 +1,45 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, CreditCard, Loader2, XCircle } from 'lucide-react';
+import {
+  nbuPaymentService,
+  type PublicNbuPaymentStatus,
+} from '@/api/services/nbuPaymentService';
 
 interface PaymentNbuSuccessProps {
   onNavigateHome?: () => void;
 }
 
+const POLL_INTERVAL_MS = 2_000;
+const MAX_POLL_ATTEMPTS = 20;
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat('uz-UZ', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+type Phase = 'pending' | 'success' | 'card_bound' | 'failure' | 'no_data';
+
+function phaseFromStatus(s: PublicNbuPaymentStatus | null): Phase {
+  if (!s) return 'pending';
+  if (!s.is_terminal) return 'pending';
+  if (s.status === 'SUCCESS') {
+    return s.purpose === 'CARD_BINDING' ? 'card_bound' : 'success';
+  }
+  return 'failure';
+}
+
 export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessProps) {
   const { t } = useTranslation();
-
   const orderId = new URLSearchParams(window.location.search).get('orderId') ?? '';
+
+  const [statusInfo, setStatusInfo] = useState<PublicNbuPaymentStatus | null>(null);
+  const [phase, setPhase] = useState<Phase>(orderId ? 'pending' : 'no_data');
+  const attemptsRef = useRef(0);
+  const timeoutRef = useRef<number | null>(null);
 
   const handleHome = useCallback(() => {
     if (onNavigateHome) {
@@ -21,11 +50,44 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
   }, [onNavigateHome]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      handleHome();
-    }, 8000);
+    if (!orderId) return;
+    let cancelled = false;
+
+    const tick = async () => {
+      attemptsRef.current += 1;
+      try {
+        const info = await nbuPaymentService.getPublicStatus(orderId);
+        if (cancelled) return;
+        setStatusInfo(info);
+        const next = phaseFromStatus(info);
+        setPhase(next);
+        if (next === 'pending' && attemptsRef.current < MAX_POLL_ATTEMPTS) {
+          timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+        }
+      } catch {
+        if (cancelled) return;
+        if (attemptsRef.current < MAX_POLL_ATTEMPTS) {
+          timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+        }
+      }
+    };
+
+    void tick();
+
+    return () => {
+      cancelled = true;
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [orderId]);
+
+  // Auto-navigate home only on confirmed success (not while pending)
+  useEffect(() => {
+    if (phase !== 'success' && phase !== 'card_bound') return;
+    const timer = window.setTimeout(handleHome, 10_000);
     return () => window.clearTimeout(timer);
-  }, [handleHome]);
+  }, [phase, handleHome]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#06080d] flex items-center justify-center p-4">
@@ -35,23 +97,111 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         className="w-full max-w-sm bg-white dark:bg-[#151515] rounded-3xl border border-gray-200 dark:border-white/10 shadow-xl p-8 text-center space-y-6"
       >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
-          className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center mx-auto"
-        >
-          <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-        </motion.div>
+        {phase === 'pending' && (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+              className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center mx-auto"
+            >
+              <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+            </motion.div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+                {t('nbu.pending.title')}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t('nbu.pending.body')}
+              </p>
+            </div>
+          </>
+        )}
 
-        <div className="space-y-2">
-          <h1 className="text-xl font-black text-gray-900 dark:text-white">
-            {t('nbu.success.title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('nbu.success.body')}
-          </p>
-        </div>
+        {phase === 'success' && (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+              className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center mx-auto"
+            >
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            </motion.div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+                {t('nbu.success.title')}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t('nbu.success.body')}
+              </p>
+            </div>
+            {statusInfo && (
+              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-2xl p-4 space-y-2 text-left">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {t('nbu.success.amountLabel')}
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    {formatMoney(statusInfo.amount_uzs)} so'm
+                  </span>
+                </div>
+                {statusInfo.flight_name && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t('nbu.success.flightLabel')}
+                    </span>
+                    <span className="font-bold text-gray-900 dark:text-white truncate ml-2">
+                      {statusInfo.flight_name}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {phase === 'card_bound' && (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+              className="w-20 h-20 rounded-full bg-sky-100 dark:bg-sky-500/15 flex items-center justify-center mx-auto"
+            >
+              <CreditCard className="w-10 h-10 text-sky-500" />
+            </motion.div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+                {t('nbu.cardBound.title')}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t('nbu.cardBound.body')}
+              </p>
+            </div>
+          </>
+        )}
+
+        {phase === 'failure' && (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+              className="w-20 h-20 rounded-full bg-rose-100 dark:bg-rose-500/15 flex items-center justify-center mx-auto"
+            >
+              <XCircle className="w-10 h-10 text-rose-500" />
+            </motion.div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+                {t('nbu.failure.title')}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t('nbu.failure.body')}
+              </p>
+            </div>
+          </>
+        )}
 
         {orderId && (
           <p className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 rounded-lg px-3 py-2 inline-block">
@@ -59,16 +209,20 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
           </p>
         )}
 
-        <button
-          onClick={handleHome}
-          className="w-full h-14 rounded-2xl font-black text-[16px]
-            bg-gradient-to-r from-amber-500 to-orange-500
-            hover:from-amber-600 hover:to-orange-600
-            text-white shadow-xl shadow-amber-500/25
-            active:scale-[0.97] transition-all"
-        >
-          {t('nbu.success.homeButton')}
-        </button>
+        {phase !== 'pending' && (
+          <button
+            onClick={handleHome}
+            className="w-full h-14 rounded-2xl font-black text-[16px]
+              bg-gradient-to-r from-amber-500 to-orange-500
+              hover:from-amber-600 hover:to-orange-600
+              text-white shadow-xl shadow-amber-500/25
+              active:scale-[0.97] transition-all"
+          >
+            {phase === 'card_bound'
+              ? t('nbu.cardBound.homeButton')
+              : t('nbu.success.homeButton')}
+          </button>
+        )}
       </motion.div>
     </div>
   );

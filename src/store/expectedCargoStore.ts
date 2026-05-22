@@ -6,6 +6,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 export interface FastEntryQueueItem {
   /** Locally generated UUID — used as React key and for targeted updates. */
   id: string;
+  scannedAt?: string;
   trackCode: string;
   /** Client code resolved via API; empty string means unresolved (user must fill). */
   clientCode: string;
@@ -104,6 +105,10 @@ interface ExpectedCargoState {
   markQueueItemNotFound: (trackCode: string) => void;
   /** Mark an item as already-sent (409) — the track code is already in the expected cargo table. */
   markQueueItemAlreadySent: (trackCode: string, flight: string | null) => void;
+  /** Move a wrong-client row to its real owner and make it safe to save. */
+  acceptQueueItemConflictOwner: (id: string) => void;
+  /** Bring all rows for one client next to each other in the scanner table. */
+  mergeClientQueueGroup: (clientCode: string) => void;
   setQueueItemClientCode: (id: string, clientCode: string) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
@@ -170,6 +175,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
             {
               ...item,
               id,
+              scannedAt: new Date().toISOString(),
               isContinuation: false,
               priorCountForClient: 0,
               notFound: item.notFound ?? false,
@@ -218,6 +224,51 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
               : item,
           ),
         })),
+
+      acceptQueueItemConflictOwner: (id) =>
+        set((state) => ({
+          entryQueue: state.entryQueue.map((item) =>
+            item.id === id && item.conflictClientCode
+              ? {
+                  ...item,
+                  clientCode: item.conflictClientCode,
+                  isResolved: true,
+                  notFound: false,
+                  isWrongClient: false,
+                  conflictClientCode: null,
+                }
+              : item,
+          ),
+        })),
+
+      mergeClientQueueGroup: (clientCode) =>
+        set((state) => {
+          const normalized = clientCode.trim().toUpperCase();
+          if (!normalized) return state;
+
+          const baseTime = Date.now();
+          const matchingItems = state.entryQueue
+            .filter((item) => item.clientCode.trim().toUpperCase() === normalized)
+            .sort((a, b) => {
+              const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
+              const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
+              return bTime - aTime;
+            });
+
+          const nextScannedAtById = new Map(
+            matchingItems.map((item, index) => [
+              item.id,
+              new Date(baseTime - index).toISOString(),
+            ]),
+          );
+
+          return {
+            entryQueue: state.entryQueue.map((item) => {
+              const scannedAt = nextScannedAtById.get(item.id);
+              return scannedAt ? { ...item, scannedAt } : item;
+            }),
+          };
+        }),
 
       setQueueItemClientCode: (id, clientCode) =>
         set((state) => ({

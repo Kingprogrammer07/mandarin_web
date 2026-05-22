@@ -27,6 +27,10 @@ function triggerHapticSuccess(): void {
   }
 }
 
+function isQueueItemBlocked(item: FastEntryQueueItem): boolean {
+  return item.isWrongClient || item.isAlreadySent || item.notFound || !item.clientCode.trim();
+}
+
 /**
  * Groups queue items by client_code so we can issue one bulk request per client.
  * Items with an empty clientCode are skipped and reported back as invalid.
@@ -42,7 +46,7 @@ function groupQueueByClient(
   const invalidItems: FastEntryQueueItem[] = [];
 
   for (const item of queue) {
-    if (!item.clientCode.trim()) {
+    if (isQueueItemBlocked(item)) {
       invalidItems.push(item);
       continue;
     }
@@ -66,8 +70,8 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
   const queryClient = useQueryClient();
   const { entryQueue, clearQueue, removeFromQueue } = useExpectedCargoStore();
 
-  const readyItems = entryQueue.filter((i) => i.clientCode.trim());
-  const unreadyItems = entryQueue.filter((i) => !i.clientCode.trim());
+  const readyItems = entryQueue.filter((i) => !isQueueItemBlocked(i));
+  const unreadyItems = entryQueue.filter(isQueueItemBlocked);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -77,11 +81,6 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
 
       if (groups.length === 0) {
         throw new Error("Saqlash uchun tayyor yozuv yo'q");
-      }
-
-      // Remove items without client codes before saving
-      for (const item of invalidItems) {
-        removeFromQueue(item.id);
       }
 
       // Send one bulk request per unique client
@@ -101,9 +100,18 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
       }, 0);
 
       const failedCount = results.filter((r) => r.status === 'rejected').length;
-      return { totalCreated, failedCount, totalGroups: groups.length };
+      const savedItemIds = failedCount === 0
+        ? entryQueue.filter((item) => !isQueueItemBlocked(item)).map((item) => item.id)
+        : [];
+      return {
+        totalCreated,
+        failedCount,
+        totalGroups: groups.length,
+        invalidCount: invalidItems.length,
+        savedItemIds,
+      };
     },
-    onSuccess: ({ totalCreated, failedCount }) => {
+    onSuccess: ({ totalCreated, failedCount, invalidCount, savedItemIds }) => {
       triggerHapticSuccess();
 
       if (failedCount > 0) {
@@ -115,7 +123,12 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
         toast.success(`${totalCreated} ta trek kodi saqlandi`);
       }
 
-      clearQueue();
+      if (failedCount === 0 && invalidCount === 0) {
+        clearQueue();
+      } else if (failedCount === 0) {
+        for (const id of savedItemIds) removeFromQueue(id);
+        toast.info(`${invalidCount} ta tekshiriladigan qator navbatda qoldi`);
+      }
       setIsConfirmOpen(false);
 
       // Refresh the summary list for the active flight
@@ -181,8 +194,7 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
 
             {unreadyItems.length > 0 && (
               <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                {unreadyItems.length} ta element mijoz kodi yo'qligi sababli o'tkazib
-                yuboriladi.
+                {unreadyItems.length} ta qator tekshirish talab qiladi va saqlashga yuborilmaydi.
               </div>
             )}
           </div>
