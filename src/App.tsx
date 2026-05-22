@@ -696,10 +696,16 @@ function AppContent() {
     userRole !== null &&
     (ROLE_CONFIG[userRole]?.allowed ?? []).includes("expected-cargo");
 
+  // NBU redirect pages render in an external browser tab (outside Telegram
+  // WebApp). They are full-screen by design — no NavigationBar, no top padding.
+  const isNbuRedirectPage =
+    currentPage === "payment_nbu_success" || currentPage === "payment_nbu_failure";
+
   const isAdminArea =
     isSuperAdminPages || isAdminLoginPage || isPOSPage ||
     isManagerPage || isStandaloneAdminSubpage || isPasskeyPage ||
-    isWarehousePage || isExpectedCargoPage || currentPage === "pickup-tv";
+    isWarehousePage || isExpectedCargoPage || currentPage === "pickup-tv" ||
+    isNbuRedirectPage;
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -860,6 +866,15 @@ function AppContent() {
         />
       ) : currentPage === "pickup-tv" ? (
         <PickupQueueTVPage />
+      ) : currentPage === "payment_nbu_success" ? (
+        <PaymentNbuSuccess
+          onNavigateHome={() => navigateToPage("user-home")}
+        />
+      ) : currentPage === "payment_nbu_failure" ? (
+        <PaymentNbuFailure
+          onNavigateHome={() => navigateToPage("user-home")}
+          onRetry={() => navigateToPage("user-home")}
+        />
       ) : (
         <main
           className={`relative ${
@@ -966,19 +981,6 @@ function AppContent() {
 
           {currentPage === "user-history" && (
             <UserHistoryPage onBack={() => navigateToPage("user-home")} />
-          )}
-
-          {currentPage === "payment_nbu_success" && (
-            <PaymentNbuSuccess
-              onNavigateHome={() => navigateToPage("user-home")}
-            />
-          )}
-
-          {currentPage === "payment_nbu_failure" && (
-            <PaymentNbuFailure
-              onNavigateHome={() => navigateToPage("user-home")}
-              onRetry={() => navigateToPage("user-home")}
-            />
           )}
 
           {currentPage === "saved_cards" && (

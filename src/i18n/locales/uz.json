@@ -1659,6 +1659,12 @@
       "title": "To'lov tasdiqlanmoqda",
       "body": "Bank to'lovni tasdiqlashi kutilmoqda. Bu odatda bir necha soniya oladi. Sahifani yopmang."
     },
+    "timeout": {
+      "title": "Tasdiqlash kutilmoqda",
+      "body": "Bank javobi vaqtida kelmadi. Bu odatda 1-2 daqiqada hal bo'ladi. Holatni yangilash uchun bosing yoki keyinroq qayta kiring.",
+      "retryButton": "Holatni yangilash",
+      "homeButton": "Bosh sahifa"
+    },
     "cardBound": {
       "title": "Karta saqlandi",
       "body": "Karta muvaffaqiyatli saqlandi. Endi kelgusi to'lovlarni qayta kirita olmasdan amalga oshirishingiz mumkin.",

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { CheckCircle2, CreditCard, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, CreditCard, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import {
   nbuPaymentService,
   type PublicNbuPaymentStatus,
@@ -12,6 +12,9 @@ interface PaymentNbuSuccessProps {
 }
 
 const POLL_INTERVAL_MS = 2_000;
+// Stop active polling after ~40s. CARD_BINDING in particular may never flip
+// via NBU's /payment/status endpoint — the binding result is only delivered
+// via async callback, so we cap polling and offer a manual refresh.
 const MAX_POLL_ATTEMPTS = 20;
 
 function formatMoney(value: number): string {
@@ -21,7 +24,7 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
-type Phase = 'pending' | 'success' | 'card_bound' | 'failure' | 'no_data';
+type Phase = 'pending' | 'timeout' | 'success' | 'card_bound' | 'failure' | 'no_data';
 
 function phaseFromStatus(s: PublicNbuPaymentStatus | null): Phase {
   if (!s) return 'pending';
@@ -38,6 +41,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
 
   const [statusInfo, setStatusInfo] = useState<PublicNbuPaymentStatus | null>(null);
   const [phase, setPhase] = useState<Phase>(orderId ? 'pending' : 'no_data');
+  const [pollKey, setPollKey] = useState(0);
   const attemptsRef = useRef(0);
   const timeoutRef = useRef<number | null>(null);
 
@@ -48,6 +52,12 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
       window.location.href = '/';
     }
   }, [onNavigateHome]);
+
+  const handleManualRefresh = useCallback(() => {
+    attemptsRef.current = 0;
+    setPhase('pending');
+    setPollKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     if (!orderId) return;
@@ -60,14 +70,21 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
         if (cancelled) return;
         setStatusInfo(info);
         const next = phaseFromStatus(info);
-        setPhase(next);
-        if (next === 'pending' && attemptsRef.current < MAX_POLL_ATTEMPTS) {
-          timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+        if (next === 'pending') {
+          if (attemptsRef.current < MAX_POLL_ATTEMPTS) {
+            timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+          } else {
+            setPhase('timeout');
+          }
+          return;
         }
+        setPhase(next);
       } catch {
         if (cancelled) return;
         if (attemptsRef.current < MAX_POLL_ATTEMPTS) {
           timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+        } else {
+          setPhase('timeout');
         }
       }
     };
@@ -80,7 +97,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
         window.clearTimeout(timeoutRef.current);
       }
     };
-  }, [orderId]);
+  }, [orderId, pollKey]);
 
   // Auto-navigate home only on confirmed success (not while pending)
   useEffect(() => {
@@ -182,6 +199,27 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
           </>
         )}
 
+        {phase === 'timeout' && (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+              className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center mx-auto"
+            >
+              <Clock className="w-10 h-10 text-amber-500" />
+            </motion.div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+                {t('nbu.timeout.title')}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t('nbu.timeout.body')}
+              </p>
+            </div>
+          </>
+        )}
+
         {phase === 'failure' && (
           <>
             <motion.div
@@ -209,7 +247,34 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
           </p>
         )}
 
-        {phase !== 'pending' && (
+        {phase === 'timeout' && (
+          <div className="space-y-3">
+            <button
+              onClick={handleManualRefresh}
+              className="w-full h-14 rounded-2xl font-black text-[16px]
+                bg-gradient-to-r from-sky-500 to-cyan-500
+                hover:from-sky-600 hover:to-cyan-600
+                text-white shadow-xl shadow-sky-500/25
+                active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-5 h-5" />
+              {t('nbu.timeout.retryButton')}
+            </button>
+            <button
+              onClick={handleHome}
+              className="w-full h-14 rounded-2xl font-bold text-base
+                bg-white dark:bg-white/5
+                border border-gray-200 dark:border-white/10
+                text-gray-900 dark:text-white
+                hover:bg-gray-50 dark:hover:bg-white/10
+                active:scale-[0.97] transition-all"
+            >
+              {t('nbu.timeout.homeButton')}
+            </button>
+          </div>
+        )}
+
+        {phase !== 'pending' && phase !== 'timeout' && (
           <button
             onClick={handleHome}
             className="w-full h-14 rounded-2xl font-black text-[16px]
