@@ -11,6 +11,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import {
   Loader2, X, CheckCircle2, AlertCircle, User, Camera, ScanLine,
   Pencil, AlertTriangle, Info, XCircle, PanelBottomClose, PanelBottomOpen, Ban,
+  Undo2, Upload, Square, CheckSquare,
 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -77,6 +78,17 @@ function parseTrackCodes(value: string): string[] {
   ];
 }
 
+function formatScanTime(value?: string): string {
+  if (!value) return '--:--:--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--:--:--';
+  return date.toLocaleTimeString('uz-UZ', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 // ── Duplicate-client detection ─────────────────────────────────────────────────
 //
 // Only warn when the same client reappears AFTER at least one track code from a
@@ -118,6 +130,7 @@ interface QueueItemRowProps {
   onAcceptConflictOwner: (id: string) => void;
   onMergeClientGroup: (clientCode: string) => void;
   onPreviewClient: (clientCode: string) => void;
+  onToggleReviewed: (id: string) => void;
 }
 
 function QueueItemRow({
@@ -131,6 +144,7 @@ function QueueItemRow({
   onAcceptConflictOwner,
   onMergeClientGroup,
   onPreviewClient,
+  onToggleReviewed,
 }: QueueItemRowProps) {
   // Auto-open edit mode for items that need manual input (not-found or no client code yet).
   const [isEditingCode, setIsEditingCode] = useState(
@@ -299,12 +313,30 @@ function QueueItemRow({
         ) : (
           <Loader2 className="size-4 shrink-0 animate-spin text-orange-400" />
         )}
-        <span className="truncate text-[12px] font-semibold">
-          {sheetStatusLabel}
-        </span>
+        <div className="min-w-0">
+          <div className="truncate text-[12px] font-semibold">
+            {sheetStatusLabel}
+          </div>
+          <div className="font-mono text-[10px] text-current/55">
+            {formatScanTime(item.scannedAt)}
+          </div>
+        </div>
       </div>
 
       <div className="flex h-11 items-center justify-end gap-1 px-2">
+        <button
+          type="button"
+          onClick={() => onToggleReviewed(item.id)}
+          className={cn(
+            'flex size-7 items-center justify-center rounded-md border border-current/10',
+            item.isReviewed
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+              : 'bg-white/70 text-zinc-400 hover:text-emerald-600 dark:bg-black/20',
+          )}
+          title={item.isReviewed ? 'Tekshirildi' : 'Tekshirildi deb belgilash'}
+        >
+          {item.isReviewed ? <CheckSquare className="size-4" /> : <Square className="size-4" />}
+        </button>
         {isSplitGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
           <button
             type="button"
@@ -520,6 +552,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const [trackCodeInput, setTrackCodeInput] = useState('');
   const [draftRows, setDraftRows] = useState<FastEntryDraftRow[]>(() => [createDraftRow()]);
   const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
+  const [isAutoMergeEnabled, setIsAutoMergeEnabled] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
   const [clientCodeInput, setClientCodeInput] = useState('');
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -556,7 +591,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     markQueueItemAlreadySent,
     acceptQueueItemConflictOwner,
     mergeClientQueueGroup,
+    toggleQueueItemReviewed,
     setQueueItemClientCode,
+    removeLatestQueueItem,
     removeFromQueue,
     setSearchQuery,
     setExpandedClient,
@@ -738,6 +775,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
         resolveQueueItemClient(trackCode, data.client_code.toUpperCase(), data.full_name, data.client_id, isContinuation, priorCount);
 
         if (isContinuation) {
+          if (isAutoMergeEnabled) {
+            requestAnimationFrame(() => mergeClientQueueGroup(data.client_code));
+          }
           playWarningSound();
           const totalCount = priorCount + 1;
           toast.warning(
@@ -895,6 +935,28 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   }, [draftRows, enqueueAutoFillTrackCode, moveFromDraftRow]);
 
   const handleDraftKeyDown = useCallback((rowId: string, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveFromDraftRow(rowId, 1);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveFromDraftRow(rowId, -1);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setDraftRows((rows) =>
+        rows.map((row) =>
+          row.id === rowId ? { ...row, trackCode: '' } : row,
+        ),
+      );
+      return;
+    }
+
     if (event.key === 'Enter') {
       event.preventDefault();
       commitDraftRow(rowId, event.shiftKey ? -1 : 1);
@@ -905,7 +967,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       event.preventDefault();
       commitDraftRow(rowId, event.shiftKey ? -1 : 1);
     }
-  }, [commitDraftRow]);
+  }, [commitDraftRow, moveFromDraftRow]);
 
   const handleDraftPaste = useCallback((rowId: string, event: ClipboardEvent<HTMLInputElement>) => {
     const codes = parseTrackCodes(event.clipboardData.getData('text'));
@@ -931,6 +993,75 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       toast.success(`${addedCount} ta track code jadvalga qo'shildi`, { duration: 1800 });
     }
   }, [enqueueAutoFillTrackCode, focusDraftRow]);
+
+  const handleUndoLatest = useCallback(() => {
+    const latest = useExpectedCargoStore.getState().entryQueue
+      .filter((item) => !item.isReviewed)
+      .sort((a, b) => {
+        const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
+        const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
+        return bTime - aTime;
+      })[0];
+
+    if (!latest) {
+      toast.info("Qaytaradigan tekshirilmagan row yo'q", { duration: 1500 });
+      return;
+    }
+
+    removeLatestQueueItem();
+    toast.success(`${latest.trackCode} qaytarildi`, { duration: 1500 });
+  }, [removeLatestQueueItem]);
+
+  const handleExcelImport = useCallback(() => {
+    const lines = importText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    let imported = 0;
+    let duplicates = 0;
+
+    for (const line of lines) {
+      const parts = line
+        .split(/\t|,|;|\s{2,}/)
+        .map((part) => part.trim().toUpperCase())
+        .filter(Boolean);
+
+      if (parts.length >= 2) {
+        const [clientCode, trackCode] = parts;
+        if (!clientCode || !trackCode) continue;
+        const liveQueue = useExpectedCargoStore.getState().entryQueue;
+        if (liveQueue.some((item) => item.trackCode === trackCode)) {
+          duplicates++;
+          continue;
+        }
+        enqueueEntry({
+          trackCode,
+          clientCode,
+          resolvedClientName: null,
+          resolvedClientId: null,
+          isResolved: false,
+        });
+        imported++;
+      } else if (parts.length === 1 && enqueueAutoFillTrackCode(parts[0] ?? '')) {
+        imported++;
+      } else {
+        duplicates++;
+      }
+    }
+
+    if (imported > 0) {
+      playSuccessSound();
+      toast.success(`${imported} ta row import qilindi`, {
+        duration: 2000,
+        description: duplicates > 0 ? `${duplicates} ta duplicate o'tkazildi` : undefined,
+      });
+      setImportText('');
+      setIsImportOpen(false);
+    } else {
+      toast.warning("Import uchun yaroqli row topilmadi", { duration: 1800 });
+    }
+  }, [enqueueAutoFillTrackCode, enqueueEntry, importText]);
 
   const handleAutoFillScan = useCallback(() => {
     const raw = trackCodeInput.trim();
@@ -1215,6 +1346,18 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
               Auto-fill
             </span>
           </label>
+
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <Switch
+              size="sm"
+              checked={isAutoMergeEnabled}
+              onCheckedChange={setIsAutoMergeEnabled}
+              className="data-[state=checked]:bg-violet-500"
+            />
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
+              Auto-merge
+            </span>
+          </label>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -1299,6 +1442,23 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={handleUndoLatest}
+              disabled={entryQueue.length === 0}
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+            >
+              <Undo2 className="size-3.5" />
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsImportOpen(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+            >
+              <Upload className="size-3.5" />
+              Import
+            </button>
             {splitGroupCount > 0 && (
               <button
                 type="button"
@@ -1326,6 +1486,55 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             ))}
           </div>
         </div>
+
+        {isImportOpen && (
+          <div className="mb-2 rounded-lg border border-orange-200 bg-orange-50/80 p-3 dark:border-orange-900/60 dark:bg-orange-950/20">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-black text-zinc-900 dark:text-zinc-100">
+                  Excel import
+                </div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Har qatorda `TRACK` yoki `CLIENT_CODE TRACK` formatida paste qiling.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportOpen(false)}
+                className="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-zinc-700 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <textarea
+              value={importText}
+              onChange={(event) => setImportText(event.target.value.toUpperCase())}
+              placeholder={'STCH100\tTRK001\nSTCH100\tTRK002\nTRK003'}
+              rows={5}
+              className="mb-2 w-full resize-y rounded-md border border-orange-200 bg-white p-2 font-mono text-sm outline-none focus:border-orange-400 dark:border-orange-900/60 dark:bg-zinc-950"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setImportText('')}
+                className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-600 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+              >
+                Tozalash
+              </button>
+              <button
+                type="button"
+                onClick={handleExcelImport}
+                disabled={!importText.trim()}
+                className="rounded-md bg-orange-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800"
+              >
+                Import qilish
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
           <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
@@ -1534,6 +1743,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                     onAcceptConflictOwner={acceptQueueItemConflictOwner}
                     onMergeClientGroup={mergeClientQueueGroup}
                     onPreviewClient={handlePreviewClient}
+                    onToggleReviewed={toggleQueueItemReviewed}
                   />
                 );
               })()
@@ -1789,6 +1999,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                 onAcceptConflictOwner={acceptQueueItemConflictOwner}
                 onMergeClientGroup={mergeClientQueueGroup}
                 onPreviewClient={handlePreviewClient}
+                onToggleReviewed={toggleQueueItemReviewed}
               />
             ))}
           </div>

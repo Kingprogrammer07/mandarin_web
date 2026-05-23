@@ -40,6 +40,8 @@ export interface FastEntryQueueItem {
   isWrongClient: boolean;
   /** The actual owning client code when isWrongClient is true. */
   conflictClientCode: string | null;
+  /** Local admin checklist state; helps operators mark rows as manually reviewed. */
+  isReviewed?: boolean;
 }
 
 // ── Notification History ───────────────────────────────────────────────────────
@@ -109,7 +111,9 @@ interface ExpectedCargoState {
   acceptQueueItemConflictOwner: (id: string) => void;
   /** Bring all rows for one client next to each other in the scanner table. */
   mergeClientQueueGroup: (clientCode: string) => void;
+  toggleQueueItemReviewed: (id: string) => void;
   setQueueItemClientCode: (id: string, clientCode: string) => void;
+  removeLatestQueueItem: () => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
 
@@ -183,6 +187,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
               alreadySentFlight: item.alreadySentFlight ?? null,
               isWrongClient: item.isWrongClient ?? false,
               conflictClientCode: item.conflictClientCode ?? null,
+              isReviewed: false,
             },
             ...state.entryQueue,
           ],
@@ -276,6 +281,29 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
             item.id === id ? { ...item, clientCode, notFound: false } : item,
           ),
         })),
+
+      toggleQueueItemReviewed: (id) =>
+        set((state) => ({
+          entryQueue: state.entryQueue.map((item) =>
+            item.id === id ? { ...item, isReviewed: !item.isReviewed } : item,
+          ),
+        })),
+
+      removeLatestQueueItem: () =>
+        set((state) => {
+          const latest = state.entryQueue
+            .filter((item) => !item.isReviewed)
+            .sort((a, b) => {
+              const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
+              const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
+              return bTime - aTime;
+            })[0];
+
+          if (!latest) return state;
+          return {
+            entryQueue: state.entryQueue.filter((item) => item.id !== latest.id),
+          };
+        }),
 
       removeFromQueue: (id) =>
         set((state) => ({
