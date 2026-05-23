@@ -111,24 +111,40 @@ function formatScanTime(value?: string): string {
 //  STCH3 × 6 consecutive       → silent (normal scanning)
 //  STCH3 × 6, OTHER, STCH3     → warning on the 7th scan
 
-function detectContinuation(
+function detectClientSwitchWarning(
   queue: FastEntryQueueItem[],
   resolvedClientCode: string,
 ): { isContinuation: boolean; priorCount: number } {
-  const resolvedQueue = queue.filter((item) => item.isResolved && item.clientCode);
-  const sameClientItems = resolvedQueue.filter((item) => item.clientCode === resolvedClientCode);
-  if (sameClientItems.length === 0) return { isContinuation: false, priorCount: 0 };
+  const normalized = resolvedClientCode.trim().toUpperCase();
+  const resolvedQueue = [...queue]
+    .filter((item) =>
+      item.isResolved &&
+      item.clientCode.trim() &&
+      !item.isWrongClient &&
+      !item.isAlreadySent &&
+      !item.notFound
+    )
+    .sort((a, b) => {
+      const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
+      const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
+      return bTime - aTime;
+    });
 
-  const lastSameIdx = resolvedQueue.reduce<number>(
-    (last, item, idx) => (item.clientCode === resolvedClientCode ? idx : last),
-    -1,
-  );
+  const previousClientCode = resolvedQueue[0]?.clientCode.trim().toUpperCase();
+  if (!previousClientCode || previousClientCode === normalized) {
+    return { isContinuation: false, priorCount: 0 };
+  }
 
-  const hasInterleavedOtherClient = resolvedQueue
-    .slice(lastSameIdx + 1)
-    .some((item) => item.clientCode !== resolvedClientCode);
+  let previousRunLength = 0;
+  for (const item of resolvedQueue) {
+    if (item.clientCode.trim().toUpperCase() !== previousClientCode) break;
+    previousRunLength += 1;
+  }
 
-  return { isContinuation: hasInterleavedOtherClient, priorCount: sameClientItems.length };
+  return {
+    isContinuation: previousRunLength >= 2,
+    priorCount: previousRunLength,
+  };
 }
 
 // ── Queue item row ─────────────────────────────────────────────────────────────
@@ -139,7 +155,6 @@ interface QueueItemRowProps {
   isSelected: boolean;
   clientScanCount: number;
   isSplitGroup: boolean;
-  splitSegmentCount: number;
   onToggleSelected: (id: string) => void;
   onRemove: (id: string) => void;
   onSetClientCode: (id: string, code: string) => void;
@@ -155,7 +170,6 @@ function QueueItemRow({
   isSelected,
   clientScanCount,
   isSplitGroup,
-  splitSegmentCount,
   onToggleSelected,
   onRemove,
   onSetClientCode,
@@ -221,8 +235,6 @@ function QueueItemRow({
     ? 'bg-red-50/90 dark:bg-red-950/25 border-red-300 dark:border-red-800 text-red-950 dark:text-red-100'
     : item.isAlreadySent
       ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800 text-orange-950 dark:text-orange-100'
-      : isSplitGroup
-        ? 'bg-violet-50/95 dark:bg-violet-950/25 border-violet-300 dark:border-violet-800 text-violet-950 dark:text-violet-100 ring-1 ring-violet-200 dark:ring-violet-800/60'
       : item.isContinuation
         ? 'bg-amber-50/90 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-100'
         : item.isResolved
@@ -237,10 +249,8 @@ function QueueItemRow({
         : 'Allaqachon yuborilgan'
       : item.notFound
         ? 'Mijoz topilmadi'
-        : isSplitGroup
-          ? `Ajralgan guruh: ${splitSegmentCount} joyda, jami ${clientScanCount} ta`
         : item.isContinuation
-          ? `Davomi: +${item.priorCountForClient} avval`
+          ? `Ehtimol aralashdi: avvalgi userdan ${item.priorCountForClient} ta`
           : item.isResolved
             ? item.resolvedClientName ?? 'Aniqlandi'
             : item.clientCode
@@ -333,8 +343,6 @@ function QueueItemRow({
           <Ban className="size-4 shrink-0 text-orange-500" />
         ) : item.notFound ? (
           <XCircle className="size-4 shrink-0 text-red-500" />
-        ) : isSplitGroup ? (
-          <AlertTriangle className="size-4 shrink-0 text-violet-500" />
         ) : item.isContinuation ? (
           <AlertTriangle className="size-4 shrink-0 text-amber-500" />
         ) : item.isResolved ? (
@@ -806,7 +814,10 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     onSuccess: (data, trackCode) => {
       if (isAutoFillRef.current) {
         const currentQueue = useExpectedCargoStore.getState().entryQueue;
-        const { isContinuation, priorCount } = detectContinuation(currentQueue, data.client_code);
+        const { isContinuation, priorCount } = detectClientSwitchWarning(
+          currentQueue,
+          data.client_code,
+        );
 
         resolveQueueItemClient(trackCode, data.client_code.toUpperCase(), data.full_name, data.client_id, isContinuation, priorCount);
 
@@ -817,10 +828,10 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           playWarningSound();
           const totalCount = priorCount + 1;
           toast.warning(
-            `${data.client_code} — orada boshqa mijoz kiritilgan, keyin yana shu mijoz`,
+            `${data.client_code} — user almashdi, tekshirib oling`,
             {
-              duration: Infinity,
-              description: `"${data.client_code}" uchun avval ${priorCount} ta trek kodi bor edi, yangi: ${trackCode}. Jami: ${totalCount} ta.`,
+              duration: 5000,
+              description: `Oldingi userdan ketma-ket ${priorCount} ta scan bor edi. Yangi track: ${trackCode}. Agar davom etsa rang avtomatik yashilga qaytadi.`,
               action: {
                 label: 'Ko\'rish',
                 onClick: () => {
@@ -834,8 +845,8 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           );
           addNotification({
             type: 'warning',
-            title: `Takroriy mijoz: ${data.client_code}`,
-            description: `Orada boshqa mijoz kiritilganidan keyin "${data.client_code}" qayta topildi. Avvalgisi: ${priorCount} ta, jami: ${totalCount} ta trek kodi.`,
+            title: `User almashdi: ${data.client_code}`,
+            description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${data.client_code}" rowi tekshirish uchun belgilandi. Jami taxminiy: ${totalCount}.`,
             navigateTo: { flightName: flightName ?? '', clientCode: data.client_code },
           });
         } else {
@@ -1884,7 +1895,6 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                     isSelected={selectedQueueItemIds.includes(item.id)}
                     clientScanCount={clientScanCounts.get(clientCode) ?? 0}
                     isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
-                    splitSegmentCount={splitSegment?.segmentCount ?? 0}
                     onToggleSelected={toggleQueueItemSelected}
                     onRemove={removeFromQueue}
                     onSetClientCode={setQueueItemClientCode}
@@ -2142,7 +2152,6 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                 isSelected={selectedQueueItemIds.includes(item.id)}
                 clientScanCount={clientScanCounts.get(item.clientCode.trim().toUpperCase()) ?? 0}
                 isSplitGroup={false}
-                splitSegmentCount={0}
                 onToggleSelected={toggleQueueItemSelected}
                 onRemove={removeFromQueue}
                 onSetClientCode={setQueueItemClientCode}

@@ -106,6 +106,7 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
       let totalCreated = 0;
       let failedCount = 0;
       const savedItemIds: string[] = [];
+      const savedClientCodes: string[] = [];
 
       await runWithConcurrency(groups, SAVE_CONCURRENCY, async (group) => {
         try {
@@ -116,6 +117,7 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
           });
           totalCreated += response.created_count;
           savedItemIds.push(...group.itemIds);
+          savedClientCodes.push(group.clientCode);
           for (const id of group.itemIds) removeFromQueue(id);
         } catch {
           failedCount += 1;
@@ -128,9 +130,10 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
         totalGroups: groups.length,
         invalidCount: invalidItems.length,
         savedItemIds,
+        savedClientCodes,
       };
     },
-    onSuccess: ({ totalCreated, failedCount, invalidCount, savedItemIds }) => {
+    onSuccess: ({ totalCreated, failedCount, invalidCount, savedItemIds, savedClientCodes }) => {
       triggerHapticSuccess();
 
       if (failedCount > 0) {
@@ -155,9 +158,17 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
       if (flightName) {
         queryClient.invalidateQueries({
           queryKey: ['expectedCargo', 'summary', flightName],
+          refetchType: 'all',
         });
+        for (const clientCode of new Set(savedClientCodes)) {
+          queryClient.invalidateQueries({
+            queryKey: ['expectedCargo', 'trackCodes', flightName, clientCode],
+            refetchType: 'all',
+          });
+        }
         queryClient.invalidateQueries({
           queryKey: ['expectedCargo', 'flights'],
+          refetchType: 'all',
         });
       }
     },

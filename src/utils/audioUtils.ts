@@ -76,10 +76,10 @@ export function playWarningSound() {
     const playTone = (freq: number, startTime: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'triangle';
+      osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(freq, startTime);
       gain.gain.setValueAtTime(0, startTime);
-      gain.gain.linearRampToValueAtTime(0.9 * volume, startTime + 0.02);
+      gain.gain.linearRampToValueAtTime(0.75 * volume, startTime + 0.01);
       gain.gain.linearRampToValueAtTime(0, startTime + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -88,8 +88,9 @@ export function playWarningSound() {
     };
 
     // Descending two-tone: 660 Hz → 440 Hz (warning interval)
-    playTone(660, ctx.currentTime, 0.14);
-    playTone(440, ctx.currentTime + 0.18, 0.18);
+    playTone(760, ctx.currentTime, 0.08);
+    playTone(760, ctx.currentTime + 0.12, 0.08);
+    playTone(520, ctx.currentTime + 0.24, 0.12);
 
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');

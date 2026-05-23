@@ -27,11 +27,11 @@ export interface FastEntryQueueItem {
   /** Flight name from the 409 response body — which flight already has this code. */
   alreadySentFlight: string | null;
   /**
-   * True when this track code belongs to a client that already has entries in the
-   * current session queue AND at least one different client was scanned in between.
+   * True for a temporary warning row when scanning switches away after a 2+ item
+   * run from another client. Cleared automatically if the new client continues.
    */
   isContinuation: boolean;
-  /** How many prior queue items share this same clientCode at the time of scan. */
+  /** Length of the previous different-client run that triggered the warning. */
   priorCountForClient: number;
   /**
    * True when the track code was found in DB but belongs to a different client
@@ -268,6 +268,12 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
                   isContinuation,
                   priorCountForClient,
                 }
+              : !isContinuation && item.clientCode.trim().toUpperCase() === clientCode.trim().toUpperCase()
+                ? {
+                    ...item,
+                    isContinuation: false,
+                    priorCountForClient: 0,
+                  }
               : item,
           ),
         })),
