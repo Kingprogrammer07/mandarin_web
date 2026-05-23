@@ -48,6 +48,12 @@ export interface AuthMeResponse {
   phone: string | null;
   telegram_id: number | null;
   role: string;
+  /**
+   * True when the backend recognises the session but the account is missing
+   * region/district. Handled by routing the user through the address
+   * drawer instead of triggering a logout.
+   */
+  requires_address?: boolean;
 }
 
 const AUTH_ME_TIMEOUT_MS = 5_000;

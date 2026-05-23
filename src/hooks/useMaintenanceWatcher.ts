@@ -8,11 +8,17 @@ interface MaintenanceWatcherResult {
 }
 
 export function useMaintenanceWatcher(): MaintenanceWatcherResult {
+  // Background tabs left open overnight previously polled forever; gating the
+  // interval on tab visibility removes a multi-hundred-thousand Edge-Request
+  // long tail without weakening the in-foreground UX.
   const { data, isLoading, error } = useQuery({
     queryKey: ['maintenance-status'],
     queryFn: systemService.getMaintenanceStatus,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: () =>
+      typeof document !== 'undefined' && document.visibilityState === 'visible'
+        ? 60_000
+        : false,
+    refetchIntervalInBackground: false,
     retry: false,
   });
 

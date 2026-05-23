@@ -20,6 +20,19 @@ import type {
   PosPickupQueueUpdateRequest,
 } from '../pickupQueue';
 
+// Polling cadence used by every warehouse / POS / TV queue query.
+// Visibility gate cuts background-tab traffic to zero, which alone removes
+// the bulk of the daily Edge Request load attributed to long-running
+// warehouse shifts.
+const QUEUE_REFETCH_INTERVAL_MS = 15_000;
+const QUEUE_STALE_TIME_MS = 10_000;
+
+const visibleRefetchInterval = (intervalMs: number) =>
+  (): number | false => {
+    if (typeof document === 'undefined') return intervalMs;
+    return document.visibilityState === 'visible' ? intervalMs : false;
+  };
+
 export const pickupQueueKeys = {
   count: (params: { status?: string; pickup_method?: string }) =>
     ['pickup_queue', 'count', params] as const,
@@ -37,8 +50,9 @@ export const useWarehousePickupQueueCount = (params: {
   return useQuery({
     queryKey: pickupQueueKeys.count(params),
     queryFn: () => getWarehousePickupQueueCount(params),
-    staleTime: 3_000,
-    refetchInterval: 3_000,
+    staleTime: QUEUE_STALE_TIME_MS,
+    refetchInterval: visibleRefetchInterval(QUEUE_REFETCH_INTERVAL_MS),
+    refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData,
   });
 };
@@ -47,8 +61,9 @@ export const useWarehousePickupQueueList = (params: WarehousePickupQueueListPara
   return useQuery({
     queryKey: pickupQueueKeys.warehouseList(params),
     queryFn: () => getWarehousePickupQueueList(params),
-    staleTime: 5_000,
-    refetchInterval: 5_000,
+    staleTime: QUEUE_STALE_TIME_MS,
+    refetchInterval: visibleRefetchInterval(QUEUE_REFETCH_INTERVAL_MS),
+    refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData,
   });
 };
@@ -141,8 +156,11 @@ export const usePickupQueueTV = (params: PickupQueueTVParams, token: string | nu
       return getPickupQueueTV(params, token);
     },
     enabled: !!token,
-    staleTime: 3_000,
-    refetchInterval: 3_000,
+    // The TV display is a stationary screen — kept short to keep the queue
+    // visibly fresh, but still gated on visibility for completeness.
+    staleTime: 5_000,
+    refetchInterval: visibleRefetchInterval(10_000),
+    refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData,
   });
 };
@@ -151,8 +169,9 @@ export const usePosPickupQueueList = () => {
   return useQuery({
     queryKey: ['pos_pickup_queue', 'list'] as const,
     queryFn: () => getPosPickupQueueList(),
-    staleTime: 5_000,
-    refetchInterval: 5_000,
+    staleTime: QUEUE_STALE_TIME_MS,
+    refetchInterval: visibleRefetchInterval(QUEUE_REFETCH_INTERVAL_MS),
+    refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData,
   });
 };

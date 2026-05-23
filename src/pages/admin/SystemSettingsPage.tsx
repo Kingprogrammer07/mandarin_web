@@ -12,6 +12,7 @@ import {
   Activity,
   AlertTriangle,
   RefreshCw,
+  XCircle,
 } from 'lucide-react';
 import { systemService, type NbuPendingPaymentRow } from '@/api/services/systemService';
 
@@ -40,17 +41,26 @@ export default function SystemSettingsPage() {
   const [showRedisClients, setShowRedisClients] = useState(false);
   const [showNbuPending, setShowNbuPending] = useState(false);
   const [reconciling, setReconciling] = useState<string | null>(null);
+  const [expiring, setExpiring] = useState<string | null>(null);
+
+  // Visibility gate + slower cadence: admins typically leave this tab open
+  // while doing other work, so previous 30 s polling generated traffic for
+  // hours per session.
+  const visibleInterval = (ms: number) =>
+    typeof document !== 'undefined' && document.visibilityState === 'visible' ? ms : false;
 
   const { data: maintenanceData, isLoading: maintenanceLoading } = useQuery({
     queryKey: ['system-maintenance'],
     queryFn: systemService.getMaintenanceStatus,
-    refetchInterval: 30_000,
+    refetchInterval: () => visibleInterval(60_000),
+    refetchIntervalInBackground: false,
   });
 
   const { data: nbuData, isLoading: nbuLoading } = useQuery({
     queryKey: ['system-nbu'],
     queryFn: systemService.getNbuStatus,
-    refetchInterval: 30_000,
+    refetchInterval: () => visibleInterval(60_000),
+    refetchIntervalInBackground: false,
   });
 
   const { data: redisInfo, isLoading: redisInfoLoading } = useQuery({
@@ -73,7 +83,8 @@ export default function SystemSettingsPage() {
     queryKey: ['system-nbu-pending'],
     queryFn: () => systemService.getNbuPending(100),
     enabled: showNbuPending,
-    refetchInterval: showNbuPending ? 15_000 : false,
+    refetchInterval: () => (showNbuPending ? visibleInterval(30_000) : false),
+    refetchIntervalInBackground: false,
   });
 
   const reconcileMutation = useMutation({
@@ -94,6 +105,34 @@ export default function SystemSettingsPage() {
       toast.error('Reconcile xatosi — server loglarini ko\'ring');
     },
   });
+
+  const expireMutation = useMutation({
+    mutationFn: systemService.expireNbu,
+    onMutate: (transactionId) => setExpiring(transactionId),
+    onSettled: () => setExpiring(null),
+    onSuccess: (res) => {
+      toast.success(`${res.previous_status} → ${res.new_status}`);
+      queryClient.invalidateQueries({ queryKey: ['system-nbu-pending'] });
+    },
+    onError: () => {
+      toast.error('Expire xatosi — server loglarini ko\'ring');
+    },
+  });
+
+  const handleExpire = useCallback(
+    (transactionId: string) => {
+      // No native confirm dialog inside Telegram WebApp — use a simple
+      // window.confirm fallback. Admin panel runs in regular browser so
+      // this is fine.
+      const ok = window.confirm(
+        'Bu tranzaksiyani EXPIRED qilib belgilamoqchimisiz?\n\n' +
+          'Hamyon kreditlanmaydi, karta saqlanmaydi. Faqat statusi o\'zgaradi.',
+      );
+      if (!ok) return;
+      expireMutation.mutate(transactionId);
+    },
+    [expireMutation],
+  );
 
   const maintenanceMutation = useMutation({
     mutationFn: systemService.toggleMaintenance,
@@ -303,14 +342,16 @@ export default function SystemSettingsPage() {
                   <div className="space-y-2 max-h-[480px] overflow-auto">
                     {nbuPending.rows.map((row: NbuPendingPaymentRow) => {
                       const isReconciling = reconciling === row.transaction_id;
+                      const isExpiring = expiring === row.transaction_id;
                       const isCardBinding = row.purpose === 'CARD_BINDING';
+                      const isBusy = isReconciling || isExpiring;
                       return (
                         <div
                           key={row.id}
                           className="border border-gray-200 dark:border-white/10 rounded-xl p-3 bg-gray-50/50 dark:bg-white/[0.02]"
                         >
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex-1 min-w-0">
+                          <div className="flex flex-col gap-2">
+                            <div className="min-w-0">
                               <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                 <span
                                   className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -342,18 +383,32 @@ export default function SystemSettingsPage() {
                                 {row.callback_received_at && ' · callback ✓'}
                               </p>
                             </div>
-                            <button
-                              onClick={() => reconcileMutation.mutate(row.transaction_id)}
-                              disabled={isReconciling || reconcileMutation.isPending}
-                              className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1"
-                            >
-                              {isReconciling ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-3 h-3" />
-                              )}
-                              Reconcile
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => reconcileMutation.mutate(row.transaction_id)}
+                                disabled={isBusy || reconcileMutation.isPending}
+                                className="flex-1 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                              >
+                                {isReconciling ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3" />
+                                )}
+                                Reconcile
+                              </button>
+                              <button
+                                onClick={() => handleExpire(row.transaction_id)}
+                                disabled={isBusy || expireMutation.isPending}
+                                className="flex-1 px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/15 text-gray-800 dark:text-gray-200 text-xs font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                              >
+                                {isExpiring ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <XCircle className="w-3 h-3" />
+                                )}
+                                Expire
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );

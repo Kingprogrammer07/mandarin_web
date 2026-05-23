@@ -165,7 +165,11 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const { data: tabCounts } = useQuery({
     queryKey: ['pos-tab-counts'],
     queryFn: () => posNotificationService.getTabCounts(),
-    refetchInterval: 30_000,
+    refetchInterval: () =>
+      typeof document !== 'undefined' && document.visibilityState === 'visible'
+        ? 60_000
+        : false,
+    refetchIntervalInBackground: false,
   });
 
   // ── Permissions ───────────────────────────────────────────────────────────
@@ -472,10 +476,15 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   } = useQuery({
     queryKey: ["cashier-log", cashierLogParams],
     queryFn: () => getCashierLog(cashierLogParams),
-    // Poll every 10 s so all cashiers see each other's entries in near-real-time
-    // without requiring a manual refresh.
-    staleTime: 10_000,
-    refetchInterval: 10_000,
+    // Cashier log refreshes are also delivered live via SSE (see
+    // useEventSource); polling exists only as a fallback. 30 s with a
+    // visibility gate is a safe floor.
+    staleTime: 30_000,
+    refetchInterval: () =>
+      typeof document !== 'undefined' && document.visibilityState === 'visible'
+        ? 30_000
+        : false,
+    refetchIntervalInBackground: false,
     // Only fire if the admin actually has pos:read — prevents a 403 for adjust-only roles
     enabled: canRead,
   });
@@ -535,17 +544,18 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       setReceivedInput("");
       setConfirmPayload(null);
 
-      // Aggressively invalidate all POS-related query keys
-      queryClient.invalidateQueries({ queryKey: ["pos-unpaid"] });
-      queryClient.invalidateQueries({ queryKey: ["cashier-log"] });
-      queryClient.invalidateQueries({ queryKey: ["pos-txn"] });
-      queryClient.invalidateQueries({ queryKey: ["client-info"] });
-      queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
-      // Refresh client wallet balance in the background
-      if (clientInfo) {
-        void handleSearch(clientInfo.client_code);
-      }
-      // refetchLog() is redundant — invalidateQueries above already triggers refetch
+      // Restrict refetches to queries that are actually mounted on the
+      // current screen — the previous five-key invalidation fan-out fired
+      // refetches for off-screen queries as well, multiplying per-payment
+      // request count.
+      queryClient.invalidateQueries({ queryKey: ["pos-unpaid"], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ["cashier-log"], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ["pos-txn"], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ["client-info"], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ["pos-notifications"], refetchType: 'active' });
+      // `handleSearch` was issued explicitly to refresh client wallet, but
+      // the `client-info` invalidation above already triggers that refetch
+      // when the panel is mounted. Drop the redundant call.
 
       // Refresh the active notification card to reflect the just-processed payment
       const currentNotif = activeNotifRef.current;

@@ -67,8 +67,12 @@ function normalizeBranch(rawBranch: RawUzpostBranch): UzpostBranch | null {
 }
 
 async function fetchUzpostBranches(): Promise<UzpostBranch[]> {
+  // The branches file is large and effectively static across sessions; force
+  // the browser HTTP cache so repeated calculator opens do not retrigger an
+  // Edge Request.
   const response = await fetch('/branches.json', {
     headers: { Accept: 'application/json, text/plain' },
+    cache: 'force-cache',
   });
 
   if (!response.ok) {

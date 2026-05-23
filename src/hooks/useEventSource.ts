@@ -42,6 +42,11 @@ type WireMessage = BroadcastMessage & { _id: string };
 const BC_CHANNEL_NAME = "pos_notifications";
 const STORAGE_KEY = "pos_notification_last";
 
+// Cap reconnect attempts so a persistent server error (expired token, server
+// down, network blip during a long shift) cannot wedge an open tab into a
+// 30-second reconnect cycle forever.
+const MAX_RECONNECT_ATTEMPTS = 10;
+
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -159,6 +164,23 @@ export function useEventSource(
         es.close();
         esRef.current = null;
 
+        if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          if (import.meta.env.DEV) {
+            console.debug("[POS] SSE: max reconnect attempts reached, giving up");
+          }
+          return;
+        }
+
+        // Skip reconnect while the tab is hidden — the SSE stream will be
+        // re-established by the visibility listener below when the user
+        // brings the page back.
+        if (
+          typeof document !== "undefined" &&
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+
         // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
         const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30_000);
         reconnectAttemptRef.current += 1;
@@ -192,6 +214,18 @@ export function useEventSource(
     };
     window.addEventListener("storage", handleStorage);
 
+    // ── Re-open SSE when the tab becomes visible again ──────────────────────
+    // Pairs with the visibility skip inside onerror: avoids the dead-quiet
+    // state where a backgrounded tab dropped the connection and never tries
+    // to recover after the user comes back.
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (esRef.current) return;
+      reconnectAttemptRef.current = 0;
+      connect();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
@@ -201,6 +235,7 @@ export function useEventSource(
       bc?.close();
       bcRef.current = null;
       window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [dispatch]);
 

@@ -1,14 +1,15 @@
-// Minimal service worker — satisfies PWA install criteria without
-// interfering with the app's own data fetching strategy.
-const CACHE_NAME = 'mandarin-cargo-shell-v1';
+// Minimal service worker — satisfies PWA install criteria and acts as a
+// cache to dramatically reduce repeated edge fetches for the app shell and
+// hashed asset chunks. Cache-first for static assets; stale-while-revalidate
+// for navigations so users still receive shell updates without forcing a
+// duplicate network fetch on every page load.
+const CACHE_NAME = 'mandarin-cargo-shell-v2';
 
 self.addEventListener('install', () => {
-  // Take control immediately without waiting for old tab to close
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Remove outdated cache versions so users always get fresh assets
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
@@ -18,28 +19,60 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Network-first: always try the network; only fall back to cache for
-// navigation requests (so the shell loads offline after first visit).
+const STATIC_ASSET_PATTERN = /\.(?:js|css|woff2?|ttf|otf|eot|png|jpg|jpeg|gif|svg|webp|ico|mp3|wav|ogg|json)$/i;
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Only cache same-origin navigations (the app shell), not API calls
+  // Never touch cross-origin or API traffic — the app handles those itself.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (event.request.mode === 'navigate') {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
-        }
-        return response;
+  // ── App-shell navigations ────────────────────────────────────────────────
+  // Stale-while-revalidate: respond from cache instantly, refresh in the
+  // background so the next navigation sees the new HTML.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        const networkFetch = fetch(event.request)
+          .then((response) => {
+            if (response.ok) {
+              cache.put(event.request, response.clone()).catch(() => {});
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || networkFetch;
       })
-      .catch(() => caches.match(event.request))
-  );
+    );
+    return;
+  }
+
+  // ── Hashed static assets ─────────────────────────────────────────────────
+  // Cache-first: Vite emits content-hashed filenames, so a cache hit is
+  // always safe. Only fall back to the network on a miss.
+  if (STATIC_ASSET_PATTERN.test(url.pathname)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        try {
+          const response = await fetch(event.request);
+          if (response.ok) {
+            cache.put(event.request, response.clone()).catch(() => {});
+          }
+          return response;
+        } catch (err) {
+          const fallback = await cache.match(event.request);
+          if (fallback) return fallback;
+          throw err;
+        }
+      })
+    );
+  }
 });
 
 // ─── Push notifications ─────────────────────────────────────────────────────

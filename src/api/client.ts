@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '@/config/config';
 import i18n from '@/i18n/config';
-import { logFrontendError, flushPendingErrors } from '@/api/services/frontendErrors';
+import { logFrontendError } from '@/api/services/frontendErrors';
 import { useMaintenanceStore } from '@/store/useMaintenanceStore';
 
 // Status codes that reliably mean the backend is down (gateway / proxy errors).
@@ -99,7 +99,10 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
-    flushPendingErrors().catch(() => {}); // fire-and-forget
+    // The pending-errors queue is now drained on a 60s interval and at
+    // `beforeunload` (see `main.tsx`). Calling it from every successful
+    // response added one localStorage read per API call for negligible
+    // benefit.
     return response;
   },
   (error) => {
@@ -264,7 +267,7 @@ apiClientFormData.interceptors.request.use(
 
 apiClientFormData.interceptors.response.use(
   (response) => {
-    flushPendingErrors().catch(() => {});
+    // See note in `apiClient.interceptors.response` above.
     return response;
   },
   (error) => {

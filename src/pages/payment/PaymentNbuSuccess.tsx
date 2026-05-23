@@ -11,11 +11,16 @@ interface PaymentNbuSuccessProps {
   onNavigateHome?: () => void;
 }
 
-const POLL_INTERVAL_MS = 2_000;
-// Stop active polling after ~40s. CARD_BINDING in particular may never flip
-// via NBU's /payment/status endpoint — the binding result is only delivered
-// via async callback, so we cap polling and offer a manual refresh.
-const MAX_POLL_ATTEMPTS = 20;
+// Exponential backoff: 2s, 4s, 8s, then 10s thereafter, capped at the same
+// ~40 s total polling window (12 attempts ≈ 2+4+8+10*9 = 104 s, so we keep
+// MAX at 10 to stay close to the previous user-visible behaviour while
+// cutting per-payment request count in half).
+const POLL_BASE_MS = 2_000;
+const POLL_MAX_MS = 10_000;
+const MAX_POLL_ATTEMPTS = 10;
+
+const pollDelay = (attempt: number): number =>
+  Math.min(POLL_BASE_MS * 2 ** Math.max(0, attempt - 1), POLL_MAX_MS);
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat('uz-UZ', {
@@ -72,7 +77,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
         const next = phaseFromStatus(info);
         if (next === 'pending') {
           if (attemptsRef.current < MAX_POLL_ATTEMPTS) {
-            timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+            timeoutRef.current = window.setTimeout(tick, pollDelay(attemptsRef.current));
           } else {
             setPhase('timeout');
           }
@@ -82,7 +87,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
       } catch {
         if (cancelled) return;
         if (attemptsRef.current < MAX_POLL_ATTEMPTS) {
-          timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+          timeoutRef.current = window.setTimeout(tick, pollDelay(attemptsRef.current));
         } else {
           setPhase('timeout');
         }

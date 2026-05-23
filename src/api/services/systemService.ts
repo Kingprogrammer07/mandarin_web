@@ -54,6 +54,12 @@ export interface NbuReconcileResponse {
   notes_tail: string | null;
 }
 
+export interface NbuExpireResponse {
+  transaction_id: string;
+  previous_status: string;
+  new_status: string;
+}
+
 export const systemService = {
   async getMaintenanceStatus(): Promise<MaintenanceStatusResponse> {
     const { data } = await apiClient.get<MaintenanceStatusResponse>('/api/v1/system/maintenance-status');
@@ -96,6 +102,13 @@ export const systemService = {
   async forceReconcileNbu(transactionId: string): Promise<NbuReconcileResponse> {
     const { data } = await apiClient.post<NbuReconcileResponse>(
       `/api/v1/system/nbu/reconcile/${encodeURIComponent(transactionId)}`,
+    );
+    return data;
+  },
+
+  async expireNbu(transactionId: string): Promise<NbuExpireResponse> {
+    const { data } = await apiClient.post<NbuExpireResponse>(
+      `/api/v1/system/nbu/expire/${encodeURIComponent(transactionId)}`,
     );
     return data;
   },

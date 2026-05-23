@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { useWarehouseQueueStore } from '../../store/useWarehouseQueueStore';
 import { bulkMarkTransactionTaken } from '../services/warehouse';
 import { warehouseKeys } from './useWarehouse';
-import { pickupQueueKeys } from './usePickupQueue';
 
 /**
  * Initializes the warehouse upload queue and runs a background sequential processor.
@@ -79,13 +78,25 @@ export function useWarehouseQueueProcessor() {
     uploadPromise
       .then(() => {
         markSuccess(id);
-        queryClient.invalidateQueries({ queryKey: warehouseKeys.allTransactions() });
-        queryClient.invalidateQueries({ queryKey: warehouseKeys.groupedTransactionSearch({}) });
-        queryClient.invalidateQueries({ queryKey: warehouseKeys.flights() });
-        queryClient.invalidateQueries({ queryKey: ["warehouse_uzpost_orders"] });
-        queryClient.invalidateQueries({ queryKey: pickupQueueKeys.count({ status: 'preparing' }) });
-        queryClient.invalidateQueries({ queryKey: ['pickup_queue', 'warehouse_list'] });
-        queryClient.invalidateQueries({ queryKey: ['pickup_queue', 'detail'] });
+        // Prefix-based invalidation with `refetchType: 'active'` collapses
+        // the seven previous concurrent refetches into refetches only for
+        // queries actually mounted on the current page.
+        queryClient.invalidateQueries({
+          queryKey: warehouseKeys.allTransactions(),
+          refetchType: 'active',
+        });
+        queryClient.invalidateQueries({
+          queryKey: warehouseKeys.flights(),
+          refetchType: 'active',
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['pickup_queue'],
+          refetchType: 'active',
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['warehouse_uzpost_orders'],
+          refetchType: 'active',
+        });
       })
       .catch((err: unknown) => {
         const message =

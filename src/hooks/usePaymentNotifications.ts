@@ -106,19 +106,31 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
   const total = data?.total ?? 0;
 
   // ── BroadcastChannel: real-time updates from other devices ─────────────────
+  // A single business event reaches every connected tablet at once. Each
+  // delivery used to trigger an immediate refetch within 1 s, multiplying
+  // load by the number of tablets. The 5 s debounce coalesces bursts and
+  // the active-query guard avoids re-invalidating queries that are already
+  // in flight.
+  const BROADCAST_DEBOUNCE_MS = 5_000;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleInvalidate = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      queryClient.invalidateQueries({
+        queryKey: ["pos-notifications"],
+        refetchType: 'active',
+      });
+    }, BROADCAST_DEBOUNCE_MS);
+  }, [queryClient]);
+
   const handleBroadcast = useCallback((msg: BroadcastMessage) => {
     if (msg.type === "POS_NOTIFY") {
       const payload = msg.payload;
       if (seenBroadcastIdsRef.current.has(payload.id)) return;
       seenBroadcastIdsRef.current.add(payload.id);
 
-      // Debounced invalidate so simultaneous multi-channel deliveries
-      // don't double-refetch.
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
-      }, 1_000);
+      scheduleInvalidate();
 
       // Show a toast for truly new pending notifications
       if (payload.paymentStatus === "pending") {
@@ -129,12 +141,9 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
       }
     } else if (msg.type === "CASHIER_ACK") {
       // Another cashier acted — just refresh the list
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["pos-notifications"] });
-      }, 1_000);
+      scheduleInvalidate();
     }
-  }, [queryClient]);
+  }, [scheduleInvalidate]);
 
   useEventSource(handleBroadcast);
 

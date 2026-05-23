@@ -17,11 +17,17 @@ export const ProfileHero = memo(({ user, onBalanceClick }: ProfileHeroProps) => 
     const [copied, setCopied] = useState(false);
     const { t } = useTranslation();
 
-    // Fetch wallet balance
+    // Fetch wallet balance. Pause polling when the tab is hidden so a
+    // profile page left open on a locked phone does not keep firing
+    // requests every 30 s overnight.
     const { data: walletData } = useQuery({
         queryKey: ['walletBalance'],
         queryFn: walletService.getWalletBalance,
-        refetchInterval: 30000,
+        refetchInterval: () =>
+            typeof document !== 'undefined' && document.visibilityState === 'visible'
+                ? 60_000
+                : false,
+        refetchIntervalInBackground: false,
     });
 
     const walletBalance = walletData?.wallet_balance ?? 0;

@@ -108,21 +108,48 @@ export interface RefreshTokenResponse {
   token_type: string;
 }
 
+// Coalesce simultaneous refresh calls and skip near-duplicate calls inside
+// a short window. Every admin page mounts an effect that calls this; with
+// 5+ admin routes, navigating between them used to fire as many refreshes
+// in seconds. The window is short enough that a freshly-rotated permission
+// set still propagates within ~30 s.
+const REFRESH_COOLDOWN_MS = 30_000;
+let inFlightRefresh: Promise<RefreshTokenResponse> | null = null;
+let lastRefreshAt = 0;
+let lastRefreshResult: RefreshTokenResponse | null = null;
+
 export async function refreshAdminToken(): Promise<RefreshTokenResponse> {
   const token = localStorage.getItem('access_token');
   if (!token) throw new Error('No token available for refresh');
 
-  const response = await apiClient.post<RefreshTokenResponse>(
-    '/admin/auth/refresh',
-    {},
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'X-Admin-Authorization': `Bearer ${token}`,
-      },
-    },
-  );
-  return response.data;
+  if (inFlightRefresh) return inFlightRefresh;
+
+  const now = Date.now();
+  if (lastRefreshResult && now - lastRefreshAt < REFRESH_COOLDOWN_MS) {
+    return lastRefreshResult;
+  }
+
+  inFlightRefresh = (async () => {
+    try {
+      const response = await apiClient.post<RefreshTokenResponse>(
+        '/admin/auth/refresh',
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Admin-Authorization': `Bearer ${token}`,
+          },
+        },
+      );
+      lastRefreshAt = Date.now();
+      lastRefreshResult = response.data;
+      return response.data;
+    } finally {
+      inFlightRefresh = null;
+    }
+  })();
+
+  return inFlightRefresh;
 }
 
 export interface SwitchRoleResponse {

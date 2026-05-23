@@ -12,11 +12,16 @@ interface PaymentNbuFailureProps {
   onRetry?: () => void;
 }
 
-const POLL_INTERVAL_MS = 2_000;
 // Briefer polling than the success page: failure URL means NBU already
 // decided this transaction is done. We only poll to catch the rare race
-// where the callback flips it to SUCCESS after the redirect.
+// where the callback flips it to SUCCESS after the redirect. Backoff:
+// 2s, 4s, 8s, 10s, 10s (total ~34 s).
+const POLL_BASE_MS = 2_000;
+const POLL_MAX_MS = 10_000;
 const MAX_POLL_ATTEMPTS = 5;
+
+const pollDelay = (attempt: number): number =>
+  Math.min(POLL_BASE_MS * 2 ** Math.max(0, attempt - 1), POLL_MAX_MS);
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat('uz-UZ', {
@@ -79,14 +84,14 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
           setPhase('failure');
           return;
         }
-        timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+        timeoutRef.current = window.setTimeout(tick, pollDelay(attemptsRef.current));
       } catch {
         if (cancelled) return;
         if (attemptsRef.current >= MAX_POLL_ATTEMPTS) {
           setPhase('failure');
           return;
         }
-        timeoutRef.current = window.setTimeout(tick, POLL_INTERVAL_MS);
+        timeoutRef.current = window.setTimeout(tick, pollDelay(attemptsRef.current));
       }
     };
 

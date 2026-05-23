@@ -112,19 +112,18 @@ export function useUnpaidCargo(clientCode: string | null): UseUnpaidCargoReturn 
     }
   }, [clientCode]);
 
+  // Both client-code and flight-filter changes reset paging and need the
+  // same fetch. Two separate effects (the old shape) fired this fetch twice
+  // on every `clientCode` change because `fetchUnpaidCargo` itself was
+  // re-created and listed in each effect's deps. Collapse into one effect
+  // and intentionally omit the memoized callbacks from deps.
   useEffect(() => {
-    if (clientCode) {
-      fetchFlights();
-      fetchUnpaidCargo(true);
-    }
-  }, [clientCode, fetchFlights, fetchUnpaidCargo]);
-
-  useEffect(() => {
-    if (clientCode) {
-      offsetRef.current = 0;
-      fetchUnpaidCargo(true);
-    }
-  }, [flightFilter, clientCode, fetchUnpaidCargo]);
+    if (!clientCode) return;
+    offsetRef.current = 0;
+    fetchFlights();
+    fetchUnpaidCargo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientCode, flightFilter]);
 
   const setFlightFilter = useCallback((flight: string | null) => {
     setFlightFilterState(flight);

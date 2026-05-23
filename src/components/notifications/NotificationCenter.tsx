@@ -280,10 +280,17 @@ export default function NotificationCenter() {
     // --- Queries ---
 
     // 1. Unread Notification Count
+    // Mounted in the global nav, so every active session hits this. 30 s with
+    // background-refetch enabled used to dominate per-session traffic; gate
+    // on visibility and slow to 60 s.
     const { data: apiUnreadData } = useQuery({
         queryKey: ['notifications', 'unread'],
         queryFn: notificationService.getUnreadCount,
-        refetchInterval: 30000,
+        refetchInterval: () =>
+            typeof document !== 'undefined' && document.visibilityState === 'visible'
+                ? 60_000
+                : false,
+        refetchIntervalInBackground: false,
     });
 
     // 2. API Notifications List

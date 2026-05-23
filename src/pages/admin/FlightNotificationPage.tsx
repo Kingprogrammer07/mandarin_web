@@ -25,7 +25,10 @@ interface FlightNotificationPageProps {
 
 type FilterMode = 'all' | 'sent' | 'pending';
 
-const POLL_INTERVAL_MS = 1500;
+// Polling cadence for bulk-send progress. The previous 1.5 s value generated
+// 200 requests per 5-minute task per watching admin. 5 s is still well below
+// human perception of "live" progress and slashes per-task traffic ~70%.
+const POLL_INTERVAL_MS = 5000;
 const PAGE_SIZE = 30;
 
 const activeTaskKey = (flightName: string) => `cargo_send_task:${flightName}`;

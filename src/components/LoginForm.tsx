@@ -52,6 +52,13 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
     // Token bor — haqiqiy roleni backenddan olamiz
     fetchAuthMe()
       .then((userData) => {
+        // requires_address bo'lsa, sessiyani tozalab, login formni ko'rsatamiz —
+        // user qayta client_code/phone kiritgach, 428 javobi address drawerni
+        // ochadi. Bu hard reload halqasidan saqlaydi.
+        if (userData.requires_address) {
+          sessionStorage.removeItem('access_token');
+          return;
+        }
         onLoginSuccess(userData.role ?? 'user');
       })
       .catch(() => {

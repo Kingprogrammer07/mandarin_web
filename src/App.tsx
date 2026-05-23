@@ -519,6 +519,17 @@ function AppContent() {
       try {
         const userData = await fetchAuthMe();
         if (!cancelled) {
+          // Backend signals "session valid, but no region/district on file"
+          // by returning requires_address=true. Push the user through the
+          // login → address drawer flow without dispatching the global
+          // logout (which would force a full SPA reload).
+          if (userData.requires_address) {
+            sessionStorage.removeItem("access_token");
+            setUserRole(null);
+            setIsCheckingAuth(false);
+            applyRoute({ page: "login" }, null, "replace");
+            return;
+          }
           const role = userData.role ?? "user";
           setUserRole(role);
           setIsCheckingAuth(false);
