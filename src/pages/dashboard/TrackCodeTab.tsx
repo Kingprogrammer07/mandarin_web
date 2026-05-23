@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, History, X, Loader2, AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, History, History as HistoryIcon, Loader2, Search, X } from "lucide-react";
 import { trackCargo } from "@/api/services/cargo";
 import { TrackResultCard } from "./components/TrackResultCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import ClientCargoHistory from "../../components/history/ClientCargoHistory";
-import { ArrowLeft, History as HistoryIcon } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 
 const HISTORY_KEY = "track_code_history_v2"; // Changed key to avoid conflict with old string-only history
@@ -120,21 +119,21 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
 
             {/* Title & History Toggle */}
-            <div className="flex items-center justify-between mb-4 px-1">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                    <span className="w-1 h-6 bg-purple-500 rounded-full inline-block" />
+            <div className="flex items-center justify-between gap-3 px-1">
+                <h2 className="flex min-w-0 items-center gap-2 text-xl font-black tracking-normal text-slate-950 dark:text-white">
+                    <span className="inline-block h-6 w-1 rounded-full bg-orange-500" />
                     {showHistory ? t('tracking.historyTitle') : t('tracking.title')}
                 </h2>
 
                 <button
                     onClick={() => setShowHistory(!showHistory)}
                     className="
-                        flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
-                        bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400
-                        hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors
+                        flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold
+                        border-slate-200 bg-white text-slate-700 shadow-sm
+                        active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200
                     "
                 >
                     {showHistory ? (
@@ -170,16 +169,15 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
             onChange={(e) => setQuery(e.target.value.toUpperCase())}
             placeholder={t('tracking.placeholder')}
             className="
-                w-full pl-12 pr-4 py-3.5 rounded-2xl
-                bg-white dark:bg-white/10
-                border border-gray-200 dark:border-white/10
-                shadow-sm focus:shadow-md
-                text-lg font-mono placeholder:font-sans placeholder:text-sm
-                focus:outline-none focus:ring-2 focus:ring-purple-500/40
+                w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4
+                font-mono text-lg font-black tracking-normal text-slate-950 shadow-sm
+                placeholder:font-sans placeholder:text-sm placeholder:font-medium placeholder:text-slate-400
+                focus:border-orange-500 focus:outline-none focus:ring-4 focus:ring-orange-500/15
+                dark:border-white/10 dark:bg-white/[0.05] dark:text-white dark:placeholder:text-slate-500
                 transition-all duration-200
             "
         />
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+        <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
     </div>
 
     {/* Search Button */}
@@ -187,17 +185,16 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
         type="submit"
         disabled={isLoading}
         className="
-            w-full flex items-center justify-center gap-2.5
-            py-3.5 rounded-2xl
-            bg-purple-600 hover:bg-purple-700 active:scale-[0.98]
-            text-white font-semibold text-sm tracking-wide
-            shadow-md shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/30
-            transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
+            flex w-full items-center justify-center gap-2.5 rounded-2xl
+            bg-gradient-to-r from-orange-500 to-amber-500 py-3.5
+            text-sm font-black tracking-normal text-white
+            shadow-lg shadow-orange-500/20 active:scale-[0.98]
+            transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60
         "
     >
         {isLoading ? (
             <>
-                <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
                 <span>{t('tracking.searching')}</span>
             </>
         ) : (
@@ -212,7 +209,7 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
                     {/* History Chips */}
                     {history.length > 0 && !data && (
                         <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 ml-1">
+                            <div className="ml-1 flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
                                 <History className="w-4 h-4" />
                                 <span>{t('tracking.recentSearches')}</span>
                             </div>
@@ -222,21 +219,20 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
                                         key={item.code}
                                         onClick={() => handleChipClick(item)}
                                         className="
-                   group flex items-center gap-2 px-3 py-1.5 rounded-full 
-                   bg-gray-100 dark:bg-white/5 hover:bg-purple-50 dark:hover:bg-purple-500/20 
-                   border border-transparent hover:border-purple-200 dark:hover:border-purple-500/30
-                   transition-all text-sm font-mono text-gray-600 dark:text-gray-300
+                   group flex items-center gap-2 rounded-full border border-slate-200
+                   bg-white px-3 py-1.5 text-sm font-mono font-bold text-slate-700 shadow-sm
+                   transition-all active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300
                  "
                                     >
                                         <span className="font-bold">{item.code}</span>
                                         {item.flightName && (
-                                            <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-white/10 rounded-md text-[10px] text-gray-500 dark:text-gray-400">
+                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-white/10 dark:text-slate-400">
                                                 {item.flightName}
                                             </span>
                                         )}
                                         <X
                                             onClick={(e) => removeFromHistory(e, item.code)}
-                                            className="w-3 h-3 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                                            className="size-3 text-slate-400 opacity-100 transition-colors active:text-red-500 sm:opacity-0 sm:group-hover:opacity-100"
                                         />
                                     </button>
                                 ))}
@@ -248,8 +244,8 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
                     <div className="min-h-[200px]">
                         {isLoading && (
                             <div className="flex flex-col items-center justify-center py-10 opacity-70">
-                                <Loader2 className="w-10 h-10 animate-spin text-purple-500 mb-2" />
-                                <p className="text-sm font-medium">{t('tracking.searching')}</p>
+                                <Loader2 className="mb-2 size-10 animate-spin text-orange-500" />
+                                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t('tracking.searching')}</p>
                             </div>
                         )}
 

@@ -88,11 +88,31 @@ export interface CargoItemResponse {
   taken_away_date?: string;
 }
 
+export type PublicTrackingStepStatus = 'available' | 'pending' | 'nodata';
+
+export interface PublicTrackingStep {
+  step: number;
+  title: string;
+  status: PublicTrackingStepStatus;
+  updated_at?: string | null;
+  delivery_method?: string | null;
+}
+
+export interface PublicTrackingSummary {
+  found: boolean;
+  service_type: 'cargo';
+  weight?: string | null;
+  import_date?: string | null;
+  progress_percentage: number;
+  steps: PublicTrackingStep[];
+}
+
 export interface TrackCodeSearchResponse {
   found: boolean;
   track_code: string;
   items: CargoItemResponse[];
   total_count: number;
+  tracking?: PublicTrackingSummary | null;
 }
 
 // Track cargo by code

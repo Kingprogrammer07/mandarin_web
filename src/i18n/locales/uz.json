@@ -1510,7 +1510,21 @@
     "notFoundDesc": "\"{{code}}\" kodi bo'yicha hech narsa topilmadi. Kodni to'g'riligini tekshiring.",
     "dateLabel": "Sana:",
     "noDate": "Mavjud emas",
-    "search": "Qidirish"
+    "search": "Qidirish",
+    "resultLabel": "Trek kod",
+    "stepStatus": {
+      "completed": "Yakunlangan",
+      "active": "Jarayonda",
+      "upcoming": "Kutilmoqda"
+    },
+    "steps": {
+      "step1": "Xitoy omborida",
+      "step2": "Yo'lda",
+      "step3": "Bojxona navbatida",
+      "step4": "Saralash bosqichida",
+      "step5": "Yetkazishga tayyor",
+      "step6": "Olib ketilgan"
+    }
   },
   "makePayment": {
     "title": "To'lov qilish",

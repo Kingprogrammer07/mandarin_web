@@ -28,7 +28,7 @@ const FlightSummaryCard = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={onToggle}
-            className={`bg-white dark:bg-[#1e1a45] rounded-2xl p-4 sm:p-5 shadow-sm border cursor-pointer transition-all duration-200 ${
+            className={`bg-white dark:bg-[#0b1018] rounded-2xl p-4 sm:p-5 shadow-sm border cursor-pointer transition-all duration-200 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${
                 isExpanded
                     ? 'border-amber-500/50 dark:border-amber-500/50 ring-2 ring-amber-500/20'
                     : 'border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10'
@@ -67,7 +67,7 @@ const FlightSummaryCard = ({
                     <div className="hidden sm:flex flex-col items-end">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{t('cargoHistory.totalCount')}</span>
                         <span className="font-black font-mono text-gray-900 dark:text-white text-lg flex items-center gap-1.5">
-                            <Package className="w-4 h-4 text-blue-500" />
+                            <Package className="w-4 h-4 text-sky-500" />
                             {t('cargoHistory.countUnit', { count: summary.total_count })}
                         </span>
                     </div>
@@ -85,7 +85,7 @@ const FlightSummaryCard = ({
                         <span className="text-sm font-bold font-mono text-gray-900 dark:text-gray-100">{t('cargoHistory.weightUnit', { weight: summary.total_weight })}</span>
                     </div>
                     <div className="flex items-center gap-1.5 border-l border-gray-200 dark:border-gray-700 pl-4">
-                        <Package className="w-4 h-4 text-blue-500" />
+                        <Package className="w-4 h-4 text-sky-500" />
                         <span className="text-sm font-bold font-mono text-gray-900 dark:text-gray-100">{t('cargoHistory.countUnit', { count: summary.total_count })}</span>
                     </div>
                 </div>
@@ -140,13 +140,13 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
             ) : (
                 <div className="flex flex-col gap-3">
                     {data?.items.map((item: CargoItemResponse) => (
-                        <div key={item.id} className="bg-white dark:bg-[#1a163d] p-4 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group">
-                            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${item.is_sent_web ? 'bg-emerald-500' : 'bg-blue-500 dark:bg-blue-600'}`} />
+                        <div key={item.id} className="bg-white dark:bg-[#0b1018] p-4 rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm relative overflow-hidden group dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${item.is_sent_web ? 'bg-emerald-500' : 'bg-sky-500'}`} />
                             
                             <div className="pl-2">
                                 <div className="flex items-center justify-between mb-3 border-b border-gray-100 dark:border-white/5 pb-2">
                                     <span className="font-mono text-lg font-bold text-gray-900 dark:text-white tracking-tight">{item.track_code}</span>
-                                    {item.box_number && <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 uppercase tracking-wider">{t('cargoHistory.box', { number: item.box_number })}</span>}
+                                    {item.box_number && <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300 border border-sky-200 dark:border-sky-400/20 uppercase tracking-wider">{t('cargoHistory.box', { number: item.box_number })}</span>}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -166,11 +166,11 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 mt-2">
-                                            <div className="bg-gray-50 dark:bg-[#131030] p-3 rounded-xl border border-gray-100 dark:border-white/5">
+                                            <div className="bg-gray-50 dark:bg-white/[0.035] p-3 rounded-xl border border-gray-100 dark:border-white/10">
                                                 <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">{t('cargoHistory.details.weight')}</div>
                                                 <div className="font-bold font-mono text-gray-900 dark:text-white text-base">{item.weight_kg != null && item.weight_kg !== '' ? `${item.weight_kg} kg` : '-'}</div>
                                             </div>
-                                            <div className="bg-gray-50 dark:bg-[#131030] p-3 rounded-xl border border-gray-100 dark:border-white/5">
+                                            <div className="bg-gray-50 dark:bg-white/[0.035] p-3 rounded-xl border border-gray-100 dark:border-white/10">
                                                 <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">{t('cargoHistory.details.count')}</div>
                                                 <div className="font-bold font-mono text-gray-900 dark:text-white text-base">{item.quantity != null && item.quantity !== '' ? `${item.quantity} ta` : '-'}</div>
                                             </div>
@@ -186,7 +186,7 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
                                                 {getSteps(item, t).map((step) => {
                                                     const isCompleted = step.status === 'completed';
                                                     const isActive = step.status === 'active';
-                                                    let iconClass = "bg-white dark:bg-[#1a163d] border-2 border-gray-200 dark:border-white/10 text-gray-300 dark:text-gray-600";
+                                                    let iconClass = "bg-white dark:bg-[#0b1018] border-2 border-gray-200 dark:border-white/10 text-gray-300 dark:text-gray-600";
                                                     if (isCompleted) iconClass = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20";
                                                     if (isActive) iconClass = "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/20 animate-pulse ring-2 ring-amber-500/20";
 
@@ -205,7 +205,7 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
                                         </div>
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <div className="bg-gray-50 dark:bg-[#131030] p-3 rounded-xl border border-gray-100 dark:border-white/5">
+                                            <div className="bg-gray-50 dark:bg-white/[0.035] p-3 rounded-xl border border-gray-100 dark:border-white/10">
                                                 <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">{t('cargoHistory.financials.pricePerKg')}</div>
                                                 <div className="flex flex-col">
                                                     <span className="font-bold font-mono text-gray-900 dark:text-white">{item.price_per_kg_uzs != null && item.price_per_kg_uzs !== '' ? `${formatMoney(item.price_per_kg_uzs)} so'm` : '-'}</span>
@@ -238,7 +238,7 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
                     ))}
                     {data && data.total > data.size && (
                         <div className="flex justify-center pt-2">
-                            <button className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-purple-500/10 dark:hover:bg-purple-500/20 px-6 py-2.5 rounded-xl transition-colors" onClick={() => setPage(p => p + 1)}>
+                            <button className="text-sm font-bold text-orange-600 dark:text-orange-300 bg-orange-50 active:scale-[0.98] dark:bg-orange-400/10 px-6 py-2.5 rounded-xl transition-colors" onClick={() => setPage(p => p + 1)}>
                                 {t('cargoHistory.loadMore')}
                             </button>
                         </div>
