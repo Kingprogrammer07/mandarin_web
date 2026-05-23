@@ -32,6 +32,9 @@ export default function ForgottenCargoModal({
   const [pricePerKg, setPricePerKg] = useState('');
   const [comment, setComment] = useState('');
   const [sendImmediately, setSendImmediately] = useState(true);
+  // Send channel: Bot mirrors to success/fail channels; Web stays silent.
+  const [markBot, setMarkBot] = useState(false);
+  const [markWeb, setMarkWeb] = useState(true);
   const [photos, setPhotos] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -55,6 +58,10 @@ export default function ForgottenCargoModal({
       toast({ title: "Kamida 1 ta rasm qo'shish majburiy", variant: 'error' });
       return;
     }
+    if (sendImmediately && !markBot && !markWeb) {
+      toast({ title: "Kamida bittasini tanlang: Bot yoki Web", variant: 'error' });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -65,6 +72,8 @@ export default function ForgottenCargoModal({
         pricePerKg: pricePerKg ? parseFloat(pricePerKg) : undefined,
         comment: comment.trim() || undefined,
         sendImmediately,
+        markBot,
+        markWeb,
         photos,
       });
       onSuccess(result);
@@ -222,6 +231,41 @@ export default function ForgottenCargoModal({
               <p className="text-[11px] text-gray-400">Saqlagandan keyin darhol Telegram orqali yuboriladi</p>
             </div>
           </label>
+
+          {/* Send channel — only relevant when sending immediately.
+              Bot → success/fail kanalga yoziladi; Web → yozilmaydi. */}
+          {sendImmediately && (
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                Yuborish kanali <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { id: 'web', label: 'Web', checked: markWeb, set: setMarkWeb },
+                  { id: 'bot', label: 'Bot', checked: markBot, set: setMarkBot },
+                ].map(({ id, label, checked, set }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => set((v) => !v)}
+                    className={`flex-1 h-10 rounded-xl border text-sm font-bold transition-colors ${
+                      checked
+                        ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                        : 'border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/[0.04]'
+                    }`}
+                  >
+                    {checked ? '✓ ' : ''}{label}
+                  </button>
+                ))}
+              </div>
+              {!markBot && !markWeb && (
+                <p className="mt-1 text-[10px] text-red-500">Kamida bittasini tanlang</p>
+              )}
+              <p className="mt-1 text-[10px] text-gray-400">
+                Bot — xato/muvaffaqiyat guruhiga yoziladi. Web — yozilmaydi.
+              </p>
+            </div>
+          )}
 
         </div>
 

@@ -65,6 +65,10 @@ export interface ForgottenCargoPayload {
   pricePerKg?: number;
   comment?: string;
   sendImmediately: boolean;
+  /** Bot send: mirror to success/fail channels + set is_sent flag. */
+  markBot: boolean;
+  /** Web send: set is_sent_web flag, no channel logging. */
+  markWeb: boolean;
   photos: File[];
 }
 
@@ -124,6 +128,8 @@ export async function addForgottenCargo(
     form.append('comment', payload.comment);
   }
   form.append('send_immediately', String(payload.sendImmediately));
+  form.append('mark_bot', String(payload.markBot));
+  form.append('mark_web', String(payload.markWeb));
   payload.photos.forEach((photo) => form.append('photos', photo));
 
   const { data } = await apiClientFormData.post<ForgottenCargoResult>(
