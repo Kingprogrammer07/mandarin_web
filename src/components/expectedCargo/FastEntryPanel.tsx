@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  type ClipboardEvent,
   type KeyboardEvent,
 } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -36,6 +37,7 @@ interface FastEntryPanelProps {
 // ── Track validation result for client-first mode ─────────────────────────────
 
 type TrackValidationStatus = 'checking' | 'match' | 'conflict' | 'already_sent' | 'not_found';
+type QueueFilter = 'all' | 'ready' | 'issues' | 'split' | 'sent' | 'not_found' | 'wrong_client';
 
 interface TrackValidation {
   status: TrackValidationStatus;
@@ -46,8 +48,34 @@ interface TrackValidation {
   alreadySentFlight?: string | null;
 }
 
+interface FastEntryDraftRow {
+  id: string;
+  trackCode: string;
+}
+
+interface QueueFilterOption {
+  key: QueueFilter;
+  label: string;
+  count: number;
+}
+
 // Stable DOM id for the Html5Qrcode video container
 const SCANNER_CONTAINER_ID = 'ec-qr-video-container';
+
+function createDraftRow(): FastEntryDraftRow {
+  return { id: crypto.randomUUID(), trackCode: '' };
+}
+
+function parseTrackCodes(value: string): string[] {
+  return [
+    ...new Set(
+      value
+        .split(/\r?\n|\t|,/)
+        .map((code) => code.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+}
 
 // ── Duplicate-client detection ─────────────────────────────────────────────────
 //
@@ -89,6 +117,7 @@ interface QueueItemRowProps {
   onSetClientCode: (id: string, code: string) => void;
   onAcceptConflictOwner: (id: string) => void;
   onMergeClientGroup: (clientCode: string) => void;
+  onPreviewClient: (clientCode: string) => void;
 }
 
 function QueueItemRow({
@@ -101,6 +130,7 @@ function QueueItemRow({
   onSetClientCode,
   onAcceptConflictOwner,
   onMergeClientGroup,
+  onPreviewClient,
 }: QueueItemRowProps) {
   // Auto-open edit mode for items that need manual input (not-found or no client code yet).
   const [isEditingCode, setIsEditingCode] = useState(
@@ -194,7 +224,7 @@ function QueueItemRow({
   return (
     <div
       className={cn(
-        'grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b text-sm transition-colors',
+        'grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b text-sm transition-colors',
         sheetRowStyle,
       )}
     >
@@ -282,6 +312,15 @@ function QueueItemRow({
             className="h-7 rounded-md bg-violet-600 px-2 text-[11px] font-bold text-white hover:bg-violet-700"
           >
             Birlashtir
+          </button>
+        )}
+        {item.clientCode.trim() && (
+          <button
+            type="button"
+            onClick={() => onPreviewClient(item.clientCode)}
+            className="h-7 rounded-md border border-current/15 bg-white/70 px-2 text-[11px] font-bold hover:bg-white dark:bg-black/20 dark:hover:bg-black/30"
+          >
+            Ko'rish
           </button>
         )}
         {item.isWrongClient && item.conflictClientCode && (
@@ -479,6 +518,8 @@ function QueueItemRow({
 export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEntryPanelProps) {
   // ── Shared state ────────────────────────────────────────────────────────────
   const [trackCodeInput, setTrackCodeInput] = useState('');
+  const [draftRows, setDraftRows] = useState<FastEntryDraftRow[]>(() => [createDraftRow()]);
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
   const [clientCodeInput, setClientCodeInput] = useState('');
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -493,6 +534,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const validatedCodesRef = useRef<Set<string>>(new Set());
 
   const trackInputRef = useRef<HTMLInputElement>(null);
+  const draftInputRefs = useRef(new Map<string, HTMLInputElement>());
   const clientInputRef = useRef<HTMLInputElement>(null);
   const qrInstanceRef = useRef<Html5Qrcode | null>(null);
 
@@ -524,10 +566,14 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     addNotification,
   } = useExpectedCargoStore();
 
+  const firstDraftRowId = draftRows[0]?.id;
   useEffect(() => {
-    const timer = setTimeout(() => trackInputRef.current?.focus(), 80);
+    const timer = setTimeout(() => {
+      const firstDraftInput = firstDraftRowId ? draftInputRefs.current.get(firstDraftRowId) : null;
+      (firstDraftInput ?? trackInputRef.current)?.focus();
+    }, 80);
     return () => clearTimeout(timer);
-  }, []);
+  }, [firstDraftRowId]);
 
   // ── Parse textarea lines ──────────────────────────────────────────────────
 
@@ -775,6 +821,117 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     }
   };
 
+  const focusDraftRow = useCallback((rowId: string) => {
+    requestAnimationFrame(() => {
+      draftInputRefs.current.get(rowId)?.focus();
+    });
+  }, []);
+
+  const enqueueAutoFillTrackCode = useCallback((raw: string) => {
+    const trackCode = raw.trim().toUpperCase();
+    if (!trackCode) return false;
+
+    const liveQueue = useExpectedCargoStore.getState().entryQueue;
+    if (liveQueue.some((item) => item.trackCode === trackCode)) {
+      toast.warning(`${trackCode} allaqachon qo'shilgan`, { duration: 1500 });
+      return false;
+    }
+
+    enqueueEntry({
+      trackCode,
+      clientCode: '',
+      resolvedClientName: null,
+      resolvedClientId: null,
+      isResolved: false,
+    });
+    resolveMutation.mutate(trackCode);
+    return true;
+  }, [enqueueEntry, resolveMutation]);
+
+  const moveFromDraftRow = useCallback((rowId: string, direction: 1 | -1) => {
+    const currentIndex = draftRows.findIndex((row) => row.id === rowId);
+    if (currentIndex === -1) return;
+
+    if (direction === -1) {
+      const previousRow = draftRows[currentIndex - 1];
+      if (previousRow) focusDraftRow(previousRow.id);
+      return;
+    }
+
+    const nextRow = draftRows[currentIndex + 1];
+    if (nextRow) {
+      focusDraftRow(nextRow.id);
+      return;
+    }
+
+    const newRow = createDraftRow();
+    setDraftRows((rows) => [...rows, newRow]);
+    focusDraftRow(newRow.id);
+  }, [draftRows, focusDraftRow]);
+
+  const handleDraftTrackChange = useCallback((rowId: string, value: string) => {
+    setDraftRows((rows) =>
+      rows.map((row) =>
+        row.id === rowId ? { ...row, trackCode: value.toUpperCase() } : row,
+      ),
+    );
+  }, []);
+
+  const commitDraftRow = useCallback((rowId: string, direction: 1 | -1 = 1) => {
+    const currentRow = draftRows.find((row) => row.id === rowId);
+    if (!currentRow) return;
+
+    const trackCode = currentRow.trackCode.trim().toUpperCase();
+    if (trackCode) {
+      enqueueAutoFillTrackCode(trackCode);
+      setDraftRows((rows) =>
+        rows.map((row) =>
+          row.id === rowId ? { ...row, trackCode: '' } : row,
+        ),
+      );
+    }
+
+    moveFromDraftRow(rowId, direction);
+  }, [draftRows, enqueueAutoFillTrackCode, moveFromDraftRow]);
+
+  const handleDraftKeyDown = useCallback((rowId: string, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitDraftRow(rowId, event.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      commitDraftRow(rowId, event.shiftKey ? -1 : 1);
+    }
+  }, [commitDraftRow]);
+
+  const handleDraftPaste = useCallback((rowId: string, event: ClipboardEvent<HTMLInputElement>) => {
+    const codes = parseTrackCodes(event.clipboardData.getData('text'));
+    if (codes.length <= 1) return;
+
+    event.preventDefault();
+    let addedCount = 0;
+    for (const code of codes) {
+      if (enqueueAutoFillTrackCode(code)) addedCount++;
+    }
+
+    setDraftRows((rows) =>
+      rows.map((row) =>
+        row.id === rowId ? { ...row, trackCode: '' } : row,
+      ),
+    );
+
+    const newRow = createDraftRow();
+    setDraftRows((rows) => [...rows, newRow]);
+    focusDraftRow(newRow.id);
+
+    if (addedCount > 1) {
+      toast.success(`${addedCount} ta track code jadvalga qo'shildi`, { duration: 1800 });
+    }
+  }, [enqueueAutoFillTrackCode, focusDraftRow]);
+
   const handleAutoFillScan = useCallback(() => {
     const raw = trackCodeInput.trim();
     if (!raw) return;
@@ -786,14 +943,13 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       return;
     }
 
-    enqueueEntry({ trackCode, clientCode: '', resolvedClientName: null, resolvedClientId: null, isResolved: false });
-    resolveMutation.mutate(trackCode);
+    enqueueAutoFillTrackCode(trackCode);
     setTrackCodeInput('');
     if (!isScanningRef.current) {
       requestAnimationFrame(() => trackInputRef.current?.focus());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackCodeInput, entryQueue, enqueueEntry]);
+  }, [trackCodeInput, entryQueue, enqueueAutoFillTrackCode]);
 
   const handleTrackKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -899,8 +1055,31 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     [parsedCodes, validationMap],
   );
 
-  const resolvedCount = entryQueue.filter((i) => i.isResolved || i.clientCode).length;
-  const blockedCount = entryQueue.filter((i) => i.isWrongClient || i.isAlreadySent || i.notFound || !i.clientCode.trim()).length;
+  const queueStats = useMemo(() => {
+    let ready = 0;
+    let blocked = 0;
+    let alreadySent = 0;
+    let notFound = 0;
+    let wrongClient = 0;
+
+    for (const item of entryQueue) {
+      const hasClientCode = item.clientCode.trim().length > 0;
+      if (item.isAlreadySent) alreadySent++;
+      if (item.notFound) notFound++;
+      if (item.isWrongClient) wrongClient++;
+
+      if (item.isWrongClient || item.isAlreadySent || item.notFound || !hasClientCode) {
+        blocked++;
+      } else {
+        ready++;
+      }
+    }
+
+    return { ready, blocked, alreadySent, notFound, wrongClient };
+  }, [entryQueue]);
+  const resolvedCount = queueStats.ready;
+  const blockedCount = queueStats.blocked;
+  const draftActiveCount = draftRows.filter((row) => row.trackCode.trim()).length;
   const clientScanCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of entryQueue) {
@@ -950,6 +1129,62 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     () => [...splitClientSegments.values()].filter((segment) => segment.segmentCount > 1).length,
     [splitClientSegments],
   );
+  const splitClientCodes = useMemo(
+    () =>
+      [...splitClientSegments.entries()]
+        .filter(([, segment]) => segment.segmentCount > 1)
+        .map(([clientCode]) => clientCode),
+    [splitClientSegments],
+  );
+  const splitRowCount = useMemo(
+    () =>
+      visibleQueue.filter((item) => {
+        const clientCode = item.clientCode.trim().toUpperCase();
+        return clientCode && (splitClientSegments.get(clientCode)?.segmentCount ?? 0) > 1;
+      }).length,
+    [splitClientSegments, visibleQueue],
+  );
+  const queueFilterOptions = useMemo<QueueFilterOption[]>(() => [
+    { key: 'all', label: 'Barchasi', count: entryQueue.length },
+    { key: 'ready', label: 'Tayyor', count: queueStats.ready },
+    { key: 'issues', label: 'Tekshirish', count: queueStats.blocked },
+    { key: 'split', label: 'Ajralgan', count: splitRowCount },
+    { key: 'sent', label: 'Yuborilgan', count: queueStats.alreadySent },
+    { key: 'not_found', label: 'Topilmadi', count: queueStats.notFound },
+    { key: 'wrong_client', label: 'Boshqa user', count: queueStats.wrongClient },
+  ], [entryQueue.length, queueStats, splitRowCount]);
+  const filteredQueue = useMemo(
+    () =>
+      visibleQueue.filter((item) => {
+        const clientCode = item.clientCode.trim().toUpperCase();
+        const isSplit = clientCode && (splitClientSegments.get(clientCode)?.segmentCount ?? 0) > 1;
+        const isIssue = item.isWrongClient || item.isAlreadySent || item.notFound || !clientCode;
+
+        if (queueFilter === 'ready') return !isIssue;
+        if (queueFilter === 'issues') return isIssue;
+        if (queueFilter === 'split') return isSplit;
+        if (queueFilter === 'sent') return item.isAlreadySent;
+        if (queueFilter === 'not_found') return item.notFound;
+        if (queueFilter === 'wrong_client') return item.isWrongClient;
+        return true;
+      }),
+    [queueFilter, splitClientSegments, visibleQueue],
+  );
+  const handleMergeAllSplitGroups = useCallback(() => {
+    for (const clientCode of splitClientCodes) {
+      mergeClientQueueGroup(clientCode);
+    }
+    if (splitClientCodes.length > 0) {
+      toast.success(`${splitClientCodes.length} ta ajralgan guruh birlashtirildi`, { duration: 1800 });
+    }
+  }, [mergeClientQueueGroup, splitClientCodes]);
+  const handlePreviewClient = useCallback((clientCode: string) => {
+    const normalized = clientCode.trim().toUpperCase();
+    if (!normalized) return;
+    setClientListHidden(false);
+    setSearchQuery(normalized);
+    setExpandedClient(normalized);
+  }, [setClientListHidden, setExpandedClient, setSearchQuery]);
 
   return (
     <div className={cn(
@@ -1034,8 +1269,66 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           isQueueExpanded ? 'flex-1 min-h-0' : 'max-h-72',
         )}
       >
+        <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50/70 px-2 py-2 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="rounded-md border border-zinc-200 bg-white px-2 py-1 font-bold text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+              Jami: {entryQueue.length}
+            </span>
+            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 font-bold text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-300">
+              Tayyor: {queueStats.ready}
+            </span>
+            <span className={cn(
+              'rounded-md border px-2 py-1 font-bold',
+              queueStats.blocked > 0
+                ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300'
+                : 'border-zinc-200 bg-white text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400',
+            )}>
+              Tekshirish: {queueStats.blocked}
+            </span>
+            <span className={cn(
+              'rounded-md border px-2 py-1 font-bold',
+              splitGroupCount > 0
+                ? 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/70 dark:bg-violet-950/30 dark:text-violet-300'
+                : 'border-zinc-200 bg-white text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400',
+            )}>
+              Ajralgan: {splitGroupCount}
+            </span>
+            <span className="rounded-md border border-orange-200 bg-orange-50 px-2 py-1 font-bold text-orange-700 dark:border-orange-900/70 dark:bg-orange-950/30 dark:text-orange-300">
+              Draft: {draftActiveCount}/{draftRows.length}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {splitGroupCount > 0 && (
+              <button
+                type="button"
+                onClick={handleMergeAllSplitGroups}
+                className="rounded-md bg-violet-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700"
+              >
+                Ajralganlarni birlashtir
+              </button>
+            )}
+            {queueFilterOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setQueueFilter(option.key)}
+                disabled={option.count === 0 && option.key !== 'all'}
+                className={cn(
+                  'rounded-md border px-2 py-1.5 text-[11px] font-bold transition-colors',
+                  queueFilter === option.key
+                    ? 'border-orange-300 bg-orange-500 text-white shadow-sm'
+                    : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+                )}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             <div className="flex h-9 items-center justify-center border-r border-inherit font-mono">#</div>
             <div className="flex h-9 items-center border-r border-inherit px-2">A · Mijoz kodi</div>
             <div className="flex h-9 items-center border-r border-inherit px-3">B · Track code</div>
@@ -1044,12 +1337,88 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             <div className="flex h-9 items-center justify-center px-2">Amal</div>
           </div>
 
-          <div className="grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20">
-            <div className="flex min-h-12 items-center justify-center border-r border-inherit font-mono text-[12px] font-bold text-orange-500">+</div>
-            <div className="flex min-h-12 items-center border-r border-inherit px-2">
-              {isAutoFill ? (
-                <span className="font-mono text-sm font-bold text-zinc-400">AUTO</span>
-              ) : (
+          {isAutoFill ? (
+            draftRows.map((row, index) => {
+              const hasTrackCode = row.trackCode.trim().length > 0;
+              return (
+                <div
+                  key={row.id}
+                  className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20"
+                >
+                  <div className="flex min-h-12 items-center justify-center border-r border-inherit font-mono text-[12px] font-bold text-orange-500">
+                    +{index + 1}
+                  </div>
+                  <div className="flex min-h-12 items-center border-r border-inherit px-2">
+                    <span className="font-mono text-sm font-bold text-zinc-400">AUTO</span>
+                  </div>
+                  <div className="relative flex min-h-12 items-center border-r border-inherit px-2">
+                    <Input
+                      id={index === 0 ? 'main-track-input' : undefined}
+                      ref={(node) => {
+                        if (node) {
+                          draftInputRefs.current.set(row.id, node);
+                          if (index === 0) trackInputRef.current = node;
+                        } else {
+                          draftInputRefs.current.delete(row.id);
+                          if (index === 0) trackInputRef.current = null;
+                        }
+                      }}
+                      value={row.trackCode}
+                      onChange={(e) => handleDraftTrackChange(row.id, e.target.value)}
+                      onKeyDown={(e) => handleDraftKeyDown(row.id, e)}
+                      onPaste={(e) => handleDraftPaste(row.id, e)}
+                      placeholder="Barcode skanerlang yoki yozing, Enter"
+                      className="h-10 rounded-none border-0 bg-transparent pr-9 font-mono text-sm shadow-none focus-visible:ring-0"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                    {index === 0 && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        {resolveMutation.isPending ? (
+                          <Loader2 className="size-4 animate-spin text-orange-400" />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleCameraScan}
+                            title={isScanning ? "Kamerani yopish" : "Kamera orqali skanerlash"}
+                            className={cn(
+                              'rounded p-1 transition-colors',
+                              isScanning
+                                ? 'bg-orange-100 text-orange-600 dark:bg-orange-950/50'
+                                : 'text-zinc-400 hover:text-orange-500',
+                            )}
+                          >
+                            <Camera className="size-4" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex min-h-12 items-center justify-center border-r border-inherit px-2 font-mono text-sm font-black text-zinc-600 dark:text-zinc-300">
+                    {hasTrackCode ? 1 : '-'}
+                  </div>
+                  <div className="flex min-h-12 min-w-0 items-center gap-2 border-r border-inherit px-3 text-[12px] font-semibold text-zinc-500 dark:text-zinc-400">
+                    <span className="truncate">
+                      {hasTrackCode
+                        ? 'Enter/Tab bilan queue ga qo\'shiladi'
+                        : 'Bo\'sh row: Enter yangi row ochadi'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => commitDraftRow(row.id)}
+                    className="min-h-12 bg-orange-500 px-2 text-[12px] font-bold text-white transition-colors hover:bg-orange-600"
+                  >
+                    {hasTrackCode ? "Qo'sh" : 'Row +'}
+                  </button>
+                </div>
+              );
+            })
+          ) : (
+            <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20">
+              <div className="flex min-h-12 items-center justify-center border-r border-inherit font-mono text-[12px] font-bold text-orange-500">+</div>
+              <div className="flex min-h-12 items-center border-r border-inherit px-2">
                 <Input
                   ref={clientInputRef}
                   value={clientCodeInput}
@@ -1060,44 +1429,8 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                   autoCorrect="off"
                   spellCheck={false}
                 />
-              )}
-            </div>
-            <div className="relative flex min-h-12 items-center border-r border-inherit px-2">
-              {isAutoFill ? (
-                <>
-                  <Input
-                    id="main-track-input"
-                    ref={trackInputRef}
-                    value={trackCodeInput}
-                    onChange={(e) => setTrackCodeInput(e.target.value.toUpperCase())}
-                    onKeyDown={handleTrackKeyDown}
-                    placeholder="Barcode skanerlang yoki yozing, Enter"
-                    className="h-10 rounded-none border-0 bg-transparent pr-9 font-mono text-sm shadow-none focus-visible:ring-0"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                    {resolveMutation.isPending ? (
-                      <Loader2 className="size-4 animate-spin text-orange-400" />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleCameraScan}
-                        title={isScanning ? "Kamerani yopish" : "Kamera orqali skanerlash"}
-                        className={cn(
-                          'rounded p-1 transition-colors',
-                          isScanning
-                            ? 'bg-orange-100 text-orange-600 dark:bg-orange-950/50'
-                            : 'text-zinc-400 hover:text-orange-500',
-                        )}
-                      >
-                        <Camera className="size-4" />
-                      </button>
-                    )}
-                  </div>
-                </>
-              ) : (
+              </div>
+              <div className="relative flex min-h-12 items-center border-r border-inherit px-2">
                 <textarea
                   value={trackCodesText}
                   onChange={(e) => {
@@ -1117,42 +1450,36 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                   autoCorrect="off"
                   spellCheck={false}
                 />
-              )}
+              </div>
+              <div className="flex min-h-12 items-center justify-center border-r border-inherit px-2 font-mono text-sm font-black text-zinc-600 dark:text-zinc-300">
+                {parsedCodes.length}
+              </div>
+              <div className="flex min-h-12 min-w-0 items-center gap-2 border-r border-inherit px-3 text-[12px] font-semibold text-zinc-500 dark:text-zinc-400">
+                {isValidating ? (
+                  <>
+                    <Loader2 className="size-3.5 shrink-0 animate-spin text-orange-400" />
+                    <span>Tekshirilmoqda...</span>
+                  </>
+                ) : (
+                  <span className="truncate">
+                    {validationCounts.conflict > 0 || validationCounts.alreadySent > 0
+                      ? `${validationCounts.conflict + validationCounts.alreadySent} ta muammo`
+                      : parsedCodes.length > 0
+                        ? `${parsedCodes.length} ta kod tayyor`
+                        : 'Manual kiritish'}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleClientFirstAdd}
+                disabled={!clientCodeInput.trim() || parsedCodes.length === 0}
+                className="min-h-12 bg-orange-500 px-2 text-[12px] font-bold text-white transition-colors hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800"
+              >
+                Qo'sh
+              </button>
             </div>
-            <div className="flex min-h-12 items-center justify-center border-r border-inherit px-2 font-mono text-sm font-black text-zinc-600 dark:text-zinc-300">
-              {isAutoFill ? entryQueue.length : parsedCodes.length}
-            </div>
-            <div className="flex min-h-12 min-w-0 items-center gap-2 border-r border-inherit px-3 text-[12px] font-semibold text-zinc-500 dark:text-zinc-400">
-              {isAutoFill ? (
-                <span className="truncate">B ustun aktiv, scanner Enter yuboradi</span>
-              ) : isValidating ? (
-                <>
-                  <Loader2 className="size-3.5 shrink-0 animate-spin text-orange-400" />
-                  <span>Tekshirilmoqda...</span>
-                </>
-              ) : (
-                <span className="truncate">
-                  {validationCounts.conflict > 0 || validationCounts.alreadySent > 0
-                    ? `${validationCounts.conflict + validationCounts.alreadySent} ta muammo`
-                    : parsedCodes.length > 0
-                      ? `${parsedCodes.length} ta kod tayyor`
-                      : 'Manual kiritish'}
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={isAutoFill ? handleAutoFillScan : handleClientFirstAdd}
-              disabled={
-                isAutoFill
-                  ? !trackCodeInput.trim()
-                  : !clientCodeInput.trim() || parsedCodes.length === 0
-              }
-              className="min-h-12 bg-orange-500 px-2 text-[12px] font-bold text-white transition-colors hover:bg-orange-600 disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800"
-            >
-              Qo'sh
-            </button>
-          </div>
+          )}
 
           {scannerReady && (
             <>
@@ -1185,12 +1512,12 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             </>
           )}
 
-          {visibleQueue.length === 0 ? (
-            <div className="flex h-12 min-w-[980px] items-center justify-center border-t border-zinc-100 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
+          {filteredQueue.length === 0 ? (
+            <div className="flex h-12 min-w-[1060px] items-center justify-center border-t border-zinc-100 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
               Jadvalga birinchi track codeni kiriting
             </div>
           ) : (
-            visibleQueue.map((item, index) => (
+            filteredQueue.map((item, index) => (
               (() => {
                 const clientCode = item.clientCode.trim().toUpperCase();
                 const splitSegment = clientCode ? splitClientSegments.get(clientCode) : undefined;
@@ -1198,7 +1525,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                   <QueueItemRow
                     key={item.id}
                     item={item}
-                    rowNumber={visibleQueue.length - index}
+                    rowNumber={filteredQueue.length - index}
                     clientScanCount={clientScanCounts.get(clientCode) ?? 0}
                     isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
                     splitSegmentCount={splitSegment?.segmentCount ?? 0}
@@ -1206,6 +1533,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                     onSetClientCode={setQueueItemClientCode}
                     onAcceptConflictOwner={acceptQueueItemConflictOwner}
                     onMergeClientGroup={mergeClientQueueGroup}
+                    onPreviewClient={handlePreviewClient}
                   />
                 );
               })()
@@ -1440,7 +1768,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           isQueueExpanded ? 'flex-1 min-h-0' : 'max-h-40',
         )}>
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="grid min-w-[980px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_112px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
               <div className="flex h-9 items-center justify-center border-r border-inherit font-mono">#</div>
               <div className="flex h-9 items-center border-r border-inherit px-2">A · Mijoz kodi</div>
               <div className="flex h-9 items-center border-r border-inherit px-3">B · Track code</div>
@@ -1460,6 +1788,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                 onSetClientCode={setQueueItemClientCode}
                 onAcceptConflictOwner={acceptQueueItemConflictOwner}
                 onMergeClientGroup={mergeClientQueueGroup}
+                onPreviewClient={handlePreviewClient}
               />
             ))}
           </div>
