@@ -25,6 +25,7 @@ import { RenameFlightModal } from '@/components/expectedCargo/RenameFlightModal'
 import { DeleteConfirmModal } from '@/components/expectedCargo/DeleteConfirmModal';
 import { ReplaceTrackCodesModal } from '@/components/expectedCargo/ReplaceTrackCodesModal';
 import { NotificationPanel } from '@/components/expectedCargo/NotificationPanel';
+import { expectedCargoQueueStorage } from '@/utils/expectedCargoQueueStorage';
 
 interface ExpectedCargoPageProps {
   onNavigate: (page: string) => void;
@@ -85,6 +86,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     setFastEntryOpen,
     syncFlightTabOrder,
     setFlightTabOrder,
+    replaceEntryQueue,
   } = useExpectedCargoStore();
 
   // ── Modal / dialog state ────────────────────────────────────────────────────
@@ -96,6 +98,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     clientCode: string;
   } | null>(null);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [hasHydratedQueueBackup, setHasHydratedQueueBackup] = useState(false);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -130,6 +133,52 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
       }
     }
   }, [flightsQuery.data, syncFlightTabOrder, activeFlightName, setActiveFlight]);
+
+  // Hydrate large scanner queues from IndexedDB. If the current in-memory queue
+  // came from older localStorage persistence, migrate it into IndexedDB once.
+  useEffect(() => {
+    let isCancelled = false;
+
+    expectedCargoQueueStorage.loadQueue()
+      .then((storedQueue) => {
+        if (isCancelled) return;
+        if (storedQueue.length > 0) {
+          replaceEntryQueue(storedQueue);
+        } else if (entryQueue.length > 0) {
+          void expectedCargoQueueStorage.saveQueue(entryQueue);
+        }
+      })
+      .catch(() => {
+        toast.warning("Mahalliy queue backupini o'qib bo'lmadi");
+      })
+      .finally(() => {
+        if (!isCancelled) setHasHydratedQueueBackup(true);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+    // Run once on page mount. entryQueue is intentionally captured for one-time migration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replaceEntryQueue]);
+
+  // Keep a durable IndexedDB backup of the queue. Debounced so scanner bursts do
+  // not write on every keystroke/scan synchronously.
+  useEffect(() => {
+    if (!hasHydratedQueueBackup) return;
+
+    const timer = window.setTimeout(() => {
+      const task = entryQueue.length > 0
+        ? expectedCargoQueueStorage.saveQueue(entryQueue)
+        : expectedCargoQueueStorage.clearQueue();
+
+      task.catch(() => {
+        toast.warning('Queue backup saqlanmadi. Brauzer xotirasini tekshiring.');
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entryQueue, hasHydratedQueueBackup]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
 

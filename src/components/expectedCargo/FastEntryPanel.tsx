@@ -128,9 +128,11 @@ function detectContinuation(
 interface QueueItemRowProps {
   item: FastEntryQueueItem;
   rowNumber: number;
+  isSelected: boolean;
   clientScanCount: number;
   isSplitGroup: boolean;
   splitSegmentCount: number;
+  onToggleSelected: (id: string) => void;
   onRemove: (id: string) => void;
   onSetClientCode: (id: string, code: string) => void;
   onAcceptConflictOwner: (id: string) => void;
@@ -142,9 +144,11 @@ interface QueueItemRowProps {
 function QueueItemRow({
   item,
   rowNumber,
+  isSelected,
   clientScanCount,
   isSplitGroup,
   splitSegmentCount,
+  onToggleSelected,
   onRemove,
   onSetClientCode,
   onAcceptConflictOwner,
@@ -244,12 +248,23 @@ function QueueItemRow({
   return (
     <div
       className={cn(
-        'grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b text-sm transition-colors',
+        'grid min-w-[1110px] grid-cols-[52px_44px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b text-sm transition-colors',
         sheetRowStyle,
       )}
     >
       <div className="flex h-11 items-center justify-center border-r border-inherit bg-black/[0.02] font-mono text-[12px] text-zinc-400 dark:bg-white/[0.03]">
         {rowNumber}
+      </div>
+
+      <div className="flex h-11 items-center justify-center border-r border-inherit bg-black/[0.015] dark:bg-white/[0.02]">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          disabled={item.isAlreadySent}
+          onChange={() => onToggleSelected(item.id)}
+          className="size-4 rounded border-current/30 accent-orange-500 disabled:cursor-not-allowed disabled:opacity-30"
+          title={item.isAlreadySent ? 'Yuborilgan row tanlanmaydi' : 'Row tanlash'}
+        />
       </div>
 
       <div className="flex h-11 min-w-0 items-center border-r border-inherit px-2">
@@ -562,6 +577,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [soundVolume, setSoundVolume] = useState(() => getCargoAudioVolume());
+  const [bulkClientCodeInput, setBulkClientCodeInput] = useState('');
   const [clientCodeInput, setClientCodeInput] = useState('');
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -600,6 +616,11 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     mergeClientQueueGroup,
     toggleQueueItemReviewed,
     setQueueItemClientCode,
+    selectedQueueItemIds,
+    toggleQueueItemSelected,
+    setQueueItemsSelected,
+    clearQueueSelection,
+    bulkSetSelectedClientCode,
     removeLatestQueueItem,
     removeFromQueue,
     setSearchQuery,
@@ -1313,6 +1334,39 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       }),
     [queueFilter, splitClientSegments, visibleQueue],
   );
+  const selectableFilteredIds = useMemo(
+    () => filteredQueue.filter((item) => !item.isAlreadySent).map((item) => item.id),
+    [filteredQueue],
+  );
+  const selectedFilteredCount = useMemo(
+    () => selectableFilteredIds.filter((id) => selectedQueueItemIds.includes(id)).length,
+    [selectableFilteredIds, selectedQueueItemIds],
+  );
+  const selectedQueueCount = selectedQueueItemIds.length;
+  const isAllFilteredSelected =
+    selectableFilteredIds.length > 0 && selectedFilteredCount === selectableFilteredIds.length;
+
+  const handleToggleAllFiltered = useCallback(() => {
+    setQueueItemsSelected(selectableFilteredIds, !isAllFilteredSelected);
+  }, [isAllFilteredSelected, selectableFilteredIds, setQueueItemsSelected]);
+
+  const handleBulkClientCodeApply = useCallback(() => {
+    const normalized = bulkClientCodeInput.trim().toUpperCase();
+    if (!normalized) {
+      toast.warning('Mijoz kodini kiriting');
+      return;
+    }
+
+    const updatedCount = bulkSetSelectedClientCode(normalized);
+    if (updatedCount === 0) {
+      toast.warning('Ozgartirish uchun row tanlanmagan');
+      return;
+    }
+
+    setBulkClientCodeInput('');
+    toast.success(`${updatedCount} ta row ${normalized} mijoziga biriktirildi`, { duration: 1800 });
+  }, [bulkClientCodeInput, bulkSetSelectedClientCode]);
+
   const handleMergeAllSplitGroups = useCallback(() => {
     for (const clientCode of splitClientCodes) {
       mergeClientQueueGroup(clientCode);
@@ -1519,6 +1573,46 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           </div>
         </div>
 
+        {selectedQueueCount > 0 && (
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-200 bg-orange-50/90 px-3 py-2 dark:border-orange-900/60 dark:bg-orange-950/20">
+            <div className="text-xs font-bold text-orange-800 dark:text-orange-200">
+              {selectedQueueCount} ta row tanlandi
+            </div>
+            <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+              <Input
+                value={bulkClientCodeInput}
+                onChange={(event) => setBulkClientCodeInput(event.target.value.toUpperCase())}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleBulkClientCodeApply();
+                  }
+                }}
+                placeholder="Yangi mijoz kodi"
+                className="h-8 w-44 rounded-md border-orange-200 bg-white font-mono text-sm shadow-none focus-visible:ring-orange-500 dark:border-orange-900/70 dark:bg-zinc-950"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={handleBulkClientCodeApply}
+                disabled={!bulkClientCodeInput.trim()}
+                className="h-8 rounded-md bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800"
+              >
+                Tanlanganlarga qo'llash
+              </button>
+              <button
+                type="button"
+                onClick={clearQueueSelection}
+                className="h-8 rounded-md border border-orange-200 bg-white px-3 text-xs font-bold text-orange-700 hover:bg-orange-100 dark:border-orange-900/70 dark:bg-zinc-950 dark:text-orange-300"
+              >
+                Bekor qilish
+              </button>
+            </div>
+          </div>
+        )}
+
         {isImportOpen && (
           <div className="mb-2 rounded-lg border border-orange-200 bg-orange-50/80 p-3 dark:border-orange-900/60 dark:bg-orange-950/20">
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -1569,8 +1663,18 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
         )}
 
         <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+          <div className="grid min-w-[1110px] grid-cols-[52px_44px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             <div className="flex h-9 items-center justify-center border-r border-inherit font-mono">#</div>
+            <div className="flex h-9 items-center justify-center border-r border-inherit">
+              <input
+                type="checkbox"
+                checked={isAllFilteredSelected}
+                disabled={selectableFilteredIds.length === 0}
+                onChange={handleToggleAllFiltered}
+                className="size-4 rounded border-current/30 accent-orange-500 disabled:cursor-not-allowed disabled:opacity-30"
+                title="Ko'rinayotgan rowlarni tanlash"
+              />
+            </div>
             <div className="flex h-9 items-center border-r border-inherit px-2">A · Mijoz kodi</div>
             <div className="flex h-9 items-center border-r border-inherit px-3">B · Track code</div>
             <div className="flex h-9 items-center justify-center border-r border-inherit px-2">C · Soni</div>
@@ -1584,11 +1688,12 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
               return (
                 <div
                   key={row.id}
-                  className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20"
+                  className="grid min-w-[1110px] grid-cols-[52px_44px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20"
                 >
                   <div className="flex min-h-12 items-center justify-center border-r border-inherit font-mono text-[12px] font-bold text-orange-500">
                     +{index + 1}
                   </div>
+                  <div className="flex min-h-12 items-center justify-center border-r border-inherit text-zinc-300">-</div>
                   <div className="flex min-h-12 items-center border-r border-inherit px-2">
                     <span className="font-mono text-sm font-bold text-zinc-400">AUTO</span>
                   </div>
@@ -1657,8 +1762,9 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
               );
             })
           ) : (
-            <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20">
+            <div className="grid min-w-[1110px] grid-cols-[52px_44px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-orange-200 bg-orange-50/60 text-sm dark:border-orange-900/50 dark:bg-orange-950/20">
               <div className="flex min-h-12 items-center justify-center border-r border-inherit font-mono text-[12px] font-bold text-orange-500">+</div>
+              <div className="flex min-h-12 items-center justify-center border-r border-inherit text-zinc-300">-</div>
               <div className="flex min-h-12 items-center border-r border-inherit px-2">
                 <Input
                   ref={clientInputRef}
@@ -1754,7 +1860,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           )}
 
           {filteredQueue.length === 0 ? (
-            <div className="flex h-12 min-w-[1060px] items-center justify-center border-t border-zinc-100 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
+            <div className="flex h-12 min-w-[1110px] items-center justify-center border-t border-zinc-100 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
               Jadvalga birinchi track codeni kiriting
             </div>
           ) : (
@@ -1767,9 +1873,11 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                     key={item.id}
                     item={item}
                     rowNumber={filteredQueue.length - index}
+                    isSelected={selectedQueueItemIds.includes(item.id)}
                     clientScanCount={clientScanCounts.get(clientCode) ?? 0}
                     isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
                     splitSegmentCount={splitSegment?.segmentCount ?? 0}
+                    onToggleSelected={toggleQueueItemSelected}
                     onRemove={removeFromQueue}
                     onSetClientCode={setQueueItemClientCode}
                     onAcceptConflictOwner={acceptQueueItemConflictOwner}
@@ -2023,9 +2131,11 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                 key={item.id}
                 item={item}
                 rowNumber={entryQueue.length - index}
+                isSelected={selectedQueueItemIds.includes(item.id)}
                 clientScanCount={clientScanCounts.get(item.clientCode.trim().toUpperCase()) ?? 0}
                 isSplitGroup={false}
                 splitSegmentCount={0}
+                onToggleSelected={toggleQueueItemSelected}
                 onRemove={removeFromQueue}
                 onSetClientCode={setQueueItemClientCode}
                 onAcceptConflictOwner={acceptQueueItemConflictOwner}

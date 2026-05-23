@@ -19,6 +19,8 @@ interface BulkSaveFABProps {
   flightName: string | null;
 }
 
+const SAVE_CONCURRENCY = 4;
+
 function triggerHapticSuccess(): void {
   try {
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
@@ -39,10 +41,10 @@ function groupQueueByClient(
   queue: FastEntryQueueItem[],
   flightName: string,
 ): {
-  groups: Array<{ flightName: string; clientCode: string; trackCodes: string[] }>;
+  groups: Array<{ flightName: string; clientCode: string; trackCodes: string[]; itemIds: string[] }>;
   invalidItems: FastEntryQueueItem[];
 } {
-  const groups = new Map<string, string[]>();
+  const groups = new Map<string, { trackCodes: string[]; itemIds: string[] }>();
   const invalidItems: FastEntryQueueItem[] = [];
 
   for (const item of queue) {
@@ -51,18 +53,36 @@ function groupQueueByClient(
       continue;
     }
     const key = item.clientCode.trim().toUpperCase();
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(item.trackCode);
+    if (!groups.has(key)) groups.set(key, { trackCodes: [], itemIds: [] });
+    groups.get(key)!.trackCodes.push(item.trackCode);
+    groups.get(key)!.itemIds.push(item.id);
   }
 
   return {
-    groups: Array.from(groups.entries()).map(([clientCode, trackCodes]) => ({
+    groups: Array.from(groups.entries()).map(([clientCode, group]) => ({
       flightName,
       clientCode,
-      trackCodes,
+      trackCodes: group.trackCodes,
+      itemIds: group.itemIds,
     })),
     invalidItems,
   };
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      await worker(items[currentIndex]!, currentIndex);
+    }
+  });
+  await Promise.all(workers);
 }
 
 export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
@@ -83,26 +103,25 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
         throw new Error("Saqlash uchun tayyor yozuv yo'q");
       }
 
-      // Send one bulk request per unique client
-      const results = await Promise.allSettled(
-        groups.map((g) =>
-          bulkCreateExpectedCargo({
-            flight_name: g.flightName,
-            client_code: g.clientCode,
-            track_codes: g.trackCodes,
-          }),
-        ),
-      );
+      let totalCreated = 0;
+      let failedCount = 0;
+      const savedItemIds: string[] = [];
 
-      const totalCreated = results.reduce((acc, r) => {
-        if (r.status === 'fulfilled') return acc + r.value.created_count;
-        return acc;
-      }, 0);
+      await runWithConcurrency(groups, SAVE_CONCURRENCY, async (group) => {
+        try {
+          const response = await bulkCreateExpectedCargo({
+            flight_name: group.flightName,
+            client_code: group.clientCode,
+            track_codes: group.trackCodes,
+          });
+          totalCreated += response.created_count;
+          savedItemIds.push(...group.itemIds);
+          for (const id of group.itemIds) removeFromQueue(id);
+        } catch {
+          failedCount += 1;
+        }
+      });
 
-      const failedCount = results.filter((r) => r.status === 'rejected').length;
-      const savedItemIds = failedCount === 0
-        ? entryQueue.filter((item) => !isQueueItemBlocked(item)).map((item) => item.id)
-        : [];
       return {
         totalCreated,
         failedCount,
@@ -125,9 +144,10 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
 
       if (failedCount === 0 && invalidCount === 0) {
         clearQueue();
-      } else if (failedCount === 0) {
-        for (const id of savedItemIds) removeFromQueue(id);
+      } else if (failedCount === 0 && savedItemIds.length > 0) {
         toast.info(`${invalidCount} ta tekshiriladigan qator navbatda qoldi`);
+      } else if (failedCount > 0) {
+        toast.info('Yuborilmagan qatorlar navbatda saqlanib qoldi');
       }
       setIsConfirmOpen(false);
 

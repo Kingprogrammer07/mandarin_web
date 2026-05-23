@@ -78,6 +78,7 @@ interface ExpectedCargoState {
 
   flightTabOrder: string[];
   entryQueue: FastEntryQueueItem[];
+  selectedQueueItemIds: string[];
   notifications: NotificationItem[];
 
   setActiveFlight: (name: string | null) => void;
@@ -90,6 +91,11 @@ interface ExpectedCargoState {
 
   syncFlightTabOrder: (apiFlightNames: string[]) => void;
   setFlightTabOrder: (orderedNames: string[]) => void;
+  replaceEntryQueue: (items: FastEntryQueueItem[]) => void;
+  toggleQueueItemSelected: (id: string) => void;
+  setQueueItemsSelected: (ids: string[], selected: boolean) => void;
+  clearQueueSelection: () => void;
+  bulkSetSelectedClientCode: (clientCode: string) => number;
 
   enqueueEntry: (
     item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentFlight' | 'isWrongClient' | 'conflictClientCode'> &
@@ -136,6 +142,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       isClientListHidden: false,
       flightTabOrder: [],
       entryQueue: [],
+      selectedQueueItemIds: [],
       notifications: [],
 
       setActiveFlight: (name) =>
@@ -171,6 +178,59 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       },
 
       setFlightTabOrder: (orderedNames) => set({ flightTabOrder: orderedNames }),
+
+      replaceEntryQueue: (items) =>
+        set((state) => {
+          const itemIds = new Set(items.map((item) => item.id));
+          return {
+            entryQueue: items,
+            selectedQueueItemIds: state.selectedQueueItemIds.filter((id) => itemIds.has(id)),
+          };
+        }),
+
+      toggleQueueItemSelected: (id) =>
+        set((state) => ({
+          selectedQueueItemIds: state.selectedQueueItemIds.includes(id)
+            ? state.selectedQueueItemIds.filter((selectedId) => selectedId !== id)
+            : [...state.selectedQueueItemIds, id],
+        })),
+
+      setQueueItemsSelected: (ids, selected) =>
+        set((state) => {
+          const next = new Set(state.selectedQueueItemIds);
+          for (const id of ids) {
+            if (selected) next.add(id);
+            else next.delete(id);
+          }
+          return { selectedQueueItemIds: Array.from(next) };
+        }),
+
+      clearQueueSelection: () => set({ selectedQueueItemIds: [] }),
+
+      bulkSetSelectedClientCode: (clientCode) => {
+        const normalized = clientCode.trim().toUpperCase();
+        if (!normalized) return 0;
+
+        let updatedCount = 0;
+        set((state) => {
+          const selectedIds = new Set(state.selectedQueueItemIds);
+          return {
+            entryQueue: state.entryQueue.map((item) => {
+              if (!selectedIds.has(item.id) || item.isAlreadySent) return item;
+              updatedCount += 1;
+              return {
+                ...item,
+                clientCode: normalized,
+                notFound: false,
+                isWrongClient: false,
+                conflictClientCode: null,
+              };
+            }),
+            selectedQueueItemIds: [],
+          };
+        });
+        return updatedCount;
+      },
 
       enqueueEntry: (item) => {
         const id = crypto.randomUUID();
@@ -278,7 +338,15 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       setQueueItemClientCode: (id, clientCode) =>
         set((state) => ({
           entryQueue: state.entryQueue.map((item) =>
-            item.id === id ? { ...item, clientCode, notFound: false } : item,
+            item.id === id
+              ? {
+                  ...item,
+                  clientCode: clientCode.trim().toUpperCase(),
+                  notFound: false,
+                  isWrongClient: false,
+                  conflictClientCode: null,
+                }
+              : item,
           ),
         })),
 
@@ -308,9 +376,10 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       removeFromQueue: (id) =>
         set((state) => ({
           entryQueue: state.entryQueue.filter((item) => item.id !== id),
+          selectedQueueItemIds: state.selectedQueueItemIds.filter((selectedId) => selectedId !== id),
         })),
 
-      clearQueue: () => set({ entryQueue: [] }),
+      clearQueue: () => set({ entryQueue: [], selectedQueueItemIds: [] }),
 
       addNotification: (notification) => {
         const id = crypto.randomUUID();
@@ -342,7 +411,6 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       partialize: (state) => ({
         activeFlightName: state.activeFlightName,
         flightTabOrder: state.flightTabOrder,
-        entryQueue: state.entryQueue,
         notifications: state.notifications,
       }),
     },
