@@ -340,6 +340,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       storage: createJSONStorage(() => localStorage),
       // isClientListHidden intentionally excluded — ephemeral UI state
       partialize: (state) => ({
+        activeFlightName: state.activeFlightName,
         flightTabOrder: state.flightTabOrder,
         entryQueue: state.entryQueue,
         notifications: state.notifications,

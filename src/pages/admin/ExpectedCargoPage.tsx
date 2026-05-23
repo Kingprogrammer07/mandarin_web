@@ -114,14 +114,18 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
 
   // ── Effects ─────────────────────────────────────────────────────────────────
 
-  // Sync tab order whenever the flights list changes
+  // Sync tab order whenever the flights list changes and preserve the selected tab across reloads.
   useEffect(() => {
     if (flightsQuery.data?.items) {
       const names = flightsQuery.data.items.map((f) => f.flight_name);
       syncFlightTabOrder(names);
 
-      // Auto-select the first flight if none is selected yet
-      if (!activeFlightName && names.length > 0) {
+      const activeExists = activeFlightName
+        ? names.some((name) => name.toUpperCase() === activeFlightName.toUpperCase())
+        : false;
+
+      // Auto-select only when nothing is selected or the persisted flight no longer exists.
+      if ((!activeFlightName || !activeExists) && names.length > 0) {
         setActiveFlight(names[0]);
       }
     }
