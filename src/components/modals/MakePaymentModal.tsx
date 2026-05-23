@@ -776,97 +776,125 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         </div>
       );
     }
+    const sortedFlights = [...flights].sort((a, b) => {
+      const aReady = a.total_payment != null ? 1 : 0;
+      const bReady = b.total_payment != null ? 1 : 0;
+      return bReady - aReady;
+    });
+
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
           {t('makePayment.selectFlight')}
         </p>
-        {flights.map((flight) => (
-          <motion.button
-            key={flight.flight_name}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => handleSelectFlight(flight)}
-            className="w-full text-left rounded-2xl p-4
-              bg-white dark:bg-white/[0.04]
-              border border-gray-200 dark:border-white/10
-              hover:border-amber-300 dark:hover:border-amber-500/40
-              shadow-sm hover:shadow-md
-              transition-all duration-200 group"
-          >
-            <div className="flex items-center justify-between gap-3">
-              {/* Left */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    flight.payment_status === 'partial'
-                      ? 'bg-amber-100 dark:bg-amber-500/15'
-                      : 'bg-blue-100 dark:bg-blue-500/15'
-                  }`}
-                >
-                  <Plane
-                    className={`w-5 h-5 ${
+        {sortedFlights.map((flight) => {
+          const isReportReady = flight.total_payment != null;
+          return (
+            <motion.button
+              key={flight.flight_name}
+              whileTap={isReportReady ? { scale: 0.97 } : undefined}
+              onClick={() => {
+                if (isReportReady) {
+                  handleSelectFlight(flight);
+                } else {
+                  toast.info(t('makePayment.reportNotReadyDesc'));
+                }
+              }}
+              className={`w-full text-left rounded-2xl p-4
+                border transition-all duration-200 group
+                ${isReportReady
+                  ? 'bg-white dark:bg-white/[0.04] border-gray-200 dark:border-white/10 hover:border-amber-300 dark:hover:border-amber-500/40 shadow-sm hover:shadow-md cursor-pointer'
+                  : 'bg-gray-50 dark:bg-white/[0.02] border-gray-100 dark:border-white/5 opacity-70 cursor-not-allowed'
+                }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                {/* Left */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       flight.payment_status === 'partial'
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-blue-600 dark:text-blue-400'
+                        ? 'bg-amber-100 dark:bg-amber-500/15'
+                        : isReportReady
+                          ? 'bg-blue-100 dark:bg-blue-500/15'
+                          : 'bg-gray-100 dark:bg-white/5'
                     }`}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-base text-gray-900 dark:text-white truncate">
-                    {flight.flight_name}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  >
+                    <Plane
+                      className={`w-5 h-5 ${
                         flight.payment_status === 'partial'
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : isReportReady
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-gray-400 dark:text-gray-600'
                       }`}
-                    >
-                      {flight.payment_status === 'partial'
-                        ? t('makePayment.partial')
-                        : t('makePayment.unpaid')}
-                    </span>
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`font-bold text-base truncate ${isReportReady ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {flight.flight_name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span
+                        className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          flight.payment_status === 'partial'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                            : isReportReady
+                              ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                              : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-500'
+                        }`}
+                      >
+                        {flight.payment_status === 'partial'
+                          ? t('makePayment.partial')
+                          : isReportReady
+                            ? t('makePayment.unpaid')
+                            : t('makePayment.reportNotReady')}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Right – amount */}
-              <div className="text-right flex-shrink-0">
-                {flight.total_payment != null ? (
-                  <>
-                    {flight.payment_status === 'partial' &&
-                    flight.remaining_amount != null ? (
-                      <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
-                          {t('makePayment.remaining')}
-                        </p>
-                        <p className="text-base font-extrabold text-amber-600 dark:text-amber-400">
-                          {formatMoney(flight.remaining_amount)}
-                          <span className="text-xs ml-1 font-semibold opacity-70">
+                {/* Right – amount */}
+                <div className="text-right flex-shrink-0">
+                  {isReportReady ? (
+                    <>
+                      {flight.payment_status === 'partial' &&
+                      flight.remaining_amount != null ? (
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            {t('makePayment.remaining')}
+                          </p>
+                          <p className="text-base font-extrabold text-amber-600 dark:text-amber-400">
+                            {formatMoney(flight.remaining_amount)}
+                            <span className="text-xs ml-1 font-semibold opacity-70">
+                              so'm
+                            </span>
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-base font-extrabold text-gray-900 dark:text-white">
+                          {formatMoney(flight.total_payment)}
+                          <span className="text-xs ml-1 font-semibold text-gray-400">
                             so'm
                           </span>
                         </p>
-                      </div>
-                    ) : (
-                      <p className="text-base font-extrabold text-gray-900 dark:text-white">
-                        {formatMoney(flight.total_payment)}
-                        <span className="text-xs ml-1 font-semibold text-gray-400">
-                          so'm
-                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <div>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                        {t('makePayment.reportNotReady')}
+                      </span>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 max-w-[140px]">
+                        {t('makePayment.reportNotReadyDesc')}
                       </p>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-xs text-gray-400 dark:text-gray-500 italic">
-                    {t('makePayment.reportNotReady')}
-                  </span>
-                )}
-                <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 ml-auto mt-1 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  )}
+                  <ChevronRight className={`w-4 h-4 ml-auto mt-1 transition-transform ${isReportReady ? 'text-gray-300 dark:text-gray-600 group-hover:translate-x-0.5' : 'text-gray-200 dark:text-gray-700'}`} />
+                </div>
               </div>
-            </div>
-          </motion.button>
-        ))}
+            </motion.button>
+          );
+        })}
       </div>
     );
   };

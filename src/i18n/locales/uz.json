@@ -1577,7 +1577,8 @@
     "partialPayment": "Qisman to'lov",
     "payRemaining": "Qoldiqni to'lash",
     "formatError": "Faqat rasm (JPG, PNG, HEIC) yoki PDF yuklang",
-    "sizeError": "Fayl hajmi 10MB dan oshmasin"
+    "sizeError": "Fayl hajmi 10MB dan oshmasin",
+    "reportNotReadyDesc": "Yukingiz hali O'zbekiston omborlariga yetib kelmagan bo'lishi mumkin"
   },
   "adminDeliveryRequest": {
     "title": "Yetkazib berish zayavkasi",
