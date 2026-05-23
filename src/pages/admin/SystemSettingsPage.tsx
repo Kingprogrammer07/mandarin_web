@@ -10,14 +10,36 @@ import {
   Loader2,
   ChevronDown,
   Activity,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
-import { systemService } from '@/api/services/systemService';
+import { systemService, type NbuPendingPaymentRow } from '@/api/services/systemService';
+
+function formatAge(seconds: number | null): string {
+  if (seconds === null || seconds < 0) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ${mins % 60}m`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat('uz-UZ', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
 
 export default function SystemSettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showRedisInfo, setShowRedisInfo] = useState(false);
   const [showRedisClients, setShowRedisClients] = useState(false);
+  const [showNbuPending, setShowNbuPending] = useState(false);
+  const [reconciling, setReconciling] = useState<string | null>(null);
 
   const { data: maintenanceData, isLoading: maintenanceLoading } = useQuery({
     queryKey: ['system-maintenance'],
@@ -41,6 +63,36 @@ export default function SystemSettingsPage() {
     queryKey: ['system-redis-clients'],
     queryFn: systemService.getRedisClients,
     enabled: showRedisClients,
+  });
+
+  const {
+    data: nbuPending,
+    isLoading: nbuPendingLoading,
+    refetch: refetchNbuPending,
+  } = useQuery({
+    queryKey: ['system-nbu-pending'],
+    queryFn: () => systemService.getNbuPending(100),
+    enabled: showNbuPending,
+    refetchInterval: showNbuPending ? 15_000 : false,
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: systemService.forceReconcileNbu,
+    onMutate: (transactionId) => setReconciling(transactionId),
+    onSettled: () => setReconciling(null),
+    onSuccess: (res) => {
+      if (res.flipped_to_terminal) {
+        toast.success(`${res.previous_status} → ${res.new_status}`);
+      } else if (res.previous_status === res.new_status) {
+        toast.message(`NBU javob: hali ${res.new_status}. Callback kutiladi.`);
+      } else {
+        toast.success(`Status: ${res.new_status}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['system-nbu-pending'] });
+    },
+    onError: () => {
+      toast.error('Reconcile xatosi — server loglarini ko\'ring');
+    },
   });
 
   const maintenanceMutation = useMutation({
@@ -180,6 +232,133 @@ export default function SystemSettingsPage() {
                   </pre>
                 ) : (
                   <p className="text-sm text-gray-500 text-center py-4">Ma'lumot yo'q</p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* NBU Stuck Payments */}
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
+        <button
+          onClick={() => setShowNbuPending(!showNbuPending)}
+          className="w-full flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-500/15 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-base text-gray-900 dark:text-white">
+                NBU pending to'lovlar
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Callback kelmagan tranzaksiyalar — qo'lda reconcile qilish
+                {nbuPending && (
+                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+                    {nbuPending.count}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <motion.div animate={{ rotate: showNbuPending ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          </motion.div>
+        </button>
+        <AnimatePresence>
+          {showNbuPending && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="px-5 pb-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Reconcile = NBU `/payment/status` ga so'rov yuborib, javobni bazaga yozish.
+                    CARD_BINDING uchun token saqlanadi, ONE_TIME uchun hamyon kreditlanadi.
+                  </p>
+                  <button
+                    onClick={() => refetchNbuPending()}
+                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 flex-shrink-0 ml-2"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Yangilash
+                  </button>
+                </div>
+
+                {nbuPendingLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 text-rose-500 animate-spin" />
+                  </div>
+                ) : !nbuPending || nbuPending.count === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">
+                    Pending tranzaksiyalar yo'q ✓
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-[480px] overflow-auto">
+                    {nbuPending.rows.map((row: NbuPendingPaymentRow) => {
+                      const isReconciling = reconciling === row.transaction_id;
+                      const isCardBinding = row.purpose === 'CARD_BINDING';
+                      return (
+                        <div
+                          key={row.id}
+                          className="border border-gray-200 dark:border-white/10 rounded-xl p-3 bg-gray-50/50 dark:bg-white/[0.02]"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    isCardBinding
+                                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300'
+                                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                  }`}
+                                >
+                                  {row.purpose}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 text-[10px] font-bold">
+                                  {formatAge(row.age_seconds)}
+                                </span>
+                                {!isCardBinding && (
+                                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    {formatMoney(row.amount_uzs)} so'm
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] font-mono text-gray-600 dark:text-gray-400 truncate">
+                                txn: {row.transaction_id}
+                              </p>
+                              <p className="text-[11px] font-mono text-gray-500 dark:text-gray-500 truncate">
+                                order: {row.order_id}
+                              </p>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-500">
+                                tg: {row.telegram_id}
+                                {row.card_masked && ` · ${row.card_masked}`}
+                                {row.callback_received_at && ' · callback ✓'}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => reconcileMutation.mutate(row.transaction_id)}
+                              disabled={isReconciling || reconcileMutation.isPending}
+                              className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                              {isReconciling ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3 h-3" />
+                              )}
+                              Reconcile
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </motion.div>
