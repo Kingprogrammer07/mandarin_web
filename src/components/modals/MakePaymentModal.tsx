@@ -776,125 +776,97 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         </div>
       );
     }
-    const sortedFlights = [...flights].sort((a, b) => {
-      const aReady = a.total_payment != null ? 1 : 0;
-      const bReady = b.total_payment != null ? 1 : 0;
-      return bReady - aReady;
-    });
-
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
           {t('makePayment.selectFlight')}
         </p>
-        {sortedFlights.map((flight) => {
-          const isReportReady = flight.total_payment != null;
-          return (
-            <motion.button
-              key={flight.flight_name}
-              whileTap={isReportReady ? { scale: 0.97 } : undefined}
-              onClick={() => {
-                if (isReportReady) {
-                  handleSelectFlight(flight);
-                } else {
-                  toast.info(t('makePayment.reportNotReadyDesc'));
-                }
-              }}
-              className={`w-full text-left rounded-xl p-3
-                border transition-all duration-200 group
-                ${isReportReady
-                  ? 'bg-white dark:bg-white/[0.04] border-gray-200 dark:border-white/10 hover:border-amber-300 dark:hover:border-amber-500/40 shadow-sm hover:shadow-md cursor-pointer'
-                  : 'bg-gray-50 dark:bg-white/[0.02] border-gray-100 dark:border-white/5 opacity-70 cursor-not-allowed'
-                }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                {/* Left */}
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+        {flights.map((flight) => (
+          <motion.button
+            key={flight.flight_name}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => handleSelectFlight(flight)}
+            className="w-full text-left rounded-xl p-3
+              bg-white dark:bg-white/[0.04]
+              border border-gray-200 dark:border-white/10
+              hover:border-amber-300 dark:hover:border-amber-500/40
+              shadow-sm hover:shadow-md
+              transition-all duration-200 group cursor-pointer"
+          >
+            <div className="flex items-center justify-between gap-3">
+              {/* Left */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    flight.payment_status === 'partial'
+                      ? 'bg-amber-100 dark:bg-amber-500/15'
+                      : 'bg-blue-100 dark:bg-blue-500/15'
+                  }`}
+                >
+                  <Plane
+                    className={`w-4 h-4 ${
                       flight.payment_status === 'partial'
-                        ? 'bg-amber-100 dark:bg-amber-500/15'
-                        : isReportReady
-                          ? 'bg-blue-100 dark:bg-blue-500/15'
-                          : 'bg-gray-100 dark:bg-white/5'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-blue-600 dark:text-blue-400'
                     }`}
-                  >
-                    <Plane
-                      className={`w-4 h-4 ${
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm truncate text-gray-900 dark:text-white">
+                    {flight.flight_name}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                         flight.payment_status === 'partial'
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : isReportReady
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-gray-400 dark:text-gray-600'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
                       }`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`font-bold text-sm truncate ${isReportReady ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                      {flight.flight_name}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span
-                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                          flight.payment_status === 'partial'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                            : isReportReady
-                              ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-500'
-                        }`}
-                      >
-                        {flight.payment_status === 'partial'
-                          ? t('makePayment.partial')
-                          : isReportReady
-                            ? t('makePayment.unpaid')
-                            : t('makePayment.reportNotReady')}
-                      </span>
-                    </div>
+                    >
+                      {flight.payment_status === 'partial'
+                        ? t('makePayment.partial')
+                        : t('makePayment.unpaid')}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Right – amount */}
-                <div className="text-right flex-shrink-0">
-                  {isReportReady ? (
-                    <>
-                      {flight.payment_status === 'partial' &&
-                      flight.remaining_amount != null ? (
-                        <div>
-                          <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                            {t('makePayment.remaining')}
-                          </p>
-                          <p className="text-sm font-extrabold text-amber-600 dark:text-amber-400">
-                            {formatMoney(flight.remaining_amount)}
-                            <span className="text-[10px] ml-1 font-semibold opacity-70">
-                              so'm
-                            </span>
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-sm font-extrabold text-gray-900 dark:text-white">
-                          {formatMoney(flight.total_payment)}
-                          <span className="text-[10px] ml-1 font-semibold text-gray-400">
+              {/* Right – amount */}
+              <div className="text-right flex-shrink-0">
+                {flight.total_payment != null ? (
+                  <>
+                    {flight.payment_status === 'partial' &&
+                    flight.remaining_amount != null ? (
+                      <div>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                          {t('makePayment.remaining')}
+                        </p>
+                        <p className="text-sm font-extrabold text-amber-600 dark:text-amber-400">
+                          {formatMoney(flight.remaining_amount)}
+                          <span className="text-[10px] ml-1 font-semibold opacity-70">
                             so'm
                           </span>
                         </p>
-                      )}
-                    </>
-                  ) : (
-                    <div>
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">
-                        {t('makePayment.reportNotReady')}
-                      </span>
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 max-w-[120px] leading-tight">
-                        {t('makePayment.reportNotReadyDesc')}
+                      </div>
+                    ) : (
+                      <p className="text-sm font-extrabold text-gray-900 dark:text-white">
+                        {formatMoney(flight.total_payment)}
+                        <span className="text-[10px] ml-1 font-semibold text-gray-400">
+                          so'm
+                        </span>
                       </p>
-                    </div>
-                  )}
-                  <ChevronRight className={`w-3.5 h-3.5 ml-auto mt-0.5 transition-transform ${isReportReady ? 'text-gray-300 dark:text-gray-600 group-hover:translate-x-0.5' : 'text-gray-200 dark:text-gray-700'}`} />
-                </div>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">
+                    {t('makePayment.reportNotReady')}
+                  </span>
+                )}
+                <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 ml-auto mt-0.5 group-hover:translate-x-0.5 transition-transform" />
               </div>
-            </motion.button>
-          );
-        })}
+            </div>
+          </motion.button>
+        ))}
       </div>
     );
   };
@@ -902,13 +874,28 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   /** STEP 1: Payment Details & Method */
   const renderStep1 = () => {
     if (detailsLoading) return <DetailSkeleton />;
-    if (detailsError || !details) {
+
+    // Flight has no cargo calculated yet — show friendly message instead of error
+    if (detailsError || !details || details.total_payment == null) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-red-400" />
-          <p className="text-gray-600 dark:text-gray-400">
-            {t('makePayment.errorOccurred')}
-          </p>
+        <div className="flex flex-col items-center justify-center py-12 text-center space-y-5 px-2">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center">
+            <Package className="w-8 h-8 text-amber-500" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-black text-gray-900 dark:text-white">
+              {t('makePayment.reportNotReady')}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[260px] mx-auto leading-relaxed">
+              {t('makePayment.reportNotReadyDesc')}
+            </p>
+          </div>
+          <button
+            onClick={goBack}
+            className="px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold text-sm active:scale-95 transition-transform"
+          >
+            {t('makePayment.retry')}
+          </button>
         </div>
       );
     }
