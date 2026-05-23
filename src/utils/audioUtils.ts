@@ -14,6 +14,7 @@ const CARGO_AUDIO_VOLUME_KEY = 'expected_cargo_audio_volume';
 const DEFAULT_CARGO_AUDIO_VOLUME = 1;
 const RUSTER_SUCCESS_MAX_MS = 1200;
 const RUSTER_SUCCESS_COOLDOWN_MS = 250;
+const RUSTER_SUCCESS_RAPID_WINDOW_MS = 2200;
 let rusterSuccessAudio: HTMLAudioElement | null = null;
 let rusterSuccessStopTimer: ReturnType<typeof setTimeout> | null = null;
 let lastRusterSuccessAt = 0;
@@ -75,6 +76,8 @@ export function playRusterSuccessSound() {
   try {
     const now = Date.now();
     if (now - lastRusterSuccessAt < RUSTER_SUCCESS_COOLDOWN_MS) return;
+    const shouldPlayShortSnippet =
+      lastRusterSuccessAt > 0 && now - lastRusterSuccessAt < RUSTER_SUCCESS_RAPID_WINDOW_MS;
     lastRusterSuccessAt = now;
 
     if (!rusterSuccessAudio) {
@@ -92,11 +95,13 @@ export function playRusterSuccessSound() {
     rusterSuccessAudio.volume = getCargoAudioVolume();
 
     void rusterSuccessAudio.play().then(() => {
-      rusterSuccessStopTimer = setTimeout(() => {
-        if (!rusterSuccessAudio) return;
-        rusterSuccessAudio.pause();
-        rusterSuccessAudio.currentTime = 0;
-      }, RUSTER_SUCCESS_MAX_MS);
+      if (shouldPlayShortSnippet) {
+        rusterSuccessStopTimer = setTimeout(() => {
+          if (!rusterSuccessAudio) return;
+          rusterSuccessAudio.pause();
+          rusterSuccessAudio.currentTime = 0;
+        }, RUSTER_SUCCESS_MAX_MS);
+      }
       if (window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
       }
