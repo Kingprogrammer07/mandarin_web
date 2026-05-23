@@ -19,12 +19,11 @@ import {
 import type { CargoItemResponse, PublicTrackingStep, TrackCodeSearchResponse } from "@/api/services/cargo";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
+import { computeStepProgress, deriveVisualStatuses, type VisualStepStatus } from "@/utils/trackingProgress";
 
 interface TrackResultCardProps {
   data: TrackCodeSearchResponse;
 }
-
-type VisualStepStatus = "completed" | "active" | "upcoming";
 
 const stepIcons = [Warehouse, Plane, ShieldCheck, ClipboardCheck, PackageCheck, CheckCircle2] as const;
 
@@ -58,15 +57,6 @@ function buildFallbackTracking(items: CargoItemResponse[], t: (key: string) => s
   ];
 }
 
-function getVisualStatus(step: PublicTrackingStep, steps: PublicTrackingStep[]): VisualStepStatus {
-  if (step.status === "available") return "completed";
-
-  const firstPendingStep = steps.find((item) => item.status === "pending");
-  if (step.status === "pending" && firstPendingStep?.step === step.step) return "active";
-
-  return "upcoming";
-}
-
 function getStatusLabel(status: VisualStepStatus, t: (key: string) => string) {
   if (status === "completed") return t("tracking.stepStatus.completed");
   if (status === "active") return t("tracking.stepStatus.active");
@@ -87,20 +77,22 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
 
   const steps = useMemo(
     () => (data.tracking?.steps?.length ? data.tracking.steps : buildFallbackTracking(allItems, t)),
-    [allItems, data.tracking?.steps, t],
+    [allItems, data.tracking, t],
   );
 
-  const visualSteps = useMemo(
-    () => steps.map((step) => ({ ...step, visualStatus: getVisualStatus(step, steps) })),
-    [steps],
-  );
+  const visualSteps = useMemo(() => {
+    const visuals = deriveVisualStatuses(steps.map((step) => step.status));
+    return steps.map((step, index) => ({ ...step, visualStatus: visuals[index] }));
+  }, [steps]);
 
   const activeStep = visualSteps.find((step) => step.visualStatus === "active")
     ?? [...visualSteps].reverse().find((step) => step.visualStatus === "completed")
     ?? visualSteps[0];
 
-  const progressPercentage = data.tracking?.progress_percentage
-    ?? Math.round((visualSteps.filter((step) => step.visualStatus === "completed").length / Math.max(visualSteps.length, 1)) * 100);
+  const progressPercentage = useMemo(
+    () => computeStepProgress(steps.map((step) => step.status)),
+    [steps],
+  );
 
   const summaryStatus = useMemo(() => {
     if (allItems.some((item) => item.is_taken_away)) {
@@ -139,7 +131,7 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
           : "border-slate-200 dark:border-white/[0.12]",
       ].join(" ")}
     >
-      <div className="space-y-4 p-4 sm:p-5">
+      <div className="space-y-3 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
             <p className="text-[11px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">
@@ -169,7 +161,7 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.035]">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-slate-900 dark:text-white">
                 {getStepTitle(activeStep, t)}
@@ -184,10 +176,10 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
           </div>
 
           <div className="relative grid grid-cols-6 gap-1">
-            <div className="absolute left-[8%] right-[8%] top-4 h-1 rounded-full bg-slate-200 dark:bg-white/10" />
+            <div className="absolute left-[8%] right-[8%] top-3.5 h-1 rounded-full bg-slate-200 dark:bg-white/10" />
             <div
-              className="absolute left-[8%] top-4 h-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all"
-              style={{ width: `${Math.min(progressPercentage, 92)}%` }}
+              className="absolute left-[8%] top-3.5 h-1 max-w-[84%] rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all"
+              style={{ width: `${Math.min(progressPercentage * 0.84, 84)}%` }}
             />
             {visualSteps.map((step, index) => {
               const Icon = stepIcons[index] ?? Circle;
@@ -223,59 +215,7 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.22, ease: "easeInOut" }}
           >
-            <div className="space-y-4 border-t border-slate-100 px-4 pb-5 pt-4 dark:border-white/[0.08] sm:px-5">
-              <div className="grid gap-2">
-                {visualSteps.map((step, index) => {
-                  const Icon = stepIcons[index] ?? Circle;
-                  const isCompleted = step.visualStatus === "completed";
-                  const isActive = step.visualStatus === "active";
-                  const formattedDate = formatDate(step.updated_at);
-
-                  return (
-                    <div
-                      key={step.step}
-                      className={[
-                        "grid grid-cols-[40px_1fr] gap-3 rounded-2xl border p-3",
-                        isCompleted
-                          ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-400/20 dark:bg-emerald-400/8"
-                          : isActive
-                            ? "border-amber-200 bg-amber-50/80 dark:border-amber-400/20 dark:bg-amber-400/8"
-                            : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]",
-                      ].join(" ")}
-                    >
-                      <span
-                        className={[
-                          "flex size-10 items-center justify-center rounded-xl",
-                          isCompleted
-                            ? "bg-emerald-500 text-white"
-                            : isActive
-                              ? "bg-amber-500 text-white"
-                            : "bg-slate-100 text-slate-400 dark:bg-white/[0.07] dark:text-slate-500",
-                        ].join(" ")}
-                      >
-                        {isCompleted ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-sm font-black text-slate-900 dark:text-white">
-                            {getStepTitle(step, t)}
-                          </p>
-                          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500 ring-1 ring-slate-200 dark:bg-white/7 dark:text-slate-300 dark:ring-white/10">
-                            {getStatusLabel(step.visualStatus, t)}
-                          </span>
-                        </div>
-                        {formattedDate && (
-                          <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            <CalendarClock className="size-3.5" />
-                            {formattedDate}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
+            <div className="space-y-3 border-t border-slate-100 px-4 pb-5 pt-3 dark:border-white/[0.08] sm:px-5">
               <div className="space-y-3">
                 {allItems.map((item) => (
                   <CargoItemPanel key={item.id} item={item} />
@@ -291,27 +231,37 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
 
 function CargoItemPanel({ item }: { item: CargoItemResponse }) {
   const { t } = useTranslation();
-  const latestDate = formatDate(item.taken_away_date ?? item.post_checkin_date ?? item.pre_checkin_date);
+  const checkinDate = formatDate(item.pre_checkin_date);
+  const arrivalDate = formatDate(item.post_checkin_date);
+  const takenDate = formatDate(item.taken_away_date);
+  const relevantDate = takenDate ?? arrivalDate ?? checkinDate;
+  const itemName = item.item_name_ru || item.item_name_cn || t("cargoHistory.names.notEntered");
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.035]">
       <div className={`absolute inset-y-0 left-0 w-1 ${item.is_taken_away ? "bg-slate-500" : item.is_sent_web ? "bg-emerald-500" : "bg-sky-500"}`} />
       <div className="space-y-4 pl-1">
-        {latestDate && (
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
-            <CalendarClock className="size-3.5 text-orange-500" />
-            {latestDate}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {item.flight_name && (
+            <DetailChip icon={Plane} label={t("reports.flight")} value={item.flight_name} />
+          )}
+          {relevantDate && (
+            <DetailChip icon={CalendarClock} label={arrivalDate ? t("tracking.arrivalDate") : t("tracking.checkinDate")} value={relevantDate} />
+          )}
+          {item.box_number && (
+            <DetailChip icon={Box} label={t("cargoHistory.details.boxCount")} value={item.box_number} />
+          )}
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <InfoBlock label={t("cargoHistory.names.cn")} value={item.item_name_cn || t("cargoHistory.names.notEntered")} />
-          <InfoBlock label={t("cargoHistory.names.ru")} value={item.item_name_ru || t("cargoHistory.names.notEntered")} />
+          <InfoBlock label={t("cargoHistory.names.ru")} value={itemName} />
+          {item.item_name_cn && item.item_name_ru && (
+            <InfoBlock label={t("cargoHistory.names.cn")} value={item.item_name_cn} />
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricBlock icon={Scale} label={t("cargoHistory.details.actualWeight")} value={item.weight_kg ? `${item.weight_kg} kg` : t("cargoHistory.details.notMeasured")} />
-          <MetricBlock icon={Box} label={t("cargoHistory.details.boxCount")} value={item.box_number || "-"} />
           <MetricBlock icon={Calculator} label={t("cargoHistory.details.count")} value={item.quantity ? `${item.quantity} ta` : "-"} />
           <MetricBlock
             icon={MapPin}
@@ -319,9 +269,33 @@ function CargoItemPanel({ item }: { item: CargoItemResponse }) {
             value={item.total_payment_uzs ? `${formatMoney(item.total_payment_uzs)} so'm` : t("cargoHistory.financials.notCalculated")}
             accent
           />
+          <MetricBlock
+            icon={ClipboardCheck}
+            label={t("cargoHistory.financials.pricePerKg")}
+            value={item.price_per_kg_uzs ? `${formatMoney(item.price_per_kg_uzs)} so'm` : "-"}
+          />
         </div>
+
+        {(checkinDate || arrivalDate || takenDate || item.exchange_rate) && (
+          <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-3 text-[11px] font-bold text-slate-500 dark:border-white/10 dark:text-slate-400">
+            {checkinDate && <span>CN: {checkinDate}</span>}
+            {arrivalDate && <span>UZ: {arrivalDate}</span>}
+            {takenDate && <span>{t("cargoStatus.taken")}: {takenDate}</span>}
+            {item.exchange_rate && <span>{t("cargoHistory.financials.exchangeRate", { rate: formatMoney(item.exchange_rate) })}</span>}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function DetailChip({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
+      <Icon className="size-3.5 shrink-0 text-orange-500" />
+      <span className="shrink-0 text-slate-400">{label}:</span>
+      <span className="min-w-0 truncate">{value}</span>
+    </span>
   );
 }
 

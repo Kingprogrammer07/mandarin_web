@@ -12,6 +12,11 @@ function getAudioContext(): AudioContext | null {
 
 const CARGO_AUDIO_VOLUME_KEY = 'expected_cargo_audio_volume';
 const DEFAULT_CARGO_AUDIO_VOLUME = 1;
+const RUSTER_SUCCESS_MAX_MS = 1200;
+const RUSTER_SUCCESS_COOLDOWN_MS = 250;
+let rusterSuccessAudio: HTMLAudioElement | null = null;
+let rusterSuccessStopTimer: ReturnType<typeof setTimeout> | null = null;
+let lastRusterSuccessAt = 0;
 
 function clampVolume(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -63,6 +68,44 @@ export function playSuccessSound() {
     }
   } catch (e) {
     console.error('Audio play failed', e);
+  }
+}
+
+export function playRusterSuccessSound() {
+  try {
+    const now = Date.now();
+    if (now - lastRusterSuccessAt < RUSTER_SUCCESS_COOLDOWN_MS) return;
+    lastRusterSuccessAt = now;
+
+    if (!rusterSuccessAudio) {
+      rusterSuccessAudio = new Audio('/ruster.mp3');
+      rusterSuccessAudio.preload = 'auto';
+    }
+
+    if (rusterSuccessStopTimer) {
+      clearTimeout(rusterSuccessStopTimer);
+      rusterSuccessStopTimer = null;
+    }
+
+    rusterSuccessAudio.pause();
+    rusterSuccessAudio.currentTime = 0;
+    rusterSuccessAudio.volume = getCargoAudioVolume();
+
+    void rusterSuccessAudio.play().then(() => {
+      rusterSuccessStopTimer = setTimeout(() => {
+        if (!rusterSuccessAudio) return;
+        rusterSuccessAudio.pause();
+        rusterSuccessAudio.currentTime = 0;
+      }, RUSTER_SUCCESS_MAX_MS);
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      }
+    }).catch(() => {
+      playSuccessSound();
+    });
+  } catch (e) {
+    console.error('Audio play failed', e);
+    playSuccessSound();
   }
 }
 

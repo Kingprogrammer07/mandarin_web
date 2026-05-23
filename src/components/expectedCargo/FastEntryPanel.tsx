@@ -29,6 +29,7 @@ import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expected
 import {
   getCargoAudioVolume,
   playSuccessSound,
+  playRusterSuccessSound,
   playErrorSound,
   playWarningSound,
   setCargoAudioVolume,
@@ -68,6 +69,7 @@ interface QueueFilterOption {
 
 // Stable DOM id for the Html5Qrcode video container
 const SCANNER_CONTAINER_ID = 'ec-qr-video-container';
+const RUSTER_SUCCESS_SOUND_KEY = 'expected_cargo_ruster_success_sound';
 
 function createDraftRow(): FastEntryDraftRow {
   return { id: crypto.randomUUID(), trackCode: '' };
@@ -624,6 +626,13 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [soundVolume, setSoundVolume] = useState(() => getCargoAudioVolume());
+  const [useRusterSuccessSound, setUseRusterSuccessSound] = useState(() => {
+    try {
+      return localStorage.getItem(RUSTER_SUCCESS_SOUND_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [bulkClientCodeInput, setBulkClientCodeInput] = useState('');
   const [clientCodeInput, setClientCodeInput] = useState('');
   const [isAutoFill, setIsAutoFill] = useState(true);
@@ -648,6 +657,32 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
 
   const isScanningRef = useRef(isScanning);
   useEffect(() => { isScanningRef.current = isScanning; }, [isScanning]);
+
+  const useRusterSuccessSoundRef = useRef(useRusterSuccessSound);
+  useEffect(() => { useRusterSuccessSoundRef.current = useRusterSuccessSound; }, [useRusterSuccessSound]);
+
+  const playConfiguredSuccessSound = useCallback(() => {
+    if (useRusterSuccessSoundRef.current) {
+      playRusterSuccessSound();
+      return;
+    }
+    playSuccessSound();
+  }, []);
+
+  const handleRusterSuccessSoundChange = useCallback((checked: boolean) => {
+    useRusterSuccessSoundRef.current = checked;
+    setUseRusterSuccessSound(checked);
+    try {
+      localStorage.setItem(RUSTER_SUCCESS_SOUND_KEY, String(checked));
+    } catch {
+      // Storage can fail in private mode; the in-memory toggle still works.
+    }
+    if (checked) {
+      playRusterSuccessSound();
+    } else {
+      playSuccessSound();
+    }
+  }, []);
 
   // Prevents the camera from firing the same barcode multiple times in 1 second.
   const lastScanRef = useRef<{ code: string; time: number } | null>(null);
@@ -813,7 +848,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     qr.start(
       { facingMode: 'environment' },
       { fps: 15, qrbox: { width: 280, height: 150 } },
-      (decodedText) => { playSuccessSound?.(); processScannedText(decodedText); },
+      (decodedText) => { playConfiguredSuccessSound(); processScannedText(decodedText); },
       () => {},
     ).catch((err: unknown) => {
       console.error('Camera start error:', err);
@@ -822,7 +857,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       setScannerReady(false);
       setIsScanning(false);
     });
-  }, [scannerReady, processScannedText]);
+  }, [scannerReady, processScannedText, playConfiguredSuccessSound]);
 
   useEffect(() => {
     return () => {
@@ -885,11 +920,11 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             navigateTo: { flightName: flightName ?? '', clientCode: data.client_code },
           });
         } else {
-          playSuccessSound();
+          playConfiguredSuccessSound();
         }
       } else {
         // Manual single-code mode (auto-fill OFF, camera scanning)
-        playSuccessSound();
+        playConfiguredSuccessSound();
         setSuggestion(data);
         requestAnimationFrame(() => clientInputRef.current?.focus());
       }
@@ -1144,7 +1179,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     }
 
     if (imported > 0) {
-      playSuccessSound();
+      playConfiguredSuccessSound();
       toast.success(`${imported} ta row import qilindi`, {
         duration: 2000,
         description: duplicates > 0 ? `${duplicates} ta duplicate o'tkazildi` : undefined,
@@ -1154,7 +1189,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     } else {
       toast.warning("Import uchun yaroqli row topilmadi", { duration: 1800 });
     }
-  }, [enqueueAutoFillTrackCode, enqueueEntry, importText]);
+  }, [enqueueAutoFillTrackCode, enqueueEntry, importText, playConfiguredSuccessSound]);
 
   const handleAutoFillScan = useCallback(() => {
     const raw = trackCodeInput.trim();
@@ -1249,7 +1284,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       });
     }
     if (addedCount > 0) {
-      playSuccessSound();
+      playConfiguredSuccessSound();
     }
     if (duplicateCount > 0) {
       toast.info(`${duplicateCount} ta navbatda allaqachon bor — o'tkazib yuborildi`, { duration: 2000 });
@@ -1258,7 +1293,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     setTrackCodesText('');
     setValidationMap({});
     validatedCodesRef.current = new Set();
-  }, [clientCodeInput, parsedCodes, entryQueue, validationMap, enqueueEntry]);
+  }, [clientCodeInput, parsedCodes, entryQueue, validationMap, enqueueEntry, playConfiguredSuccessSound]);
 
   // ── Derived counts for validation summary ────────────────────────────────
 
@@ -1487,6 +1522,18 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             </span>
           </label>
 
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <Switch
+              size="sm"
+              checked={useRusterSuccessSound}
+              onCheckedChange={handleRusterSuccessSoundChange}
+              className="data-[state=checked]:bg-emerald-500"
+            />
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
+              Ruster
+            </span>
+          </label>
+
           <label className="flex items-center gap-1.5 select-none">
             <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
               Ovoz
@@ -1497,8 +1544,8 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
               max={100}
               value={Math.round(soundVolume * 100)}
               onChange={(event) => handleSoundVolumeChange(Number(event.target.value) / 100)}
-              onMouseUp={() => playSuccessSound()}
-              onTouchEnd={() => playSuccessSound()}
+              onMouseUp={playConfiguredSuccessSound}
+              onTouchEnd={playConfiguredSuccessSound}
               className="h-1.5 w-24 accent-orange-500"
               title={`Ovoz: ${Math.round(soundVolume * 100)}%`}
             />
