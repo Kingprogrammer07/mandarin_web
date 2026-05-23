@@ -73,12 +73,20 @@ function createDraftRow(): FastEntryDraftRow {
   return { id: crypto.randomUUID(), trackCode: '' };
 }
 
+function normalizePastedValue(value: string): string {
+  return value
+    .trim()
+    .replace(/^["']+|["']+$/g, '')
+    .trim()
+    .toUpperCase();
+}
+
 function parseTrackCodes(value: string): string[] {
   return [
     ...new Set(
       value
         .split(/\r?\n|\t|,/)
-        .map((code) => code.trim().toUpperCase())
+        .map(normalizePastedValue)
         .filter(Boolean),
     ),
   ];
@@ -646,7 +654,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     return [...new Set(
       trackCodesText
         .split('\n')
-        .map((l) => l.trim().toUpperCase())
+        .map(normalizePastedValue)
         .filter(Boolean),
     )];
   }, [trackCodesText]);
@@ -1057,7 +1065,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     for (const line of lines) {
       const parts = line
         .split(/\t|,|;|\s{2,}/)
-        .map((part) => part.trim().toUpperCase())
+        .map(normalizePastedValue)
         .filter(Boolean);
 
       if (parts.length >= 2) {
