@@ -10,10 +10,37 @@ function getAudioContext(): AudioContext | null {
   return Ctor ? new Ctor() : null;
 }
 
+const CARGO_AUDIO_VOLUME_KEY = 'expected_cargo_audio_volume';
+const DEFAULT_CARGO_AUDIO_VOLUME = 1;
+
+function clampVolume(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+export function getCargoAudioVolume(): number {
+  try {
+    const stored = localStorage.getItem(CARGO_AUDIO_VOLUME_KEY);
+    if (stored === null) return DEFAULT_CARGO_AUDIO_VOLUME;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) ? clampVolume(parsed) : DEFAULT_CARGO_AUDIO_VOLUME;
+  } catch {
+    return DEFAULT_CARGO_AUDIO_VOLUME;
+  }
+}
+
+export function setCargoAudioVolume(value: number) {
+  try {
+    localStorage.setItem(CARGO_AUDIO_VOLUME_KEY, String(clampVolume(value)));
+  } catch {
+    // Ignore storage failures; audio can still play with the in-memory value.
+  }
+}
+
 export function playSuccessSound() {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
+    const volume = getCargoAudioVolume();
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -23,7 +50,7 @@ export function playSuccessSound() {
     osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1); // slide up
 
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+    gain.gain.linearRampToValueAtTime(0.9 * volume, ctx.currentTime + 0.05);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
 
     osc.connect(gain);
@@ -44,6 +71,7 @@ export function playWarningSound() {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
+    const volume = getCargoAudioVolume();
 
     const playTone = (freq: number, startTime: number, duration: number) => {
       const osc = ctx.createOscillator();
@@ -51,7 +79,7 @@ export function playWarningSound() {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, startTime);
       gain.gain.setValueAtTime(0, startTime);
-      gain.gain.linearRampToValueAtTime(0.25, startTime + 0.02);
+      gain.gain.linearRampToValueAtTime(0.9 * volume, startTime + 0.02);
       gain.gain.linearRampToValueAtTime(0, startTime + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -75,6 +103,7 @@ export function playErrorSound() {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
+    const volume = getCargoAudioVolume();
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -83,7 +112,7 @@ export function playErrorSound() {
     osc.frequency.setValueAtTime(300, ctx.currentTime); // low pitch
     osc.frequency.setValueAtTime(250, ctx.currentTime + 0.15);
 
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.setValueAtTime(1 * volume, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
 
     osc.connect(gain);

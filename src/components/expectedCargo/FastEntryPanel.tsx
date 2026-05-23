@@ -26,7 +26,13 @@ import {
 } from '@/api/services/expectedCargo';
 import { isAxiosError } from 'axios';
 import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expectedCargoStore';
-import { playSuccessSound, playErrorSound, playWarningSound } from '@/utils/audioUtils';
+import {
+  getCargoAudioVolume,
+  playSuccessSound,
+  playErrorSound,
+  playWarningSound,
+  setCargoAudioVolume,
+} from '@/utils/audioUtils';
 
 interface FastEntryPanelProps {
   flightName: string | null;
@@ -555,6 +561,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
   const [isAutoMergeEnabled, setIsAutoMergeEnabled] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
+  const [soundVolume, setSoundVolume] = useState(() => getCargoAudioVolume());
   const [clientCodeInput, setClientCodeInput] = useState('');
   const [isAutoFill, setIsAutoFill] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -861,6 +868,11 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     }
   };
 
+  const handleSoundVolumeChange = useCallback((value: number) => {
+    setSoundVolume(value);
+    setCargoAudioVolume(value);
+  }, []);
+
   const focusDraftRow = useCallback((rowId: string) => {
     requestAnimationFrame(() => {
       draftInputRefs.current.get(rowId)?.focus();
@@ -904,9 +916,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       return;
     }
 
-    const newRow = createDraftRow();
-    setDraftRows((rows) => [...rows, newRow]);
-    focusDraftRow(newRow.id);
+    focusDraftRow(rowId);
   }, [draftRows, focusDraftRow]);
 
   const handleDraftTrackChange = useCallback((rowId: string, value: string) => {
@@ -929,10 +939,14 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           row.id === rowId ? { ...row, trackCode: '' } : row,
         ),
       );
+      if (direction === 1) {
+        focusDraftRow(rowId);
+        return;
+      }
     }
 
     moveFromDraftRow(rowId, direction);
-  }, [draftRows, enqueueAutoFillTrackCode, moveFromDraftRow]);
+  }, [draftRows, enqueueAutoFillTrackCode, focusDraftRow, moveFromDraftRow]);
 
   const handleDraftKeyDown = useCallback((rowId: string, event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
@@ -985,9 +999,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       ),
     );
 
-    const newRow = createDraftRow();
-    setDraftRows((rows) => [...rows, newRow]);
-    focusDraftRow(newRow.id);
+    focusDraftRow(rowId);
 
     if (addedCount > 1) {
       toast.success(`${addedCount} ta track code jadvalga qo'shildi`, { duration: 1800 });
@@ -1356,6 +1368,26 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             />
             <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
               Auto-merge
+            </span>
+          </label>
+
+          <label className="flex items-center gap-1.5 select-none">
+            <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+              Ovoz
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(soundVolume * 100)}
+              onChange={(event) => handleSoundVolumeChange(Number(event.target.value) / 100)}
+              onMouseUp={() => playSuccessSound()}
+              onTouchEnd={() => playSuccessSound()}
+              className="h-1.5 w-24 accent-orange-500"
+              title={`Ovoz: ${Math.round(soundVolume * 100)}%`}
+            />
+            <span className="w-8 text-right font-mono text-[10px] font-bold text-orange-500">
+              {Math.round(soundVolume * 100)}%
             </span>
           </label>
         </div>
