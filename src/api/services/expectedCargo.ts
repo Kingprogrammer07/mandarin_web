@@ -82,6 +82,7 @@ export interface DeleteExpectedCargoResponse {
 export interface AlreadySentErrorBody {
   detail: string;
   track_code: string;
+  client_code?: string | null;
   flight_name: string | null;
 }
 

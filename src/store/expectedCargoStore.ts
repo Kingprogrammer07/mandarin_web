@@ -24,6 +24,8 @@ export interface FastEntryQueueItem {
    * expected cargo table (was sent in a previous session).
    */
   isAlreadySent: boolean;
+  /** Client code from the already-sent 409 response, if backend provides it. */
+  alreadySentClientCode: string | null;
   /** Flight name from the 409 response body — which flight already has this code. */
   alreadySentFlight: string | null;
   /**
@@ -98,8 +100,8 @@ interface ExpectedCargoState {
   bulkSetSelectedClientCode: (clientCode: string) => number;
 
   enqueueEntry: (
-    item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentFlight' | 'isWrongClient' | 'conflictClientCode'> &
-      Partial<Pick<FastEntryQueueItem, 'isWrongClient' | 'conflictClientCode' | 'isAlreadySent' | 'alreadySentFlight' | 'notFound'>>,
+    item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentClientCode' | 'alreadySentFlight' | 'isWrongClient' | 'conflictClientCode'> &
+      Partial<Pick<FastEntryQueueItem, 'isWrongClient' | 'conflictClientCode' | 'isAlreadySent' | 'alreadySentClientCode' | 'alreadySentFlight' | 'notFound'>>,
   ) => void;
   resolveQueueItemClient: (
     trackCode: string,
@@ -112,7 +114,7 @@ interface ExpectedCargoState {
   /** Mark an item as not-found (404) — leaves isResolved false, flags for red UI. */
   markQueueItemNotFound: (trackCode: string) => void;
   /** Mark an item as already-sent (409) — the track code is already in the expected cargo table. */
-  markQueueItemAlreadySent: (trackCode: string, flight: string | null) => void;
+  markQueueItemAlreadySent: (trackCode: string, flight: string | null, clientCode?: string | null) => void;
   /** Move a wrong-client row to its real owner and make it safe to save. */
   acceptQueueItemConflictOwner: (id: string) => void;
   /** Bring all rows for one client next to each other in the scanner table. */
@@ -244,6 +246,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
               priorCountForClient: 0,
               notFound: item.notFound ?? false,
               isAlreadySent: item.isAlreadySent ?? false,
+              alreadySentClientCode: item.alreadySentClientCode ?? null,
               alreadySentFlight: item.alreadySentFlight ?? null,
               isWrongClient: item.isWrongClient ?? false,
               conflictClientCode: item.conflictClientCode ?? null,
@@ -265,15 +268,15 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
                   resolvedClientId: clientId,
                   isResolved: true,
                   notFound: false,
-                  isContinuation,
-                  priorCountForClient,
-                }
-              : !isContinuation && item.clientCode.trim().toUpperCase() === clientCode.trim().toUpperCase()
-                ? {
-                    ...item,
-                    isContinuation: false,
-                    priorCountForClient: 0,
-                  }
+            isContinuation,
+            priorCountForClient,
+          }
+        : item.isContinuation
+          ? {
+              ...item,
+              isContinuation: false,
+              priorCountForClient: 0,
+            }
               : item,
           ),
         })),
@@ -287,11 +290,19 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
           ),
         })),
 
-      markQueueItemAlreadySent: (trackCode, flight) =>
+      markQueueItemAlreadySent: (trackCode, flight, clientCode) =>
         set((state) => ({
           entryQueue: state.entryQueue.map((item) =>
             item.trackCode === trackCode
-              ? { ...item, isAlreadySent: true, isResolved: false, notFound: false, alreadySentFlight: flight }
+              ? {
+                  ...item,
+                  clientCode: clientCode?.trim().toUpperCase() || item.clientCode,
+                  isAlreadySent: true,
+                  isResolved: false,
+                  notFound: false,
+                  alreadySentClientCode: clientCode?.trim().toUpperCase() || null,
+                  alreadySentFlight: flight,
+                }
               : item,
           ),
         })),

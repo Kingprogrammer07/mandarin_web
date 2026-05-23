@@ -81,6 +81,35 @@ function normalizePastedValue(value: string): string {
     .toUpperCase();
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getApiErrorStatus(error: unknown): number | undefined {
+  if (isAxiosError(error)) return error.response?.status;
+  if (isRecord(error) && typeof error.status === 'number') return error.status;
+  return undefined;
+}
+
+function getApiErrorData(error: unknown): unknown {
+  if (isAxiosError(error)) return error.response?.data;
+  if (isRecord(error) && 'data' in error) return error.data;
+  return undefined;
+}
+
+function getAlreadySentBody(error: unknown): AlreadySentErrorBody | null {
+  const data = getApiErrorData(error);
+  const body = isRecord(data) && isRecord(data.detail) ? data.detail : data;
+  if (!isRecord(body) || typeof body.track_code !== 'string') return null;
+
+  return {
+    detail: typeof body.detail === 'string' ? body.detail : '',
+    track_code: body.track_code,
+    client_code: typeof body.client_code === 'string' ? body.client_code : null,
+    flight_name: typeof body.flight_name === 'string' ? body.flight_name : null,
+  };
+}
+
 function parseTrackCodes(value: string): string[] {
   return [
     ...new Set(
@@ -245,12 +274,14 @@ function QueueItemRow({
     ? `Boshqa mijoz: ${item.conflictClientCode ?? '-'}`
     : item.isAlreadySent
       ? item.alreadySentFlight
-        ? `Yuborilgan: ${item.alreadySentFlight}`
-        : 'Allaqachon yuborilgan'
-      : item.notFound
-        ? 'Mijoz topilmadi'
+        ? `Yuborilgan: ${item.alreadySentClientCode ? `${item.alreadySentClientCode} / ` : ''}${item.alreadySentFlight}`
+        : item.alreadySentClientCode
+          ? `Allaqachon yuborilgan: ${item.alreadySentClientCode}`
+          : 'Allaqachon yuborilgan'
+        : item.notFound
+          ? 'Mijoz topilmadi'
         : item.isContinuation
-          ? `Ehtimol aralashdi: avvalgi userdan ${item.priorCountForClient} ta`
+          ? `Navbat almashdi: avvalgi userdan ${item.priorCountForClient} ta`
           : item.isResolved
             ? item.resolvedClientName ?? 'Aniqlandi'
             : item.clientCode
@@ -710,9 +741,13 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
                   ? { status: 'match', resolvedClientCode: ownerCode, resolvedClientName: r.value.full_name }
                   : { status: 'conflict', resolvedClientCode: ownerCode, resolvedClientName: r.value.full_name };
             } else {
-              if (isAxiosError(r.reason) && r.reason.response?.status === 409) {
-                const body = r.reason.response.data as AlreadySentErrorBody;
-                next[code] = { status: 'already_sent', alreadySentFlight: body.flight_name ?? null };
+              if (getApiErrorStatus(r.reason) === 409) {
+                const body = getAlreadySentBody(r.reason);
+                next[code] = {
+                  status: 'already_sent',
+                  resolvedClientCode: body?.client_code?.toUpperCase(),
+                  alreadySentFlight: body?.flight_name ?? null,
+                };
               } else {
                 next[code] = { status: 'not_found' };
               }
@@ -828,10 +863,10 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           playWarningSound();
           const totalCount = priorCount + 1;
           toast.warning(
-            `${data.client_code} — user almashdi, tekshirib oling`,
+            `${data.client_code} - navbat almashdi, tekshiring`,
             {
               duration: 5000,
-              description: `Oldingi userdan ketma-ket ${priorCount} ta scan bor edi. Yangi track: ${trackCode}. Agar davom etsa rang avtomatik yashilga qaytadi.`,
+              description: `Oldingi userdan ketma-ket ${priorCount} ta scan bor edi. Yangi track: ${trackCode}. Keyingi scan kelganda bu sariq belgi avtomatik o'chadi.`,
               action: {
                 label: 'Ko\'rish',
                 onClick: () => {
@@ -845,8 +880,8 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
           );
           addNotification({
             type: 'warning',
-            title: `User almashdi: ${data.client_code}`,
-            description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${data.client_code}" rowi tekshirish uchun belgilandi. Jami taxminiy: ${totalCount}.`,
+            title: `Navbat almashdi: ${data.client_code}`,
+            description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${data.client_code}" rowi tekshirish nuqtasi sifatida belgilandi. Jami taxminiy: ${totalCount}.`,
             navigateTo: { flightName: flightName ?? '', clientCode: data.client_code },
           });
         } else {
@@ -861,18 +896,24 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     },
 
     onError: (err, trackCode) => {
-      if (isAxiosError(err) && err.response?.status === 409) {
-        const body = err.response.data as AlreadySentErrorBody;
+      if (getApiErrorStatus(err) === 409) {
+        const body = getAlreadySentBody(err);
+        const alreadySentClientCode = body?.client_code?.toUpperCase() ?? null;
         playWarningSound();
         if (isAutoFillRef.current) {
-          markQueueItemAlreadySent(trackCode, body.flight_name ?? null);
+          markQueueItemAlreadySent(trackCode, body?.flight_name ?? null, alreadySentClientCode);
         }
-        toast.warning(`${trackCode} — allaqachon yuborilgan`, {
-          duration: 4000,
-          description: body.flight_name
-            ? `"${body.flight_name}" reysida mavjud`
-            : 'Bu trek kodi kutilayotgan yuklarga kiritilgan',
-        });
+        toast.warning(
+          alreadySentClientCode
+            ? `${trackCode} - ${alreadySentClientCode} allaqachon yuborilgan`
+            : `${trackCode} - allaqachon yuborilgan`,
+          {
+            duration: 4000,
+            description: body?.flight_name
+              ? `"${body.flight_name}" reysida mavjud`
+              : 'Bu trek kodi kutilayotgan yuklarga kiritilgan',
+          },
+        );
         return;
       }
 
@@ -1173,13 +1214,15 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
         conflictCount++;
         if (v.resolvedClientCode) conflictOwners.push(v.resolvedClientCode);
       } else if (v?.status === 'already_sent') {
+        const alreadySentClientCode = v.resolvedClientCode?.toUpperCase() ?? normalizedClient;
         enqueueEntry({
           trackCode: code,
-          clientCode: normalizedClient,
+          clientCode: alreadySentClientCode,
           resolvedClientName: null,
           resolvedClientId: null,
           isResolved: false,
           isAlreadySent: true,
+          alreadySentClientCode,
           alreadySentFlight: v.alreadySentFlight ?? null,
         });
         conflictCount++;
