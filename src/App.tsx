@@ -18,6 +18,7 @@ import MaintenancePage from "./components/MaintenancePage";
 import MaintenanceOverlay from "./components/system/MaintenanceOverlay";
 import { useHealthCheck } from "./hooks/useHealthCheck";
 import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
+import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
 
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
@@ -369,6 +370,11 @@ function AppContent() {
 
   const isMaintenanceMode = useMaintenanceStore((s) => s.isMaintenanceMode);
   useHealthCheck();
+
+  // Single app-wide SSE connection that pushes real-time updates (wallet,
+  // queue, notifications, maintenance, NBU) and drives React Query
+  // invalidation — replaces the former per-resource polling.
+  useGlobalEvents();
 
   const { isMaintenance, isAdmin: isMaintenanceAdmin } = useMaintenanceWatcher();
 

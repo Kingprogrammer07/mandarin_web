@@ -43,23 +43,22 @@ export default function SystemSettingsPage() {
   const [reconciling, setReconciling] = useState<string | null>(null);
   const [expiring, setExpiring] = useState<string | null>(null);
 
-  // Visibility gate + slower cadence: admins typically leave this tab open
-  // while doing other work, so previous 30 s polling generated traffic for
-  // hours per session.
+  // Maintenance + NBU toggles are pushed via SSE (`maintenance.toggled`,
+  // `nbu.status.changed`), so these are slow visibility-gated fallbacks.
   const visibleInterval = (ms: number) =>
     typeof document !== 'undefined' && document.visibilityState === 'visible' ? ms : false;
 
   const { data: maintenanceData, isLoading: maintenanceLoading } = useQuery({
     queryKey: ['system-maintenance'],
     queryFn: systemService.getMaintenanceStatus,
-    refetchInterval: () => visibleInterval(60_000),
+    refetchInterval: () => visibleInterval(5 * 60_000),
     refetchIntervalInBackground: false,
   });
 
   const { data: nbuData, isLoading: nbuLoading } = useQuery({
     queryKey: ['system-nbu'],
     queryFn: systemService.getNbuStatus,
-    refetchInterval: () => visibleInterval(60_000),
+    refetchInterval: () => visibleInterval(5 * 60_000),
     refetchIntervalInBackground: false,
   });
 

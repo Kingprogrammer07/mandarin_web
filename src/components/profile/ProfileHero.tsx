@@ -17,15 +17,15 @@ export const ProfileHero = memo(({ user, onBalanceClick }: ProfileHeroProps) => 
     const [copied, setCopied] = useState(false);
     const { t } = useTranslation();
 
-    // Fetch wallet balance. Pause polling when the tab is hidden so a
-    // profile page left open on a locked phone does not keep firing
-    // requests every 30 s overnight.
+    // Wallet/debt changes are pushed in real time via the `wallet.changed`
+    // SSE event (after POS confirm, zayafka, or NBU top-up). This poll is a
+    // slow, visibility-gated fallback that also covers an SSE outage.
     const { data: walletData } = useQuery({
         queryKey: ['walletBalance'],
         queryFn: walletService.getWalletBalance,
         refetchInterval: () =>
             typeof document !== 'undefined' && document.visibilityState === 'visible'
-                ? 60_000
+                ? 5 * 60_000
                 : false,
         refetchIntervalInBackground: false,
     });

@@ -20,12 +20,12 @@ import type {
   PosPickupQueueUpdateRequest,
 } from '../pickupQueue';
 
-// Polling cadence used by every warehouse / POS / TV queue query.
-// Visibility gate cuts background-tab traffic to zero, which alone removes
-// the bulk of the daily Edge Request load attributed to long-running
-// warehouse shifts.
-const QUEUE_REFETCH_INTERVAL_MS = 15_000;
-const QUEUE_STALE_TIME_MS = 10_000;
+// Queue mutations are pushed in real time via the `queue.changed` SSE event
+// (see useGlobalEvents), which invalidates these keys instantly. The interval
+// below is now a slow, visibility-gated safety-net fallback rather than the
+// primary freshness mechanism.
+const QUEUE_REFETCH_INTERVAL_MS = 60_000;
+const QUEUE_STALE_TIME_MS = 30_000;
 
 const visibleRefetchInterval = (intervalMs: number) =>
   (): number | false => {
@@ -156,10 +156,10 @@ export const usePickupQueueTV = (params: PickupQueueTVParams, token: string | nu
       return getPickupQueueTV(params, token);
     },
     enabled: !!token,
-    // The TV display is a stationary screen — kept short to keep the queue
-    // visibly fresh, but still gated on visibility for completeness.
-    staleTime: 5_000,
-    refetchInterval: visibleRefetchInterval(10_000),
+    // Stationary display. SSE `queue.changed` keeps it live; the 30 s poll is
+    // a fallback so an always-on TV recovers if the stream drops.
+    staleTime: 15_000,
+    refetchInterval: visibleRefetchInterval(30_000),
     refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData,
   });

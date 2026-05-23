@@ -8,15 +8,16 @@ interface MaintenanceWatcherResult {
 }
 
 export function useMaintenanceWatcher(): MaintenanceWatcherResult {
-  // Background tabs left open overnight previously polled forever; gating the
-  // interval on tab visibility removes a multi-hundred-thousand Edge-Request
-  // long tail without weakening the in-foreground UX.
+  // Maintenance flips are pushed in real time via the `maintenance.toggled`
+  // SSE event (see useGlobalEvents), so this query is now just a safety-net
+  // fallback: a slow, visibility-gated poll that catches a missed event or
+  // an SSE outage without generating continuous traffic.
   const { data, isLoading, error } = useQuery({
     queryKey: ['maintenance-status'],
     queryFn: systemService.getMaintenanceStatus,
     refetchInterval: () =>
       typeof document !== 'undefined' && document.visibilityState === 'visible'
-        ? 60_000
+        ? 5 * 60_000
         : false,
     refetchIntervalInBackground: false,
     retry: false,
