@@ -1,10 +1,10 @@
 import { useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PackageSearch } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
 import { ClientSummaryRow, TABLE_GRID_COLS } from './ClientSummaryRow';
 import { ExpandedTrackCodeList } from './ExpandedTrackCodeList';
-import type { ClientSummaryItem } from '@/api/services/expectedCargo';
+import type { ClientSummaryItem, ClientSummarySort } from '@/api/services/expectedCargo';
 
 const COLLAPSED_ROW_HEIGHT = 48;     // h-12
 const TRACK_CODE_ROW_HEIGHT = 40;    // h-10 per expanded track code row
@@ -14,9 +14,18 @@ const EXPANDED_MAX_VISIBLE = 12;     // cap used to prevent extreme initial esti
 interface VirtualizedClientListProps {
   items: ClientSummaryItem[];
   isLoading: boolean;
+  isFetching: boolean;
   flightName: string;
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+  sort: ClientSummarySort;
   expandedClientCode: string | null;
   isEditMode: boolean;
+  onPageChange: (page: number) => void;
+  onSizeChange: (size: number) => void;
+  onSortChange: (sort: ClientSummarySort) => void;
   onToggleExpand: (code: string) => void;
   onDeleteClient: (clientCode: string) => void;
   onRequestReplace: (clientCode: string) => void;
@@ -48,6 +57,94 @@ function EmptyState() {
 }
 
 /** Column header row — mirrors the TABLE_GRID_COLS widths used by each data row. */
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500];
+
+function SummaryControls({
+  page,
+  size,
+  total,
+  totalPages,
+  sort,
+  isFetching,
+  onPageChange,
+  onSizeChange,
+  onSortChange,
+}: {
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+  sort: ClientSummarySort;
+  isFetching: boolean;
+  onPageChange: (page: number) => void;
+  onSizeChange: (size: number) => void;
+  onSortChange: (sort: ClientSummarySort) => void;
+}) {
+  const safeTotalPages = Math.max(totalPages, 1);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3 py-2">
+      <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+        <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+          {total} ta mijoz
+        </span>
+        {isFetching && <span className="text-orange-500">Yangilanmoqda...</span>}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={sort}
+          onChange={(event) => onSortChange(event.target.value as ClientSummarySort)}
+          className="h-8 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 text-[11px] font-medium text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-orange-400"
+          title="Trek kod soni bo'yicha saralash"
+        >
+          <option value="track_count_desc">Trek soni: ko'pdan kamga</option>
+          <option value="track_count_asc">Trek soni: kamdan ko'pga</option>
+          <option value="client_code_asc">Mijoz kodi: A-Z</option>
+          <option value="client_code_desc">Mijoz kodi: Z-A</option>
+        </select>
+
+        <select
+          value={size}
+          onChange={(event) => onSizeChange(Number(event.target.value))}
+          className="h-8 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 text-[11px] font-medium text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-orange-400"
+          title="Har sahifadagi mijozlar soni"
+        >
+          {PAGE_SIZE_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option} ta
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="flex size-8 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 disabled:opacity-40"
+            title="Oldingi sahifa"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <span className="min-w-16 text-center font-mono text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            {page}/{safeTotalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.min(safeTotalPages, page + 1))}
+            disabled={page >= safeTotalPages}
+            className="flex size-8 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 disabled:opacity-40"
+            title="Keyingi sahifa"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ColumnHeader() {
   return (
     <div
@@ -85,9 +182,18 @@ function estimateRowHeight(
 export function VirtualizedClientList({
   items,
   isLoading,
+  isFetching,
   flightName,
+  page,
+  size,
+  total,
+  totalPages,
+  sort,
   expandedClientCode,
   isEditMode,
+  onPageChange,
+  onSizeChange,
+  onSortChange,
   onToggleExpand,
   onDeleteClient,
   onRequestReplace,
@@ -112,13 +218,60 @@ export function VirtualizedClientList({
     rowVirtualizer.measure();
   }, [expandedClientCode, isEditMode, rowVirtualizer]);
 
-  if (isLoading) return <LoadingSkeleton />;
-  if (items.length === 0) return <EmptyState />;
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col bg-[#ffffff] dark:bg-[#1a1a1a]">
+        <SummaryControls
+          page={page}
+          size={size}
+          total={total}
+          totalPages={totalPages}
+          sort={sort}
+          isFetching={isFetching}
+          onPageChange={onPageChange}
+          onSizeChange={onSizeChange}
+          onSortChange={onSortChange}
+        />
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex h-full flex-col bg-[#ffffff] dark:bg-[#1a1a1a]">
+        <SummaryControls
+          page={page}
+          size={size}
+          total={total}
+          totalPages={totalPages}
+          sort={sort}
+          isFetching={isFetching}
+          onPageChange={onPageChange}
+          onSizeChange={onSizeChange}
+          onSortChange={onSortChange}
+        />
+        <EmptyState />
+      </div>
+    );
+  }
 
   const virtualItems = rowVirtualizer.getVirtualItems();
+  const rowOffset = (page - 1) * size;
 
   return (
     <div className="flex flex-col h-full bg-[#ffffff] dark:bg-[#1a1a1a]">
+      <SummaryControls
+        page={page}
+        size={size}
+        total={total}
+        totalPages={totalPages}
+        sort={sort}
+        isFetching={isFetching}
+        onPageChange={onPageChange}
+        onSizeChange={onSizeChange}
+        onSortChange={onSortChange}
+      />
       <ColumnHeader />
 
       <div
@@ -152,7 +305,7 @@ export function VirtualizedClientList({
               >
                 <ClientSummaryRow
                   item={item}
-                  rowNumber={virtualItem.index + 1}
+                  rowNumber={rowOffset + virtualItem.index + 1}
                   isExpanded={isExpanded}
                   isEditMode={isEditMode}
                   onToggleExpand={() => onToggleExpand(item.client_code)}
@@ -163,7 +316,7 @@ export function VirtualizedClientList({
                       <ExpandedTrackCodeList
                         flightName={flightName}
                         clientCode={item.client_code}
-                        rowNumber={virtualItem.index + 1}
+                        rowNumber={rowOffset + virtualItem.index + 1}
                         isEditMode={isEditMode}
                         onRequestReplace={onRequestReplace}
                       />

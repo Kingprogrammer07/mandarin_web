@@ -11,7 +11,7 @@ import {
   renameClientCode,
   exportExpectedCargoExcel,
   createEmptyFlight,
-  type ClientSummaryItem,
+  type ClientSummarySort,
   type DeleteExpectedCargoResponse,
 } from '@/api/services/expectedCargo';
 import { useExpectedCargoStore } from '@/store/expectedCargoStore';
@@ -99,6 +99,9 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
   } | null>(null);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [hasHydratedQueueBackup, setHasHydratedQueueBackup] = useState(false);
+  const [summaryPage, setSummaryPage] = useState(1);
+  const [summarySize, setSummarySize] = useState(50);
+  const [summarySort, setSummarySort] = useState<ClientSummarySort>('track_count_desc');
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -109,8 +112,23 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
   });
 
   const summaryQuery = useQuery({
-    queryKey: ['expectedCargo', 'summary', activeFlightName],
-    queryFn: () => getClientSummaryByFlight(activeFlightName!, 1, 200),
+    queryKey: [
+      'expectedCargo',
+      'summary',
+      activeFlightName,
+      summaryPage,
+      summarySize,
+      searchQuery.trim(),
+      summarySort,
+    ],
+    queryFn: () =>
+      getClientSummaryByFlight(
+        activeFlightName!,
+        summaryPage,
+        summarySize,
+        searchQuery,
+        summarySort,
+      ),
     enabled: !!activeFlightName,
     staleTime: 30_000,
   });
@@ -133,6 +151,11 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
       }
     }
   }, [flightsQuery.data, syncFlightTabOrder, activeFlightName, setActiveFlight]);
+
+  useEffect(() => {
+    setSummaryPage(1);
+    setExpandedClient(null);
+  }, [activeFlightName, summarySize, summarySort, setExpandedClient]);
 
   // Hydrate large scanner queues from IndexedDB. If the current in-memory queue
   // came from older localStorage persistence, migrate it into IndexedDB once.
@@ -181,13 +204,6 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
   }, [entryQueue, hasHydratedQueueBackup]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
-
-  const filteredSummaryItems = useMemo(() => {
-    const items: ClientSummaryItem[] = summaryQuery.data?.items ?? [];
-    if (!searchQuery.trim()) return items;
-    const q = searchQuery.trim().toLowerCase();
-    return items.filter((item) => item.client_code.toLowerCase().includes(q));
-  }, [summaryQuery.data?.items, searchQuery]);
 
   // ── Mutations ────────────────────────────────────────────────────────────────
 
@@ -309,6 +325,21 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     setReplaceTarget({ flightName: activeFlightName, clientCode });
   };
 
+  const handleSearchChange = useCallback((query: string) => {
+    setSummaryPage(1);
+    setSearchQuery(query);
+  }, [setSearchQuery]);
+
+  const handleSummarySizeChange = useCallback((size: number) => {
+    setSummaryPage(1);
+    setSummarySize(size);
+  }, []);
+
+  const handleSummarySortChange = useCallback((sort: ClientSummarySort) => {
+    setSummaryPage(1);
+    setSummarySort(sort);
+  }, []);
+
   const handleAddFlight = useCallback(() => {
     const name = prompt("Yangi reys nomini kiriting:");
     if (name && name.trim()) {
@@ -324,6 +355,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
       setActiveFlight(flightName);
     }
     // Highlight the client in the list.
+    setSummaryPage(1);
     setSearchQuery(clientCode);
     setExpandedClient(clientCode);
   }, [activeFlightName, setActiveFlight, setSearchQuery, setExpandedClient]);
@@ -347,7 +379,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
         isEditMode={isEditMode}
         isFastEntryOpen={isFastEntryOpen}
         queueCount={entryQueue.length}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         onToggleEditMode={toggleEditMode}
         onToggleFastEntry={() => setFastEntryOpen(!isFastEntryOpen)}
         onExport={handleExport}
@@ -417,11 +449,20 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
             )
           ) : (
             <VirtualizedClientList
-              items={filteredSummaryItems}
+              items={summaryQuery.data?.items ?? []}
               isLoading={summaryQuery.isLoading}
+              isFetching={summaryQuery.isFetching}
               flightName={activeFlightName}
+              page={summaryQuery.data?.page ?? summaryPage}
+              size={summaryQuery.data?.size ?? summarySize}
+              total={summaryQuery.data?.total ?? 0}
+              totalPages={summaryQuery.data?.total_pages ?? 0}
+              sort={summarySort}
               expandedClientCode={expandedClientCode}
               isEditMode={isEditMode}
+              onPageChange={setSummaryPage}
+              onSizeChange={handleSummarySizeChange}
+              onSortChange={handleSummarySortChange}
               onToggleExpand={setExpandedClient}
               onDeleteClient={handleDeleteClient}
               onRenameClient={handleRenameClient}

@@ -151,6 +151,12 @@ export interface PaginatedClientSummaryResponse {
   total_pages: number;
 }
 
+export type ClientSummarySort =
+  | 'track_count_desc'
+  | 'track_count_asc'
+  | 'client_code_asc'
+  | 'client_code_desc';
+
 // ── API 12 — Flight list ───────────────────────────────────────────────────────
 
 export interface FlightListItem {
@@ -352,9 +358,17 @@ export async function getClientSummaryByFlight(
   flightName: string,
   page = 1,
   size = 200,
+  search?: string,
+  sort: ClientSummarySort = 'track_count_desc',
 ): Promise<PaginatedClientSummaryResponse> {
   const response = await apiClient.get<PaginatedClientSummaryResponse>(`${BASE}/summary`, {
-    params: { flight_name: flightName, page, size },
+    params: {
+      flight_name: flightName,
+      page,
+      size,
+      sort,
+      ...(search?.trim() ? { search: search.trim() } : {}),
+    },
   });
   return response.data;
 }
