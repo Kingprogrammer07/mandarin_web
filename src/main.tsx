@@ -2,8 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'next-themes'
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from "@vercel/speed-insights/react"
 import { toast } from 'sonner'
 import { flushPendingErrors } from '@/api/services/frontendErrors'
 import './index.css'
@@ -73,26 +71,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   });
 }
 
-// Vercel Analytics / SpeedInsights beacons used to fire for every admin tab
-// on every navigation. Admin sessions are long-lived (hours), generate the
-// bulk of pageviews, and are not the audience these tools are meant to
-// measure. Restrict them to client-facing routes only.
-const isAdminPath = (path: string): boolean =>
-  path === '/admin' ||
-  path.startsWith('/admin/') ||
-  path === '/pos' ||
-  path.startsWith('/pos/') ||
-  path === '/warehouse' ||
-  path.startsWith('/warehouse/') ||
-  path === '/manager' ||
-  path.startsWith('/manager/') ||
-  path === '/cargo' ||
-  path.startsWith('/cargo/') ||
-  path === '/flights' ||
-  path.startsWith('/flights/');
-
-const shouldEnableAnalytics = !isAdminPath(window.location.pathname);
-
 // Drain any queued frontend errors on a relaxed cadence and at unload. The
 // previous implementation called `flushPendingErrors` from every Axios
 // response interceptor, multiplying queue-check overhead with traffic.
@@ -109,8 +87,6 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <App />
-        {shouldEnableAnalytics && <Analytics />}
-        {shouldEnableAnalytics && <SpeedInsights />}
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,
