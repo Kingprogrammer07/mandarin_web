@@ -2,8 +2,12 @@
 # runner and rsync the static bundle to the Hetzner server's Nginx web root.
 #
 # Build runs OFF the server, so a broken build never touches the live site and
-# the ARM box stays free. Production env comes from .env.production
-# (VITE_API_BASE_URL=https://bot.webmandarin.uz).
+# the ARM box stays free.
+#
+# Env: .env / .env.production are gitignored, so the runner has no env on a
+# clean checkout. The "Write production env" step below writes it from the
+# values here. These are PUBLIC (they get baked into the client bundle anyway) —
+# NEVER put secrets in a VITE_* var. To change the API host etc., edit that step.
 #
 # Required GitHub repo secrets (Settings → Secrets and variables → Actions):
 #   DEPLOY_HOST     → 89.167.37.232
@@ -31,6 +35,18 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+
+      # .env* is gitignored → write the production env here. PUBLIC values only.
+      - name: Write production env
+        run: |
+          cat > .env.production <<'EOF'
+          VITE_API_BASE_URL=https://bot.webmandarin.uz
+          VITE_API_INIT_DATA_URL=/auth/validate-init-data
+          VITE_API_REGISTER_URL=/auth/register
+          VITE_API_LOGIN_URL=/auth/login
+          VITE_PLAUSIBLE_DOMAIN=webmandarin.uz
+          VITE_PLAUSIBLE_SRC=https://analytics.webmandarin.uz/js/script.js
+          EOF
 
       - name: Install deps
         run: npm ci
