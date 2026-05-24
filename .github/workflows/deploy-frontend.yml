@@ -39,7 +39,7 @@ jobs:
         run: npm run build
 
       - name: Deploy dist/ to server via rsync
-        uses: burnett01/rsync-deployments@7.0.2
+        uses: burnett01/rsync-deployments@7.0.1
         with:
           # -a archive, -z compress, --delete removes stale files for an
           # atomic-ish mirror of dist/ into the web root.
