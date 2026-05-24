@@ -12,6 +12,22 @@ import App from './App.tsx'
 // Remove these two lines to disable.
 // eruda.init();
 
+// Self-hosted Plausible analytics — privacy-first, cookieless, ~1KB. Injected
+// only in PROD and only when configured, so dev traffic never pollutes stats.
+// Same-site subdomain keeps it safe inside the Telegram WebApp WebView.
+// Configure via .env: VITE_PLAUSIBLE_DOMAIN, VITE_PLAUSIBLE_SRC.
+if (import.meta.env.PROD) {
+  const plausibleDomain = import.meta.env.VITE_PLAUSIBLE_DOMAIN;
+  const plausibleSrc = import.meta.env.VITE_PLAUSIBLE_SRC;
+  if (plausibleDomain && plausibleSrc) {
+    const script = document.createElement('script');
+    script.defer = true;
+    script.setAttribute('data-domain', plausibleDomain);
+    script.src = plausibleSrc;
+    document.head.appendChild(script);
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
