@@ -1,0 +1,51 @@
+# Vercel-like auto-deploy: on every push to main, build the SPA on the GitHub
+# runner and rsync the static bundle to the Hetzner server's Nginx web root.
+#
+# Build runs OFF the server, so a broken build never touches the live site and
+# the ARM box stays free. Production env comes from .env.production
+# (VITE_API_BASE_URL=https://bot.webmandarin.uz).
+#
+# Required GitHub repo secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST     → 89.167.37.232
+#   DEPLOY_USER     → root  (or a dedicated deploy user)
+#   DEPLOY_SSH_KEY  → private key whose PUBLIC key is in the server's
+#                     ~/.ssh/authorized_keys (see FRONTEND_DEPLOY_PROMPT.md)
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build
+
+      - name: Deploy dist/ to server via rsync
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          # -a archive, -z compress, --delete removes stale files for an
+          # atomic-ish mirror of dist/ into the web root.
+          switches: -avz --delete
+          path: dist/
+          remote_path: /var/www/mandarin-frontend/
+          remote_host: ${{ secrets.DEPLOY_HOST }}
+          remote_user: ${{ secrets.DEPLOY_USER }}
+          remote_key: ${{ secrets.DEPLOY_SSH_KEY }}
