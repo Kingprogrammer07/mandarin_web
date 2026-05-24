@@ -167,7 +167,7 @@ export function ExpectedCargoHeader({
           <Input
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Mijoz kodi bo'yicha qidirish..."
+            placeholder="Mijoz kodi yoki trek kodi bo'yicha qidirish..."
             className="pl-9 h-9 text-sm bg-[#ffffff] dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:ring-orange-500"
           />
           {searchQuery && (
