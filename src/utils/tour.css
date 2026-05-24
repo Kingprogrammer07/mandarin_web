@@ -1,0 +1,37 @@
+/**
+ * driver.js layering. The overlay must sit ABOVE app modals
+ * (MakePaymentModal uses z-index ~10010), and the popover must sit ABOVE the
+ * overlay — otherwise the overlay swallows clicks and the popover (Next btn)
+ * becomes unreachable, appearing "stuck under the shadow".
+ */
+.driver-overlay {
+  z-index: 2000000 !important;
+}
+
+/* Highlighted stage + popover one layer higher than the overlay. */
+.driver-popover {
+  z-index: 2000001 !important;
+  border-radius: 16px;
+  font-family: inherit;
+}
+
+/* driver.js raises the active element; make sure it clears app modals too. */
+.driver-active-element {
+  z-index: 2000002 !important;
+}
+
+.driver-popover-title {
+  font-weight: 800;
+}
+
+.driver-popover-next-btn,
+.driver-popover-prev-btn {
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  text-shadow: none !important;
+}
+
+.driver-popover-next-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  color: #fff !important;
+}

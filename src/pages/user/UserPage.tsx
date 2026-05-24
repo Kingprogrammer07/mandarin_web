@@ -8,6 +8,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LogOut, RefreshCw, UserCog, FileImage, ShieldCheck, X } from 'lucide-react';
 import { useState, useCallback, lazy, Suspense, memo, useTransition, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { DriveStep } from 'driver.js';
+import { useGuideTour } from '@/hooks/useGuideTour';
+import { pickVisible } from '@/utils/tour';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { UniqueBackground } from '@/components/ui/UniqueBackground';
@@ -183,6 +186,33 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
       refetch();
    }, [refetch]);
 
+   // One-time onboarding tour for the profile page. Quick actions render twice
+   // (mobile + desktop) — pickVisible highlights whichever copy is on screen.
+   const buildProfileTour = useCallback((): DriveStep[] => [
+      {
+         element: '[data-tour="profile-hero"]',
+         popover: {
+            title: t('tour.profile.hero.title'),
+            description: t('tour.profile.hero.desc'),
+         },
+      },
+      {
+         element: pickVisible('[data-tour="profile-actions"]') ?? '[data-tour="profile-actions"]',
+         popover: {
+            title: t('tour.profile.actions.title'),
+            description: t('tour.profile.actions.desc'),
+         },
+      },
+      {
+         element: '[data-tour="profile-personal"]',
+         popover: {
+            title: t('tour.profile.personal.title'),
+            description: t('tour.profile.personal.desc'),
+         },
+      },
+   ], [t]);
+   useGuideTour('profile', buildProfileTour, !isLoading && !isError && !!user);
+
    if (isLoading) {
       return <ProfileSkeleton />;
    }
@@ -229,15 +259,19 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
 
                      {/* LEFT COLUMN (Desktop): Profile Hero & Quick Actions */}
                      <aside className="w-full md:col-span-5 lg:col-span-4 md:sticky md:top-8 self-start z-30">
-                        <ProfileHero user={user} onBalanceClick={() => setIsWalletModalOpen(true)} />
+                        <div data-tour="profile-hero">
+                           <ProfileHero user={user} onBalanceClick={() => setIsWalletModalOpen(true)} />
+                        </div>
 
                         {/* Desktop Only: Quick Actions & Buttons moved here */}
                         <div className="hidden md:flex flex-col gap-6 mt-6">
-                           <QuickActions
-                              onWalletClick={() => setIsWalletModalOpen(true)}
-                              onCardsClick={() => setIsCardsModalOpen(true)}
-                              onPassportsClick={() => setIsPassportsModalOpen(true)}
-                           />
+                           <div data-tour="profile-actions">
+                              <QuickActions
+                                 onWalletClick={() => setIsWalletModalOpen(true)}
+                                 onCardsClick={() => setIsCardsModalOpen(true)}
+                                 onPassportsClick={() => setIsPassportsModalOpen(true)}
+                              />
+                           </div>
 
                            {/* Passport Images (Desktop) */}
                            {isSensitiveVisible && <PassportImages images={user.passport_images} />}
@@ -272,7 +306,7 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
                         <div className="mt-3 space-y-5 pb-10 md:mt-0 md:space-y-6 md:pb-0">
 
                            {/* Mobile Only: Quick Actions */}
-                           <div className="md:hidden max-w-md mx-auto w-full">
+                           <div className="md:hidden max-w-md mx-auto w-full" data-tour="profile-actions">
                               <QuickActions
                                  onWalletClick={() => setIsWalletModalOpen(true)}
                                  onCardsClick={() => setIsCardsModalOpen(true)}
@@ -280,11 +314,13 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
                               />
                            </div>
 
-                           <PersonalInfo
-                              user={user}
-                              isSensitiveVisible={isSensitiveVisible}
-                              onToggleSensitive={() => setIsSensitiveVisible((visible) => !visible)}
-                           />
+                           <div data-tour="profile-personal">
+                              <PersonalInfo
+                                 user={user}
+                                 isSensitiveVisible={isSensitiveVisible}
+                                 onToggleSensitive={() => setIsSensitiveVisible((visible) => !visible)}
+                              />
+                           </div>
 
                            {/* Mobile Only: Passport Images */}
                            {isSensitiveVisible && (

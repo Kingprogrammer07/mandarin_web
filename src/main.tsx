@@ -8,9 +8,12 @@ import { toast } from 'sonner'
 import { flushPendingErrors } from '@/api/services/frontendErrors'
 import './index.css'
 import App from './App.tsx'
-// import eruda from 'eruda';
+import eruda from 'eruda';
 
-// eruda.init();
+// In-app dev console for mobile / Telegram WebApp (no native devtools there).
+// Remove these two lines to disable.
+eruda.init();
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

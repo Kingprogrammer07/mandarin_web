@@ -8,6 +8,8 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
+import { useGuideTour } from '@/hooks/useGuideTour';
+import type { DriveStep } from 'driver.js';
 import TrackCodeTab from '@/pages/dashboard/TrackCodeTab';
 import {
   getActiveCarouselItems,
@@ -64,6 +66,32 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
 
   const { t } = useTranslation();
   const { canInstall, handleInstall } = useInstallPrompt();
+
+  // One-time onboarding tour for the home dashboard.
+  const buildDashboardTour = useCallback((): DriveStep[] => [
+    {
+      element: '[data-tour="dash-search"]',
+      popover: {
+        title: t('tour.dashboard.search.title'),
+        description: t('tour.dashboard.search.desc'),
+      },
+    },
+    {
+      element: '[data-tour="dash-actions"]',
+      popover: {
+        title: t('tour.dashboard.actions.title'),
+        description: t('tour.dashboard.actions.desc'),
+      },
+    },
+    {
+      element: '[data-tour="dash-notif"]',
+      popover: {
+        title: t('tour.dashboard.notif.title'),
+        description: t('tour.dashboard.notif.desc'),
+      },
+    },
+  ], [t]);
+  useGuideTour('dashboard', buildDashboardTour, activeTab === 'home');
 
   const { data: apiCarouselItems } = useQuery({
     queryKey: ['carousel-items'],
@@ -268,7 +296,9 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
         <HeaderTabs activeTab={activeTab} setActiveTab={handleSetActiveTab} />
 
         {activeTab === 'home' && (
-          <QuickSearchBar onClick={handleQuickSearch} />
+          <div data-tour="dash-search">
+            <QuickSearchBar onClick={handleQuickSearch} />
+          </div>
         )}
 
         {activeTab === 'schedule' && (
@@ -304,7 +334,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                   <span className="inline-block h-5 w-1 rounded-full bg-amber-500 shadow-[0_0_16px_rgba(245,158,11,0.35)]"></span>
                   {t('dashboard.sections.important')}
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" data-tour="dash-notif">
                   <Suspense fallback={<div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-white/5" />}>
                     <NotificationCenter />
                   </Suspense>
@@ -352,7 +382,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
               </div>
             </section>
 
-            <section className="mb-5">
+            <section className="mb-5" data-tour="dash-actions">
               <div className="flex items-center justify-between mb-3 ml-1 mr-1">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <span className="w-1 h-5 bg-amber-500 rounded-full inline-block shadow-[0_0_16px_rgba(245,158,11,0.35)]"></span>

@@ -1724,5 +1724,52 @@
     "title": "Beta Versiya",
     "desc": "Platforma hozirda sinov (beta) rejimida ishlamoqda. Ayrim xatoliklar yoki kamchiliklar kuzatilishi mumkin. Agar biron muammoga duch kelsangiz, iltimos bizga xabar bering.",
     "action": "Adminga yozish"
+  },
+  "tour": {
+    "next": "Keyingi",
+    "prev": "Orqaga",
+    "done": "Tushunarli",
+    "dashboard": {
+      "search": {
+        "title": "Track kod qidiruvi",
+        "desc": "Yukingizni track kod orqali shu yerdan tez qidiring."
+      },
+      "actions": {
+        "title": "Asosiy amallar",
+        "desc": "Bu yerdan to'lov qilish, kalkulyator va boshqa asosiy xizmatlardan foydalanasiz."
+      },
+      "notif": {
+        "title": "Bildirishnomalar",
+        "desc": "Yuk holati va to'lovlar haqidagi yangiliklarni shu yerdan kuzatib boring."
+      }
+    },
+    "profile": {
+      "hero": {
+        "title": "Profilingiz",
+        "desc": "Ismingiz va hisob balansingiz shu yerda. Balansni bosib hamyonni ochasiz."
+      },
+      "actions": {
+        "title": "Tez amallar",
+        "desc": "Hamyon, to'lov kartalari va pasport ma'lumotlarini shu yerdan boshqarasiz."
+      },
+      "personal": {
+        "title": "Shaxsiy ma'lumotlar",
+        "desc": "Maxfiy ma'lumotlarni ko'rsatish/yashirish va profilni tahrirlash shu bo'limda."
+      }
+    },
+    "payment": {
+      "amount": {
+        "title": "To'lov summasi",
+        "desc": "Tanlangan reys uchun to'lanishi kerak bo'lgan umumiy summa shu yerda ko'rinadi."
+      },
+      "methods": {
+        "title": "To'lov usuli",
+        "desc": "Online (karta) yoki naqd to'lovni shu yerdan tanlaysiz."
+      },
+      "wallet": {
+        "title": "Hamyon balansi",
+        "desc": "Hisobingizdagi mablag'ni to'lovga qo'shib, summani kamaytirishingiz mumkin."
+      }
+    }
   }
 }

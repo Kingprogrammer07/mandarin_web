@@ -51,6 +51,9 @@ import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
 import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
+import { useGuideTour } from '@/hooks/useGuideTour';
+import { pickVisible } from '@/utils/tour';
+import type { DriveStep } from 'driver.js';
 
 // ============================================================================
 // Helpers
@@ -412,6 +415,37 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   });
   
   const partialAllowed = details?.partial_allowed !== false;
+
+  // One-time onboarding tour for the payment-details step (methods, wallet,
+  // partial). Runs only when step 1 is rendered with loaded details.
+  const buildPaymentTour = useCallback((): DriveStep[] => [
+    {
+      element: '[data-tour="pay-amount"]',
+      popover: {
+        title: t('tour.payment.amount.title'),
+        description: t('tour.payment.amount.desc'),
+      },
+    },
+    {
+      element: pickVisible('[data-tour="pay-methods"]') ?? '[data-tour="pay-methods"]',
+      popover: {
+        title: t('tour.payment.methods.title'),
+        description: t('tour.payment.methods.desc'),
+      },
+    },
+    {
+      element: '[data-tour="pay-wallet"]',
+      popover: {
+        title: t('tour.payment.wallet.title'),
+        description: t('tour.payment.wallet.desc'),
+      },
+    },
+  ], [t]);
+  useGuideTour(
+    'payment',
+    buildPaymentTour,
+    isOpen && step === 1 && !!details && !detailsLoading && !showSuccess,
+  );
 
   // NBU status probe
   const { data: nbuStatus } = useQuery({
@@ -960,7 +994,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         )}
 
         {/* ---- Big Amount Display ---- */}
-        <div className="text-center py-5 px-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/[0.08] dark:to-orange-500/[0.05] border border-amber-300/70 dark:border-amber-500/25 shadow-sm">
+        <div data-tour="pay-amount" className="text-center py-5 px-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/[0.08] dark:to-orange-500/[0.05] border border-amber-300/70 dark:border-amber-500/25 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-amber-700/80 dark:text-amber-400/70 mb-1.5">
             {details.has_existing_partial
               ? t('makePayment.existingRemaining')
@@ -1178,6 +1212,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
         {/* ---- Wallet Balance & Toggle ---- */}
         <div
+          data-tour="pay-wallet"
           className={`p-3.5 rounded-xl border transition-all duration-200 ${
             details.wallet_balance <= 0
               ? 'bg-gray-50 dark:bg-white/[0.02] border-gray-200 dark:border-white/5 opacity-75'
@@ -1294,6 +1329,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         {/* ---- NBU Online Payment (primary CTA when enabled) ---- */}
         {nbuEnabled && (
           <motion.button
+            data-tour="pay-methods"
             whileTap={{ scale: 0.97 }}
             onClick={handleNbuPayment}
             disabled={isNbuInitiating}
@@ -1317,7 +1353,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             When NBU is enabled the gateway button above is the canonical
             online path, so we drop the manual receipt-upload variant to
             keep the wizard focused. Cash still always shows. */}
-        <div className={`grid gap-3 ${nbuEnabled ? 'grid-cols-1' : walletCoversAll ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
+        <div data-tour="pay-methods" className={`grid gap-3 ${nbuEnabled ? 'grid-cols-1' : walletCoversAll ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
           {!nbuEnabled && (
             <motion.button
               whileTap={{ scale: 0.97 }}
