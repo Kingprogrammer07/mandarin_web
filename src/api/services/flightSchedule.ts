@@ -110,7 +110,7 @@ export interface FlightDashboardItem {
   name: string;
   type: FlightDashboardType;
   status: FlightDashboardStatus;
-  source: 'flight_cargos' | 'expected_cargo';
+  source: 'flight_cargos' | 'expected_cargo' | 'google_sheets';
   is_new: boolean;
   last_activity_at: string | null;
   stats: FlightDashboardStats;
