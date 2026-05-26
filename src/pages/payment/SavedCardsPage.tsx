@@ -61,7 +61,7 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
   });
 
   const bindMutation = useMutation({
-    mutationFn: nbuPaymentService.bindCard,
+    mutationFn: () => nbuPaymentService.bindCard(),
     onSuccess: (data) => {
       const paymentUrl = data.payment_url;
       if (paymentUrl) {
@@ -185,8 +185,17 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-base text-gray-900 dark:text-white truncate">
-                  {card.card_masked ?? t('nbu.cards.unknown')}
+                  {card.nickname || card.card_masked || t('nbu.cards.namedCardFallback')}
                 </p>
+                {card.nickname && card.card_masked ? (
+                  <p className="font-mono text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {card.card_masked}
+                  </p>
+                ) : !card.card_masked ? (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                    {t('nbu.cards.pendingMasked')}
+                  </p>
+                ) : null}
                 {card.last_used_at && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {t('nbu.cards.lastUsed', {
