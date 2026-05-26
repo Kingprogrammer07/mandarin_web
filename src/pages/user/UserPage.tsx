@@ -17,6 +17,7 @@ import { UniqueBackground } from '@/components/ui/UniqueBackground';
 import { WalletModal } from '@/components/wallet/WalletModal';
 import { CardsManagerModal } from '@/components/wallet/CardsManagerModal';
 import { ExtraPassportsModal } from '@/components/profile/ExtraPassportsModal';
+import { clearNbuReturnParams } from '@/utils/nbuReturnContext';
 
 // Lazy load the heavy modal
 const EditProfileModal = lazy(() => import('@/components/profile/EditProfileModal').then(module => ({ default: module.EditProfileModal })));
@@ -163,6 +164,14 @@ const UserPage = ({ onLogout }: { onLogout?: () => void }) => {
    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
    const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
    const [isPassportsModalOpen, setIsPassportsModalOpen] = useState(false);
+
+   useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('nbuReturn') !== 'cards') return;
+
+      setIsCardsModalOpen(true);
+      clearNbuReturnParams();
+   }, []);
    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
    const [isSensitiveVisible, setIsSensitiveVisible] = useState(false);
    const [isModalLoading, startTransition] = useTransition();

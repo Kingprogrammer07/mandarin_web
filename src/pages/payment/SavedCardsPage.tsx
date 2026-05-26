@@ -11,6 +11,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
+import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
 
 interface SavedCardsPageProps {
   onBack?: () => void;
@@ -64,11 +65,11 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
     onSuccess: (data) => {
       const paymentUrl = data.payment_url;
       if (paymentUrl) {
-        if (window.Telegram?.WebApp?.openLink) {
-          window.Telegram.WebApp.openLink(paymentUrl);
-        } else {
-          window.location.href = paymentUrl;
-        }
+        redirectToNbuUrl({
+          orderId: data.order_id,
+          kind: 'card_binding',
+          paymentUrl,
+        });
       }
     },
     onError: () => {

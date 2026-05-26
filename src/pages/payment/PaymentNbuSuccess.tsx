@@ -6,6 +6,7 @@ import {
   nbuPaymentService,
   type PublicNbuPaymentStatus,
 } from '@/api/services/nbuPaymentService';
+import { getNbuReturnPath } from '@/utils/nbuReturnContext';
 
 interface PaymentNbuSuccessProps {
   onNavigateHome?: () => void;
@@ -43,6 +44,7 @@ function phaseFromStatus(s: PublicNbuPaymentStatus | null): Phase {
 export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessProps) {
   const { t } = useTranslation();
   const orderId = new URLSearchParams(window.location.search).get('orderId') ?? '';
+  const returnPath = orderId ? getNbuReturnPath(orderId) : null;
 
   const [statusInfo, setStatusInfo] = useState<PublicNbuPaymentStatus | null>(null);
   const [phase, setPhase] = useState<Phase>(orderId ? 'pending' : 'no_data');
@@ -51,12 +53,16 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
   const timeoutRef = useRef<number | null>(null);
 
   const handleHome = useCallback(() => {
+    if (returnPath) {
+      window.location.href = returnPath;
+      return;
+    }
     if (onNavigateHome) {
       onNavigateHome();
     } else {
       window.location.href = '/';
     }
-  }, [onNavigateHome]);
+  }, [onNavigateHome, returnPath]);
 
   const handleManualRefresh = useCallback(() => {
     attemptsRef.current = 0;
@@ -104,12 +110,24 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
     };
   }, [orderId, pollKey]);
 
-  // Auto-navigate home only on confirmed success (not while pending)
+  const hasStoredSession = useCallback(
+    () =>
+      Boolean(
+        localStorage.getItem('access_token') ||
+        sessionStorage.getItem('access_token'),
+      ),
+    [],
+  );
+
+  // Auto-navigate home only when the redirect tab still has an app session.
+  // External bank/browser returns often lose sessionStorage, and forcing
+  // user-home from there resolves to /auth/login.
   useEffect(() => {
     if (phase !== 'success' && phase !== 'card_bound') return;
+    if (!hasStoredSession()) return;
     const timer = window.setTimeout(handleHome, 10_000);
     return () => window.clearTimeout(timer);
-  }, [phase, handleHome]);
+  }, [phase, handleHome, hasStoredSession]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#06080d] flex items-center justify-center p-4">

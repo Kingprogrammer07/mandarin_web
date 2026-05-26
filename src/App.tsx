@@ -295,6 +295,9 @@ function getPathForPage(
   if (page === "pickup-tv") return "/pickup-tv";
   if (page === "admin-expenses") return "/admin/expenses";
   if (page === "system-settings") return "/admin/system-settings";
+  if (page === "payment_nbu_success") return "/payment/nbu/success";
+  if (page === "payment_nbu_failure") return "/payment/nbu/failure";
+  if (page === "saved_cards") return "/payment/nbu/cards";
   if (page === "admin-flight-notifications" && flightName)
     return `/flights/${encodeURIComponent(flightName)}/notifications`;
   return "/auth/login";

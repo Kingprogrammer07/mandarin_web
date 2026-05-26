@@ -29,6 +29,7 @@ import { QuickSearchBar } from './dashboard-components/QuickSearchBar';
 import { CarouselCard } from './dashboard-components/CarouselCard';
 import { CAROUSEL_ITEMS, PRIMARY_ACTIONS, SECONDARY_ACTIONS } from './dashboard-components/constants';
 import type { CarouselItemData } from './dashboard-components/types';
+import { clearNbuReturnParams } from '@/utils/nbuReturnContext';
 
 const loadNotificationCenter = () => import('@/components/notifications/NotificationCenter');
 
@@ -57,6 +58,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
   const [initialTrackView] = useState<'search' | 'history'>('search');
   const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentFlightName, setPaymentFlightName] = useState<string | null>(null);
   const [isOurAddressModalOpen, setIsOurAddressModalOpen] = useState(false);
 
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -120,11 +122,22 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
 
   useEffect(() => {
     const handleOpenPayment = () => {
+      setPaymentFlightName(null);
       setIsPaymentModalOpen(true);
     };
 
     window.addEventListener('dashboard:open-payment', handleOpenPayment);
     return () => window.removeEventListener('dashboard:open-payment', handleOpenPayment);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('nbuReturn') !== 'payment') return;
+
+    const flightName = params.get('nbuFlight');
+    setPaymentFlightName(flightName);
+    setIsPaymentModalOpen(true);
+    clearNbuReturnParams();
   }, []);
 
   const sortedCarouselItems = useMemo((): CarouselItemData[] => {
@@ -268,6 +281,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     } else if (id === 'delivery_history') {
       handleSetActiveTab('delivery_history');
     } else if (id === 'payment') {
+      setPaymentFlightName(null);
       setIsPaymentModalOpen(true);
     } else if (id === 'our_address') {
       setIsOurAddressModalOpen(true);
@@ -508,7 +522,11 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
           />
           <MakePaymentModal
             isOpen={isPaymentModalOpen}
-            onClose={() => setIsPaymentModalOpen(false)}
+            onClose={() => {
+              setIsPaymentModalOpen(false);
+              setPaymentFlightName(null);
+            }}
+            preselectedFlightName={paymentFlightName}
           />
           <CalculatorModal
             isOpen={isCalculatorOpen}

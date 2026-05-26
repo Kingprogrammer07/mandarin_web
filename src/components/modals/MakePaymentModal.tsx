@@ -50,6 +50,7 @@ import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
+import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
 import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
 import { useGuideTour } from '@/hooks/useGuideTour';
 import { pickVisible } from '@/utils/tour';
@@ -675,12 +676,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setIsNbuInitiating(true);
     try {
       const response = await nbuPaymentService.init({ flight_name: selectedFlightName });
-      const paymentUrl = response.payment_url;
-      if (window.Telegram?.WebApp?.openLink) {
-        window.Telegram.WebApp.openLink(paymentUrl);
-      } else {
-        window.location.href = paymentUrl;
-      }
+      redirectToNbuUrl({
+        orderId: response.order_id,
+        kind: 'payment',
+        paymentUrl: response.payment_url,
+        flightName: selectedFlightName,
+      });
     } catch (err: unknown) {
       const error = err as { status?: number; data?: { detail?: string | { message?: string } }; message?: string };
       const status = error?.status ?? 0;
@@ -976,16 +977,23 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleChargeCard(card.id)}
                   disabled={chargingCardId === card.id || nbuChargeMutation.isPending}
-                  className="px-2.5 py-1.5 rounded-md text-[11px] font-bold
+                  className="min-w-[132px] px-2.5 py-1.5 rounded-md
                     bg-sky-500 hover:bg-sky-600 text-white
                     active:scale-95 transition-all
                     disabled:opacity-60 disabled:cursor-not-allowed
-                    whitespace-nowrap"
+                    whitespace-nowrap text-center"
                 >
                   {chargingCardId === card.id ? (
                     <Loader2 className="w-3 h-3 animate-spin inline" />
                   ) : (
-                    t('nbu.cards.payWithCard')
+                    <span className="flex flex-col items-center leading-tight">
+                      <span className="text-[11px] font-bold">
+                        {t('nbu.cards.payWithCard')}
+                      </span>
+                      <span className="mt-0.5 font-mono text-[10px] font-black text-white/90">
+                        {card.card_masked ?? t('nbu.cards.unknown')}
+                      </span>
+                    </span>
                   )}
                 </motion.button>
               </div>

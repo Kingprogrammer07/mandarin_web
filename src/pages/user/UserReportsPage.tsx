@@ -33,6 +33,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 const MakePaymentModal = lazy(() => import('@/components/modals/MakePaymentModal'));
 import { useTranslation } from 'react-i18next';
+import { clearNbuReturnParams } from '@/utils/nbuReturnContext';
 
 const PAGE_SIZE = 10;
 const TRACK_PREVIEW_LIMIT = 3;
@@ -647,6 +648,19 @@ export default function UserReportsPage({ onBack, onNavigateToDelivery }: UserRe
         // Refresh history after payment
         if (selectedFlight) refetchHistory();
     }, [selectedFlight, refetchHistory]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('nbuReturn') !== 'payment') return;
+
+        const flightName = params.get('nbuFlight');
+        if (flightName) {
+            setSelectedFlight(flightName);
+            setPaymentFlightName(flightName);
+        }
+        setIsPaymentOpen(true);
+        clearNbuReturnParams();
+    }, []);
 
     // --- Render Helpers ---
 

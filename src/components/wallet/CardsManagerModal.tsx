@@ -10,6 +10,7 @@ import { walletService } from '@/api/services/walletService';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
 
 interface CardsManagerModalProps {
     isOpen: boolean;
@@ -73,11 +74,11 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                 toast.error(t('makePayment.errorOccurred', "Xatolik yuz berdi"));
                 return;
             }
-            if (window.Telegram?.WebApp?.openLink) {
-                window.Telegram.WebApp.openLink(paymentUrl);
-            } else {
-                window.location.href = paymentUrl;
-            }
+            redirectToNbuUrl({
+                orderId: data.order_id,
+                kind: 'card_binding',
+                paymentUrl,
+            });
         },
         onError: () => {
             toast.error(t('makePayment.errorOccurred', "Xatolik yuz berdi"));

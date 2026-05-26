@@ -6,6 +6,7 @@ import {
   nbuPaymentService,
   type PublicNbuPaymentStatus,
 } from '@/api/services/nbuPaymentService';
+import { getNbuReturnPath } from '@/utils/nbuReturnContext';
 
 interface PaymentNbuFailureProps {
   onNavigateHome?: () => void;
@@ -43,6 +44,7 @@ function phaseFromStatus(s: PublicNbuPaymentStatus | null): Phase {
 export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNbuFailureProps) {
   const { t } = useTranslation();
   const orderId = new URLSearchParams(window.location.search).get('orderId') ?? '';
+  const returnPath = orderId ? getNbuReturnPath(orderId) : null;
 
   const [statusInfo, setStatusInfo] = useState<PublicNbuPaymentStatus | null>(null);
   const [phase, setPhase] = useState<Phase>(orderId ? 'checking' : 'failure');
@@ -50,20 +52,28 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
   const timeoutRef = useRef<number | null>(null);
 
   const handleHome = useCallback(() => {
+    if (returnPath) {
+      window.location.href = returnPath;
+      return;
+    }
     if (onNavigateHome) {
       onNavigateHome();
     } else {
       window.location.href = '/';
     }
-  }, [onNavigateHome]);
+  }, [onNavigateHome, returnPath]);
 
   const handleRetry = useCallback(() => {
+    if (returnPath) {
+      window.location.href = returnPath;
+      return;
+    }
     if (onRetry) {
       onRetry();
     } else {
       window.location.href = '/';
     }
-  }, [onRetry]);
+  }, [onRetry, returnPath]);
 
   useEffect(() => {
     if (!orderId) return;
