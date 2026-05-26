@@ -1710,8 +1710,33 @@
       "deleteSuccess": "Karta o'chirildi",
       "chargeSuccess": "To'lov muvaffaqiyatli amalga oshirildi",
       "chargeFailed": "To'lov bekor qilindi",
-      "lastUsed": "Oxirgi ishlatilgan: {{when}}"
-    }
+      "lastUsed": "Oxirgi ishlatilgan: {{when}}",
+      "nicknameLabel": "Karta nomi (ixtiyoriy)",
+      "nicknamePlaceholder": "Masalan: Asosiy kartam",
+      "nicknameHint": "Kartani keyin tanib olishingiz uchun nom bering. Karta raqami birinchi to'lovdan keyin ko'rinadi.",
+      "pendingMasked": "Raqam birinchi to'lovdan so'ng ko'rinadi",
+      "rename": "Nomini o'zgartirish",
+      "renamePrompt": "Karta uchun yangi nom kiriting",
+      "renameSuccess": "Karta nomi yangilandi",
+      "renameError": "Nomni o'zgartirishda xatolik",
+      "save": "Saqlash",
+      "cancel": "Bekor qilish",
+      "bindContinue": "Davom etish",
+      "namedCardFallback": "Saqlangan karta"
+    },
+    "confirm": {
+      "title": "To'lovni tasdiqlang",
+      "subtitle": "Quyidagi karta bilan to'lov amalga oshiriladi",
+      "amountLabel": "To'lov summasi",
+      "cardLabel": "Karta",
+      "flightLabel": "Reys",
+      "payButton": "To'lash",
+      "processing": "To'lov amalga oshirilmoqda...",
+      "cancel": "Bekor qilish"
+    },
+    "chargeSuccessTitle": "To'lov bajarildi!",
+    "chargeSuccessBody": "To'lovingiz muvaffaqiyatli o'tdi. Rahmat!",
+    "chargeSuccessDone": "Yopish"
   },
   "maintenance": {
     "title": "Texnik ishlar olib borilmoqda",

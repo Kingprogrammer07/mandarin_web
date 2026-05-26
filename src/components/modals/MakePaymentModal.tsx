@@ -46,7 +46,7 @@ import {
   type AvailableFlightItem,
   type PaymentLinkItem,
 } from '@/api/services/paymentService';
-import { nbuPaymentService } from '@/api/services/nbuPaymentService';
+import { nbuPaymentService, type SavedCardItem } from '@/api/services/nbuPaymentService';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
@@ -311,7 +311,13 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isNbuInitiating, setIsNbuInitiating] = useState(false);
-  const [chargingCardId, setChargingCardId] = useState<number | null>(null);
+  // Tracks which card's charge is in flight (used to reset state cleanly); the
+  // value itself isn't rendered — the drawer reflects status via the mutation.
+  const [, setChargingCardId] = useState<number | null>(null);
+  // Saved-card one-tap now routes through a confirm drawer instead of charging
+  // instantly; `chargeDone` swaps that drawer to a celebratory success view.
+  const [confirmChargeCard, setConfirmChargeCard] = useState<SavedCardItem | null>(null);
+  const [chargeDone, setChargeDone] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { isMaintenance } = useMaintenanceWatcher();
@@ -358,6 +364,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setShowSuccess(false);
     setSelectedTrackCode(null);
     setTrackData(null);
+    setConfirmChargeCard(null);
+    setChargeDone(false);
+    setChargingCardId(null);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -469,12 +478,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     mutationFn: nbuPaymentService.chargeSavedCard,
     onSuccess: (data) => {
       if (data.status === 'SUCCESS') {
-        toast.success(t('nbu.cards.chargeSuccess'));
+        // Stay in the drawer and reveal the success view — the user should
+        // *feel* the payment landed, not just see a toast flash and vanish.
         queryClient.invalidateQueries({ queryKey: ['payment-history'] });
         queryClient.invalidateQueries({ queryKey: ['payment-available-flights'] });
-        handleClose();
+        queryClient.invalidateQueries({ queryKey: ['nbu-cards'] });
+        setChargeDone(true);
       } else {
         toast.error(data.error || t('nbu.cards.chargeFailed'));
+        setConfirmChargeCard(null);
       }
       setChargingCardId(null);
     },
@@ -517,6 +529,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       }
       toast.error(msg);
       setChargingCardId(null);
+      setConfirmChargeCard(null);
     },
   });
 
@@ -725,14 +738,25 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     }
   }, [selectedFlightName, t]);
 
-  const handleChargeCard = useCallback(
-    (cardId: number) => {
-      if (!selectedFlightName) return;
-      setChargingCardId(cardId);
-      nbuChargeMutation.mutate({ card_id: cardId, flight_name: selectedFlightName });
-    },
-    [selectedFlightName, nbuChargeMutation],
-  );
+  // Execute the charge for the card the user confirmed in the drawer.
+  const confirmCharge = useCallback(() => {
+    if (!confirmChargeCard || !selectedFlightName) return;
+    setChargingCardId(confirmChargeCard.id);
+    nbuChargeMutation.mutate({
+      card_id: confirmChargeCard.id,
+      flight_name: selectedFlightName,
+    });
+  }, [confirmChargeCard, selectedFlightName, nbuChargeMutation]);
+
+  // Close the confirm/success drawer. After a completed payment, also close the
+  // whole wizard so the user lands back home rather than on a stale form.
+  const closeChargeDrawer = useCallback(() => {
+    const wasDone = chargeDone;
+    setConfirmChargeCard(null);
+    setChargeDone(false);
+    setChargingCardId(null);
+    if (wasDone) handleClose();
+  }, [chargeDone, handleClose]);
 
   const handleConfirm = useCallback(() => {
     if (!selectedFlightName) return;
@@ -958,46 +982,43 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 {t('nbu.cards.tapToPay', "Bir bosishda to'lash")}
               </span>
             </div>
-            {savedCards.map((card) => (
-              <div
-                key={card.id}
-                className="flex items-center gap-2.5 p-2.5 rounded-lg
-                  bg-sky-50/60 dark:bg-sky-500/5
-                  border border-sky-100 dark:border-sky-500/10"
-              >
-                <div className="w-8 h-8 rounded-md bg-white dark:bg-white/5 flex items-center justify-center flex-shrink-0">
-                  <CreditCard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-mono font-semibold text-xs text-gray-900 dark:text-white truncate">
-                    {card.card_masked ?? t('nbu.cards.unknown')}
-                  </p>
-                </div>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleChargeCard(card.id)}
-                  disabled={chargingCardId === card.id || nbuChargeMutation.isPending}
-                  className="min-w-[132px] px-2.5 py-1.5 rounded-md
-                    bg-sky-500 hover:bg-sky-600 text-white
-                    active:scale-95 transition-all
-                    disabled:opacity-60 disabled:cursor-not-allowed
-                    whitespace-nowrap text-center"
+            {savedCards.map((card) => {
+              const primaryLabel =
+                card.nickname || card.card_masked || t('nbu.cards.namedCardFallback');
+              const secondaryLabel = card.card_masked
+                ? (card.nickname ? card.card_masked : t('nbu.cards.tokenized'))
+                : t('nbu.cards.pendingMasked');
+              return (
+                <div
+                  key={card.id}
+                  className="flex items-center gap-2.5 p-2.5 rounded-lg
+                    bg-sky-50/60 dark:bg-sky-500/5
+                    border border-sky-100 dark:border-sky-500/10"
                 >
-                  {chargingCardId === card.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin inline" />
-                  ) : (
-                    <span className="flex flex-col items-center leading-tight">
-                      <span className="text-[11px] font-bold">
-                        {t('nbu.cards.payWithCard')}
-                      </span>
-                      <span className="mt-0.5 font-mono text-[10px] font-black text-white/90">
-                        {card.card_masked ?? t('nbu.cards.unknown')}
-                      </span>
-                    </span>
-                  )}
-                </motion.button>
-              </div>
-            ))}
+                  <div className="w-8 h-8 rounded-md bg-white dark:bg-white/5 flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-xs text-gray-900 dark:text-white truncate">
+                      {primaryLabel}
+                    </p>
+                    <p className={`text-[10px] truncate ${card.nickname && card.card_masked ? 'font-mono text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                      {secondaryLabel}
+                    </p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setConfirmChargeCard(card)}
+                    className="shrink-0 px-3 py-2 rounded-md
+                      bg-sky-500 hover:bg-sky-600 text-white
+                      active:scale-95 transition-all
+                      whitespace-nowrap text-[11px] font-bold"
+                  >
+                    {t('nbu.cards.payWithCard')}
+                  </motion.button>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -1853,6 +1874,143 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 </div>
               )}
             </div>
+          </BottomDrawer>
+
+          {/* Saved-card charge: confirmation → success, in one native drawer */}
+          <BottomDrawer
+            open={!!confirmChargeCard}
+            onClose={() => {
+              if (!nbuChargeMutation.isPending) closeChargeDrawer();
+            }}
+          >
+            {confirmChargeCard && !chargeDone && (
+              <div className="space-y-5">
+                <div className="text-center space-y-1">
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white">
+                    {t('nbu.confirm.title')}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {t('nbu.confirm.subtitle')}
+                  </p>
+                </div>
+
+                {/* Amount */}
+                <div className="text-center py-4 rounded-2xl bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-500/[0.08] dark:to-cyan-500/[0.05] border border-sky-200/70 dark:border-sky-500/25">
+                  <p className="text-xs font-bold uppercase tracking-wider text-sky-700/80 dark:text-sky-400/70 mb-1">
+                    {t('nbu.confirm.amountLabel')}
+                  </p>
+                  <p className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                    {formatMoney(payableAmount)}
+                    <span className="text-lg ml-1.5 font-bold text-sky-600 dark:text-sky-400">so'm</span>
+                  </p>
+                </div>
+
+                {/* Card + flight */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10">
+                    <div className="w-9 h-9 rounded-lg bg-sky-100 dark:bg-sky-500/15 flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="w-4.5 h-4.5 text-sky-600 dark:text-sky-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500">{t('nbu.confirm.cardLabel')}</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                        {confirmChargeCard.nickname || confirmChargeCard.card_masked || t('nbu.cards.namedCardFallback')}
+                      </p>
+                      {confirmChargeCard.nickname && confirmChargeCard.card_masked && (
+                        <p className="font-mono text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                          {confirmChargeCard.card_masked}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedFlightName && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10">
+                      <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                        <Plane className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">{t('nbu.confirm.flightLabel')}</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{selectedFlightName}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2.5 pt-1">
+                  <button
+                    onClick={confirmCharge}
+                    disabled={nbuChargeMutation.isPending}
+                    className="w-full h-14 rounded-2xl font-black text-[16px]
+                      bg-gradient-to-r from-sky-500 to-cyan-500
+                      hover:from-sky-600 hover:to-cyan-600
+                      text-white shadow-lg shadow-sky-500/25
+                      active:scale-[0.97] transition-all
+                      disabled:opacity-60 disabled:cursor-not-allowed
+                      flex items-center justify-center gap-2"
+                  >
+                    {nbuChargeMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        {t('nbu.confirm.processing')}
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5" />
+                        {t('nbu.confirm.payButton')}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={closeChargeDrawer}
+                    disabled={nbuChargeMutation.isPending}
+                    className="w-full h-12 rounded-2xl font-bold text-sm
+                      bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300
+                      hover:bg-gray-200 dark:hover:bg-white/10
+                      active:scale-[0.97] transition-all disabled:opacity-50"
+                  >
+                    {t('nbu.confirm.cancel')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {confirmChargeCard && chargeDone && (
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="flex flex-col items-center justify-center py-6 text-center space-y-4"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.05 }}
+                  className="w-24 h-24 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center"
+                >
+                  <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                </motion.div>
+                <div className="space-y-1.5">
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white">
+                    {t('nbu.chargeSuccessTitle')}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[280px]">
+                    {t('nbu.chargeSuccessBody')}
+                  </p>
+                </div>
+                <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                  {formatMoney(payableAmount)}
+                  <span className="text-base ml-1.5 font-bold">so'm</span>
+                </p>
+                <button
+                  onClick={closeChargeDrawer}
+                  className="mt-2 w-full max-w-[280px] h-14 rounded-2xl font-black text-[16px]
+                    bg-gradient-to-r from-emerald-500 to-teal-500
+                    text-white shadow-xl shadow-emerald-500/25
+                    active:scale-[0.97] transition-all"
+                >
+                  {t('nbu.chargeSuccessDone')}
+                </button>
+              </motion.div>
+            )}
           </BottomDrawer>
         </>
       )}

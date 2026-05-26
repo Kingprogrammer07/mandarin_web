@@ -38,6 +38,16 @@ export interface BindCardInitResponse {
   order_id: string;
 }
 
+export interface BindCardRequest {
+  /** Optional label captured at bind time; NBU never returns the PAN on bind. */
+  nickname?: string | null;
+}
+
+export interface RenameCardRequest {
+  /** New label; null/blank clears it. */
+  nickname: string | null;
+}
+
 export interface ChargeSavedCardRequest {
   card_id: number;
   flight_name: string;
@@ -94,8 +104,15 @@ export const nbuPaymentService = {
     return response.data;
   },
 
-  async bindCard(): Promise<BindCardInitResponse> {
-    const response = await apiClient.post<BindCardInitResponse>(`${BASE}/cards/bind`);
+  async bindCard(nickname?: string | null): Promise<BindCardInitResponse> {
+    const body: BindCardRequest = { nickname: nickname?.trim() || null };
+    const response = await apiClient.post<BindCardInitResponse>(`${BASE}/cards/bind`, body);
+    return response.data;
+  },
+
+  async renameCard(cardId: number, nickname: string | null): Promise<SavedCardItem> {
+    const body: RenameCardRequest = { nickname: nickname?.trim() || null };
+    const response = await apiClient.patch<SavedCardItem>(`${BASE}/cards/${cardId}`, body);
     return response.data;
   },
 

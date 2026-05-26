@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CreditCard, Trash2, Plus, Loader2, ChevronLeft, X } from 'lucide-react';
+import { CreditCard, Trash2, Plus, Loader2, ChevronLeft, X, Pencil, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { walletService } from '@/api/services/walletService';
@@ -41,6 +41,12 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
     const [cardNumber, setCardNumber] = useState('');
     const [cardHolder, setCardHolder] = useState('');
 
+    // NBU saved-card UX state: optional label entered before binding, and
+    // inline rename of an existing card.
+    const [bindNickname, setBindNickname] = useState('');
+    const [editingCardId, setEditingCardId] = useState<number | null>(null);
+    const [editName, setEditName] = useState('');
+
     // Fetch refund cards (manual entry — used for refund payouts only)
     const { data: cardsData, isLoading } = useQuery({
         queryKey: ['walletCards'],
@@ -67,7 +73,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
     });
 
     const nbuBindMutation = useMutation({
-        mutationFn: nbuPaymentService.bindCard,
+        mutationFn: (nickname?: string) => nbuPaymentService.bindCard(nickname),
         onSuccess: (data) => {
             const paymentUrl = data.payment_url;
             if (!paymentUrl) {
@@ -96,14 +102,38 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
         },
     });
 
+    const nbuRenameMutation = useMutation({
+        mutationFn: ({ cardId, nickname }: { cardId: number; nickname: string }) =>
+            nbuPaymentService.renameCard(cardId, nickname),
+        onSuccess: () => {
+            toast.success(t('nbu.cards.renameSuccess', 'Karta nomi yangilandi'));
+            queryClient.invalidateQueries({ queryKey: ['nbu-cards'] });
+            setEditingCardId(null);
+            setEditName('');
+        },
+        onError: () => {
+            toast.error(t('nbu.cards.renameError', "Nomni o'zgartirishda xatolik"));
+        },
+    });
+
     const handleNbuBind = () => {
-        nbuBindMutation.mutate();
+        nbuBindMutation.mutate(bindNickname.trim() || undefined);
     };
 
     const handleNbuDelete = (cardId: number) => {
         if (confirm(t('nbu.cards.deleteConfirm', "Kartani o'chirasizmi?"))) {
             nbuDeleteMutation.mutate(cardId);
         }
+    };
+
+    const startEdit = (cardId: number, current: string | null) => {
+        setEditingCardId(cardId);
+        setEditName(current ?? '');
+    };
+
+    const submitEdit = () => {
+        if (editingCardId == null) return;
+        nbuRenameMutation.mutate({ cardId: editingCardId, nickname: editName.trim() });
     };
 
     // Mutations
@@ -320,63 +350,121 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                             <div className="flex justify-center py-6">
                                                 <Loader2 className="h-5 w-5 animate-spin text-sky-500" />
                                             </div>
-                                        ) : (nbuCardsData?.items ?? []).length === 0 ? (
-                                            <Button
-                                                variant="outline"
-                                                disabled={nbuBindMutation.isPending}
-                                                onClick={handleNbuBind}
-                                                className="w-full rounded-[18px] border-2 border-dashed border-sky-300 py-6 text-sky-700 hover:border-sky-500 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
-                                            >
-                                                {nbuBindMutation.isPending ? (
-                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                ) : (
-                                                    <Plus className="h-4 w-4 mr-2" />
-                                                )}
-                                                {t('nbu.cards.bindNew', "Yangi karta saqlash")}
-                                            </Button>
                                         ) : (
                                             <div className="space-y-2.5">
-                                                {(nbuCardsData?.items ?? []).map((card) => (
-                                                    <div
-                                                        key={card.id}
-                                                        className="flex items-center gap-3 rounded-[18px] border border-sky-200/60 bg-gradient-to-br from-sky-50 to-cyan-50 p-3.5 dark:border-sky-500/20 dark:from-sky-500/10 dark:to-cyan-500/5"
-                                                    >
-                                                        <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-white/80 dark:bg-white/10 flex items-center justify-center">
-                                                            <CreditCard className="h-5 w-5 text-sky-600 dark:text-sky-300" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="font-mono text-sm font-bold text-gray-950 truncate dark:text-[#fff8ed]">
-                                                                {card.card_masked ?? t('nbu.cards.unknown', "Saqlangan karta")}
-                                                            </p>
-                                                            <p className="text-[11px] text-gray-500 dark:text-[#fff8ed]/55">
-                                                                {t('nbu.cards.tokenized', "Tokenlangan — xavfsiz")}
-                                                            </p>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            disabled={nbuDeleteMutation.isPending}
-                                                            onClick={() => handleNbuDelete(card.id)}
-                                                            className="h-9 w-9 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                                                            aria-label={t('nbu.cards.deleteConfirm', "Kartani o'chirasizmi?")}
+                                                {(nbuCardsData?.items ?? []).map((card) => {
+                                                    const primaryLabel =
+                                                        card.nickname ||
+                                                        card.card_masked ||
+                                                        t('nbu.cards.namedCardFallback', "Saqlangan karta");
+                                                    const secondaryLabel = card.card_masked
+                                                        ? (card.nickname
+                                                            ? card.card_masked
+                                                            : t('nbu.cards.tokenized', "Tokenlangan — xavfsiz"))
+                                                        : t('nbu.cards.pendingMasked', "Raqam birinchi to'lovdan so'ng ko'rinadi");
+                                                    const isEditing = editingCardId === card.id;
+                                                    return (
+                                                        <div
+                                                            key={card.id}
+                                                            className="flex items-center gap-3 rounded-[18px] border border-sky-200/60 bg-gradient-to-br from-sky-50 to-cyan-50 p-3.5 dark:border-sky-500/20 dark:from-sky-500/10 dark:to-cyan-500/5"
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                                <Button
-                                                    variant="outline"
-                                                    disabled={nbuBindMutation.isPending}
-                                                    onClick={handleNbuBind}
-                                                    className="w-full rounded-[18px] border-2 border-dashed border-sky-300 py-4 text-sky-700 hover:border-sky-500 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
-                                                >
-                                                    {nbuBindMutation.isPending ? (
-                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                    ) : (
-                                                        <Plus className="h-4 w-4 mr-2" />
-                                                    )}
-                                                    {t('nbu.cards.bindNew', "Yangi karta saqlash")}
-                                                </Button>
+                                                            <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-white/80 dark:bg-white/10 flex items-center justify-center">
+                                                                <CreditCard className="h-5 w-5 text-sky-600 dark:text-sky-300" />
+                                                            </div>
+
+                                                            {isEditing ? (
+                                                                <div className="flex flex-1 items-center gap-2 min-w-0">
+                                                                    <Input
+                                                                        autoFocus
+                                                                        value={editName}
+                                                                        onChange={(e) => setEditName(e.target.value.slice(0, 40))}
+                                                                        placeholder={t('nbu.cards.nicknamePlaceholder', "Masalan: Asosiy kartam")}
+                                                                        className="h-9 flex-1 min-w-0"
+                                                                        onKeyDown={(e) => { if (e.key === 'Enter') submitEdit(); }}
+                                                                    />
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        disabled={nbuRenameMutation.isPending}
+                                                                        onClick={submitEdit}
+                                                                        className="h-9 w-9 shrink-0 rounded-full text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                                                                        aria-label={t('nbu.cards.save', "Saqlash")}
+                                                                    >
+                                                                        {nbuRenameMutation.isPending
+                                                                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                                            : <Check className="h-4 w-4" />}
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => { setEditingCardId(null); setEditName(''); }}
+                                                                        className="h-9 w-9 shrink-0 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"
+                                                                        aria-label={t('nbu.cards.cancel', "Bekor qilish")}
+                                                                    >
+                                                                        <X className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-bold text-gray-950 truncate dark:text-[#fff8ed]">
+                                                                            {primaryLabel}
+                                                                        </p>
+                                                                        <p className={`text-[11px] truncate ${card.nickname && card.card_masked ? 'font-mono text-gray-600 dark:text-[#fff8ed]/70' : 'text-gray-500 dark:text-[#fff8ed]/55'}`}>
+                                                                            {secondaryLabel}
+                                                                        </p>
+                                                                    </div>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => startEdit(card.id, card.nickname)}
+                                                                        className="h-9 w-9 rounded-full text-gray-400 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-300"
+                                                                        aria-label={t('nbu.cards.rename', "Nomini o'zgartirish")}
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        disabled={nbuDeleteMutation.isPending}
+                                                                        onClick={() => handleNbuDelete(card.id)}
+                                                                        className="h-9 w-9 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                                                                        aria-label={t('nbu.cards.deleteConfirm', "Kartani o'chirasizmi?")}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {/* Bind block: optional nickname (NBU never returns the PAN
+                                                    on bind, so the label is the user's pre-charge anchor). */}
+                                                <div className="space-y-2 pt-1">
+                                                    <Input
+                                                        value={bindNickname}
+                                                        onChange={(e) => setBindNickname(e.target.value.slice(0, 40))}
+                                                        placeholder={t('nbu.cards.nicknamePlaceholder', "Masalan: Asosiy kartam")}
+                                                        className="h-11"
+                                                    />
+                                                    <p className="px-1 text-[11px] leading-snug text-gray-400 dark:text-[#fff8ed]/45">
+                                                        {t('nbu.cards.nicknameHint', "Kartani keyin tanib olishingiz uchun nom bering. Karta raqami birinchi to'lovdan keyin ko'rinadi.")}
+                                                    </p>
+                                                    <Button
+                                                        variant="outline"
+                                                        disabled={nbuBindMutation.isPending}
+                                                        onClick={handleNbuBind}
+                                                        className="w-full rounded-[18px] border-2 border-dashed border-sky-300 py-5 text-sky-700 hover:border-sky-500 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
+                                                    >
+                                                        {nbuBindMutation.isPending ? (
+                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                        ) : (
+                                                            <Plus className="h-4 w-4 mr-2" />
+                                                        )}
+                                                        {t('nbu.cards.bindNew', "Yangi karta saqlash")}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
                                     </section>
