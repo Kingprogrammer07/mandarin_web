@@ -8,6 +8,11 @@ interface TelegramWebAppGuardProps {
   children: React.ReactNode;
 }
 
+// Public marketing site. Only the root path opened OUTSIDE Telegram is bounced
+// here — every real surface (/auth/login, /admin/*, /payment/nbu/*, the Mini
+// App itself) is untouched.
+const MARKETING_SITE_URL = 'https://mandarincargo.uz';
+
 const STYLES = `
   @keyframes fade-in-up {
     0%   { opacity: 0; transform: translateY(12px); }
@@ -177,6 +182,12 @@ function NetworkErrorScreen({ onRetry, retrying }: { onRetry: () => void; retryi
 
 /* ─────────────── MAIN GUARD ─────────────── */
 export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardProps) {
+  // Root path in a plain browser (no Telegram Mini App context) → marketing
+  // site. The Mini App opens at root *inside* Telegram (initData present), so
+  // that case is excluded and proceeds to the normal validation flow below.
+  const shouldRedirectRoot =
+    window.location.pathname === '/' && !window.Telegram?.WebApp?.initData;
+
   const isBrowserRoute =
     window.location.pathname.startsWith('/admin') ||
     window.location.pathname === '/pos' ||
@@ -191,7 +202,7 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
   const [retrying, setRetrying] = useState(false);
 
   const checkTelegramWebApp = useCallback(async () => {
-    if (isBrowserRoute) return;
+    if (isBrowserRoute || shouldRedirectRoot) return;
 
     try {
       const telegramData = getTelegramWebAppData();
@@ -240,12 +251,17 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
       setIsValidating(false);
       setRetrying(false);
     }
-  }, [isBrowserRoute]);
+  }, [isBrowserRoute, shouldRedirectRoot]);
 
   useEffect(() => {
+    if (shouldRedirectRoot) {
+      // replace() so the marketing site isn't trapped behind a back-button loop
+      window.location.replace(MARKETING_SITE_URL);
+      return;
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void checkTelegramWebApp();
-  }, [checkTelegramWebApp]);
+  }, [checkTelegramWebApp, shouldRedirectRoot]);
 
   const handleRetry = useCallback(() => {
     setRetrying(true);
@@ -254,6 +270,8 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
     void checkTelegramWebApp();
   }, [checkTelegramWebApp]);
 
+  // Redirecting root → marketing: show the loader during the brief navigation.
+  if (shouldRedirectRoot) return <LoadingScreen />;
   if (isValidating) return <LoadingScreen />;
   if (isNetworkFailure) return <NetworkErrorScreen onRetry={handleRetry} retrying={retrying} />;
   if (!isValid) return <ErrorScreen />;
