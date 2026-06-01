@@ -25,7 +25,7 @@ PRIVACY AND SECURITY IS IMPORTANT!
 1. `src/main.tsx` → renders `<App />`
 2. `TelegramWebAppGuard` wraps the app — validates Telegram context, attempts auto-login with `initData`
 3. `App.tsx` checks token validity (`/auth/me`), loads user role, and resolves the initial route
-4. Session token stored in `sessionStorage`; cleared on 401/403 responses
+4. Token storage is **split by role**, both keyed `access_token`: admin → `localStorage` (plus `admin_role`), user → `sessionStorage`. Never mix them. Cleared on 401/403 responses.
 
 ### Routing
 
@@ -37,7 +37,7 @@ Custom history-based routing — **not** React Router components. `App.tsx` main
 
 ### API Layer (`src/api/`)
 
-All HTTP via Axios (`src/api/apiClient.ts`) with interceptors that:
+All HTTP via Axios (`src/api/client.ts`) with interceptors that:
 - Attach `Authorization: Bearer <token>` header
 - Attach Telegram `initData` header
 - Attach `Accept-Language` from i18next
