@@ -55,8 +55,12 @@ interface FlightActionBarProps {
 
 const FlightActionBar = memo(({ reports, onPay, onDeliveryRequest }: FlightActionBarProps) => {
     const { t } = useTranslation();
-    const totalExpected = reports.reduce((s, r) => s + (r.expected_amount ?? 0), 0);
-    const totalPaid = reports.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
+    // `expected_amount` / `paid_amount` are FLIGHT-LEVEL figures (sourced from the
+    // flight's transaction row) that the backend repeats on every per-cargo report
+    // item. Summing them double-counts the debt once per cargo box — take the
+    // flight-level value a single time instead.
+    const totalExpected = Math.max(0, ...reports.map((r) => r.expected_amount ?? 0));
+    const totalPaid = Math.max(0, ...reports.map((r) => r.paid_amount ?? 0));
     const totalRemaining = Math.max(0, totalExpected - totalPaid);
     const allTakenAway = reports.every((r) => r.is_taken_away);
     const anyUnpaid = reports.some((r) => r.payment_status !== 'paid' && (r.expected_amount ?? 0) - (r.paid_amount ?? 0) > 0);

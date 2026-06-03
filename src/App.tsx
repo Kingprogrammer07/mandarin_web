@@ -432,7 +432,6 @@ function AppContent() {
       });
     },
     // startTransition is stable — safe to omit from deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
   const handleLogout = useCallback(() => {
