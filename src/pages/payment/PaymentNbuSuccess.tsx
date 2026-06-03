@@ -7,6 +7,7 @@ import {
   type PublicNbuPaymentStatus,
 } from '@/api/services/nbuPaymentService';
 import { getNbuReturnPath } from '@/utils/nbuReturnContext';
+import { playApplePaySound } from '@/utils/audioUtils';
 
 interface PaymentNbuSuccessProps {
   onNavigateHome?: () => void;
@@ -51,6 +52,15 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
   const [pollKey, setPollKey] = useState(0);
   const attemptsRef = useRef(0);
   const timeoutRef = useRef<number | null>(null);
+  const soundPlayedRef = useRef(false);
+
+  // Celebratory chime the moment a payment confirms — once per mount.
+  useEffect(() => {
+    if (phase === 'success' && !soundPlayedRef.current) {
+      soundPlayedRef.current = true;
+      playApplePaySound();
+    }
+  }, [phase]);
 
   const handleHome = useCallback(() => {
     if (returnPath) {

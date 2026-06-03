@@ -51,6 +51,7 @@ import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
 import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { playApplePaySound } from '@/utils/audioUtils';
 import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
 import { useGuideTour } from '@/hooks/useGuideTour';
 import { pickVisible } from '@/utils/tour';
@@ -483,6 +484,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         queryClient.invalidateQueries({ queryKey: ['payment-history'] });
         queryClient.invalidateQueries({ queryKey: ['payment-available-flights'] });
         queryClient.invalidateQueries({ queryKey: ['nbu-cards'] });
+        playApplePaySound();
         setChargeDone(true);
       } else {
         toast.error(data.error || t('nbu.cards.chargeFailed'));

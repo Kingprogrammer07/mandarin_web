@@ -114,6 +114,36 @@ export function playRusterSuccessSound() {
   }
 }
 
+const APPLE_PAY_VOLUME = 0.9; // 90% — celebratory cue on a confirmed web payment
+let applePayAudio: HTMLAudioElement | null = null;
+
+/**
+ * Play the Apple-Pay-style success chime (`/applepay.mp3`) at a fixed 90% volume.
+ *
+ * Used on the web NBU payment-success surfaces so the user *feels* the payment
+ * landed. Autoplay may be blocked in a redirect tab that never received a user
+ * gesture — that rejection is swallowed (the visual success state still shows).
+ */
+export function playApplePaySound() {
+  try {
+    if (!applePayAudio) {
+      applePayAudio = new Audio('/applepay.mp3');
+      applePayAudio.preload = 'auto';
+    }
+    applePayAudio.pause();
+    applePayAudio.currentTime = 0;
+    applePayAudio.volume = APPLE_PAY_VOLUME;
+    void applePayAudio.play().catch(() => {
+      // Autoplay policy blocked it (no prior gesture in this tab) — ignore.
+    });
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+    }
+  } catch (e) {
+    console.error('Audio play failed', e);
+  }
+}
+
 /** Two-tone descending warning chime — distinct from success (ascending) and error (square). */
 export function playWarningSound() {
   try {

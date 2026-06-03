@@ -60,6 +60,21 @@ export interface ReceiptUrlResponse {
   content_type: string;
 }
 
+export interface ReceiptResolveResponse {
+  order_id: string;
+  client_code: string | null;
+  client_name: string | null;
+  flight_name: string | null;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  payment_status: string;
+  is_taken_away: boolean;
+  card_masked: string | null;
+  paid_at: string | null;
+  nbu_status: string;
+}
+
 export interface NotificationFilters {
   status?: string;          // e.g. "pending,partial" or "paid"
   flight?: string;
@@ -120,6 +135,17 @@ export const posNotificationService = {
       ...filters,
     };
     const response = await apiClient.get<PosNotificationListResponse>(BASE, { params });
+    return response.data;
+  },
+
+  /**
+   * Resolve a receipt QR (order_id) to the client's pickup/payment record.
+   * The QR encodes only the order_id; this hits the authenticated POS endpoint.
+   */
+  resolveReceipt: async (orderId: string): Promise<ReceiptResolveResponse> => {
+    const response = await apiClient.get<ReceiptResolveResponse>(
+      `/api/v1/pos/receipt/${encodeURIComponent(orderId)}`,
+    );
     return response.data;
   },
 

@@ -88,6 +88,10 @@ export interface TransactionHistoryItem {
   is_taken_away: boolean;
   created_at: string;
   breakdown: PaymentBreakdown;
+  /** Masked PAN of the NBU card that paid (when known), e.g. "860049******1234". */
+  nbu_card_masked?: string | null;
+  /** order_id of the latest SUCCESS NBU payment — used to fetch a viewable receipt. */
+  nbu_order_id?: string | null;
 }
 
 export interface TransactionHistoryResponse {

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { TFunction } from 'i18next';
 import {
   ArrowLeft,
@@ -11,8 +12,11 @@ import {
   Clock,
   AlertCircle,
   Landmark,
+  Loader2,
+  X,
 } from 'lucide-react';
 import { paymentService, type TransactionHistoryItem } from '@/api/services/paymentService';
+import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { formatTashkentDateTime } from '@/lib/format';
 import { UniqueBackground } from '@/components/ui/UniqueBackground';
 import { useTranslation } from 'react-i18next';
@@ -82,6 +86,35 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
   const StatusIcon = statusMeta[item.payment_status].Icon;
   const PickupIcon = item.is_taken_away ? CheckCircle2 : Clock;
   const paymentTypeLabel = getPaymentTypeLabel(item.payment_type, t);
+
+  // Receipt viewer — fetches the rendered PNG (owner-scoped) on demand.
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+
+  const openReceipt = useCallback(async () => {
+    if (!item.nbu_order_id || receiptLoading) return;
+    setReceiptLoading(true);
+    try {
+      const url = await nbuPaymentService.getReceiptBlobUrl(item.nbu_order_id);
+      setReceiptUrl(url);
+    } catch {
+      // Silent — button simply does nothing on failure.
+    } finally {
+      setReceiptLoading(false);
+    }
+  }, [item.nbu_order_id, receiptLoading]);
+
+  const closeReceipt = useCallback(() => {
+    setReceiptUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  // Release the object URL if the card unmounts while the viewer is open.
+  useEffect(() => () => {
+    if (receiptUrl) URL.revokeObjectURL(receiptUrl);
+  }, [receiptUrl]);
 
   const showBreakdown = item.payment_status === 'paid' || item.payment_status === 'partial';
   const breakdownEntries = useMemo(
@@ -167,7 +200,72 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
               <BreakdownBadge key={entry.key} label={entry.label} value={entry.value} icon={entry.icon} />
             ))}
           </div>
+          {/* NBU card + receipt: recognise the card, view the rendered check. */}
+          {(item.nbu_card_masked || item.nbu_order_id) && (
+            <div className="mt-2.5 flex items-center justify-between gap-2">
+              {item.nbu_card_masked ? (
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 min-w-0">
+                  <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                  <span className="font-mono truncate">{item.nbu_card_masked}</span>
+                </div>
+              ) : <span />}
+              {item.nbu_order_id && (
+                <button
+                  onClick={openReceipt}
+                  disabled={receiptLoading}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold
+                    bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400
+                    hover:bg-sky-100 dark:hover:bg-sky-500/20 active:scale-95 transition-all
+                    disabled:opacity-60"
+                >
+                  {receiptLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ReceiptText className="w-3.5 h-3.5" />
+                  )}
+                  {t('paymentHistory.card.viewReceipt', 'Chekni ko\'rish')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Receipt image viewer */}
+      {createPortal(
+        <AnimatePresence>
+          {receiptUrl && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeReceipt}
+              className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative max-w-sm w-full"
+              >
+                <button
+                  onClick={closeReceipt}
+                  className="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white dark:bg-[#222] shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200"
+                  aria-label={t('common.close', 'Yopish')}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <img
+                  src={receiptUrl}
+                  alt={t('paymentHistory.card.viewReceipt', 'Chek')}
+                  className="w-full rounded-2xl shadow-2xl"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
     </motion.div>
   );

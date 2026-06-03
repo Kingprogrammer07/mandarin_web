@@ -26,8 +26,10 @@ import {
   ChevronDown,
   MessageSquare,
   DollarSign,
+  ScanLine,
 } from "lucide-react";
 import CalculatorModal from "@/components/modals/CalculatorModal";
+import ReceiptScannerModal from "@/pages/pos/components/ReceiptScannerModal";
 
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
 import { refreshAdminToken } from "@/api/services/adminAuth";
@@ -209,6 +211,19 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   // ── Calculator modal ──────────────────────────────────────────────────────
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // ── Receipt QR scanner ────────────────────────────────────────────────────
+  // Opens via the toolbar button or a `?receipt=<order_id>` deep link (when a
+  // cashier scans the QR with a device that navigates to /pos?receipt=...).
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerOrderId, setScannerOrderId] = useState<string | null>(null);
+  useEffect(() => {
+    const receipt = new URLSearchParams(window.location.search).get("receipt");
+    if (receipt) {
+      setScannerOrderId(receipt);
+      setIsScannerOpen(true);
+    }
+  }, []);
 
   // ── Sound preference (persisted in localStorage) ─────────────────────────
   const [soundEnabled, setSoundEnabled] = useState<boolean>(
@@ -893,6 +908,15 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               </button>
             )}
+
+            {/* Receipt QR scanner */}
+            <button
+              onClick={() => { setScannerOrderId(null); setIsScannerOpen(true); }}
+              title="Chek skaneri"
+              className="p-2 rounded-xl text-gray-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-500/[0.08] transition-colors"
+            >
+              <ScanLine className="w-4 h-4" />
+            </button>
 
             {/* Calculator */}
             <button
@@ -1695,6 +1719,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
         isAdminMode
+      />
+
+      <ReceiptScannerModal
+        open={isScannerOpen}
+        onClose={() => { setIsScannerOpen(false); setScannerOrderId(null); }}
+        initialOrderId={scannerOrderId}
+        onOpenInPos={(code) => { void handleSearch(code); }}
       />
     </>
   );

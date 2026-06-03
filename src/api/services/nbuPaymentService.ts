@@ -125,6 +125,17 @@ export const nbuPaymentService = {
     await apiClient.delete(`${BASE}/cards/${cardId}`);
   },
 
+  /**
+   * Fetch the caller's own receipt PNG (owner-scoped) and return an object URL
+   * for use in an <img>. Caller must `URL.revokeObjectURL` when done.
+   */
+  async getReceiptBlobUrl(orderId: string): Promise<string> {
+    const response = await apiClient.get(`${BASE}/receipt/${encodeURIComponent(orderId)}`, {
+      responseType: 'blob',
+    });
+    return URL.createObjectURL(response.data as Blob);
+  },
+
   async getPublicStatus(orderId: string): Promise<PublicNbuPaymentStatus> {
     const response = await apiClient.get<PublicNbuPaymentStatus>(
       `${BASE}/payment-status-public/${orderId}`,
