@@ -1736,7 +1736,12 @@
     },
     "chargeSuccessTitle": "Платёж выполнен!",
     "chargeSuccessBody": "Ваш платёж успешно прошёл. Спасибо!",
-    "chargeSuccessDone": "Закрыть"
+    "chargeSuccessDone": "Закрыть",
+    "deliveryCta": {
+      "title": "Оставьте заявку за 1 минуту",
+      "body": "Ваш груз будет доставлен в ближайшее время",
+      "button": "Оставить заявку"
+    }
   },
   "maintenance": {
     "title": "Ведутся технические работы",

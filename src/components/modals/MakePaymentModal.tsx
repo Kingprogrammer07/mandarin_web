@@ -2002,11 +2002,30 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   {formatMoney(payableAmount)}
                   <span className="text-base ml-1.5 font-bold">so'm</span>
                 </p>
+
+                {/* Delivery upsell — strike while the iron is hot */}
+                <div className="w-full max-w-[280px] rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/5 border border-amber-200 dark:border-amber-500/20 p-3 space-y-1">
+                  <p className="text-sm font-black text-amber-700 dark:text-amber-300">
+                    {t('nbu.deliveryCta.title', "1 daqiqada zayavka qoldiring")}
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {t('nbu.deliveryCta.body', 'Yukingiz tezda yetkazib beriladi')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { window.location.href = '/?tab=request'; }}
+                  className="w-full max-w-[280px] h-14 rounded-2xl font-black text-[16px]
+                    bg-gradient-to-r from-amber-500 to-orange-500
+                    text-white shadow-xl shadow-amber-500/25
+                    active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+                >
+                  <Package className="w-5 h-5" />
+                  {t('nbu.deliveryCta.button', 'Zayavka qoldirish')}
+                </button>
                 <button
                   onClick={closeChargeDrawer}
-                  className="mt-2 w-full max-w-[280px] h-14 rounded-2xl font-black text-[16px]
-                    bg-gradient-to-r from-emerald-500 to-teal-500
-                    text-white shadow-xl shadow-emerald-500/25
+                  className="w-full max-w-[280px] h-12 rounded-2xl font-bold text-sm
+                    bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200
                     active:scale-[0.97] transition-all"
                 >
                   {t('nbu.chargeSuccessDone')}

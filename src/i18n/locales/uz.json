@@ -1736,7 +1736,12 @@
     },
     "chargeSuccessTitle": "To'lov bajarildi!",
     "chargeSuccessBody": "To'lovingiz muvaffaqiyatli o'tdi. Rahmat!",
-    "chargeSuccessDone": "Yopish"
+    "chargeSuccessDone": "Yopish",
+    "deliveryCta": {
+      "title": "1 daqiqada zayavka qoldiring",
+      "body": "Yukingiz tezda yetkazib beriladi",
+      "button": "Zayavka qoldirish"
+    }
   },
   "maintenance": {
     "title": "Texnik ishlar olib borilmoqda",

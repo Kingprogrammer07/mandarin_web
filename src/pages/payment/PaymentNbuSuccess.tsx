@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, CreditCard, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, CreditCard, Loader2, RefreshCw, XCircle, Package } from 'lucide-react';
 import {
   nbuPaymentService,
   type PublicNbuPaymentStatus,
@@ -79,6 +79,18 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
     setPhase('pending');
     setPollKey((k) => k + 1);
   }, []);
+
+  // Send the user straight to the delivery-request tab to "strike while the
+  // iron is hot" right after a confirmed payment.
+  const handleLeaveDelivery = useCallback(() => {
+    try {
+      const url = new URL(returnPath || '/', window.location.origin);
+      url.searchParams.set('tab', 'request');
+      window.location.href = url.toString();
+    } catch {
+      window.location.href = '/?tab=request';
+    }
+  }, [returnPath]);
 
   useEffect(() => {
     if (!orderId) return;
@@ -208,6 +220,30 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
                 )}
               </div>
             )}
+
+            {/* Delivery upsell — prompt a zayavka right after payment */}
+            <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/5 border border-amber-200 dark:border-amber-500/20 p-4 space-y-2.5">
+              <div className="flex items-center justify-center gap-2 text-amber-700 dark:text-amber-300">
+                <Package className="w-5 h-5" />
+                <p className="text-sm font-black">
+                  {t('nbu.deliveryCta.title', "1 daqiqada zayavka qoldiring")}
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('nbu.deliveryCta.body', 'Yukingiz tezda yetkazib beriladi')}
+              </p>
+              <button
+                onClick={handleLeaveDelivery}
+                className="w-full h-12 rounded-xl font-black text-sm
+                  bg-gradient-to-r from-amber-500 to-orange-500
+                  hover:from-amber-600 hover:to-orange-600
+                  text-white shadow-lg shadow-amber-500/25
+                  active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+              >
+                <Package className="w-4 h-4" />
+                {t('nbu.deliveryCta.button', 'Zayavka qoldirish')}
+              </button>
+            </div>
           </>
         )}
 

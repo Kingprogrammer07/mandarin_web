@@ -260,7 +260,9 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   }, []);
 
   const isFlightMode = flightName.trim().length > 0;
-  const isSearchMode = !isFlightMode && searchQuery.trim().length > 0;
+  // Client-code search must combine WITH a selected flight (AND), not replace it.
+  // Backend `search-grouped` ANDs flight + code, so always forward both when present.
+  const isSearchMode = searchQuery.trim().length > 0;
   const isEnabled = isFlightMode || isSearchMode;
 
   const { data: activeData, isLoading } = useGroupedWarehouseSearch(
