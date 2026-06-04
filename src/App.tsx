@@ -17,6 +17,7 @@ import { Skeleton } from "./components/ui/skeleton";
 import MaintenancePage from "./components/MaintenancePage";
 import MaintenanceOverlay from "./components/system/MaintenanceOverlay";
 import { useHealthCheck } from "./hooks/useHealthCheck";
+import { useVersionWatcher } from "./hooks/useVersionWatcher";
 import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
@@ -373,6 +374,10 @@ function AppContent() {
 
   const isMaintenanceMode = useMaintenanceStore((s) => s.isMaintenanceMode);
   useHealthCheck();
+
+  // Detect a newer frontend deploy and prompt the user to reload — covers
+  // clients sitting on an already-loaded page that never trigger a chunk fetch.
+  useVersionWatcher();
 
   // Single app-wide SSE connection that pushes real-time updates (wallet,
   // queue, notifications, maintenance, NBU) and drives React Query
@@ -740,6 +745,13 @@ function AppContent() {
   const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && !isExemptFromMaintenance;
   const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && !isExemptFromMaintenance;
 
+  // Operational consoles (POS cashier, warehouse) must keep working when a
+  // transient server-down signal (502/503/504/network) flips the store-driven
+  // `isMaintenanceMode`. Suppress the full-screen MaintenancePage on these pages
+  // so a brief backend blip never blocks a cashier mid-transaction. The page is
+  // resolved from `currentPage` state (reliable) rather than window.pathname.
+  const isServerDownMaintenanceExemptPage = isPOSPage || isWarehousePage;
+
   if (showMaintenanceOverlay) {
     return (
       <>
@@ -752,7 +764,7 @@ function AppContent() {
 
   return (
     <>
-    {isMaintenanceMode && <MaintenancePage />}
+    {isMaintenanceMode && !isServerDownMaintenanceExemptPage && <MaintenancePage />}
     {showAdminMaintenanceBanner && (
       <div className="fixed top-0 left-0 right-0 z-[9998] h-9 flex items-center justify-center bg-amber-500/90 text-white text-xs font-bold px-4 shadow-md">
         {t('maintenance.adminBanner')}

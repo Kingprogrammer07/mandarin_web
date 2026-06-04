@@ -32,6 +32,13 @@
       "continue": true
     },
     {
+      "src": "/version\\.json",
+      "headers": {
+        "Cache-Control": "no-store, max-age=0"
+      },
+      "continue": true
+    },
+    {
       "src": "/branches\\.json",
       "headers": {
         "Cache-Control": "public, max-age=86400"

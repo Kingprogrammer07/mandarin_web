@@ -3,7 +3,7 @@
 // hashed asset chunks. Cache-first for static assets; stale-while-revalidate
 // for navigations so users still receive shell updates without forcing a
 // duplicate network fetch on every page load.
-const CACHE_NAME = 'mandarin-cargo-shell-v2';
+const CACHE_NAME = 'mandarin-cargo-shell-v3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -29,6 +29,11 @@ self.addEventListener('fetch', (event) => {
   // Never touch cross-origin or API traffic — the app handles those itself.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
+
+  // version.json is the deploy-detection probe — it MUST always hit the
+  // network, otherwise the client compares against a cached (stale) build id
+  // and never learns that a new version shipped.
+  if (url.pathname === '/version.json') return;
 
   // ── App-shell navigations ────────────────────────────────────────────────
   // Stale-while-revalidate: respond from cache instantly, refresh in the

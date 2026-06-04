@@ -1,10 +1,31 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react-swc"
-import { defineConfig } from "vite"
+import { defineConfig, type Plugin } from "vite"
+
+// Unique per build. Baked into the bundle as `__BUILD_ID__` and written to
+// `version.json` so a running client can detect that a newer deploy exists
+// (see src/utils/appUpdate.ts) and prompt the user to reload.
+const BUILD_ID = Date.now().toString(36)
+
+// Emits `version.json` into the build output with the current BUILD_ID.
+// Served by the CDN; the client polls it and compares against its baked-in id.
+const emitVersionJson = (): Plugin => ({
+  name: "emit-version-json",
+  generateBundle() {
+    this.emitFile({
+      type: "asset",
+      fileName: "version.json",
+      source: JSON.stringify({ buildId: BUILD_ID }),
+    })
+  },
+})
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  define: {
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
+  },
+  plugins: [react(), tailwindcss(), emitVersionJson()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

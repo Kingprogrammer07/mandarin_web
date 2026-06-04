@@ -2,8 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'next-themes'
-import { toast } from 'sonner'
 import { flushPendingErrors } from '@/api/services/frontendErrors'
+import { promptForReloadIfStale } from '@/utils/appUpdate'
 import './index.css'
 import App from './App.tsx'
 // import eruda from 'eruda';
@@ -39,41 +39,19 @@ const queryClient = new QueryClient({
   },
 })
 
-// Tracks whether we have already prompted the user about a stale bundle so
-// repeated preload errors do not stack toasts.
-let staleBundlePromptShown = false;
-
-const promptForReloadIfStale = (reason: unknown): void => {
-  if (staleBundlePromptShown) return;
-  staleBundlePromptShown = true;
-
-  if (reason !== undefined) {
-    console.warn('[app] stale bundle detected', reason);
-  }
-
-  toast.message("Yangi versiya mavjud", {
-    description: "Iltimos, sahifani yangilang.",
-    duration: Infinity,
-    action: {
-      label: "Yangilash",
-      onClick: () => window.location.reload(),
-    },
-  });
-};
-
 // After a new Vercel deploy, old chunk hashes no longer exist on the CDN.
 // Previously we hard-reloaded immediately, which produced a request storm
 // (HTML + every chunk + every asset) per affected tab. Surface a toast so
 // the user decides when to reload, eliminating the storm.
 window.addEventListener('vite:preloadError', (event) => {
-  promptForReloadIfStale(event);
+  promptForReloadIfStale(undefined, event);
 });
 window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
   if (
     event.reason instanceof TypeError &&
     event.reason.message.includes('dynamically imported module')
   ) {
-    promptForReloadIfStale(event.reason);
+    promptForReloadIfStale(undefined, event.reason);
   }
 });
 
