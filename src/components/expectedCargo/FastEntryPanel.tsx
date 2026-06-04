@@ -40,6 +40,12 @@ interface FastEntryPanelProps {
   onClose: () => void;
   /** When true the queue list expands to fill available height (client list is hidden). */
   isQueueExpanded: boolean;
+  /** Opens the saved preview list for an already-sent track code. */
+  onPreviewSavedTrack?: (params: {
+    flightName: string | null;
+    clientCode: string;
+    trackCode?: string;
+  }) => void;
 }
 
 // ── Track validation result for client-first mode ─────────────────────────────
@@ -191,7 +197,7 @@ interface QueueItemRowProps {
   onSetClientCode: (id: string, code: string) => void;
   onAcceptConflictOwner: (id: string) => void;
   onMergeClientGroup: (clientCode: string) => void;
-  onPreviewClient: (clientCode: string) => void;
+  onPreviewClient: (clientCode: string, trackCode?: string, flightName?: string | null) => void;
   onToggleReviewed: (id: string) => void;
 }
 
@@ -419,7 +425,7 @@ function QueueItemRow({
         {item.clientCode.trim() && (
           <button
             type="button"
-            onClick={() => onPreviewClient(item.clientCode)}
+            onClick={() => onPreviewClient(item.clientCode, item.trackCode, item.alreadySentFlight)}
             className="h-7 rounded-md border border-current/15 bg-white/70 px-2 text-[11px] font-bold hover:bg-white dark:bg-black/20 dark:hover:bg-black/30"
           >
             Ko'rish
@@ -617,7 +623,12 @@ function QueueItemRow({
 
 // ── FastEntryPanel ─────────────────────────────────────────────────────────────
 
-export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEntryPanelProps) {
+export function FastEntryPanel({
+  flightName,
+  onClose,
+  isQueueExpanded,
+  onPreviewSavedTrack,
+}: FastEntryPanelProps) {
   // ── Shared state ────────────────────────────────────────────────────────────
   const [trackCodeInput, setTrackCodeInput] = useState('');
   const [draftRows, setDraftRows] = useState<FastEntryDraftRow[]>(() => [createDraftRow()]);
@@ -712,6 +723,38 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     isClientListHidden,
     addNotification,
   } = useExpectedCargoStore();
+
+  const openSavedPreview = useCallback((
+    clientCode: string,
+    trackCode?: string,
+    targetFlightName?: string | null,
+  ) => {
+    const normalizedClient = clientCode.trim().toUpperCase();
+    const normalizedTrack = trackCode?.trim().toUpperCase();
+    const normalizedFlight = targetFlightName?.trim() || flightName;
+    if (!normalizedClient) return;
+
+    if (onPreviewSavedTrack) {
+      onPreviewSavedTrack({
+        flightName: normalizedFlight ?? null,
+        clientCode: normalizedClient,
+        trackCode: normalizedTrack || undefined,
+      });
+      return;
+    }
+
+    setClientListHidden(false);
+    setFastEntryOpen(true);
+    setSearchQuery(normalizedTrack || normalizedClient);
+    setExpandedClient(normalizedClient);
+  }, [
+    flightName,
+    onPreviewSavedTrack,
+    setClientListHidden,
+    setExpandedClient,
+    setFastEntryOpen,
+    setSearchQuery,
+  ]);
 
   const firstDraftRowId = draftRows[0]?.id;
   useEffect(() => {
@@ -848,7 +891,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
     qr.start(
       { facingMode: 'environment' },
       { fps: 15, qrbox: { width: 280, height: 150 } },
-      (decodedText) => { playConfiguredSuccessSound(); processScannedText(decodedText); },
+      (decodedText) => { processScannedText(decodedText); },
       () => {},
     ).catch((err: unknown) => {
       console.error('Camera start error:', err);
@@ -857,7 +900,7 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       setScannerReady(false);
       setIsScanning(false);
     });
-  }, [scannerReady, processScannedText, playConfiguredSuccessSound]);
+  }, [scannerReady, processScannedText]);
 
   useEffect(() => {
     return () => {
@@ -947,6 +990,16 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
             description: body?.flight_name
               ? `"${body.flight_name}" reysida mavjud`
               : 'Bu trek kodi kutilayotgan yuklarga kiritilgan',
+            action: alreadySentClientCode
+              ? {
+                  label: 'Ko\'rish',
+                  onClick: () => openSavedPreview(
+                    alreadySentClientCode,
+                    trackCode,
+                    body?.flight_name ?? null,
+                  ),
+                }
+              : undefined,
           },
         );
         return;
@@ -1472,13 +1525,13 @@ export function FastEntryPanel({ flightName, onClose, isQueueExpanded }: FastEnt
       toast.success(`${splitClientCodes.length} ta ajralgan guruh birlashtirildi`, { duration: 1800 });
     }
   }, [mergeClientQueueGroup, splitClientCodes]);
-  const handlePreviewClient = useCallback((clientCode: string) => {
-    const normalized = clientCode.trim().toUpperCase();
-    if (!normalized) return;
-    setClientListHidden(false);
-    setSearchQuery(normalized);
-    setExpandedClient(normalized);
-  }, [setClientListHidden, setExpandedClient, setSearchQuery]);
+  const handlePreviewClient = useCallback((
+    clientCode: string,
+    trackCode?: string,
+    targetFlightName?: string | null,
+  ) => {
+    openSavedPreview(clientCode, trackCode, targetFlightName);
+  }, [openSavedPreview]);
 
   return (
     <div className={cn(

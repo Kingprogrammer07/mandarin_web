@@ -84,6 +84,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     toggleEditMode,
     setSearchQuery,
     setFastEntryOpen,
+    setClientListHidden,
     syncFlightTabOrder,
     setFlightTabOrder,
     replaceEntryQueue,
@@ -349,16 +350,23 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
   }, [createEmptyFlightMutation]);
 
   /** Navigate to a specific client from the notification panel. */
-  const handleNavigateToClient = useCallback((flightName: string, clientCode: string) => {
+  const handleNavigateToClient = useCallback((
+    flightName: string,
+    clientCode: string,
+    searchTerm?: string,
+  ) => {
     // Switch to the relevant flight if needed.
     if (flightName && flightName !== activeFlightName) {
       setActiveFlight(flightName);
     }
     // Highlight the client in the list.
+    const normalizedClient = clientCode.trim().toUpperCase();
+    const normalizedSearch = searchTerm?.trim().toUpperCase() || normalizedClient;
     setSummaryPage(1);
-    setSearchQuery(clientCode);
-    setExpandedClient(clientCode);
-  }, [activeFlightName, setActiveFlight, setSearchQuery, setExpandedClient]);
+    setClientListHidden(false);
+    setSearchQuery(normalizedSearch);
+    setExpandedClient(normalizedClient);
+  }, [activeFlightName, setActiveFlight, setClientListHidden, setSearchQuery, setExpandedClient]);
 
   const handleBack = () => window.history.back();
 
@@ -405,6 +413,9 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
             flightName={activeFlightName}
             onClose={() => setFastEntryOpen(false)}
             isQueueExpanded={isClientListHidden}
+            onPreviewSavedTrack={({ flightName, clientCode, trackCode }) =>
+              handleNavigateToClient(flightName ?? activeFlightName ?? '', clientCode, trackCode)
+            }
           />
         )}
 
