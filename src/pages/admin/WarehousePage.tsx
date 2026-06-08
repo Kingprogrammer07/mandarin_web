@@ -49,6 +49,36 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// Per-method colour for the pickup-queue method filter, so each courier is
+// instantly recognisable. `active` is the selected pill; `idle` keeps the brand
+// hue as text so the colour reads even when unselected.
+const PICKUP_METHOD_STYLES: Record<PickupMethod | "all", { active: string; idle: string }> = {
+  all: {
+    active: "bg-gray-800 text-white dark:bg-white/90 dark:text-gray-900 shadow-sm",
+    idle: "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200",
+  },
+  self_pickup: {
+    active: "bg-emerald-500 text-white shadow-sm",
+    idle: "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10",
+  },
+  yandex: {
+    active: "bg-red-500 text-white shadow-sm",
+    idle: "text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10",
+  },
+  bts: {
+    active: "bg-violet-500 text-white shadow-sm",
+    idle: "text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10",
+  },
+  uzpost: {
+    active: "bg-blue-500 text-white shadow-sm",
+    idle: "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10",
+  },
+  mandarin: {
+    active: "bg-amber-500 text-white shadow-sm",
+    idle: "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10",
+  },
+};
+
 type ActiveTab = "transactions" | "my-activity" | "uzpost-orders";
 
 interface WarehousePageProps {
@@ -681,8 +711,8 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                         onClick={() => setQueuePickupMethod(m)}
                         className={`flex-1 min-w-[72px] px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap ${
                           queuePickupMethod === m
-                            ? "bg-white dark:bg-white/[0.09] text-gray-900 dark:text-white shadow-sm"
-                            : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                            ? PICKUP_METHOD_STYLES[m].active
+                            : PICKUP_METHOD_STYLES[m].idle
                         }`}
                       >
                         {m === "all" ? "Barchasi" : m === "self_pickup" ? "O'zi" : m.toUpperCase()}
