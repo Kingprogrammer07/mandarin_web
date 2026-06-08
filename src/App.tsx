@@ -468,6 +468,33 @@ function AppContent() {
     return () => window.removeEventListener("auth:logout", handleLogout);
   }, [handleLogout]);
 
+  // Role switch issues a brand-new JWT with a different role. The switcher
+  // can't reach this component's `userRole` state, so it broadcasts here.
+  // Updating `userRole` (and the persisted `admin_role`) BEFORE navigating is
+  // essential: `navigateToPage` validates the target against `userRole`, so a
+  // stale role would bounce the new home page back to the old role's default
+  // and render nothing. See RoleSwitcher.
+  const handleRoleSwitched = useCallback(
+    (event: Event) => {
+      const detail = (event as CustomEvent<{ role: string; homePage: string | null }>).detail;
+      const nextRole = detail?.role ?? localStorage.getItem("admin_role");
+      if (!nextRole) return;
+
+      localStorage.setItem("admin_role", nextRole);
+      setUserRole(nextRole);
+
+      const targetPage = detail?.homePage
+        ? resolvePageFromPath(detail.homePage).page
+        : getDefaultPageForRole(nextRole);
+      applyRoute({ page: targetPage }, nextRole, "replace");
+    },
+    [applyRoute],
+  );
+  useEffect(() => {
+    window.addEventListener("auth:role-switched", handleRoleSwitched);
+    return () => window.removeEventListener("auth:role-switched", handleRoleSwitched);
+  }, [handleRoleSwitched]);
+
   useEffect(() => {
     let cancelled = false;
 

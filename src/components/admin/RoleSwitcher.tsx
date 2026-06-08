@@ -5,10 +5,12 @@ import { getAdminJwtClaims } from "../../api/services/adminManagement";
 import { switchAdminRole } from "../../api/services/adminAuth";
 
 interface RoleSwitcherProps {
-  onNavigate: (page: string) => void;
+  // Kept for call-site compatibility; navigation is now driven by App via the
+  // "auth:role-switched" event so the role swap and the route change stay in sync.
+  onNavigate?: (page: string) => void;
 }
 
-export default function RoleSwitcher({ onNavigate }: RoleSwitcherProps) {
+export default function RoleSwitcher(_props: RoleSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [claims, setClaims] = useState(() => getAdminJwtClaims());
   const ref = useRef<HTMLDivElement>(null);
@@ -37,53 +39,30 @@ export default function RoleSwitcher({ onNavigate }: RoleSwitcherProps) {
       try {
         const res = await switchAdminRole(roleName);
         localStorage.setItem("access_token", res.access_token);
+        // Persist the new active role so a later reload re-bootstraps with it.
+        localStorage.setItem("admin_role", res.role_name);
         // Also update sessionStorage if that's where the token lives
         if (sessionStorage.getItem("access_token")) {
           sessionStorage.setItem("access_token", res.access_token);
         }
-        const newClaims = getAdminJwtClaims();
-        setClaims(newClaims);
+        setClaims(getAdminJwtClaims());
         setIsOpen(false);
         toast.success(`Rol almashtirildi: ${roleName}`);
 
-        // Navigate to the new role's home page
-        if (newClaims.home_page) {
-          // Map home_page path to page name
-          const path = newClaims.home_page;
-          const pageMap: Record<string, string> = {
-            "/admin/accounts": "admin-accounts",
-            "/admin/roles": "admin-roles",
-            "/admin/audit": "admin-audit",
-            "/admin/profile": "admin-profile",
-            "/admin/carousel": "admin-carousel",
-            "/admin/flight-schedule": "flight-schedule-admin",
-            "/admin/clients": "manager-page",
-            "/admin/warehouse": "warehouse-page",
-            "/admin/expected-cargo": "expected-cargo",
-            "/admin/delivery-request": "admin-delivery-request",
-            "/admin/passkey": "passkey-page",
-            "/pos": "pos-dashboard",
-            "/flights": "flights",
-            "/statistics": "statistics",
-            "/import": "import",
-            "/pickup-tv": "pickup-tv",
-          };
-          const target = pageMap[path];
-          if (target) {
-            onNavigate(target);
-          } else {
-            // Fallback: try to resolve from path
-            window.location.reload();
-          }
-        } else {
-          window.location.reload();
-        }
+        // Hand navigation to App: it owns `userRole`, which gates every route.
+        // Updating the role and the page together there avoids the stale-role
+        // bounce that previously left the new home page blank.
+        window.dispatchEvent(
+          new CustomEvent("auth:role-switched", {
+            detail: { role: res.role_name, homePage: res.home_page },
+          }),
+        );
       } catch (err: unknown) {
         const e = err as { message?: string };
         toast.error(e.message ?? "Rol almashtirishda xatolik");
       }
     },
-    [currentRole, onNavigate],
+    [currentRole],
   );
 
   if (roleNames.length <= 1) return null;
