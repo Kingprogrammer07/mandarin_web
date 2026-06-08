@@ -966,6 +966,13 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     const savedCards = nbuCardsData?.items ?? [];
     const hasSavedCards = savedCards.length > 0;
 
+    // Manual online (card transfer / payment links + receipt upload) is offered
+    // whenever the flight has an active card OR at least one active payment link
+    // — independent of NBU, so NBU and manual can be shown side by side. When
+    // neither exists, only cash remains (NBU still shows when enabled).
+    const hasManualOnline =
+      !!details.card_number || (details.payment_links?.length ?? 0) > 0;
+
     return (
       <div className="space-y-5">
         {/* ---- Saved Cards Section ----
@@ -1381,11 +1388,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         )}
 
         {/* ---- Payment Method Buttons ----
-            When NBU is enabled the gateway button above is the canonical
-            online path, so we drop the manual receipt-upload variant to
-            keep the wizard focused. Cash still always shows. */}
-        <div data-tour="pay-methods" className={`grid gap-3 ${nbuEnabled ? 'grid-cols-1' : walletCoversAll ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
-          {!nbuEnabled && (
+            Manual online (card / payment links + receipt) shows alongside NBU
+            whenever the flight has an active card or payment link. If neither
+            exists, only cash remains here (NBU button above still shows when
+            enabled). */}
+        <div data-tour="pay-methods" className={`grid gap-3 ${hasManualOnline ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          {hasManualOnline && (
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => handleChooseMethod('online')}
