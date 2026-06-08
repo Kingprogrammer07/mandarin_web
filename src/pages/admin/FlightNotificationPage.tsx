@@ -7,6 +7,7 @@ import {
   getNotificationSummary,
   startSendNotifications,
   getSendTaskState,
+  getActiveSendTask,
   cancelSendTask,
   type ClientNotificationStatus,
   type NotificationSummary,
@@ -32,6 +33,15 @@ const POLL_INTERVAL_MS = 5000;
 const PAGE_SIZE = 30;
 
 const activeTaskKey = (flightName: string) => `cargo_send_task:${flightName}`;
+
+// Written to localStorage the instant "Send" is pressed, before the start
+// request resolves. If the page reloads in that window, mount recovery sees the
+// placeholder and asks the server for the running task instead of losing it.
+const PENDING_PLACEHOLDER = 'pending';
+
+// Ostatka (A-) flights deliver via the bot to the ostatka group, not per-client.
+// The web send path is blocked server-side; the UI disables it too.
+const isOstatkaFlight = (name: string) => name.trim().toUpperCase().startsWith('A-');
 
 // ─── Progress Modal ────────────────────────────────────────────────────────────
 
@@ -337,22 +347,58 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
     void fetchSummary();
   }, [fetchSummary]);
 
-  // Restore in-progress task after page reload/reopen
+  // Restore an in-progress send after page reload/reopen.
+  //
+  // Two recovery paths:
+  //  1. A real task_id in localStorage → resume it directly.
+  //  2. No id, or the "pending" placeholder (reload happened mid send-start),
+  //     or a stale id whose state lookup failed → ask the server for any task
+  //     still running on this flight (cargo_send_active index).
   useEffect(() => {
-    const savedTaskId = localStorage.getItem(activeTaskKey(flightName));
-    if (!savedTaskId) return;
+    let cancelled = false;
 
-    getSendTaskState(savedTaskId)
-      .then((state) => {
-        if (state.status === 'completed' || state.status === 'failed') {
+    const resume = (state: SendTaskState) => {
+      localStorage.setItem(activeTaskKey(flightName), state.task_id);
+      setTaskId(state.task_id);
+      setTaskState(state);
+      startPolling(state.task_id);
+    };
+
+    const recoverFromServer = async () => {
+      try {
+        const active = await getActiveSendTask(flightName);
+        if (cancelled) return;
+        if (!active || active.status === 'completed' || active.status === 'failed') {
           localStorage.removeItem(activeTaskKey(flightName));
           return;
         }
-        setTaskId(savedTaskId);
-        setTaskState(state);
-        startPolling(savedTaskId);
-      })
-      .catch(() => localStorage.removeItem(activeTaskKey(flightName)));
+        resume(active);
+      } catch {
+        if (!cancelled) localStorage.removeItem(activeTaskKey(flightName));
+      }
+    };
+
+    const restore = async () => {
+      const saved = localStorage.getItem(activeTaskKey(flightName));
+      if (saved && saved !== PENDING_PLACEHOLDER) {
+        try {
+          const state = await getSendTaskState(saved);
+          if (cancelled) return;
+          if (state.status === 'completed' || state.status === 'failed') {
+            localStorage.removeItem(activeTaskKey(flightName));
+            return;
+          }
+          resume(state);
+          return;
+        } catch {
+          // Stale/unknown id — fall through to server-side recovery.
+        }
+      }
+      await recoverFromServer();
+    };
+
+    void restore();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flightName]);
 
@@ -427,9 +473,25 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
   const allVisibleSelected =
     filteredClients.length > 0 && filteredClients.every((c) => selected.has(c.client_id));
 
+  // Select every not-yet-sent client across the whole flight (not just the
+  // current filter/page), so the operator can fire one send at the remainder.
+  const selectPending = () => {
+    const pendingIds = (summary?.clients ?? [])
+      .filter((c) => !c.is_sent)
+      .map((c) => c.client_id);
+    setSelected(new Set(pendingIds));
+    if (pendingIds.length === 0) {
+      toast({ title: "Yuborilmagan mijoz yo'q", variant: 'default' });
+    }
+  };
+
   // ── Send ───────────────────────────────────────────────────────────────────
 
   const handleSend = async () => {
+    if (isOstatka) {
+      toast({ title: "Ostatka (A-) reyslar bot orqali yuboriladi", variant: 'error' });
+      return;
+    }
     if (selected.size === 0) {
       toast({ title: "Kamida 1 ta mijozni tanlang", variant: 'error' });
       return;
@@ -461,6 +523,9 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
         setIsSending(false);
         return;
       }
+      // Persist a placeholder BEFORE the request resolves so a reload in this
+      // window can still recover the task via the server-side flight index.
+      localStorage.setItem(activeTaskKey(flightName), PENDING_PLACEHOLDER);
       const resp = await startSendNotifications(flightName, {
         client_ids: [...selected],
         only_pending: false,
@@ -483,6 +548,9 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
       });
       startPolling(resp.task_id);
     } catch (err) {
+      // Drop the optimistic placeholder so reload recovery doesn't chase a task
+      // that never started.
+      localStorage.removeItem(activeTaskKey(flightName));
       const errMsg = (err as { message?: string })?.message ?? "Yuborishni boshlashda xatolik";
       toast({ title: errMsg, variant: 'error' });
     } finally {
@@ -525,7 +593,10 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (isLoading) {
+  // Show the spinner only when there's nothing to display. If a task was
+  // recovered on reload, render the page so the progress modal is visible even
+  // while the summary is still loading.
+  if (isLoading && !taskState) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
         <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
@@ -533,6 +604,7 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
     );
   }
 
+  const isOstatka = isOstatkaFlight(flightName);
   const pendingCount = summary?.pending_count ?? 0;
   const totalCount = summary?.total_clients ?? 0;
   const botSentCount = summary?.bot_sent_count ?? 0;
@@ -642,13 +714,23 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
             Barchasi
           </button>
 
+          {/* Quick-select every not-yet-sent client across the whole flight */}
+          <button
+            onClick={selectPending}
+            className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/[0.08] border border-amber-200/60 dark:border-amber-500/15 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-500/15 transition-colors"
+          >
+            <Clock className="w-3 h-3" />
+            Yuborilmaganlar
+          </button>
+
           <Filter className="w-3.5 h-3.5 text-gray-300 dark:text-white/20" />
 
           <div className="flex-1" />
 
           <button
             onClick={() => setShowForgottenModal(true)}
-            className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/[0.08] border border-violet-200/60 dark:border-violet-500/15 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-500/15 transition-colors"
+            disabled={isOstatka}
+            className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/[0.08] border border-violet-200/60 dark:border-violet-500/15 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-500/15 transition-colors disabled:opacity-40"
           >
             <Plus className="w-3.5 h-3.5" />
             Unutilgan yuk
@@ -656,7 +738,7 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
 
           <button
             onClick={handleSend}
-            disabled={isSending || selectedCount === 0}
+            disabled={isSending || selectedCount === 0 || isOstatka}
             className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-black text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50 rounded-xl transition-colors"
           >
             {isSending ? (
@@ -698,6 +780,16 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
           )}
         </div>
       </div>
+
+      {/* ── Ostatka (A-) notice ── */}
+      {isOstatka && (
+        <div className="mx-4 mt-3 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/[0.08] border border-amber-200/60 dark:border-amber-500/15">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 leading-snug">
+            Ostatka (A-) reyslar bot orqali yuboriladi. Web orqali yuborish o'chirilgan.
+          </p>
+        </div>
+      )}
 
       {/* ── Client list ── */}
       <div className="px-4 py-3 space-y-2">

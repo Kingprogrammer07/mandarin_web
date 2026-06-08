@@ -106,6 +106,19 @@ export async function getSendTaskState(taskId: string): Promise<SendTaskState> {
   return data;
 }
 
+/**
+ * Recover the flight's currently-running send task, or null if none.
+ *
+ * Used on page (re)load to resume the progress bar when the browser never
+ * persisted the task_id (e.g. reload during the send-start request).
+ */
+export async function getActiveSendTask(flightName: string): Promise<SendTaskState | null> {
+  const { data } = await apiClient.get<SendTaskState | null>(
+    `/api/v1/admin/flight-notifications/${encodeURIComponent(flightName)}/active-task`,
+  );
+  return data ?? null;
+}
+
 export async function cancelSendTask(taskId: string): Promise<{ cancelled: boolean; message: string }> {
   const { data } = await apiClient.post<{ cancelled: boolean; message: string }>(
     `/api/v1/admin/flight-notifications/tasks/${encodeURIComponent(taskId)}/cancel`,
