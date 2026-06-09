@@ -629,19 +629,49 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   const walletDeduction = useWallet ? Math.min(displayBalance, totalOwed) : 0;
   const netAfterWallet = totalOwed - walletDeduction;
+  const activeNotifAmounts = useMemo(() => {
+    if (!activeNotifData) return null;
+
+    const flightItemsTotal = activeNotifData.flight_items.reduce(
+      (sum, item) => sum + (item.total_amount || 0),
+      0,
+    );
+    const total =
+      activeNotifData.total_amount > 0
+        ? activeNotifData.total_amount
+        : flightItemsTotal > 0
+          ? flightItemsTotal
+          : activeNotifData.amount_paid > 0
+            ? activeNotifData.amount_paid
+            : 0;
+    const remaining =
+      activeNotifData.payment_status === "paid"
+        ? 0
+        : activeNotifData.remaining_amount > 0
+          ? activeNotifData.remaining_amount
+          : Math.max(0, total - activeNotifData.amount_paid);
+    const payable =
+      activeNotifData.payment_status === "paid"
+        ? activeNotifData.amount_paid
+        : remaining > 0
+          ? remaining
+          : total;
+
+    return { total, remaining, payable };
+  }, [activeNotifData]);
 
   // Auto-fill received input when selection/wallet/notification changes
   const userEditedRef = useRef(false);
   const prevNetRef = useRef(0);
   useEffect(() => {
     const net = totalOwed - (useWallet ? Math.min(displayBalance, totalOwed) : 0);
-    const notifFallback = activeNotifData?.remaining_amount ?? 0;
+    const notifFallback = activeNotifAmounts?.payable ?? 0;
     const effective = net > 0 ? net : notifFallback;
     if (!userEditedRef.current || effective !== prevNetRef.current) {
       setReceivedInput(effective > 0 ? String(Math.round(effective)) : "");
       prevNetRef.current = effective;
     }
-  }, [totalOwed, useWallet, displayBalance, activeNotifData]);
+  }, [totalOwed, useWallet, displayBalance, activeNotifAmounts]);
 
   const receivedAmount = parseFloat(receivedInput) || netAfterWallet;
 
@@ -1272,7 +1302,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                     </span>
                                   </div>
                                   <div className="flex flex-col gap-0.5 mt-0.5">
-                                    <span className="text-[12px] text-gray-500 dark:text-gray-400">Jami: <span className="font-bold text-[13px] text-gray-700 dark:text-gray-300">{formatCurrencySum(activeNotifData.total_amount)}</span></span>
+                                    <span className="text-[12px] text-gray-500 dark:text-gray-400">Jami: <span className="font-bold text-[13px] text-gray-700 dark:text-gray-300">{formatCurrencySum(activeNotifAmounts?.total ?? activeNotifData.total_amount)}</span></span>
                                     {activeNotifData.amount_paid > 0 && (
                                       <span className="text-[12px] text-gray-500 dark:text-gray-400">To'langan: <span className="font-bold text-[13px] text-green-600 dark:text-green-400">{formatCurrencySum(activeNotifData.amount_paid)}</span></span>
                                     )}
@@ -1287,9 +1317,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                     // "paid" → no remaining debt, never fall back to amount_paid
                                     if (n.payment_status === "paid") return formatCurrencySum(0);
                                     // partial/pending → show remaining, then total, then 0
-                                    const amt = n.remaining_amount > 0 ? n.remaining_amount
-                                              : n.total_amount > 0    ? n.total_amount
-                                              : 0;
+                                    const amt = activeNotifAmounts?.payable ?? 0;
                                     return formatCurrencySum(amt);
                                   })()
                                 : formatCurrencySum(totalOwed)
@@ -1314,7 +1342,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                   if (normalized !== null) setReceivedInput(normalized);
                                 }}
                                 onFocus={(e) => e.target.select()}
-                                placeholder={String(Math.round(netAfterWallet)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
+                                placeholder={String(Math.round(netAfterWallet || activeNotifAmounts?.payable || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
                                 disabled={activeNotifData?.payment_status === "paid"}
                                 className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                               />

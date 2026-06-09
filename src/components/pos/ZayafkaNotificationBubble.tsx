@@ -77,23 +77,36 @@ export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props
   const hasReceipt = Boolean(n.receipt_s3_key);
   const meta = STATUS_META[n.payment_status] ?? STATUS_META.pending;
 
-  // Live UzPost price lookup — guarantees the pre-fill is the actual UzPost
-  // delivery fee for this delivery request, not whatever stale value happens
-  // to be cached in pos_notifications.total_amount.
+  const storedPayableAmount =
+    n.remaining_amount > 0
+      ? n.remaining_amount
+      : n.total_amount > 0
+        ? n.total_amount
+        : 0;
+
+  const isWalletOnly = n.payment_type === "wallet";
+  const needsLivePrice =
+    isPending &&
+    n.delivery_request_id != null &&
+    storedPayableAmount <= 0 &&
+    !isWalletOnly;
+
   const { data: livePrice } = useQuery({
     queryKey: ["zayafka-uzpost-price", n.delivery_request_id],
     queryFn: () => posNotificationService.getZayafkaUzpostPrice(n.delivery_request_id!),
-    enabled: isPending && n.delivery_request_id != null,
+    enabled: needsLivePrice,
     staleTime: 60_000,
     retry: 1,
   });
 
   const prefillAmount =
-    livePrice?.uzpost_price && livePrice.uzpost_price > 0
-      ? String(livePrice.uzpost_price)
-      : n.total_amount > 0
-        ? String(n.total_amount)
-        : "";
+    storedPayableAmount > 0
+      ? String(storedPayableAmount)
+      : livePrice?.uzpost_price && livePrice.uzpost_price > 0
+        ? String(livePrice.uzpost_price)
+        : isWalletOnly
+          ? "0"
+          : "";
 
   const [amount, setAmount] = useState<string>(prefillAmount);
   const [rejectComment, setRejectComment] = useState("");
@@ -102,8 +115,7 @@ export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props
   const [loading, setLoading] = useState<"confirm" | "reject" | "edit" | "receipt" | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  // Sync local amount state when the notification data or live UzPost price changes.
-  // Live price wins over stored total_amount so a drifted DB row can't fool the operator.
+  // Sync local amount state when the notification data or fallback live price changes.
   useEffect(() => {
     if (!editMode) {
       setAmount(prefillAmount);

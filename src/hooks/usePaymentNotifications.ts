@@ -61,6 +61,7 @@ function saveReadIds(ids: Set<number>) {
 
 const DEFAULT_FILTERS: NotificationFilters = {
   sort: "created_desc",
+  source: "flight",
 };
 
 function usePageVisibility(): boolean {
