@@ -63,6 +63,45 @@ export interface ChargeSavedCardResponse {
   error: string | null;
 }
 
+export interface NbuDeliveryInitRequest {
+  flight_names: string[];
+  location_id: number;
+  phone_number?: string | null;
+  wallet_used?: number;
+}
+
+export interface NbuDeliveryInitResponse {
+  payment_url: string | null;
+  transaction_id: string;
+  order_id: string;
+  delivery_request_id: number;
+  amount_tiyin: number;
+  amount_uzs: number;
+  wallet_used: number;
+  total_fee: number;
+  session_timeout_seconds: number;
+}
+
+export interface NbuDeliveryChargeRequest {
+  card_id: number;
+  flight_names: string[];
+  location_id: number;
+  phone_number?: string | null;
+  wallet_used?: number;
+}
+
+export interface NbuDeliveryChargeResponse {
+  transaction_id: string;
+  order_id: string;
+  status: 'SUCCESS' | 'FAILED' | string;
+  delivery_request_id: number;
+  amount_tiyin: number;
+  amount_uzs: number;
+  wallet_used: number;
+  total_fee: number;
+  error: string | null;
+}
+
 export type NbuPurpose =
   | 'ONE_TIME_PAYMENT'
   | 'RECURRING_PAYMENT'
@@ -96,6 +135,26 @@ export const nbuPaymentService = {
 
   async init(body: NbuInitRequest): Promise<NbuInitResponse> {
     const response = await apiClient.post<NbuInitResponse>(`${BASE}/init`, body);
+    return response.data;
+  },
+
+  /** Open an NBU session to pay an UzPost delivery fee (redirect flow). */
+  async initDelivery(body: NbuDeliveryInitRequest): Promise<NbuDeliveryInitResponse> {
+    const response = await apiClient.post<NbuDeliveryInitResponse>(
+      `${BASE}/delivery/init`,
+      body,
+    );
+    return response.data;
+  },
+
+  /** Pay an UzPost delivery fee synchronously from a saved card. */
+  async chargeDelivery(
+    body: NbuDeliveryChargeRequest,
+  ): Promise<NbuDeliveryChargeResponse> {
+    const response = await apiClient.post<NbuDeliveryChargeResponse>(
+      `${BASE}/delivery/charge`,
+      body,
+    );
     return response.data;
   },
 

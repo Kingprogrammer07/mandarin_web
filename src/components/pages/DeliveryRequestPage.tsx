@@ -23,6 +23,7 @@ import {
   Clock,
   MapPin,
   Phone,
+  CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -44,6 +45,11 @@ import {
   saveUzpostBranchPreference,
 } from '@/utils/uzpostBranchStorage';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
+import {
+  nbuPaymentService,
+  type SavedCardItem,
+} from '@/api/services/nbuPaymentService';
+import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
 
 const UzpostBranchPicker = lazy(() =>
   import('@/components/delivery/UzpostBranchPicker').then((module) => ({
@@ -597,6 +603,10 @@ interface StepUzpostProps {
   onBack: () => void;
   phoneNumber: string;
   onPhoneChange: (value: string) => void;
+  nbuEnabled: boolean;
+  savedCards: SavedCardItem[];
+  onPayOnline: (walletUsed: number, phoneNumber: string) => void;
+  onChargeCard: (cardId: number, walletUsed: number, phoneNumber: string) => void;
 }
 
 function StepUzpostPayment({
@@ -615,9 +625,15 @@ function StepUzpostPayment({
   onBack,
   phoneNumber,
   onPhoneChange,
+  nbuEnabled,
+  savedCards,
+  onPayOnline,
+  onChargeCard,
 }: StepUzpostProps) {
   const { t } = useTranslation();
   const [useWallet, setUseWallet] = useState(false);
+  // 'online' = NBU card payment, 'manual' = bank-transfer receipt upload.
+  const [payMethod, setPayMethod] = useState<'online' | 'manual'>('online');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [receiptProcessing, setReceiptProcessing] = useState(false);
@@ -866,6 +882,11 @@ function StepUzpostPayment({
   }
 
   const fullyCoveredByWallet = remaining <= 0;
+  // Online (NBU) payment is offered only when money actually needs collecting and
+  // the gateway is enabled. When the wallet fully covers the fee, we fall back to
+  // the manual submit (no card charge needed).
+  const onlineAvailable = nbuEnabled && !fullyCoveredByWallet;
+  const onlineMode = onlineAvailable && payMethod === 'online';
   const cameraOverlay =
     isCameraOpen && typeof document !== 'undefined'
       ? createPortal(
@@ -1035,8 +1056,78 @@ function StepUzpostPayment({
         </div>
       )}
 
-      {/* Card Info (only if payment remains) */}
-      {calcData && !fullyCoveredByWallet && calcData.card && (
+      {/* Payment method toggle — only when there is money to collect online */}
+      {onlineAvailable && (
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setPayMethod('online')}
+            className={`h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+              payMethod === 'online'
+                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300'
+            }`}
+          >
+            <CreditCard className="w-4 h-4" />
+            Onlayn to'lov
+          </button>
+          <button
+            type="button"
+            onClick={() => setPayMethod('manual')}
+            className={`h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+              payMethod === 'manual'
+                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
+                : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300'
+            }`}
+          >
+            <Upload className="w-4 h-4" />
+            Chek yuklash
+          </button>
+        </div>
+      )}
+
+      {/* Online (NBU) payment panel */}
+      {onlineMode && (
+        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {t('deliveryRequest.steps.uzpost.remainingPayment')}
+            </span>
+            <span className="font-extrabold text-lg">{remaining.toLocaleString()} so'm</span>
+          </div>
+
+          {savedCards.length > 0 && (
+            <div className="space-y-2 mb-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                Saqlangan kartalar
+              </p>
+              {savedCards.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => onChargeCard(card.id, walletApplied, phoneNumber)}
+                  className="w-full h-12 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-between px-4 text-sm font-semibold active:scale-[0.98] transition disabled:opacity-50"
+                >
+                  <span className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-emerald-500" />
+                    {card.card_masked || card.nickname || 'Karta'}
+                  </span>
+                  <span className="text-emerald-600 dark:text-emerald-400">To'lash</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            NBU orqali xavfsiz onlayn to'lov. To'lovdan so'ng zayavka avtomatik
+            tasdiqlanadi.
+          </p>
+        </div>
+      )}
+
+      {/* Card Info (manual transfer only) */}
+      {!onlineMode && calcData && !fullyCoveredByWallet && calcData.card && (
         <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.paymentCard')}
@@ -1064,8 +1155,8 @@ function StepUzpostPayment({
         </div>
       )}
 
-      {/* File Upload (only if payment remains) */}
-      {!fullyCoveredByWallet && (
+      {/* File Upload (manual transfer only, when payment remains) */}
+      {!onlineMode && !fullyCoveredByWallet && (
         <div className="mb-6">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.uploadReceipt')}
@@ -1180,29 +1271,55 @@ function StepUzpostPayment({
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <button
-          onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
-          disabled={submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)}
-          className={`
-            flex-1 h-14 rounded-2xl font-bold text-base text-white
-            flex items-center justify-center gap-2
-            transition-all duration-200 active:scale-[0.98]
-            ${
-              submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)
-                ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
-                : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
-            }
-          `}
-        >
-          {submitting ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              {t('deliveryRequest.steps.uzpost.submitButton')}
-              <Check className="w-5 h-5" />
-            </>
-          )}
-        </button>
+        {onlineMode ? (
+          <button
+            onClick={() => onPayOnline(walletApplied, phoneNumber)}
+            disabled={submitting || !selectedBranch || !calcData}
+            className={`
+              flex-1 h-14 rounded-2xl font-bold text-base text-white
+              flex items-center justify-center gap-2
+              transition-all duration-200 active:scale-[0.98]
+              ${
+                submitting || !selectedBranch || !calcData
+                  ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
+              }
+            `}
+          >
+            {submitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                {remaining.toLocaleString()} so'm to'lash
+                <CreditCard className="w-5 h-5" />
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
+            disabled={submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)}
+            className={`
+              flex-1 h-14 rounded-2xl font-bold text-base text-white
+              flex items-center justify-center gap-2
+              transition-all duration-200 active:scale-[0.98]
+              ${
+                submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)
+                  ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
+              }
+            `}
+          >
+            {submitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                {t('deliveryRequest.steps.uzpost.submitButton')}
+                <Check className="w-5 h-5" />
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1332,6 +1449,28 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
 
   // UzPost phone state
   const [uzpostPhone, setUzpostPhone] = useState('');
+
+  // NBU online payment (UzPost delivery fee) — feature flag + saved cards
+  const [nbuEnabled, setNbuEnabled] = useState(false);
+  const [savedCards, setSavedCards] = useState<SavedCardItem[]>([]);
+  useEffect(() => {
+    let active = true;
+    nbuPaymentService
+      .getStatus()
+      .then((s) => {
+        if (active) setNbuEnabled(Boolean(s.enabled));
+      })
+      .catch(() => {});
+    nbuPaymentService
+      .listCards()
+      .then((r) => {
+        if (active) setSavedCards(r.items);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // API state
   const [flights, setFlights] = useState<FlightItem[]>([]);
@@ -1533,6 +1672,96 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
     [selectedFlights, selectedUzpostBranch, t]
   );
 
+  // Shared error surfacing for UzPost online (NBU) payment calls. NBU 422 errors
+  // carry an object detail ({message, code}); manual flow returns a string.
+  const showUzpostApiError = useCallback(
+    (err: unknown) => {
+      const e = err as {
+        status?: number;
+        message?: string;
+        data?: { detail?: string | { message?: string } };
+      };
+      const detail = e?.data?.detail;
+      const detailText =
+        typeof detail === 'string' ? detail : detail?.message || undefined;
+      const message = e?.message || t('deliveryRequest.toast.submitError');
+      if (e?.status === 400 && message.toLowerCase().includes('profile')) {
+        setProfileIncomplete(true);
+        return;
+      }
+      toast.error(detailText || message);
+    },
+    [t]
+  );
+
+  // Redirect-based NBU payment for the UzPost delivery fee.
+  const handleUzpostPayOnline = useCallback(
+    async (walletUsed: number, phoneNumber: string) => {
+      if (!selectedUzpostBranch) {
+        toast.error('UzPost punktini tanlang');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const res = await nbuPaymentService.initDelivery({
+          flight_names: selectedFlights,
+          location_id: selectedUzpostBranch.id,
+          phone_number: phoneNumber.trim() || null,
+          wallet_used: walletUsed,
+        });
+        saveUzpostBranchPreference(selectedUzpostBranch);
+        if (res.payment_url) {
+          redirectToNbuUrl({
+            orderId: res.order_id,
+            kind: 'payment',
+            paymentUrl: res.payment_url,
+            flightName: selectedFlights[0],
+          });
+        } else {
+          toast.error("To'lov havolasi olinmadi. Qayta urinib ko'ring.");
+          setSubmitting(false);
+        }
+      } catch (err: unknown) {
+        showUzpostApiError(err);
+        setSubmitting(false);
+      }
+    },
+    [selectedFlights, selectedUzpostBranch, showUzpostApiError]
+  );
+
+  // Synchronous saved-card charge for the UzPost delivery fee.
+  const handleUzpostChargeCard = useCallback(
+    async (cardId: number, walletUsed: number, phoneNumber: string) => {
+      if (!selectedUzpostBranch) {
+        toast.error('UzPost punktini tanlang');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const res = await nbuPaymentService.chargeDelivery({
+          card_id: cardId,
+          flight_names: selectedFlights,
+          location_id: selectedUzpostBranch.id,
+          phone_number: phoneNumber.trim() || null,
+          wallet_used: walletUsed,
+        });
+        if (res.status === 'SUCCESS') {
+          saveUzpostBranchPreference(selectedUzpostBranch);
+          setSavedUzpostBranchId(selectedUzpostBranch.id);
+          toast.success("To'lov muvaffaqiyatli amalga oshirildi!");
+          setCurrentStep(4);
+        } else {
+          toast.error(res.error || "To'lov amalga oshmadi. Boshqa usulni sinab ko'ring.");
+        }
+      } catch (err: unknown) {
+        showUzpostApiError(err);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [selectedFlights, selectedUzpostBranch, showUzpostApiError]
+  );
+
   const goBackStep = useCallback(() => {
     setProfileIncomplete(false);
     if (currentStep > 1) {
@@ -1635,6 +1864,10 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
           onBack={goBackStep}
           phoneNumber={uzpostPhone}
           onPhoneChange={setUzpostPhone}
+          nbuEnabled={nbuEnabled}
+          savedCards={savedCards}
+          onPayOnline={handleUzpostPayOnline}
+          onChargeCard={handleUzpostChargeCard}
         />
       )}
 
