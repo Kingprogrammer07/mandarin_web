@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
@@ -144,7 +145,8 @@ const EmptyState = memo(() => {
 // ============================================
 
 const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
   // Our generated payment receipt — fetched on demand (auth-scoped blob) and
   // shown in a lightweight image overlay.
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
@@ -270,7 +272,7 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
             )}
             {item.uzpost_tracking_error && (
               <span className="rounded-lg bg-amber-100 px-2 py-1 font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                Tracking vaqtincha mavjud emas
+                {t('deliveryHistory.card.trackingUnavailable')}
               </span>
             )}
           </div>
@@ -281,7 +283,7 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
               rel="noreferrer"
               className="mt-2 inline-flex font-bold text-orange-600 underline-offset-2 hover:underline dark:text-orange-300"
             >
-              UzPost cheki (PDF yorlig'i)
+              {t('deliveryHistory.card.uzpostLabel')}
             </a>
           )}
         </div>
@@ -299,7 +301,7 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
             )}
             {item.payment_amount_uzs != null && (
               <span className="rounded-lg bg-white px-2 py-1 font-bold text-emerald-700 dark:bg-white/10 dark:text-emerald-300">
-                {item.payment_amount_uzs.toLocaleString()} so'm
+                {item.payment_amount_uzs.toLocaleString(numberLocale)} {t('deliveryHistory.card.currencyUzs')}
               </span>
             )}
           </div>
@@ -315,32 +317,33 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
               ) : (
                 <Receipt className="w-3.5 h-3.5" />
               )}
-              To'lov chekini ko'rish
+              {t('deliveryHistory.card.viewPaymentReceipt')}
             </button>
           )}
         </div>
       )}
 
       {/* Receipt image overlay */}
-      {receiptUrl && (
+      {receiptUrl && createPortal(
         <div
-          className="fixed inset-0 z-[10070] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
           onClick={closeReceipt}
         >
           <button
             onClick={closeReceipt}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center active:scale-90"
-            aria-label="Yopish"
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white shadow-lg backdrop-blur-md transition active:scale-90"
+            aria-label={t('common.close')}
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
           <img
             src={receiptUrl}
-            alt="To'lov cheki"
-            className="max-h-[88vh] w-auto rounded-2xl shadow-2xl"
+            alt={t('deliveryHistory.card.paymentReceiptAlt')}
+            className="max-h-[88svh] max-w-[min(92vw,420px)] rounded-2xl object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Admin comment for rejected */}

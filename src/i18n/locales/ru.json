@@ -844,7 +844,8 @@
     "confirmDelete": "С подтверждаете удаление?",
     "copied": "скопировано",
     "saving": "Сохранение...",
-    "save": "Сохранить"
+    "save": "Сохранить",
+    "close": "Закрыть"
   },
   "passport": {
     "addNew": "Новый паспорт",
@@ -1204,19 +1205,28 @@
         "incompleteTitle": "Адрес заполнен не полностью",
         "incompleteDescription": "Для доставки необходимо указать область, район и точный адрес. Нажмите \"Редактировать адрес\", чтобы заполнить данные."
       },
-      "actions": {
-        "editAddress": "Редактировать адрес",
-        "closeEdit": "Закрыть",
-        "saveAndConfirmAddress": "Сохранить и подтвердить адрес",
-        "savingAddress": "Сохранение..."
-      },
-      "errors": {
-        "addressRequired": "Введите полный адрес доставки",
-        "checkAddressBeforeSubmit": "Проверьте адрес доставки перед отправкой заявки.",
-        "clientIdMissing": "ID клиента не найден. Проверьте клиента.",
-        "saveAddressFailed": "Не удалось сохранить адрес. Попробуйте еще раз."
-      }
+    "actions": {
+      "editAddress": "Редактировать адрес",
+      "closeEdit": "Закрыть",
+      "saveAndConfirmAddress": "Сохранить и подтвердить адрес",
+      "savingAddress": "Сохранение...",
+      "cancel": "Отмена",
+      "submit": "Подтвердить",
+      "submitting": "Отправляем..."
     },
+    "errors": {
+      "addressRequired": "Введите полный адрес доставки",
+      "checkAddressBeforeSubmit": "Проверьте адрес доставки перед отправкой заявки.",
+      "clientIdMissing": "ID клиента не найден. Проверьте клиента.",
+      "saveAddressFailed": "Не удалось сохранить адрес. Попробуйте еще раз.",
+      "receiptRequired": "Для доставки UzPost необходимо загрузить чек оплаты, если суммы в кошельке недостаточно."
+    },
+    "receipt": {
+      "uploadLabel": "Загрузите чек оплаты",
+      "dropHint": "Загрузите или перетащите изображение чека",
+      "pasteHint": "или вставьте через Ctrl+V (Paste)"
+    }
+  },
     "steps": {
       "type": {
         "title": "Выберите тип доставки",
@@ -1264,6 +1274,14 @@
         "remainingPayment": "Остаток к оплате",
         "paymentCard": "Карта оплаты",
         "uploadReceipt": "Загрузить чек (Фото или PDF)",
+        "onlinePayment": "Онлайн-оплата",
+        "receiptUploadTab": "Загрузить чек",
+        "savedCards": "Сохранённые карты",
+        "cardFallback": "Карта",
+        "payButton": "Оплатить",
+        "payAmountButton": "Оплатить {{amount}}",
+        "nbuPaymentDescription": "Безопасная онлайн-оплата через NBU. После оплаты заявка подтвердится автоматически.",
+        "currencyUzs": "сум",
         "uploadButton": "Нажмите и выберите файл",
         "uploadGalleryButton": "Выбрать файл",
         "uploadCameraButton": "Сделать фото",
@@ -1337,7 +1355,12 @@
       "uzpostIndex": "Индекс",
       "processedAt": "Рассмотрено: {{date}}",
       "caption": "Примечание",
-      "openInMap": "Открыть на карте"
+      "openInMap": "Открыть на карте",
+      "trackingUnavailable": "Отслеживание временно недоступно",
+      "uzpostLabel": "Чек UzPost (PDF-ярлык)",
+      "viewPaymentReceipt": "Посмотреть чек оплаты",
+      "paymentReceiptAlt": "Чек оплаты",
+      "currencyUzs": "сум"
     },
     "loadingMore": "Загрузка...",
     "loadMore": "Загрузить ещё",
@@ -1405,7 +1428,10 @@
       "paymentType": "Тип оплаты",
       "takenAway": "Забрано",
       "notTakenAway": "Не забрано",
-      "breakdown": "Разбивка оплаты"
+      "breakdown": "Разбивка оплаты",
+      "viewReceipt": "Посмотреть чек",
+      "receiptAlt": "Чек оплаты",
+      "currencyUzs": "сум"
     },
     "breakdownTypes": {
       "click": "Click",

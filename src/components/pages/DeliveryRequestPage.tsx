@@ -630,7 +630,7 @@ function StepUzpostPayment({
   onPayOnline,
   onChargeCard,
 }: StepUzpostProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [useWallet, setUseWallet] = useState(false);
   // 'online' = NBU card payment, 'manual' = bank-transfer receipt upload.
   const [payMethod, setPayMethod] = useState<'online' | 'manual'>('online');
@@ -647,6 +647,11 @@ function StepUzpostPayment({
 
   const walletApplied = useWallet && calcData ? Math.min(calcData.wallet_balance, calcData.total_amount) : 0;
   const remaining = calcData ? Math.max(calcData.total_amount - walletApplied, 0) : 0;
+  const numberLocale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
+  const formatUzs = useCallback(
+    (value: number) => `${value.toLocaleString(numberLocale)} ${t('deliveryRequest.steps.uzpost.currencyUzs')}`,
+    [numberLocale, t],
+  );
 
   useEffect(() => {
     return () => {
@@ -1042,13 +1047,13 @@ function StepUzpostPayment({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                  -{walletApplied.toLocaleString()} so'm
+                  -{formatUzs(walletApplied)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
                 <span className="font-extrabold text-lg">
-                  {remaining.toLocaleString()} so'm
+                  {formatUzs(remaining)}
                 </span>
               </div>
             </div>
@@ -1069,7 +1074,7 @@ function StepUzpostPayment({
             }`}
           >
             <CreditCard className="w-4 h-4" />
-            Onlayn to'lov
+            {t('deliveryRequest.steps.uzpost.onlinePayment')}
           </button>
           <button
             type="button"
@@ -1081,7 +1086,7 @@ function StepUzpostPayment({
             }`}
           >
             <Upload className="w-4 h-4" />
-            Chek yuklash
+            {t('deliveryRequest.steps.uzpost.receiptUploadTab')}
           </button>
         </div>
       )}
@@ -1093,13 +1098,13 @@ function StepUzpostPayment({
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {t('deliveryRequest.steps.uzpost.remainingPayment')}
             </span>
-            <span className="font-extrabold text-lg">{remaining.toLocaleString()} so'm</span>
+            <span className="font-extrabold text-lg">{formatUzs(remaining)}</span>
           </div>
 
           {savedCards.length > 0 && (
             <div className="space-y-2 mb-3">
               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                Saqlangan kartalar
+                {t('deliveryRequest.steps.uzpost.savedCards')}
               </p>
               {savedCards.map((card) => (
                 <button
@@ -1111,17 +1116,18 @@ function StepUzpostPayment({
                 >
                   <span className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-emerald-500" />
-                    {card.card_masked || card.nickname || 'Karta'}
+                    {card.card_masked || card.nickname || t('deliveryRequest.steps.uzpost.cardFallback')}
                   </span>
-                  <span className="text-emerald-600 dark:text-emerald-400">To'lash</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    {t('deliveryRequest.steps.uzpost.payButton')}
+                  </span>
                 </button>
               ))}
             </div>
           )}
 
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            NBU orqali xavfsiz onlayn to'lov. To'lovdan so'ng zayavka avtomatik
-            tasdiqlanadi.
+            {t('deliveryRequest.steps.uzpost.nbuPaymentDescription')}
           </p>
         </div>
       )}
@@ -1290,7 +1296,7 @@ function StepUzpostPayment({
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                {remaining.toLocaleString()} so'm to'lash
+                {t('deliveryRequest.steps.uzpost.payAmountButton', { amount: formatUzs(remaining) })}
                 <CreditCard className="w-5 h-5" />
               </>
             )}

@@ -268,7 +268,7 @@ export function DeliveryRequestModal({
         }
 
         if (deliveryType === 'uzpost' && remainingAmount > 0 && !receiptFile) {
-            setErrorStatus('Uzpost yetkazib berish uchun to\'lov cheki yuklanishi shart (agar hamyon yetmasa).');
+            setErrorStatus(t('deliveryRequest.adminModal.errors.receiptRequired'));
             return;
         }
 
@@ -616,7 +616,7 @@ export function DeliveryRequestModal({
 
                                         {remainingAmount > 0 && (
                                             <div className="space-y-2">
-                                                <label className="text-sm font-medium text-gray-700">To'lov chekini yuklash <span className="text-red-500">*</span></label>
+                                                <label className="text-sm font-medium text-gray-700">{t('deliveryRequest.adminModal.receipt.uploadLabel')} <span className="text-red-500">*</span></label>
                                                 <div
                                                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                                     onDragLeave={() => setIsDragging(false)}
@@ -639,8 +639,12 @@ export function DeliveryRequestModal({
                                                                 onChange={handleFileChange}
                                                             />
                                                             <Upload className="h-8 w-8 text-gray-400 mb-2 pointer-events-none" />
-                                                            <span className="text-sm font-medium text-gray-700 pointer-events-none text-center">Chek rasmini yuklang yoki tashlang</span>
-                                                            <span className="text-xs text-gray-500 mt-1 pointer-events-none text-center">yoki Ctrl+V (Paste) orqali kiritish</span>
+                                                            <span className="text-sm font-medium text-gray-700 pointer-events-none text-center">
+                                                                {t('deliveryRequest.adminModal.receipt.dropHint')}
+                                                            </span>
+                                                            <span className="text-xs text-gray-500 mt-1 pointer-events-none text-center">
+                                                                {t('deliveryRequest.adminModal.receipt.pasteHint')}
+                                                            </span>
                                                         </>
                                                     ) : (
                                                         <div className="relative border rounded-lg overflow-hidden flex flex-col items-center justify-center p-2 bg-gray-50 w-full">
@@ -683,7 +687,7 @@ export function DeliveryRequestModal({
                                         onClick={onClose}
                                         disabled={isSubmitting}
                                     >
-                                        Bekor qilish
+                                        {t('deliveryRequest.adminModal.actions.cancel')}
                                     </Button>
                                     <Button
                                         type="submit"
@@ -693,10 +697,10 @@ export function DeliveryRequestModal({
                                         {isSubmitting ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Yuborilmoqda...
+                                                {t('deliveryRequest.adminModal.actions.submitting')}
                                             </>
                                         ) : (
-                                            'Tasdiqlash'
+                                            t('deliveryRequest.adminModal.actions.submit')
                                         )}
                                     </Button>
                                     </div>

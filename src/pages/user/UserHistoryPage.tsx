@@ -55,7 +55,10 @@ const statusMeta: Record<PaymentStatus, { labelKey: string; className: string; I
   },
 };
 
-const formatMoney = (value: number) => `${value.toLocaleString('uz-UZ')} so'm`;
+const formatMoney = (value: number, language: string, currencyLabel: string) => {
+  const locale = language === 'ru' ? 'ru-RU' : 'uz-UZ';
+  return `${value.toLocaleString(locale)} ${currencyLabel}`;
+};
 
 const getPaymentTypeLabel = (type: string | null | undefined, t: TFunction) => {
   const normalizedType = type?.trim().toLowerCase();
@@ -82,7 +85,9 @@ const BreakdownBadge = ({ label, value, icon: Icon }: { label: string; value: nu
 );
 
 const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'ru' ? 'ru' : 'uz';
+  const currencyLabel = t('paymentHistory.card.currencyUzs');
   const StatusIcon = statusMeta[item.payment_status].Icon;
   const PickupIcon = item.is_taken_away ? CheckCircle2 : Clock;
   const paymentTypeLabel = getPaymentTypeLabel(item.payment_type, t);
@@ -144,7 +149,7 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
           <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight truncate" title={item.flight_name}>{item.flight_name}</h3>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300/80 flex items-center gap-1">
             <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-            {formatTashkentDateTime(item.created_at, 'uz')}
+            {formatTashkentDateTime(item.created_at, language)}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -170,15 +175,15 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
       <div className="relative mt-4 grid grid-cols-2 gap-2 sm:gap-3">
         <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-white/25 dark:border-white/10 p-3">
           <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-semibold">{t('paymentHistory.card.totalAmount')}</p>
-          <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{formatMoney(item.total_amount)}</p>
+          <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{formatMoney(item.total_amount, language, currencyLabel)}</p>
         </div>
         <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-white/25 dark:border-white/10 p-3">
           <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-semibold">{t('paymentHistory.card.paid')}</p>
-          <p className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-300">{formatMoney(item.paid_amount)}</p>
+          <p className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-300">{formatMoney(item.paid_amount, language, currencyLabel)}</p>
         </div>
         <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-white/25 dark:border-white/10 p-3">
           <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-semibold">{t('paymentHistory.card.remaining')}</p>
-          <p className="text-base sm:text-lg font-bold text-amber-600 dark:text-amber-300">{formatMoney(item.remaining_amount)}</p>
+          <p className="text-base sm:text-lg font-bold text-amber-600 dark:text-amber-300">{formatMoney(item.remaining_amount, language, currencyLabel)}</p>
         </div>
         <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-white/25 dark:border-white/10 p-3">
           <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1">
@@ -223,7 +228,7 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
                   ) : (
                     <ReceiptText className="w-3.5 h-3.5" />
                   )}
-                  {t('paymentHistory.card.viewReceipt', 'Chekni ko\'rish')}
+                  {t('paymentHistory.card.viewReceipt')}
                 </button>
               )}
             </div>
@@ -240,7 +245,7 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeReceipt}
-              className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -252,13 +257,13 @@ const HistoryCard = ({ item }: { item: TransactionHistoryItem }) => {
                 <button
                   onClick={closeReceipt}
                   className="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white dark:bg-[#222] shadow-lg flex items-center justify-center text-gray-700 dark:text-gray-200"
-                  aria-label={t('common.close', 'Yopish')}
+                  aria-label={t('common.close')}
                 >
                   <X className="w-5 h-5" />
                 </button>
                 <img
                   src={receiptUrl}
-                  alt={t('paymentHistory.card.viewReceipt', 'Chek')}
+                  alt={t('paymentHistory.card.receiptAlt')}
                   className="w-full rounded-2xl shadow-2xl"
                 />
               </motion.div>

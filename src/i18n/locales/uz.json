@@ -844,7 +844,8 @@
     "confirmDelete": "O'chirishni tasdiqlaysizmi?",
     "copied": "nusxalandi",
     "saving": "Saqlanmoqda...",
-    "save": "Saqlash"
+    "save": "Saqlash",
+    "close": "Yopish"
   },
   "passport": {
     "addNew": "Yangi pasport",
@@ -1204,19 +1205,28 @@
         "incompleteTitle": "Manzil to'liq emas",
         "incompleteDescription": "Yetkazib berish uchun viloyat, tuman va uy manzili kiritilishi shart. \"Manzilni tahrirlash\" tugmasini bosib to'ldiring."
       },
-      "actions": {
-        "editAddress": "Manzilni tahrirlash",
-        "closeEdit": "Yopish",
-        "saveAndConfirmAddress": "Manzilni saqlash va tasdiqlash",
-        "savingAddress": "Saqlanmoqda..."
-      },
-      "errors": {
-        "addressRequired": "Yetkazib berish manzilini to'liq kiriting",
-        "checkAddressBeforeSubmit": "Zayafka yuborishdan oldin yetkazib berish manzilini tekshiring.",
-        "clientIdMissing": "Mijoz ID si topilmadi. Mijozni tekshiring.",
-        "saveAddressFailed": "Manzilni saqlashda xatolik yuz berdi. Qayta urinib ko'ring."
-      }
+    "actions": {
+      "editAddress": "Manzilni tahrirlash",
+      "closeEdit": "Yopish",
+      "saveAndConfirmAddress": "Manzilni saqlash va tasdiqlash",
+      "savingAddress": "Saqlanmoqda...",
+      "cancel": "Bekor qilish",
+      "submit": "Tasdiqlash",
+      "submitting": "Yuborilmoqda..."
     },
+    "errors": {
+      "addressRequired": "Yetkazib berish manzilini to'liq kiriting",
+      "checkAddressBeforeSubmit": "Zayafka yuborishdan oldin yetkazib berish manzilini tekshiring.",
+      "clientIdMissing": "Mijoz ID si topilmadi. Mijozni tekshiring.",
+      "saveAddressFailed": "Manzilni saqlashda xatolik yuz berdi. Qayta urinib ko'ring.",
+      "receiptRequired": "UzPost yetkazib berish uchun to'lov cheki yuklanishi shart (agar hamyon yetmasa)."
+    },
+    "receipt": {
+      "uploadLabel": "To'lov chekini yuklash",
+      "dropHint": "Chek rasmini yuklang yoki tashlang",
+      "pasteHint": "yoki Ctrl+V (Paste) orqali kiritish"
+    }
+  },
     "steps": {
       "type": {
         "title": "Yetkazish turini tanlang",
@@ -1264,6 +1274,14 @@
         "remainingPayment": "Qoldiq to'lov",
         "paymentCard": "To'lov kartasi",
         "uploadReceipt": "Chekni yuklash (Rasm yoki PDF)",
+        "onlinePayment": "Onlayn to'lov",
+        "receiptUploadTab": "Chek yuklash",
+        "savedCards": "Saqlangan kartalar",
+        "cardFallback": "Karta",
+        "payButton": "To'lash",
+        "payAmountButton": "{{amount}} to'lash",
+        "nbuPaymentDescription": "NBU orqali xavfsiz onlayn to'lov. To'lovdan so'ng zayavka avtomatik tasdiqlanadi.",
+        "currencyUzs": "so'm",
         "uploadButton": "Bosing va faylni tanlang",
         "uploadGalleryButton": "Fayldan tanlash",
         "uploadCameraButton": "Kamerada olish",
@@ -1337,7 +1355,12 @@
       "uzpostIndex": "Index",
       "processedAt": "Ko'rib chiqildi: {{date}}",
       "caption": "Izoh",
-      "openInMap": "Xaritada ko'rish"
+      "openInMap": "Xaritada ko'rish",
+      "trackingUnavailable": "Tracking vaqtincha mavjud emas",
+      "uzpostLabel": "UzPost cheki (PDF yorlig'i)",
+      "viewPaymentReceipt": "To'lov chekini ko'rish",
+      "paymentReceiptAlt": "To'lov cheki",
+      "currencyUzs": "so'm"
     },
     "loadingMore": "Yuklanmoqda...",
     "loadMore": "Yana yuklash",
@@ -1405,7 +1428,10 @@
       "paymentType": "To'lov turi",
       "takenAway": "Olib ketilgan",
       "notTakenAway": "Olib ketilmagan",
-      "breakdown": "To'lov taqsimoti"
+      "breakdown": "To'lov taqsimoti",
+      "viewReceipt": "Chekni ko'rish",
+      "receiptAlt": "To'lov cheki",
+      "currencyUzs": "so'm"
     },
     "breakdownTypes": {
       "click": "Click",
