@@ -52,6 +52,9 @@ export interface DeliveryRequestHistoryItem {
   uzpost_tracking_status: string | null;
   uzpost_tracking_error: string | null;
   uzpost_label_pdf_url: string | null;
+  payment_receipt_order_id: string | null;
+  payment_card_masked: string | null;
+  payment_amount_uzs: number | null;
   status: string;
   admin_comment: string | null;
   created_at: string;

@@ -11,11 +11,16 @@ import {
   AlertTriangle,
   MapPin,
   Phone,
+  Receipt,
+  CreditCard,
+  Loader2,
+  X,
 } from 'lucide-react';
 import {
   getDeliveryHistory,
   type DeliveryRequestHistoryItem,
 } from '@/api/services/deliveryService';
+import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 
 // ============================================
 // TYPES
@@ -140,6 +145,26 @@ const EmptyState = memo(() => {
 
 const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
   const { t } = useTranslation();
+  // Our generated payment receipt — fetched on demand (auth-scoped blob) and
+  // shown in a lightweight image overlay.
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const openReceipt = async () => {
+    if (!item.payment_receipt_order_id || loadingReceipt) return;
+    setLoadingReceipt(true);
+    try {
+      const url = await nbuPaymentService.getReceiptBlobUrl(item.payment_receipt_order_id);
+      setReceiptUrl(url);
+    } catch {
+      // Receipt is best-effort; silently ignore (the row still shows other info).
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
+  const closeReceipt = () => {
+    if (receiptUrl) URL.revokeObjectURL(receiptUrl);
+    setReceiptUrl(null);
+  };
   const typeLabel = t(`deliveryHistory.types.${item.delivery_type}`, item.delivery_type);
   const typeColor = DELIVERY_TYPE_COLORS[item.delivery_type] ?? DELIVERY_TYPE_COLORS.bts;
   const hasUzpostLocation =
@@ -256,9 +281,65 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
               rel="noreferrer"
               className="mt-2 inline-flex font-bold text-orange-600 underline-offset-2 hover:underline dark:text-orange-300"
             >
-              UzPost PDF yorlig'ini ochish
+              UzPost cheki (PDF yorlig'i)
             </a>
           )}
+        </div>
+      )}
+
+      {/* Payment receipt (our generated check) + card that paid */}
+      {(item.payment_receipt_order_id || item.payment_card_masked) && (
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs dark:border-emerald-500/20 dark:bg-emerald-500/10">
+          <div className="flex flex-wrap items-center gap-2">
+            {item.payment_card_masked && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 font-mono font-bold text-emerald-700 dark:bg-white/10 dark:text-emerald-300">
+                <CreditCard className="w-3.5 h-3.5" />
+                {item.payment_card_masked}
+              </span>
+            )}
+            {item.payment_amount_uzs != null && (
+              <span className="rounded-lg bg-white px-2 py-1 font-bold text-emerald-700 dark:bg-white/10 dark:text-emerald-300">
+                {item.payment_amount_uzs.toLocaleString()} so'm
+              </span>
+            )}
+          </div>
+          {item.payment_receipt_order_id && (
+            <button
+              type="button"
+              onClick={openReceipt}
+              disabled={loadingReceipt}
+              className="mt-2 inline-flex items-center gap-1.5 font-bold text-emerald-700 underline-offset-2 hover:underline disabled:opacity-50 dark:text-emerald-300"
+            >
+              {loadingReceipt ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Receipt className="w-3.5 h-3.5" />
+              )}
+              To'lov chekini ko'rish
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Receipt image overlay */}
+      {receiptUrl && (
+        <div
+          className="fixed inset-0 z-[10070] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={closeReceipt}
+        >
+          <button
+            onClick={closeReceipt}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center active:scale-90"
+            aria-label="Yopish"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={receiptUrl}
+            alt="To'lov cheki"
+            className="max-h-[88vh] w-auto rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
 
