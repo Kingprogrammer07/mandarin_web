@@ -11,6 +11,7 @@ import {
   type PosNotificationItem,
 } from "@/api/services/posNotificationService";
 import { STATUS_META, formatSum, formatDateTime } from "./PaymentNotificationDrawer";
+import { apiErrorMessage } from "@/utils/apiError";
 
 // ─── Receipt Preview (re-used inline) ────────────────────────────────────────
 
@@ -151,8 +152,11 @@ export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props
       });
       toast.success("To'lov tasdiqlandi");
       onRefresh();
-    } catch {
-      toast.error("Tasdiqlashda xatolik yuz berdi");
+    } catch (err) {
+      // 409 = zayafka already processed (bot/another cashier). Show the exact
+      // backend reason so it doesn't look like a server crash.
+      toast.error(apiErrorMessage(err, "Zayafka to'lovini tasdiqlashda xatolik"));
+      onRefresh();
     } finally {
       setLoading(null);
     }
@@ -168,8 +172,9 @@ export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props
       });
       toast.success("To'lov rad etildi");
       onRefresh();
-    } catch {
-      toast.error("Rad etishda xatolik yuz berdi");
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Zayafka to'lovini rad etishda xatolik"));
+      onRefresh();
     } finally {
       setLoading(null);
       setShowRejectInput(false);
@@ -192,8 +197,8 @@ export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props
       toast.success("Summa yangilandi");
       setEditMode(false);
       onRefresh();
-    } catch {
-      toast.error("Summani yangilashda xatolik");
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Summani yangilashda xatolik"));
     } finally {
       setLoading(null);
     }

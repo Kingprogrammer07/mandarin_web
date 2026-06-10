@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { QuickDatePresets } from "@/components/ui/QuickDatePresets";
 import { posNotificationService, type PosNotificationItem, type NotificationFilters } from "@/api/services/posNotificationService";
 import { ZayafkaNotificationBubble } from "./ZayafkaNotificationBubble";
+import { apiErrorMessage } from "@/utils/apiError";
 
 
 interface Props {
@@ -248,8 +249,11 @@ const NotificationBubble = memo(function NotificationBubble({
       setConfirmMode(false);
       setShowWarning(false);
       onRefresh();
-    } catch {
-      toast.error("Tasdiqlashda xatolik yuz berdi");
+    } catch (err) {
+      // A 409 here means another cashier (or the bot) already confirmed this
+      // reys — surface the backend's exact reason so it doesn't read like a crash.
+      toast.error(apiErrorMessage(err, "Reys to'lovini tasdiqlashda xatolik"));
+      onRefresh();
     } finally {
       setLoading(false);
     }
@@ -266,8 +270,9 @@ const NotificationBubble = memo(function NotificationBubble({
       toast.success("To'lov rad etildi");
       setRejectMode(false);
       onRefresh();
-    } catch {
-      toast.error("Rad etishda xatolik yuz berdi");
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Reys to'lovini rad etishda xatolik"));
+      onRefresh();
     } finally {
       setLoadingReject(false);
     }
