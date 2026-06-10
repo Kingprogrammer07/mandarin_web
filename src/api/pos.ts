@@ -119,10 +119,11 @@ export interface CashierLogResponse {
 export interface CashierLogSummary {
   cash: number;
   card: number;
+  terminal: number;
   click: number;
   payme: number;
   wallet: number;
-  /** Cash/card/click/payme total. Excludes wallet adjustments. */
+  /** Cash/card/terminal/click/payme total. Excludes wallet adjustments. */
   total: number;
 }
 
