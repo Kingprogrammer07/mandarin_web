@@ -15,6 +15,7 @@ import type { UnpaidCargoItem } from '@/api/verification';
 export const PAYMENT_TYPES: { id: PaymentProvider; label: string }[] = [
   { id: "cash", label: "Naqd" },
   { id: "card", label: "Karta" },
+  { id: "terminal", label: "Terminal" },
   { id: "click", label: "Click" },
   { id: "payme", label: "Payme" },
 ];
@@ -22,6 +23,8 @@ export const PAYMENT_TYPES: { id: PaymentProvider; label: string }[] = [
 export const PROVIDER_CHIP: Record<string, string> = {
   cash: "bg-green-50  dark:bg-green-500/10  text-green-600  dark:text-green-400",
   card: "bg-blue-50   dark:bg-blue-500/10   text-blue-600   dark:text-blue-400",
+  terminal:
+    "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
   click:
     "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400",
   payme:
@@ -116,6 +119,7 @@ export const FILTER_TABS: { id: FilterType; label: string }[] = [
 export const PAYMENT_LABEL: Record<string, string> = {
   cash: "Naqd",
   card: "Karta",
+  terminal: "Terminal",
   click: "Click",
   payme: "Payme",
   wallet: "Hamyon",
@@ -126,6 +130,7 @@ export const LOG_PROVIDER_FILTERS: { value: CashierLogProvider | "all"; label: s
   { value: "all", label: "Barchasi" },
   { value: "cash", label: "Naqd" },
   { value: "card", label: "Karta" },
+  { value: "terminal", label: "Terminal" },
   { value: "click", label: "Click" },
   { value: "payme", label: "Payme" },
   { value: "wallet", label: "Hamyon" },

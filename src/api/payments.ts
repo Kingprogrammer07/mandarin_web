@@ -5,7 +5,7 @@ import { apiClient } from './client';
 // ============================================
 
 // Backend PaymentProvider enum
-export type PaymentProvider = 'cash' | 'click' | 'payme' | 'card';
+export type PaymentProvider = 'cash' | 'click' | 'payme' | 'card' | 'terminal';
 
 // Active card from backend
 export interface ActiveCard {
