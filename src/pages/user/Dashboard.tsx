@@ -30,6 +30,7 @@ import { CarouselCard } from './dashboard-components/CarouselCard';
 import { CAROUSEL_ITEMS, PRIMARY_ACTIONS, SECONDARY_ACTIONS } from './dashboard-components/constants';
 import type { CarouselItemData } from './dashboard-components/types';
 import { clearNbuReturnParams } from '@/utils/nbuReturnContext';
+import { getPendingDeliveryReview } from '@/api/services/deliveryService';
 
 const loadNotificationCenter = () => import('@/components/notifications/NotificationCenter');
 
@@ -39,6 +40,7 @@ const FlightSchedulePage = lazy(() => import('@/components/pages/FlightScheduleP
 const DeliveryRequestPage = lazy(() => import('@/components/pages/DeliveryRequestPage'));
 const DeliveryHistoryPage = lazy(() => import('@/components/pages/DeliveryHistoryPage'));
 const CalculatorModal = lazy(() => import('@/components/modals/CalculatorModal'));
+const DeliveryReviewModal = lazy(() => import('@/components/delivery/DeliveryReviewModal'));
 const ProhibitedItemsModal = lazy(() => import('@/components/modals/ProhibitedItemsModal'));
 const OurAddressModal = lazy(() => import('@/components/modals/OurAddressModal'));
 const NotificationCenter = lazy(loadNotificationCenter);
@@ -56,6 +58,27 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
     return valid.includes(tab ?? '') ? (tab as string) : 'home';
   });
   const [initialTrackView] = useState<'search' | 'history'>('search');
+
+  // Post-delivery review prompt: on load, ask the backend whether the user has
+  // an approved delivery awaiting a review. Shown unless snoozed this session
+  // ("Keyinroq"). Covers both uzpost (approved in-session → shows on return) and
+  // other types (approved later → shows on next app entry) via one check.
+  const [reviewDrId, setReviewDrId] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    getPendingDeliveryReview()
+      .then((res) => {
+        if (!active || !res.delivery_request_id) return;
+        const snoozed = sessionStorage.getItem(
+          `delivery_review_snoozed:${res.delivery_request_id}`
+        );
+        if (!snoozed) setReviewDrId(res.delivery_request_id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentFlightName, setPaymentFlightName] = useState<string | null>(null);
@@ -540,6 +563,17 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
             isOpen={isOurAddressModalOpen}
             onClose={() => setIsOurAddressModalOpen(false)}
           />
+          {reviewDrId !== null && (
+            <DeliveryReviewModal
+              open
+              deliveryRequestId={reviewDrId}
+              onDismiss={() => {
+                sessionStorage.setItem(`delivery_review_snoozed:${reviewDrId}`, '1');
+                setReviewDrId(null);
+              }}
+              onSubmitted={() => setReviewDrId(null)}
+            />
+          )}
         </Suspense>
 
         <CarouselMediaModal

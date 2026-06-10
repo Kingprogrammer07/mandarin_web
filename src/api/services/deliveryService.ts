@@ -163,3 +163,40 @@ export async function getDeliveryHistory(
   });
   return response.data;
 }
+
+// ============================================
+// DELIVERY REVIEW (web feedback after approval)
+// ============================================
+
+export interface PendingDeliveryReview {
+  delivery_request_id: number | null;
+  delivery_type: string | null;
+  flight_names: string[];
+  created_at: string | null;
+}
+
+export interface SubmitDeliveryReviewBody {
+  delivery_request_id: number;
+  rating: number; // 1-5
+  aspect?: string | null;
+  comment?: string | null;
+}
+
+/** Most recent approved delivery awaiting a review, or all-null when none. */
+export async function getPendingDeliveryReview(): Promise<PendingDeliveryReview> {
+  const response = await apiClient.get<PendingDeliveryReview>(
+    '/api/user/delivery/pending-review'
+  );
+  return response.data;
+}
+
+/** Submit a star rating (+ optional aspect/comment) for a delivery. */
+export async function submitDeliveryReview(
+  body: SubmitDeliveryReviewBody
+): Promise<DeliverySuccessResponse> {
+  const response = await apiClient.post<DeliverySuccessResponse>(
+    '/api/user/delivery/review',
+    body
+  );
+  return response.data;
+}
