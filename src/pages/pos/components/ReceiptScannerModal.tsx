@@ -241,6 +241,14 @@ export default function ReceiptScannerModal({
             {/* Result view */}
             {result ? (
               <div className="space-y-4">
+                {result.source === 'zayafka' && (
+                  <div className="flex items-center justify-center">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                      <Package className="w-4 h-4" />
+                      {t('pos.scanner.zayafka', 'Zayafka (UzPost)')}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-center">
                   {result.is_taken_away ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200">
@@ -258,6 +266,9 @@ export default function ReceiptScannerModal({
                 <div className="rounded-2xl border border-gray-200 dark:border-white/10 divide-y divide-gray-100 dark:divide-white/5">
                   <Row label={t('pos.scanner.client', 'Mijoz')} value={result.client_code || '—'} mono />
                   {result.client_name && <Row label={t('pos.scanner.name', 'Ism')} value={result.client_name} />}
+                  {result.branch_name && (
+                    <Row label={t('pos.scanner.branch', 'Filial')} value={result.branch_name} />
+                  )}
                   <Row label={t('pos.scanner.flight', 'Reys')} value={result.flight_name || '—'} />
                   <Row label={t('pos.scanner.total', 'Jami')} value={`${formatMoney(result.total_amount)} so'm`} />
                   <Row label={t('pos.scanner.paid', "To'langan")} value={`${formatMoney(result.paid_amount)} so'm`} />

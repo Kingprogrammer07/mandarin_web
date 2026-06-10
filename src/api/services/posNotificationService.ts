@@ -73,6 +73,10 @@ export interface ReceiptResolveResponse {
   card_masked: string | null;
   paid_at: string | null;
   nbu_status: string;
+  /** "flight" (cargo payment) | "zayafka" (UzPost delivery fee). */
+  source?: string;
+  /** UzPost branch, present only for zayafka receipts. */
+  branch_name?: string | null;
 }
 
 export interface NotificationFilters {
