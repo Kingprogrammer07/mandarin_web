@@ -696,6 +696,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         kind: 'payment',
         paymentUrl: response.payment_url,
         flightName: selectedFlightName,
+        // After a flight payment, land on the payment-history page.
+        homePath: '/user/history',
       });
     } catch (err: unknown) {
       const error = err as { status?: number; data?: { detail?: string | { message?: string } }; message?: string };

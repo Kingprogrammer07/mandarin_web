@@ -1716,6 +1716,8 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
             kind: 'payment',
             paymentUrl: res.payment_url,
             flightName: selectedFlights[0],
+            // After a zayafka payment, land on the delivery-history tab.
+            homePath: '/user/home?tab=delivery_history',
           });
         } else {
           toast.error("To'lov havolasi olinmadi. Qayta urinib ko'ring.");

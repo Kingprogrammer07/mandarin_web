@@ -5,6 +5,8 @@ interface NbuReturnContext {
   kind: NbuReturnKind;
   path: string;
   flightName?: string;
+  /** Where the success page's "home" button should land (e.g. a history page). */
+  homePath?: string;
   createdAt: number;
 }
 
@@ -13,6 +15,8 @@ interface SaveNbuReturnContextInput {
   kind: NbuReturnKind;
   paymentUrl: string;
   flightName?: string | null;
+  /** Where the success page's "home" button should land (e.g. a history page). */
+  homePath?: string | null;
 }
 
 const KEY_PREFIX = 'nbu_return_context:';
@@ -40,6 +44,7 @@ function safeRead(key: string): NbuReturnContext | null {
       kind: parsed.kind,
       path: parsed.path,
       flightName: parsed.flightName,
+      homePath: parsed.homePath,
       createdAt: parsed.createdAt,
     };
   } catch {
@@ -73,10 +78,27 @@ export function redirectToNbuUrl(input: SaveNbuReturnContextInput): void {
     kind: input.kind,
     path: currentAppPath(),
     flightName: input.flightName ?? undefined,
+    homePath: input.homePath ?? undefined,
     createdAt: Date.now(),
   });
 
   window.location.assign(input.paymentUrl);
+}
+
+/**
+ * The "home" target the success page should land on after this payment — set at
+ * redirect time (e.g. the payment-history page). Same-origin validated. Null when
+ * none was stored (caller falls back to its default home).
+ */
+export function getNbuHomePath(orderId: string): string | null {
+  const exact = orderId ? safeRead(`${KEY_PREFIX}${orderId}`) : null;
+  const fallback = safeRead(LAST_KEY);
+  const context = exact ?? (fallback?.orderId === orderId ? fallback : null);
+  if (!context?.homePath) return null;
+
+  const url = safeSameOriginPath(context.homePath);
+  if (!url) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 export function getNbuReturnPath(orderId: string): string | null {

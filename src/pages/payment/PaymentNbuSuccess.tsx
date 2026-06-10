@@ -6,7 +6,7 @@ import {
   nbuPaymentService,
   type PublicNbuPaymentStatus,
 } from '@/api/services/nbuPaymentService';
-import { getNbuReturnPath } from '@/utils/nbuReturnContext';
+import { getNbuReturnPath, getNbuHomePath } from '@/utils/nbuReturnContext';
 import { playApplePaySound } from '@/utils/audioUtils';
 
 interface PaymentNbuSuccessProps {
@@ -46,6 +46,9 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
   const { t } = useTranslation();
   const orderId = new URLSearchParams(window.location.search).get('orderId') ?? '';
   const returnPath = orderId ? getNbuReturnPath(orderId) : null;
+  // Explicit post-payment "home" target set by the initiator (e.g. payment-history
+  // for a flight payment, delivery-history for a zayafka). Falls back to returnPath.
+  const homePath = orderId ? getNbuHomePath(orderId) : null;
 
   const [statusInfo, setStatusInfo] = useState<PublicNbuPaymentStatus | null>(null);
   const [phase, setPhase] = useState<Phase>(orderId ? 'pending' : 'no_data');
@@ -63,6 +66,11 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
   }, [phase]);
 
   const handleHome = useCallback(() => {
+    // Prefer the explicit post-payment target (history page) when set.
+    if (homePath) {
+      window.location.href = homePath;
+      return;
+    }
     if (returnPath) {
       window.location.href = returnPath;
       return;
@@ -72,7 +80,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
     } else {
       window.location.href = '/';
     }
-  }, [onNavigateHome, returnPath]);
+  }, [onNavigateHome, returnPath, homePath]);
 
   const handleManualRefresh = useCallback(() => {
     attemptsRef.current = 0;
