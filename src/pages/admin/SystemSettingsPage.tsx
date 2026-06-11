@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   RefreshCw,
   XCircle,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { systemService, type NbuPendingPaymentRow } from '@/api/services/systemService';
 
@@ -42,6 +44,7 @@ export default function SystemSettingsPage() {
   const [showNbuPending, setShowNbuPending] = useState(false);
   const [reconciling, setReconciling] = useState<string | null>(null);
   const [expiring, setExpiring] = useState<string | null>(null);
+  const [selectedTxns, setSelectedTxns] = useState<Set<string>>(new Set());
 
   // Maintenance + NBU toggles are pushed via SSE (`maintenance.toggled`,
   // `nbu.status.changed`), so these are slow visibility-gated fallbacks.
@@ -132,6 +135,63 @@ export default function SystemSettingsPage() {
     },
     [expireMutation],
   );
+
+  // Bulk expire — selected rows or all stale (>1h). Each row is reconciled
+  // against NBU first, so a payment that actually landed is credited (SUCCESS),
+  // never expired.
+  const bulkExpireMutation = useMutation({
+    mutationFn: systemService.expireNbuBulk,
+    onSuccess: (res) => {
+      const parts = [`${res.expired} ta expired`];
+      if (res.flipped_to_success) {
+        parts.push(`${res.flipped_to_success} ta SUCCESS (kreditlandi)`);
+      }
+      if (res.skipped) parts.push(`${res.skipped} ta o'tkazib yuborildi`);
+      toast.success(parts.join(' · '));
+      setSelectedTxns(new Set());
+      queryClient.invalidateQueries({ queryKey: ['system-nbu-pending'] });
+    },
+    onError: () => {
+      toast.error('Bulk expire xatosi — server loglarini ko\'ring');
+    },
+  });
+
+  const toggleSelect = useCallback((transactionId: string) => {
+    setSelectedTxns((prev) => {
+      const next = new Set(prev);
+      if (next.has(transactionId)) next.delete(transactionId);
+      else next.add(transactionId);
+      return next;
+    });
+  }, []);
+
+  const visibleTxns = nbuPending?.rows.map((r) => r.transaction_id) ?? [];
+  const allSelected =
+    visibleTxns.length > 0 && visibleTxns.every((t) => selectedTxns.has(t));
+
+  const toggleSelectAll = () => {
+    setSelectedTxns(allSelected ? new Set() : new Set(visibleTxns));
+  };
+
+  const handleBulkExpireSelected = () => {
+    if (selectedTxns.size === 0) return;
+    const ok = window.confirm(
+      `${selectedTxns.size} ta tranzaksiyani EXPIRED qilasizmi?\n\n` +
+        'Har biri avval NBU bilan tekshiriladi (reconcile). Haqiqatda ' +
+        'to\'langani SUCCESS bo\'lib kreditlanadi, qolgani expired bo\'ladi.',
+    );
+    if (!ok) return;
+    bulkExpireMutation.mutate({ transaction_ids: Array.from(selectedTxns) });
+  };
+
+  const handleBulkExpireStale = () => {
+    const ok = window.confirm(
+      '1 soatdan ortiq pendingda turgan BARCHA tranzaksiyalarni ' +
+        'EXPIRED qilasizmi?\n\nHar biri avval NBU bilan tekshiriladi.',
+    );
+    if (!ok) return;
+    bulkExpireMutation.mutate({ older_than_seconds: 3600 });
+  };
 
   const maintenanceMutation = useMutation({
     mutationFn: systemService.toggleMaintenance,
@@ -338,18 +398,71 @@ export default function SystemSettingsPage() {
                     Pending tranzaksiyalar yo'q ✓
                   </p>
                 ) : (
+                  <>
+                    {/* Bulk actions toolbar */}
+                    <div className="flex items-center gap-2 flex-wrap pb-1">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.06] hover:bg-gray-200 dark:hover:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200"
+                      >
+                        {allSelected ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-rose-500" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5" />
+                        )}
+                        {allSelected ? 'Belgini olib tashlash' : 'Hammasini tanlash'}
+                      </button>
+                      <button
+                        onClick={handleBulkExpireSelected}
+                        disabled={selectedTxns.size === 0 || bulkExpireMutation.isPending}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800 dark:bg-white/15 hover:bg-gray-900 dark:hover:bg-white/20 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {bulkExpireMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
+                        Tanlanganlarni expire ({selectedTxns.size})
+                      </button>
+                      <button
+                        onClick={handleBulkExpireStale}
+                        disabled={bulkExpireMutation.isPending}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-rose-300 dark:border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Barcha eskirgan (&gt;1h) expire
+                      </button>
+                    </div>
+
                   <div className="space-y-2 max-h-[480px] overflow-auto">
                     {nbuPending.rows.map((row: NbuPendingPaymentRow) => {
                       const isReconciling = reconciling === row.transaction_id;
                       const isExpiring = expiring === row.transaction_id;
                       const isCardBinding = row.purpose === 'CARD_BINDING';
                       const isBusy = isReconciling || isExpiring;
+                      const isSelected = selectedTxns.has(row.transaction_id);
                       return (
                         <div
                           key={row.id}
-                          className="border border-gray-200 dark:border-white/10 rounded-xl p-3 bg-gray-50/50 dark:bg-white/[0.02]"
+                          className={`border rounded-xl p-3 ${
+                            isSelected
+                              ? 'border-rose-300 dark:border-rose-500/40 bg-rose-50/50 dark:bg-rose-500/[0.06]'
+                              : 'border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]'
+                          }`}
                         >
-                          <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
+                          <button
+                            onClick={() => toggleSelect(row.transaction_id)}
+                            className="flex-shrink-0 pt-0.5 text-gray-400 hover:text-rose-500"
+                            aria-label="Tanlash"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-rose-500" />
+                            ) : (
+                              <Square className="w-4 h-4" />
+                            )}
+                          </button>
+                          <div className="flex flex-col gap-2 flex-1 min-w-0">
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                 <span
@@ -409,10 +522,12 @@ export default function SystemSettingsPage() {
                               </button>
                             </div>
                           </div>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
+                  </>
                 )}
               </div>
             </motion.div>

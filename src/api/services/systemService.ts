@@ -60,6 +60,21 @@ export interface NbuExpireResponse {
   new_status: string;
 }
 
+export interface NbuExpireBulkRequest {
+  /** Specific NBU transaction ids to expire (selected rows). */
+  transaction_ids?: string[];
+  /** Expire ALL pending rows older than this many seconds. */
+  older_than_seconds?: number;
+}
+
+export interface NbuExpireBulkResponse {
+  requested: number;
+  expired: number;
+  flipped_to_success: number;
+  skipped: number;
+  expired_transaction_ids: string[];
+}
+
 export const systemService = {
   async getMaintenanceStatus(): Promise<MaintenanceStatusResponse> {
     const { data } = await apiClient.get<MaintenanceStatusResponse>('/api/v1/system/maintenance-status');
@@ -109,6 +124,14 @@ export const systemService = {
   async expireNbu(transactionId: string): Promise<NbuExpireResponse> {
     const { data } = await apiClient.post<NbuExpireResponse>(
       `/api/v1/system/nbu/expire/${encodeURIComponent(transactionId)}`,
+    );
+    return data;
+  },
+
+  async expireNbuBulk(body: NbuExpireBulkRequest): Promise<NbuExpireBulkResponse> {
+    const { data } = await apiClient.post<NbuExpireBulkResponse>(
+      '/api/v1/system/nbu/expire-bulk',
+      body,
     );
     return data;
   },
