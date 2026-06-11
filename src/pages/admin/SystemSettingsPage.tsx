@@ -15,6 +15,8 @@ import {
   XCircle,
   CheckSquare,
   Square,
+  BarChart3,
+  Send,
 } from 'lucide-react';
 import { systemService, type NbuPendingPaymentRow } from '@/api/services/systemService';
 
@@ -45,6 +47,7 @@ export default function SystemSettingsPage() {
   const [reconciling, setReconciling] = useState<string | null>(null);
   const [expiring, setExpiring] = useState<string | null>(null);
   const [selectedTxns, setSelectedTxns] = useState<Set<string>>(new Set());
+  const [maxFlightsInput, setMaxFlightsInput] = useState<number | null>(null);
 
   // Maintenance + NBU toggles are pushed via SSE (`maintenance.toggled`,
   // `nbu.status.changed`), so these are slow visibility-gated fallbacks.
@@ -193,6 +196,33 @@ export default function SystemSettingsPage() {
     bulkExpireMutation.mutate({ older_than_seconds: 3600 });
   };
 
+  // ── Hourly NBU report config ───────────────────────────────────────────
+  const { data: reportConfig } = useQuery({
+    queryKey: ['system-nbu-report-config'],
+    queryFn: systemService.getNbuReportConfig,
+    refetchInterval: () => visibleInterval(5 * 60_000),
+    refetchIntervalInBackground: false,
+  });
+
+  const reportConfigMutation = useMutation({
+    mutationFn: systemService.updateNbuReportConfig,
+    onSuccess: (cfg) => {
+      queryClient.setQueryData(['system-nbu-report-config'], cfg);
+      toast.success('Hisobot sozlamasi saqlandi');
+    },
+    onError: () => toast.error('Sozlamani saqlab bo\'lmadi'),
+  });
+
+  const resendReportMutation = useMutation({
+    mutationFn: (hoursBack: number) => systemService.resendNbuReports(hoursBack),
+    onSuccess: (res) => {
+      toast.success(`${res.sent} ta soatlik hisobot yuborildi`);
+    },
+    onError: () => toast.error('Hisobotni qayta yuborib bo\'lmadi'),
+  });
+
+  const effectiveMaxFlights = maxFlightsInput ?? reportConfig?.max_flights ?? 3;
+
   const maintenanceMutation = useMutation({
     mutationFn: systemService.toggleMaintenance,
     onSuccess: (data) => {
@@ -335,6 +365,93 @@ export default function SystemSettingsPage() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Hourly NBU Report */}
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-base text-gray-900 dark:text-white">
+                Soatlik NBU hisobot
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Har soat guruhga NBU to'lovlari xulosasi yuboriladi
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                reportConfigMutation.mutate({ enabled: !reportConfig?.enabled })
+              }
+              disabled={reportConfigMutation.isPending}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                reportConfig?.enabled
+                  ? 'bg-emerald-500'
+                  : 'bg-gray-300 dark:bg-white/20'
+              } disabled:opacity-50`}
+              aria-label="Hisobotni yoqish/o'chirish"
+            >
+              <span
+                className={`inline-block h-5 w-5 mt-0.5 rounded-full bg-white shadow transform transition-transform ${
+                  reportConfig?.enabled ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                Ko'rinadigan reyslar (top-N)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={effectiveMaxFlights}
+                  onChange={(e) => setMaxFlightsInput(Number(e.target.value))}
+                  className="w-20 px-3 py-1.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500/20 text-gray-700 dark:text-gray-200"
+                />
+                <button
+                  onClick={() => {
+                    reportConfigMutation.mutate({
+                      max_flights: effectiveMaxFlights,
+                    });
+                    setMaxFlightsInput(null);
+                  }}
+                  disabled={
+                    reportConfigMutation.isPending ||
+                    effectiveMaxFlights === reportConfig?.max_flights
+                  }
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Saqlash
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => resendReportMutation.mutate(1)}
+              disabled={resendReportMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-xs font-bold disabled:opacity-50"
+            >
+              {resendReportMutation.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              Oxirgi soatni qayta yuborish
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            Guruh ID: {reportConfig?.group_id ?? '—'} · oyna: o'tgan to'liq soat
+            (masalan 15:00–15:59). Bo'sh soatlar ham yuboriladi.
+          </p>
+        </div>
       </div>
 
       {/* NBU Stuck Payments */}

@@ -217,6 +217,26 @@ export async function getCashierLog(params: CashierLogParams = {}): Promise<Cash
 }
 
 /**
+ * GET /api/v1/payments/cashier-log/export
+ *
+ * Downloads the cashier log as an .xlsx workbook (3 worksheets: filtered log,
+ * NBU pending, NBU expired) for the given date range + optional provider.
+ * Requires `pos:read` permission.
+ */
+export async function exportCashierLog(params: {
+  date_from?: string;
+  date_to?: string;
+  payment_provider?: CashierLogProvider;
+}): Promise<Blob> {
+  const res = await apiClient.get('/api/v1/payments/cashier-log/export', {
+    params,
+    headers: getAdminHeaders(),
+    responseType: 'blob',
+  });
+  return res.data as Blob;
+}
+
+/**
  * POST /api/v1/payments/adjust-balance
  *
  * Manually credit or debit a client's wallet balance.

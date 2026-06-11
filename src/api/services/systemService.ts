@@ -75,6 +75,22 @@ export interface NbuExpireBulkResponse {
   expired_transaction_ids: string[];
 }
 
+export interface NbuReportConfig {
+  enabled: boolean;
+  max_flights: number;
+  group_id: number;
+}
+
+export interface NbuReportConfigUpdate {
+  enabled?: boolean;
+  max_flights?: number;
+}
+
+export interface NbuReportResendResponse {
+  sent: number;
+  windows: string[];
+}
+
 export const systemService = {
   async getMaintenanceStatus(): Promise<MaintenanceStatusResponse> {
     const { data } = await apiClient.get<MaintenanceStatusResponse>('/api/v1/system/maintenance-status');
@@ -132,6 +148,31 @@ export const systemService = {
     const { data } = await apiClient.post<NbuExpireBulkResponse>(
       '/api/v1/system/nbu/expire-bulk',
       body,
+    );
+    return data;
+  },
+
+  async getNbuReportConfig(): Promise<NbuReportConfig> {
+    const { data } = await apiClient.get<NbuReportConfig>(
+      '/api/v1/system/nbu/report-config',
+    );
+    return data;
+  },
+
+  async updateNbuReportConfig(
+    body: NbuReportConfigUpdate,
+  ): Promise<NbuReportConfig> {
+    const { data } = await apiClient.post<NbuReportConfig>(
+      '/api/v1/system/nbu/report-config',
+      body,
+    );
+    return data;
+  },
+
+  async resendNbuReports(hoursBack: number): Promise<NbuReportResendResponse> {
+    const { data } = await apiClient.post<NbuReportResendResponse>(
+      '/api/v1/system/nbu/report/resend',
+      { hours_back: hoursBack },
     );
     return data;
   },

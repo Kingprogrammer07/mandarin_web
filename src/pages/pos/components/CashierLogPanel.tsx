@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   ReceiptText,
   RefreshCw,
@@ -8,12 +9,16 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { QuickDatePresets } from "@/components/ui/QuickDatePresets";
 import { formatCurrencySum } from "@/lib/format";
 import type { CashierLogResponse, CashierLogProvider } from "@/api/pos";
+import { exportCashierLog } from "@/api/pos";
 import {
   getSelectedProviderTotal,
+  toIsoDateBound,
   LOG_PROVIDER_FILTERS,
 } from "./utils";
 import { LogEntry } from "./LogEntry";
@@ -56,6 +61,28 @@ export function CashierLogPanel({
     return window.innerWidth >= 1024;
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await exportCashierLog({
+        date_from: toIsoDateBound(logDateFrom, "start"),
+        date_to: toIsoDateBound(logDateTo, "end"),
+        payment_provider: logProvider === "all" ? undefined : logProvider,
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `kassir_hisobot_${logDateFrom || "all"}_${logDateTo || "all"}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Excel yuklab bo'lmadi");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const hasFilters = Boolean(logDateFrom || logDateTo || logProvider !== "all");
   const entryCount = logData?.items.length ?? 0;
@@ -257,6 +284,21 @@ export function CashierLogPanel({
                           </span>
                         </div>
                       )}
+
+                      {/* Excel export — filtered range + provider, with NBU
+                          pending/expired worksheets */}
+                      <button
+                        onClick={handleExport}
+                        disabled={exporting}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {exporting ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Download className="w-3.5 h-3.5" />
+                        )}
+                        Excel yuklab olish
+                      </button>
                     </motion.div>
                   )}
                 </AnimatePresence>
