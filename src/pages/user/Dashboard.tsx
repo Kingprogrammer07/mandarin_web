@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Smartphone,
   MessageSquare,
+  Gift,
 } from 'lucide-react';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { useGuideTour } from '@/hooks/useGuideTour';
@@ -45,12 +46,44 @@ const ProhibitedItemsModal = lazy(() => import('@/components/modals/ProhibitedIt
 const OurAddressModal = lazy(() => import('@/components/modals/OurAddressModal'));
 const NotificationCenter = lazy(loadNotificationCenter);
 
+/**
+ * Dev-only: read a forced delivery id from `?reviewTest=<id>` so the review
+ * modal can be opened on demand while testing locally. Returns null in
+ * production or when the param is absent/invalid.
+ */
+function readForcedReviewId(): number | null {
+  if (!import.meta.env.DEV) return null;
+  const forced = new URLSearchParams(window.location.search).get('reviewTest');
+  if (forced && !Number.isNaN(Number(forced))) return Number(forced);
+  return null;
+}
+
+// Per-user "shown once" guard for the service-review prompt. Persisted in
+// localStorage (not sessionStorage) so a given review is asked exactly once and
+// never nags again — whether the user submitted it or dismissed it.
+const REVIEW_SEEN_PREFIX = 'review_seen:';
+function isReviewSeen(id: number): boolean {
+  try {
+    return localStorage.getItem(`${REVIEW_SEEN_PREFIX}${id}`) === '1';
+  } catch {
+    return false;
+  }
+}
+function markReviewSeen(id: number): void {
+  try {
+    localStorage.setItem(`${REVIEW_SEEN_PREFIX}${id}`, '1');
+  } catch {
+    // Storage unavailable (private mode) — worst case it asks again next time.
+  }
+}
+
 interface DashboardProps {
   onNavigateToReports?: () => void;
   onNavigateToHistory?: () => void;
+  onNavigateToReferral?: () => void;
 }
 
-export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: DashboardProps) {
+export default function Dashboard({ onNavigateToReports, onNavigateToHistory, onNavigateToReferral }: DashboardProps) {
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
@@ -59,20 +92,23 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
   });
   const [initialTrackView] = useState<'search' | 'history'>('search');
 
-  // Post-delivery review prompt: on load, ask the backend whether the user has
-  // an approved delivery awaiting a review. Shown unless snoozed this session
-  // ("Keyinroq"). Covers both uzpost (approved in-session → shows on return) and
-  // other types (approved later → shows on next app entry) via one check.
-  const [reviewDrId, setReviewDrId] = useState<number | null>(null);
+  // Service-review prompt: on load, ask the backend whether the user has an
+  // approved delivery that still triggers a (one-time) bot-service review. Shown
+  // at most once per user per delivery — `isReviewSeen` guards it permanently.
+  // Dev-only force trigger: open the modal on demand for local testing, e.g.
+  // `?reviewTest=123`. Resolved once in the initializer (not an effect) so it
+  // never causes a setState-in-effect cascade; in that mode submit is mocked.
+  const [reviewDrId, setReviewDrId] = useState<number | null>(readForcedReviewId);
+  const reviewIsMock = readForcedReviewId() !== null;
   useEffect(() => {
+    // Dev force already armed the modal — skip the real pending-review fetch.
+    if (readForcedReviewId() !== null) return;
     let active = true;
     getPendingDeliveryReview()
       .then((res) => {
         if (!active || !res.delivery_request_id) return;
-        const snoozed = sessionStorage.getItem(
-          `delivery_review_snoozed:${res.delivery_request_id}`
-        );
-        if (!snoozed) setReviewDrId(res.delivery_request_id);
+        if (isReviewSeen(res.delivery_request_id)) return; // shown once already
+        setReviewDrId(res.delivery_request_id);
       })
       .catch(() => {});
     return () => {
@@ -444,7 +480,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
               </div>
             </section>
 
-            <section className="mb-6">
+            <section>
               <div className="flex items-center justify-between mb-4 ml-1 mr-1">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <span className="w-1 h-5 bg-amber-500 rounded-full inline-block"></span>
@@ -495,6 +531,34 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
                     </div>
                   </div>
                   <Plus className="w-5 h-5 text-amber-500 dark:text-amber-400 group-hover:rotate-90 transition-transform duration-200 shrink-0" />
+                </button>
+              )}
+
+              {onNavigateToReferral && (
+                <button
+                  data-tour="dash-referral"
+                  className="
+                    w-full relative overflow-hidden rounded-2xl p-4 flex items-center justify-between mb-3
+                    bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/5
+                    border border-amber-200 dark:border-amber-500/20
+                    active:scale-[0.98] transition-all duration-200 group shadow-sm hover:shadow-md
+                  "
+                  onClick={onNavigateToReferral}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform text-amber-600 dark:text-amber-400">
+                      <Gift className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                        {t('referral.dashboardTitle')}
+                      </h3>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                        {t('referral.dashboardDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <svg className="w-5 h-5 text-amber-500 dark:text-amber-400 group-hover:translate-x-1 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m9 18 6-6-6-6" /></svg>
                 </button>
               )}
 
@@ -567,11 +631,16 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory }: 
             <DeliveryReviewModal
               open
               deliveryRequestId={reviewDrId}
+              mock={reviewIsMock}
               onDismiss={() => {
-                sessionStorage.setItem(`delivery_review_snoozed:${reviewDrId}`, '1');
+                // Mark seen so it never asks again (skip while dev-testing).
+                if (!reviewIsMock) markReviewSeen(reviewDrId);
                 setReviewDrId(null);
               }}
-              onSubmitted={() => setReviewDrId(null)}
+              onSubmitted={() => {
+                if (!reviewIsMock) markReviewSeen(reviewDrId);
+                setReviewDrId(null);
+              }}
             />
           )}
         </Suspense>

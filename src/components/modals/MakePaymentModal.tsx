@@ -474,6 +474,22 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     staleTime: 60_000,
     enabled: isOpen && nbuEnabled,
   });
+  const savedCards = nbuCardsData?.items ?? [];
+
+  const buildPaymentCardsTour = useCallback((): DriveStep[] => [
+    {
+      element: '[data-tour="pay-saved-card"]',
+      popover: {
+        title: t('tour.payment.savedCard.title'),
+        description: t('tour.payment.savedCard.desc'),
+      },
+    },
+  ], [t]);
+  useGuideTour(
+    'payment-cards',
+    buildPaymentCardsTour,
+    isOpen && step === 1 && nbuEnabled && savedCards.length > 0 && !!details && !detailsLoading && !showSuccess,
+  );
 
   const nbuChargeMutation = useMutation({
     mutationFn: nbuPaymentService.chargeSavedCard,
@@ -965,7 +981,6 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
     const walletCoversAll = details.wallet_balance >= payableAmount && payableAmount > 0;
 
-    const savedCards = nbuCardsData?.items ?? [];
     const hasSavedCards = savedCards.length > 0;
 
     // Manual online (card transfer / payment links + receipt upload) is offered
@@ -984,7 +999,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             so this surface stays focused on completing the current payment.
             Each row offers one-tap charge for the resolved payable amount. */}
         {nbuEnabled && hasSavedCards && (
-          <div className="space-y-3">
+          <div data-tour="pay-saved-card" className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
                 {t('nbu.cards.title')}

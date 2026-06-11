@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import type { DriveStep } from 'driver.js';
 import {
   CreditCard,
   Trash2,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { useGuideTour } from '@/hooks/useGuideTour';
 
 interface SavedCardsPageProps {
   onBack?: () => void;
@@ -48,6 +50,7 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
     queryFn: nbuPaymentService.listCards,
     staleTime: 60_000,
   });
+  const cards = cardsData?.items ?? [];
 
   const deleteMutation = useMutation({
     mutationFn: nbuPaymentService.deleteCard,
@@ -90,7 +93,30 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
     bindMutation.mutate();
   }, [bindMutation]);
 
-  const cards = cardsData?.items ?? [];
+  const buildCardTour = useCallback((): DriveStep[] => {
+    const steps: DriveStep[] = [
+      {
+        element: '[data-tour="card-bind"]',
+        popover: {
+          title: t('tour.cardBinding.bind.title'),
+          description: t('tour.cardBinding.bind.desc'),
+        },
+      },
+    ];
+
+    if (cards.length > 0) {
+      steps.push({
+        element: '[data-tour="card-item"]',
+        popover: {
+          title: t('tour.cardBinding.use.title'),
+          description: t('tour.cardBinding.use.desc'),
+        },
+      });
+    }
+
+    return steps;
+  }, [t, cards.length]);
+  useGuideTour('card-binding', buildCardTour, !isLoading && !isError);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#06080d] px-4 pt-6 pb-24">
@@ -112,6 +138,7 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
       <div className="max-w-lg mx-auto space-y-4">
         {/* Bind new card button */}
         <motion.button
+          data-tour="card-bind"
           whileTap={{ scale: 0.97 }}
           onClick={handleBind}
           disabled={bindMutation.isPending}
@@ -168,9 +195,10 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
 
         {/* Card list */}
         <AnimatePresence>
-          {cards.map((card) => (
+          {cards.map((card, index) => (
             <motion.div
               key={card.id}
+              data-tour={index === 0 ? 'card-item' : undefined}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}

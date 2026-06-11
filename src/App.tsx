@@ -53,6 +53,7 @@ const ExpensesPage = lazy(() => import("./pages/admin/ExpensesPage"));
 const PaymentNbuSuccess = lazy(() => import("./pages/payment/PaymentNbuSuccess"));
 const PaymentNbuFailure = lazy(() => import("./pages/payment/PaymentNbuFailure"));
 const SavedCardsPage = lazy(() => import("./pages/payment/SavedCardsPage"));
+const ReferralPage = lazy(() => import("./pages/user/ReferralPage"));
 const SystemSettingsPage = lazy(() => import("./pages/admin/SystemSettingsPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ type Page =
   | "user-home"
   | "user-reports"
   | "user-history"
+  | "user-referral"
   | "admin-accounts"
   | "admin-roles"
   | "admin-audit"
@@ -103,7 +105,7 @@ interface RouteInfo {
 const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   user: {
     default: "user-home",
-    allowed: ["user-home", "user-profile", "user-history", "user-reports", "saved_cards"],
+    allowed: ["user-home", "user-profile", "user-history", "user-reports", "saved_cards", "user-referral"],
   },
   worker: {
     default: "flights",
@@ -132,6 +134,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "user-profile",
       "user-history",
       "user-reports",
+      "user-referral",
       "admin-accounts",
       "admin-roles",
       "admin-audit",
@@ -165,6 +168,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "user-profile",
       "user-history",
       "user-reports",
+      "user-referral",
       "admin-accounts",
       "admin-roles",
       "admin-audit",
@@ -338,6 +342,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/user/home") return { page: "user-home" };
   if (path === "/user/reports") return { page: "user-reports" };
   if (path === "/user/history") return { page: "user-history" };
+  if (path === "/user/referral") return { page: "user-referral" };
   if (path === "/admin/accounts") return { page: "admin-accounts" };
   if (path === "/admin/roles") return { page: "admin-roles" };
   if (path === "/admin/audit") return { page: "admin-audit" };
@@ -1022,6 +1027,7 @@ function AppContent() {
             <UserHome
               onNavigateToReports={() => navigateToPage("user-reports")}
               onNavigateToHistory={() => navigateToPage("user-history")}
+              onNavigateToReferral={() => navigateToPage("user-referral")}
             />
           )}
 
@@ -1043,6 +1049,10 @@ function AppContent() {
 
           {currentPage === "saved_cards" && (
             <SavedCardsPage onBack={() => navigateToPage("user-home")} />
+          )}
+
+          {currentPage === "user-referral" && (
+            <ReferralPage onBack={() => navigateToPage("user-home")} />
           )}
 
           {currentPage === "system-settings" && (

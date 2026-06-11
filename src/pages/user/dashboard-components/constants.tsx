@@ -1,7 +1,7 @@
 import {
   ShieldAlert,
   ShieldOff,
-  IdCard,
+  // IdCard,
   Rocket,
   Plane,
   Calculator,
@@ -25,15 +25,16 @@ export const CAROUSEL_ITEMS: CarouselItemData[] = [
     bgIcon: <ShieldAlert className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
     mainIcon: <ShieldOff className="text-white/90" style={{ width: 32, height: 32 }} />,
   },
-  {
-    id: 2,
-    type: 'feature',
-    titleKey: 'dashboard.carousel.id.title',
-    subKey: 'dashboard.carousel.id.sub',
-    gradient: 'from-blue-900 to-blue-600',
-    bgIcon: <IdCard className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
-    mainIcon: <IdCard className="text-white/90" style={{ width: 32, height: 32 }} />,
-  },
+  // Temporarily hidden: "ID olish" feature.
+  // {
+  //   id: 2,
+  //   type: 'feature',
+  //   titleKey: 'dashboard.carousel.id.title',
+  //   subKey: 'dashboard.carousel.id.sub',
+  //   gradient: 'from-blue-900 to-blue-600',
+  //   bgIcon: <IdCard className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
+  //   mainIcon: <IdCard className="text-white/90" style={{ width: 32, height: 32 }} />,
+  // },
   {
     id: 3,
     type: 'feature',

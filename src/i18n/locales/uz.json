@@ -1205,28 +1205,28 @@
         "incompleteTitle": "Manzil to'liq emas",
         "incompleteDescription": "Yetkazib berish uchun viloyat, tuman va uy manzili kiritilishi shart. \"Manzilni tahrirlash\" tugmasini bosib to'ldiring."
       },
-    "actions": {
-      "editAddress": "Manzilni tahrirlash",
-      "closeEdit": "Yopish",
-      "saveAndConfirmAddress": "Manzilni saqlash va tasdiqlash",
-      "savingAddress": "Saqlanmoqda...",
-      "cancel": "Bekor qilish",
-      "submit": "Tasdiqlash",
-      "submitting": "Yuborilmoqda..."
+      "actions": {
+        "editAddress": "Manzilni tahrirlash",
+        "closeEdit": "Yopish",
+        "saveAndConfirmAddress": "Manzilni saqlash va tasdiqlash",
+        "savingAddress": "Saqlanmoqda...",
+        "cancel": "Bekor qilish",
+        "submit": "Tasdiqlash",
+        "submitting": "Yuborilmoqda..."
+      },
+      "errors": {
+        "addressRequired": "Yetkazib berish manzilini to'liq kiriting",
+        "checkAddressBeforeSubmit": "Zayafka yuborishdan oldin yetkazib berish manzilini tekshiring.",
+        "clientIdMissing": "Mijoz ID si topilmadi. Mijozni tekshiring.",
+        "saveAddressFailed": "Manzilni saqlashda xatolik yuz berdi. Qayta urinib ko'ring.",
+        "receiptRequired": "UzPost yetkazib berish uchun to'lov cheki yuklanishi shart (agar hamyon yetmasa)."
+      },
+      "receipt": {
+        "uploadLabel": "To'lov chekini yuklash",
+        "dropHint": "Chek rasmini yuklang yoki tashlang",
+        "pasteHint": "yoki Ctrl+V (Paste) orqali kiritish"
+      }
     },
-    "errors": {
-      "addressRequired": "Yetkazib berish manzilini to'liq kiriting",
-      "checkAddressBeforeSubmit": "Zayafka yuborishdan oldin yetkazib berish manzilini tekshiring.",
-      "clientIdMissing": "Mijoz ID si topilmadi. Mijozni tekshiring.",
-      "saveAddressFailed": "Manzilni saqlashda xatolik yuz berdi. Qayta urinib ko'ring.",
-      "receiptRequired": "UzPost yetkazib berish uchun to'lov cheki yuklanishi shart (agar hamyon yetmasa)."
-    },
-    "receipt": {
-      "uploadLabel": "To'lov chekini yuklash",
-      "dropHint": "Chek rasmini yuklang yoki tashlang",
-      "pasteHint": "yoki Ctrl+V (Paste) orqali kiritish"
-    }
-  },
     "steps": {
       "type": {
         "title": "Yetkazish turini tanlang",
@@ -1813,6 +1813,16 @@
         "desc": "Maxfiy ma'lumotlarni ko'rsatish/yashirish va profilni tahrirlash shu bo'limda."
       }
     },
+    "cardBinding": {
+      "bind": {
+        "title": "Kartani ulash",
+        "desc": "Yangi kartani ulash uchun shu tugmani bosing. Bank sahifasiga o'tasiz, karta ma'lumotlari va SMS kodni kiritasiz, so'ng ilovaga qaytasiz."
+      },
+      "use": {
+        "title": "Ulangan karta",
+        "desc": "Bu sizning saqlangan kartangiz. To'lov vaqtida uni tanlab, karta ma'lumotlarini qayta kiritmasdan bir bosishda to'lashingiz mumkin."
+      }
+    },
     "payment": {
       "amount": {
         "title": "To'lov summasi",
@@ -1825,7 +1835,62 @@
       "wallet": {
         "title": "Hamyon balansi",
         "desc": "Hisobingizdagi mablag'ni to'lovga qo'shib, summani kamaytirishingiz mumkin."
+      },
+      "savedCard": {
+        "title": "Saqlangan karta bilan to'lash",
+        "desc": "Tez to'lash uchun saqlangan kartangizni shu yerdan tanlang."
       }
     }
+  },
+  "referral": {
+    "title": "Do'stlarni taklif qilish",
+    "subtitle": "Havolangizni ulashing va do'stlaringizni taklif qiling",
+    "back": "Orqaga",
+    "stats": {
+      "invited": "Siz taklif qilganlar"
+    },
+    "yourLink": "Sizning havolangiz",
+    "copy": "Nusxa olish",
+    "copied": "Havola nusxalandi",
+    "copyFailed": "Nusxalashda xatolik",
+    "share": "Ulashish",
+    "shareText": "📦 Xitoydan O'zbekistonga arzon va ishonchli yuk tashish — Mandarin Cargo! Mana havolam, ro'yxatdan o'ting:",
+    "linkUnavailable": "Havola hozircha mavjud emas",
+    "howTitle": "Qanday ishlaydi?",
+    "how1": "Havolangizni do'stlaringizga yuboring",
+    "how2": "Ular havola orqali ro'yxatdan o'tadi",
+    "how3": "Ularning ro'yxati va soni shu yerda ko'rinadi",
+    "invitedList": "Taklif qilinganlar",
+    "empty": "Hozircha hech kim taklif qilinmagan",
+    "loadError": "Ma'lumotni yuklab bo'lmadi",
+    "dashboardTitle": "Do'stlarni taklif qilish",
+    "dashboardDesc": "Havolangizni ulashing va statistikani koʻring",
+    "prev": "Oldingi",
+    "next": "Keyingi",
+    "pageOf": "{{page}} / {{total}}"
+  },
+  "review": {
+    "title": "Bot xizmatini baholang",
+    "subtitle": "Fikringiz biz uchun juda muhim",
+    "close": "Yopish",
+    "starLabel": "{{n}} yulduz",
+    "ratePrompt": "Iltimos, baho bering (1-5 yulduz)",
+    "aspectsTitle": "Nima yoqdi? (bir nechtasini tanlash mumkin)",
+    "aspects": {
+      "fast": "Tezkor yetkazib berish",
+      "price": "Qulay narx",
+      "service": "Yaxshi xizmat",
+      "easy": "Oson jarayon",
+      "botGreat": "Bot ajoyib",
+      "support": "Ishonchli",
+      "other": "Boshqa"
+    },
+    "commentLabel": "Sharh (ixtiyoriy)",
+    "commentPlaceholder": "Tajribangiz haqida yozing...",
+    "later": "Keyinroq",
+    "submit": "Yuborish",
+    "thanks": "Rahmat! Sharhingiz qabul qilindi.",
+    "mockThanks": "(Test) Sharh yuborildi — rahmat!",
+    "error": "Sharh yuborishda xatolik. Qayta urinib ko'ring."
   }
 }
