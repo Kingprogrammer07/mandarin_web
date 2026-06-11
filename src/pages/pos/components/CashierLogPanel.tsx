@@ -14,6 +14,7 @@ import { formatCurrencySum } from "@/lib/format";
 import type { CashierLogResponse, CashierLogProvider } from "@/api/pos";
 import {
   getSelectedProviderTotal,
+  LOG_PROVIDER_FILTERS,
 } from "./utils";
 import { LogEntry } from "./LogEntry";
 import { POSStatsCards } from "./POSStatsCards";
@@ -218,12 +219,11 @@ export function CashierLogPanel({
                         }
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
                       >
-                        <option value="all">Barchasi</option>
-                        <option value="cash">Naqd</option>
-                        <option value="card">Karta</option>
-                        <option value="click">Click</option>
-                        <option value="payme">Payme</option>
-                        <option value="wallet">Hamyon</option>
+                        {LOG_PROVIDER_FILTERS.map((f) => (
+                          <option key={f.value} value={f.value}>
+                            {f.label}
+                          </option>
+                        ))}
                       </select>
 
                       {/* Date range */}

@@ -17,7 +17,7 @@ const getAdminHeaders = () => {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type PaymentProvider = 'cash' | 'click' | 'payme' | 'card' | 'terminal';
-export type CashierLogProvider = PaymentProvider | 'wallet';
+export type CashierLogProvider = PaymentProvider | 'wallet' | 'nbu';
 
 /** Card with collected balance — returned by GET /payments/cards. */
 export interface CardWithBalance {
@@ -122,8 +122,9 @@ export interface CashierLogSummary {
   terminal: number;
   click: number;
   payme: number;
+  nbu: number;
   wallet: number;
-  /** Cash/card/terminal/click/payme total. Excludes wallet adjustments. */
+  /** Cash/card/terminal/click/payme/nbu total. Excludes wallet adjustments. */
   total: number;
 }
 

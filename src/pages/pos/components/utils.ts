@@ -29,6 +29,8 @@ export const PROVIDER_CHIP: Record<string, string> = {
     "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400",
   payme:
     "bg-cyan-50   dark:bg-cyan-500/10   text-cyan-600   dark:text-cyan-400",
+  nbu:
+    "bg-rose-50   dark:bg-rose-500/10   text-rose-600   dark:text-rose-400",
   wallet:
     "bg-amber-50  dark:bg-amber-500/10  text-amber-600  dark:text-amber-400",
 };
@@ -122,6 +124,7 @@ export const PAYMENT_LABEL: Record<string, string> = {
   terminal: "Terminal",
   click: "Click",
   payme: "Payme",
+  nbu: "NBU (karta)",
   wallet: "Hamyon",
   online: "Online",
 };
@@ -133,6 +136,7 @@ export const LOG_PROVIDER_FILTERS: { value: CashierLogProvider | "all"; label: s
   { value: "terminal", label: "Terminal" },
   { value: "click", label: "Click" },
   { value: "payme", label: "Payme" },
+  { value: "nbu", label: "NBU" },
   { value: "wallet", label: "Hamyon" },
 ];
 
