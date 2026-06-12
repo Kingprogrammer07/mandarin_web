@@ -1691,10 +1691,25 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
       const detailText =
         typeof detail === 'string' ? detail : detail?.message || undefined;
       const message = e?.message || t('deliveryRequest.toast.submitError');
-      if (e?.status === 400 && message.toLowerCase().includes('profile')) {
+      const httpStatus = e?.status ?? 0;
+
+      if (httpStatus === 400 && message.toLowerCase().includes('profile')) {
         setProfileIncomplete(true);
         return;
       }
+      // Gateway / server / network problems: show a friendly localized message,
+      // never the raw backend text (e.g. "NBU gateway is currently unavailable"
+      // or "Request failed with status code 502") — the user must not see
+      // server-error internals.
+      if (httpStatus <= 0 || httpStatus >= 500) {
+        toast.error(t('nbu.error.502'));
+        return;
+      }
+      if (httpStatus === 429) {
+        toast.error(t('nbu.error.429'));
+        return;
+      }
+      // 4xx: the backend detail is a localized (Uzbek) validation message.
       toast.error(detailText || message);
     },
     [t]
