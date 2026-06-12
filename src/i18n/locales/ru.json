@@ -1684,6 +1684,23 @@
       "changeClient": "Другой клиент"
     }
   },
+  "system": {
+    "uzpost": {
+      "title": "Заявки UzPost",
+      "paid": "Оплачено - reconcile",
+      "sibling": "Есть approved DR",
+      "reconcile": "Reconcile",
+      "reject": "Reject",
+      "rejectConfirm": "Отклонить эту заявку UzPost?",
+      "expireSelected": "Expire выбранные ({{count}})",
+      "expireOld": "Expire все устаревшие (>1 ч)",
+      "expireOldConfirm": "Пометить все заявки UzPost в pending старше 1 часа как expired?",
+      "empty": "Pending-заявок UzPost нет",
+      "reconcileOk": "Статус: {{status}}",
+      "rejectOk": "Статус: {{status}}",
+      "bulkResult": "{{rejected}} отклонено, {{skipped_paid}} оплаченных пропущено"
+    }
+  },
   "nbu": {
     "success": {
       "title": "Оплата успешно выполнена",

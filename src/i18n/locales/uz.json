@@ -1684,6 +1684,23 @@
       "changeClient": "Boshqa mijoz"
     }
   },
+  "system": {
+    "uzpost": {
+      "title": "UzPost zayafkalar",
+      "paid": "To'langan - reconcile",
+      "sibling": "Approved DR mavjud",
+      "reconcile": "Reconcile",
+      "reject": "Reject",
+      "rejectConfirm": "Bu UzPost zayafkani reject qilmoqchimisiz?",
+      "expireSelected": "Tanlanganlarni expire ({{count}})",
+      "expireOld": "Barcha eskirgan (>1soat) expire",
+      "expireOldConfirm": "1 soatdan ortiq pendingda turgan barcha UzPost zayafkalarni expire qilmoqchimisiz?",
+      "empty": "Pending UzPost zayafkalar yo'q",
+      "reconcileOk": "Status: {{status}}",
+      "rejectOk": "Status: {{status}}",
+      "bulkResult": "{{rejected}} rad etildi, {{skipped_paid}} to'langan o'tkazib yuborildi"
+    }
+  },
   "nbu": {
     "success": {
       "title": "To'lov muvaffaqiyatli amalga oshirildi",

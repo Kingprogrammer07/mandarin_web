@@ -18,7 +18,11 @@ import {
   BarChart3,
   Send,
 } from 'lucide-react';
-import { systemService, type NbuPendingPaymentRow } from '@/api/services/systemService';
+import {
+  systemService,
+  type NbuPendingPaymentRow,
+  type UzPostPendingRow,
+} from '@/api/services/systemService';
 
 function formatAge(seconds: number | null): string {
   if (seconds === null || seconds < 0) return '—';
@@ -38,15 +42,35 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function getMutationErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error !== 'object' || error === null) return fallback;
+
+  const maybeError = error as {
+    message?: unknown;
+    data?: { detail?: unknown };
+  };
+  if (typeof maybeError.data?.detail === 'string' && maybeError.data.detail) {
+    return maybeError.data.detail;
+  }
+  if (typeof maybeError.message === 'string' && maybeError.message) {
+    return maybeError.message;
+  }
+  return fallback;
+}
+
 export default function SystemSettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showRedisInfo, setShowRedisInfo] = useState(false);
   const [showRedisClients, setShowRedisClients] = useState(false);
   const [showNbuPending, setShowNbuPending] = useState(false);
+  const [showUzpostPending, setShowUzpostPending] = useState(false);
   const [reconciling, setReconciling] = useState<string | null>(null);
   const [expiring, setExpiring] = useState<string | null>(null);
+  const [uzpostReconciling, setUzpostReconciling] = useState<number | null>(null);
+  const [uzpostRejecting, setUzpostRejecting] = useState<number | null>(null);
   const [selectedTxns, setSelectedTxns] = useState<Set<string>>(new Set());
+  const [selectedUzpostIds, setSelectedUzpostIds] = useState<Set<number>>(new Set());
   const [maxFlightsInput, setMaxFlightsInput] = useState<number | null>(null);
 
   // Maintenance + NBU toggles are pushed via SSE (`maintenance.toggled`,
@@ -89,6 +113,18 @@ export default function SystemSettingsPage() {
     queryFn: () => systemService.getNbuPending(100),
     enabled: showNbuPending,
     refetchInterval: () => (showNbuPending ? visibleInterval(30_000) : false),
+    refetchIntervalInBackground: false,
+  });
+
+  const {
+    data: uzpostPending,
+    isLoading: uzpostPendingLoading,
+    refetch: refetchUzpostPending,
+  } = useQuery({
+    queryKey: ['system-uzpost-pending'],
+    queryFn: () => systemService.listUzpostPending(100),
+    enabled: showUzpostPending,
+    refetchInterval: () => (showUzpostPending ? visibleInterval(30_000) : false),
     refetchIntervalInBackground: false,
   });
 
@@ -197,6 +233,98 @@ export default function SystemSettingsPage() {
   };
 
   // ── Hourly NBU report config ───────────────────────────────────────────
+  const uzpostReconcileMutation = useMutation({
+    mutationFn: systemService.reconcileUzpost,
+    onMutate: (deliveryRequestId) => setUzpostReconciling(deliveryRequestId),
+    onSettled: () => setUzpostReconciling(null),
+    onSuccess: (res) => {
+      if (res.approved) {
+        toast.success(t('system.uzpost.reconcileOk', { status: res.new_status }));
+      } else {
+        toast.message(t('system.uzpost.reconcileOk', { status: res.new_status }));
+      }
+      queryClient.invalidateQueries({ queryKey: ['system-uzpost-pending'] });
+    },
+    onError: (error) => {
+      toast.error(getMutationErrorMessage(error, t('makePayment.errorOccurred')));
+    },
+  });
+
+  const uzpostRejectMutation = useMutation({
+    mutationFn: systemService.rejectUzpost,
+    onMutate: (deliveryRequestId) => setUzpostRejecting(deliveryRequestId),
+    onSettled: () => setUzpostRejecting(null),
+    onSuccess: (res) => {
+      toast.success(t('system.uzpost.rejectOk', { status: res.new_status }));
+      queryClient.invalidateQueries({ queryKey: ['system-uzpost-pending'] });
+    },
+    onError: (error) => {
+      toast.error(getMutationErrorMessage(error, t('makePayment.errorOccurred')));
+    },
+  });
+
+  const uzpostBulkExpireMutation = useMutation({
+    mutationFn: systemService.expireUzpostBulk,
+    onSuccess: (res) => {
+      toast.success(
+        t('system.uzpost.bulkResult', {
+          rejected: res.rejected,
+          skipped_paid: res.skipped_paid,
+        }),
+      );
+      setSelectedUzpostIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['system-uzpost-pending'] });
+    },
+    onError: (error) => {
+      toast.error(getMutationErrorMessage(error, t('makePayment.errorOccurred')));
+    },
+  });
+
+  const toggleUzpostSelect = useCallback((deliveryRequestId: number) => {
+    setSelectedUzpostIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(deliveryRequestId)) next.delete(deliveryRequestId);
+      else next.add(deliveryRequestId);
+      return next;
+    });
+  }, []);
+
+  const visibleUzpostIds =
+    uzpostPending?.rows.map((row) => row.delivery_request_id) ?? [];
+  const allUzpostSelected =
+    visibleUzpostIds.length > 0 &&
+    visibleUzpostIds.every((deliveryRequestId) =>
+      selectedUzpostIds.has(deliveryRequestId),
+    );
+
+  const toggleSelectAllUzpost = () => {
+    setSelectedUzpostIds(
+      allUzpostSelected ? new Set() : new Set(visibleUzpostIds),
+    );
+  };
+
+  const handleUzpostReject = useCallback(
+    (row: UzPostPendingRow) => {
+      const ok = window.confirm(t('system.uzpost.rejectConfirm'));
+      if (!ok) return;
+      uzpostRejectMutation.mutate(row.delivery_request_id);
+    },
+    [t, uzpostRejectMutation],
+  );
+
+  const handleUzpostBulkExpireSelected = () => {
+    if (selectedUzpostIds.size === 0) return;
+    uzpostBulkExpireMutation.mutate({
+      delivery_request_ids: Array.from(selectedUzpostIds),
+    });
+  };
+
+  const handleUzpostBulkExpireOld = () => {
+    const ok = window.confirm(t('system.uzpost.expireOldConfirm'));
+    if (!ok) return;
+    uzpostBulkExpireMutation.mutate({ older_than_seconds: 3600 });
+  };
+
   const { data: reportConfig } = useQuery({
     queryKey: ['system-nbu-report-config'],
     queryFn: systemService.getNbuReportConfig,
@@ -644,6 +772,232 @@ export default function SystemSettingsPage() {
                       );
                     })}
                   </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* UzPost Pending Requests */}
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
+        <button
+          onClick={() => setShowUzpostPending(!showUzpostPending)}
+          className="w-full flex items-center justify-between p-5 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/15 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-base text-gray-900 dark:text-white">
+                {t('system.uzpost.title')}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                UzPost pending zayafkalarini reconcile yoki reject qilish
+                {uzpostPending && (
+                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+                    {uzpostPending.count}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <motion.div animate={{ rotate: showUzpostPending ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          </motion.div>
+        </button>
+        <AnimatePresence>
+          {showUzpostPending && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="px-5 pb-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Reconcile = to'langan UzPost zayafkani tasdiqlashga qayta urinish.
+                    Reject = faqat pending va to'lanmagan zayafkalar uchun.
+                  </p>
+                  <button
+                    onClick={() => refetchUzpostPending()}
+                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 flex-shrink-0 ml-2"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Yangilash
+                  </button>
+                </div>
+
+                {uzpostPendingLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                  </div>
+                ) : !uzpostPending || uzpostPending.count === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">
+                    {t('system.uzpost.empty')}
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap pb-1">
+                      <button
+                        onClick={toggleSelectAllUzpost}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.06] hover:bg-gray-200 dark:hover:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200"
+                      >
+                        {allUzpostSelected ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5" />
+                        )}
+                        {allUzpostSelected ? 'Belgini olib tashlash' : 'Hammasini tanlash'}
+                      </button>
+                      <button
+                        onClick={handleUzpostBulkExpireSelected}
+                        disabled={
+                          selectedUzpostIds.size === 0 ||
+                          uzpostBulkExpireMutation.isPending
+                        }
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800 dark:bg-white/15 hover:bg-gray-900 dark:hover:bg-white/20 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {uzpostBulkExpireMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
+                        {t('system.uzpost.expireSelected', {
+                          count: selectedUzpostIds.size,
+                        })}
+                      </button>
+                      <button
+                        onClick={handleUzpostBulkExpireOld}
+                        disabled={uzpostBulkExpireMutation.isPending}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-blue-300 dark:border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {t('system.uzpost.expireOld')}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-[480px] overflow-auto">
+                      {uzpostPending.rows.map((row: UzPostPendingRow) => {
+                        const isReconciling =
+                          uzpostReconciling === row.delivery_request_id;
+                        const isRejecting =
+                          uzpostRejecting === row.delivery_request_id;
+                        const isBusy = isReconciling || isRejecting;
+                        const isSelected = selectedUzpostIds.has(
+                          row.delivery_request_id,
+                        );
+                        const flights = row.flight_names.length
+                          ? row.flight_names.join(', ')
+                          : '—';
+                        return (
+                          <div
+                            key={row.delivery_request_id}
+                            className={`border rounded-xl p-3 ${
+                              isSelected
+                                ? 'border-blue-300 dark:border-blue-500/40 bg-blue-50/50 dark:bg-blue-500/[0.06]'
+                                : 'border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]'
+                            }`}
+                          >
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() =>
+                                  toggleUzpostSelect(row.delivery_request_id)
+                                }
+                                className="flex-shrink-0 pt-0.5 text-gray-400 hover:text-blue-500"
+                                aria-label="Tanlash"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-blue-500" />
+                                ) : (
+                                  <Square className="w-4 h-4" />
+                                )}
+                              </button>
+                              <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 text-[10px] font-bold">
+                                      {formatAge(row.age_seconds)}
+                                    </span>
+                                    {row.is_paid && (
+                                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 text-[10px] font-bold">
+                                        {t('system.uzpost.paid')}
+                                      </span>
+                                    )}
+                                    {row.has_approved_sibling && (
+                                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 text-[10px] font-bold">
+                                        {t('system.uzpost.sibling')}
+                                      </span>
+                                    )}
+                                    {row.uzpost_order_number && (
+                                      <span className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-gray-300 text-[10px] font-bold">
+                                        {row.uzpost_order_number}
+                                      </span>
+                                    )}
+                                    {row.amount_uzs !== null && (
+                                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                        {formatMoney(row.amount_uzs)} so'm
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">
+                                    {row.client_code}
+                                  </p>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-500 truncate">
+                                    reyslar: {flights}
+                                  </p>
+                                  <p className="text-[11px] font-mono text-gray-500 dark:text-gray-500 truncate">
+                                    DR: {row.delivery_request_id}
+                                    {row.nbu_order_id && ` - ${row.nbu_order_id}`}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() =>
+                                      uzpostReconcileMutation.mutate(
+                                        row.delivery_request_id,
+                                      )
+                                    }
+                                    disabled={
+                                      isBusy ||
+                                      uzpostReconcileMutation.isPending
+                                    }
+                                    className="flex-1 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                                  >
+                                    {isReconciling ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="w-3 h-3" />
+                                    )}
+                                    {t('system.uzpost.reconcile')}
+                                  </button>
+                                  <button
+                                    onClick={() => handleUzpostReject(row)}
+                                    disabled={
+                                      row.is_paid ||
+                                      isBusy ||
+                                      uzpostRejectMutation.isPending
+                                    }
+                                    className="flex-1 px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/15 text-gray-800 dark:text-gray-200 text-xs font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                                  >
+                                    {isRejecting ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <XCircle className="w-3 h-3" />
+                                    )}
+                                    {t('system.uzpost.reject')}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </>
                 )}
               </div>

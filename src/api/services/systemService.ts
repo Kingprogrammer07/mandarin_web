@@ -75,6 +75,51 @@ export interface NbuExpireBulkResponse {
   expired_transaction_ids: string[];
 }
 
+export interface UzPostPendingRow {
+  delivery_request_id: number;
+  client_code: string;
+  flight_names: string[];
+  created_at: string | null;
+  age_seconds: number | null;
+  is_paid: boolean;
+  nbu_order_id: string | null;
+  amount_uzs: number | null;
+  has_approved_sibling: boolean;
+  uzpost_order_number: string | null;
+}
+
+export interface UzPostPendingResponse {
+  count: number;
+  rows: UzPostPendingRow[];
+}
+
+export interface UzPostReconcileResponse {
+  delivery_request_id: number;
+  previous_status: string;
+  new_status: string;
+  approved: boolean;
+  detail: string;
+}
+
+export interface UzPostRejectResponse {
+  delivery_request_id: number;
+  previous_status: string;
+  new_status: string;
+}
+
+export interface UzPostExpireBulkRequest {
+  delivery_request_ids?: number[];
+  older_than_seconds?: number;
+}
+
+export interface UzPostExpireBulkResponse {
+  requested: number;
+  rejected: number;
+  skipped_paid: number;
+  skipped: number;
+  rejected_ids: number[];
+}
+
 export interface NbuReportConfig {
   enabled: boolean;
   max_flights: number;
@@ -147,6 +192,38 @@ export const systemService = {
   async expireNbuBulk(body: NbuExpireBulkRequest): Promise<NbuExpireBulkResponse> {
     const { data } = await apiClient.post<NbuExpireBulkResponse>(
       '/api/v1/system/nbu/expire-bulk',
+      body,
+    );
+    return data;
+  },
+
+  async listUzpostPending(limit = 100): Promise<UzPostPendingResponse> {
+    const { data } = await apiClient.get<UzPostPendingResponse>(
+      '/api/v1/system/uzpost/pending',
+      { params: { limit } },
+    );
+    return data;
+  },
+
+  async reconcileUzpost(drId: number): Promise<UzPostReconcileResponse> {
+    const { data } = await apiClient.post<UzPostReconcileResponse>(
+      `/api/v1/system/uzpost/reconcile/${drId}`,
+    );
+    return data;
+  },
+
+  async rejectUzpost(drId: number): Promise<UzPostRejectResponse> {
+    const { data } = await apiClient.post<UzPostRejectResponse>(
+      `/api/v1/system/uzpost/reject/${drId}`,
+    );
+    return data;
+  },
+
+  async expireUzpostBulk(
+    body: UzPostExpireBulkRequest,
+  ): Promise<UzPostExpireBulkResponse> {
+    const { data } = await apiClient.post<UzPostExpireBulkResponse>(
+      '/api/v1/system/uzpost/expire-bulk',
       body,
     );
     return data;
