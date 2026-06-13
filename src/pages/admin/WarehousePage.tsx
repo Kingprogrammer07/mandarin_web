@@ -14,6 +14,8 @@ import {
   X,
   Volume2,
   VolumeX,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -36,7 +38,7 @@ import UzPostOrdersPanel from "../../components/warehouse/UzPostOrdersPanel";
 import PickupQueuePanel from "../../components/warehouse/PickupQueuePanel";
 import { useEventSource, type BroadcastMessage, type PosNotificationPayload } from "../../hooks/useEventSource";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
-import { revertTakenStatus } from "../../api/services/warehouse";
+import { revertTakenStatus, exportWarehouseTransactions } from "../../api/services/warehouse";
 import type { PickupMethod, PickupQueuePriority } from "../../api/pickupQueue";
 import { PICKUP_PRIORITY_LABELS } from "../../api/pickupQueue";
 import { playNotificationSound } from "../../utils/notificationSounds";
@@ -131,6 +133,7 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
 
   const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
   const [isDark, setIsDark] = useState(getInitialTheme);
+  const [exporting, setExporting] = useState(false);
 
   const canView = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('warehouse:read');
   const canMarkTaken = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('warehouse:mark_taken');
@@ -307,6 +310,34 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     },
     isEnabled,
   );
+
+  // Export warehouse cargo to Excel. Carries whatever transaction filters are
+  // active (flight / search / payment / taken); with none set it pulls EVERY
+  // flight and every cargo row.
+  const handleExportWarehouse = useCallback(async () => {
+    setExporting(true);
+    try {
+      const blob = await exportWarehouseTransactions({
+        flight_name: flightName || undefined,
+        payment_status: paymentStatus,
+        taken_status: takenStatus,
+        code: searchQuery || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sklad_yuklari_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Excel yuklab olindi");
+    } catch {
+      toast.error("Yuklab olishda xatolik");
+    } finally {
+      setExporting(false);
+    }
+  }, [flightName, paymentStatus, takenStatus, searchQuery]);
 
   const handleMarkTaken = useCallback(
     (
@@ -557,6 +588,24 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
 
           {/* Filters — only shown on Transactions tab */}
           {activeTab === "transactions" && <WarehouseFilters />}
+
+          {/* Excel export — exports current filter (or everything if no filter) */}
+          {activeTab === "transactions" && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={handleExportWarehouse}
+                disabled={exporting}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition active:scale-95 hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {exporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Excel yuklab olish
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

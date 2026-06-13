@@ -383,6 +383,40 @@ export async function getFlightTransactions(
   return response.data;
 }
 
+export interface ExportWarehouseParams {
+  flight_name?: string;
+  payment_status?: string;
+  taken_status?: string;
+  code?: string;
+  phone?: string;
+  name?: string;
+}
+
+/**
+ * Download warehouse cargo as an Excel file. With no params it exports EVERY
+ * flight and every cargo row; the optional filters mirror the per-flight list.
+ */
+export async function exportWarehouseTransactions(
+  params: ExportWarehouseParams = {},
+): Promise<Blob> {
+  const response = await apiClient.get('/api/v1/warehouse/export', {
+    params: {
+      ...(params.flight_name ? { flight_name: params.flight_name } : {}),
+      ...(params.payment_status && params.payment_status !== 'all'
+        ? { payment_status: params.payment_status }
+        : {}),
+      ...(params.taken_status && params.taken_status !== 'all'
+        ? { taken_status: params.taken_status }
+        : {}),
+      ...(params.code ? { code: params.code } : {}),
+      ...(params.phone ? { phone: params.phone } : {}),
+      ...(params.name ? { name: params.name } : {}),
+    },
+    responseType: 'blob',
+  });
+  return response.data as Blob;
+}
+
 export async function markTransactionTaken(
   transactionId: number,
   data: FormData,
