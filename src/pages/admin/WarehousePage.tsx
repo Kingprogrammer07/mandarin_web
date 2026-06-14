@@ -527,6 +527,19 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
                   <PackageSearch className="w-4 h-4" />
                 </button>
               )}
+              {/* Excel export — always visible; current filter or everything */}
+              <button
+                onClick={handleExportWarehouse}
+                disabled={exporting}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors disabled:opacity-60"
+                title="Excel yuklab olish"
+              >
+                {exporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
               <RoleSwitcher onNavigate={onNavigate} />
               <button
                 onClick={toggleTheme}
@@ -588,24 +601,6 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
 
           {/* Filters — only shown on Transactions tab */}
           {activeTab === "transactions" && <WarehouseFilters />}
-
-          {/* Excel export — exports current filter (or everything if no filter) */}
-          {activeTab === "transactions" && (
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={handleExportWarehouse}
-                disabled={exporting}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition active:scale-95 hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {exporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                Excel yuklab olish
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
