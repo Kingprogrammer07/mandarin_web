@@ -25,6 +25,8 @@ export interface BulkCreateExpectedCargoRequest {
   flight_name: string;
   client_code: string;
   track_codes: string[];
+  /** ISO scan timestamps positionally aligned with track_codes (preserves scan order). */
+  scanned_ats?: string[];
 }
 
 export interface BulkCreateExpectedCargoResponse {

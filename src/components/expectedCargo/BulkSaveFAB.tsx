@@ -40,14 +40,22 @@ function isQueueItemBlocked(item: FastEntryQueueItem): boolean {
  * Groups queue items by client_code so we can issue one bulk request per client.
  * Items with an empty clientCode are skipped and reported back as invalid.
  */
+interface SaveChunk {
+  flightName: string;
+  clientCode: string;
+  trackCodes: string[];
+  itemIds: string[];
+  scannedAts: string[];
+}
+
 function groupQueueByClient(
   queue: FastEntryQueueItem[],
   flightName: string,
 ): {
-  groups: Array<{ flightName: string; clientCode: string; trackCodes: string[]; itemIds: string[] }>;
+  groups: SaveChunk[];
   invalidItems: FastEntryQueueItem[];
 } {
-  const groups = new Map<string, { trackCodes: string[]; itemIds: string[] }>();
+  const groups = new Map<string, { trackCodes: string[]; itemIds: string[]; scannedAts: string[] }>();
   const invalidItems: FastEntryQueueItem[] = [];
 
   for (const item of queue) {
@@ -56,23 +64,27 @@ function groupQueueByClient(
       continue;
     }
     const key = item.clientCode.trim().toUpperCase();
-    if (!groups.has(key)) groups.set(key, { trackCodes: [], itemIds: [] });
-    groups.get(key)!.trackCodes.push(item.trackCode);
-    groups.get(key)!.itemIds.push(item.id);
+    if (!groups.has(key)) groups.set(key, { trackCodes: [], itemIds: [], scannedAts: [] });
+    const group = groups.get(key)!;
+    group.trackCodes.push(item.trackCode);
+    group.itemIds.push(item.id);
+    // Carry each code's scan time so the backend can preserve the true scan order.
+    group.scannedAts.push(item.scannedAt ?? '');
   }
 
   return {
     // Slice each client into ≤500-code chunks so the server's per-request cap is
-    // never exceeded. trackCodes and itemIds are sliced in lockstep so a chunk's
-    // confirmed items can be removed precisely on success.
+    // never exceeded. trackCodes/itemIds/scannedAts are sliced in lockstep so a
+    // chunk's confirmed items can be removed precisely on success.
     groups: Array.from(groups.entries()).flatMap(([clientCode, group]) => {
-      const chunks: Array<{ flightName: string; clientCode: string; trackCodes: string[]; itemIds: string[] }> = [];
+      const chunks: SaveChunk[] = [];
       for (let offset = 0; offset < group.trackCodes.length; offset += SAVE_CHUNK_SIZE) {
         chunks.push({
           flightName,
           clientCode,
           trackCodes: group.trackCodes.slice(offset, offset + SAVE_CHUNK_SIZE),
           itemIds: group.itemIds.slice(offset, offset + SAVE_CHUNK_SIZE),
+          scannedAts: group.scannedAts.slice(offset, offset + SAVE_CHUNK_SIZE),
         });
       }
       return chunks;
@@ -132,6 +144,7 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
             flight_name: group.flightName,
             client_code: group.clientCode,
             track_codes: group.trackCodes,
+            scanned_ats: group.scannedAts,
           });
           totalCreated += response.created_count;
           savedItemIds.push(...group.itemIds);
