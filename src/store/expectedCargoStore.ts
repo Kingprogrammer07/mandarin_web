@@ -29,6 +29,12 @@ export interface FastEntryQueueItem {
   /** Flight name from the 409 response body — which flight already has this code. */
   alreadySentFlight: string | null;
   /**
+   * True when the already-sent match is in a DIFFERENT flight (not the one being
+   * scanned). Rendered green with an info note instead of an orange error, but
+   * still excluded from saving because the track code is globally unique.
+   */
+  isCrossFlight?: boolean;
+  /**
    * True for a temporary warning row when scanning switches away after a 2+ item
    * run from another client. Cleared automatically if the new client continues.
    */
@@ -44,6 +50,15 @@ export interface FastEntryQueueItem {
   conflictClientCode: string | null;
   /** Local admin checklist state; helps operators mark rows as manually reviewed. */
   isReviewed?: boolean;
+  /**
+   * Durability lifecycle, persisted to IndexedDB (never shown in the UI):
+   *   'pending' — scanned, not yet saved to the server.
+   *   'saving'  — a save request is in flight; resumable on crash/reload.
+   *   'saved'   — confirmed by the server (transient; row is then removed).
+   */
+  status?: 'pending' | 'saving' | 'saved';
+  /** Active flight the item was scanned under. Informational / future per-flight load. */
+  flightName?: string | null;
 }
 
 // ── Notification History ───────────────────────────────────────────────────────
@@ -77,6 +92,11 @@ interface ExpectedCargoState {
    * Not persisted (resets on page reload).
    */
   isClientListHidden: boolean;
+  /**
+   * Scanner resolve source: 'online' calls the API per scan (default); 'offline'
+   * resolves from a downloaded per-flight index (no per-scan network). Persisted.
+   */
+  scannerMode: 'online' | 'offline';
 
   flightTabOrder: string[];
   entryQueue: FastEntryQueueItem[];
@@ -90,6 +110,7 @@ interface ExpectedCargoState {
   setSearchQuery: (query: string) => void;
   setFastEntryOpen: (open: boolean) => void;
   setClientListHidden: (hidden: boolean) => void;
+  setScannerMode: (mode: 'online' | 'offline') => void;
 
   syncFlightTabOrder: (apiFlightNames: string[]) => void;
   setFlightTabOrder: (orderedNames: string[]) => void;
@@ -103,6 +124,16 @@ interface ExpectedCargoState {
     item: Omit<FastEntryQueueItem, 'id' | 'isContinuation' | 'priorCountForClient' | 'notFound' | 'isAlreadySent' | 'alreadySentClientCode' | 'alreadySentFlight' | 'isWrongClient' | 'conflictClientCode'> &
       Partial<Pick<FastEntryQueueItem, 'isWrongClient' | 'conflictClientCode' | 'isAlreadySent' | 'alreadySentClientCode' | 'alreadySentFlight' | 'notFound'>>,
   ) => void;
+  /**
+   * Prepend a batch of fully-built items (ids + durability fields already set)
+   * in a single state update. Used by the scanner drain loop to coalesce a burst
+   * of scans into one render instead of one per code.
+   */
+  enqueueRawItems: (items: FastEntryQueueItem[]) => void;
+  /** Mark items 'saving' before a save request (durably persisted, resumable). */
+  markItemsSaving: (ids: string[]) => void;
+  /** Reset items to 'pending' after a failed or aborted save. */
+  markItemsPending: (ids: string[]) => void;
   resolveQueueItemClient: (
     trackCode: string,
     clientCode: string,
@@ -114,7 +145,12 @@ interface ExpectedCargoState {
   /** Mark an item as not-found (404) — leaves isResolved false, flags for red UI. */
   markQueueItemNotFound: (trackCode: string) => void;
   /** Mark an item as already-sent (409) — the track code is already in the expected cargo table. */
-  markQueueItemAlreadySent: (trackCode: string, flight: string | null, clientCode?: string | null) => void;
+  markQueueItemAlreadySent: (
+    trackCode: string,
+    flight: string | null,
+    clientCode?: string | null,
+    crossFlight?: boolean,
+  ) => void;
   /** Move a wrong-client row to its real owner and make it safe to save. */
   acceptQueueItemConflictOwner: (id: string) => void;
   /** Bring all rows for one client next to each other in the scanner table. */
@@ -142,6 +178,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       searchQuery: '',
       isFastEntryOpen: false,
       isClientListHidden: false,
+      scannerMode: 'online',
       flightTabOrder: [],
       entryQueue: [],
       selectedQueueItemIds: [],
@@ -169,6 +206,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       setSearchQuery: (query) => set({ searchQuery: query }),
       setFastEntryOpen: (open) => set({ isFastEntryOpen: open }),
       setClientListHidden: (hidden) => set({ isClientListHidden: hidden }),
+      setScannerMode: (mode) => set({ scannerMode: mode }),
 
       syncFlightTabOrder: (apiFlightNames) => {
         const currentOrder = get().flightTabOrder;
@@ -251,11 +289,40 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
               isWrongClient: item.isWrongClient ?? false,
               conflictClientCode: item.conflictClientCode ?? null,
               isReviewed: false,
+              status: 'pending',
+              flightName: state.activeFlightName,
             },
             ...state.entryQueue,
           ],
         }));
       },
+
+      enqueueRawItems: (items) =>
+        set((state) =>
+          items.length === 0
+            ? state
+            : { entryQueue: [...items, ...state.entryQueue] },
+        ),
+
+      markItemsSaving: (ids) =>
+        set((state) => {
+          const idSet = new Set(ids);
+          return {
+            entryQueue: state.entryQueue.map((item) =>
+              idSet.has(item.id) ? { ...item, status: 'saving' } : item,
+            ),
+          };
+        }),
+
+      markItemsPending: (ids) =>
+        set((state) => {
+          const idSet = new Set(ids);
+          return {
+            entryQueue: state.entryQueue.map((item) =>
+              idSet.has(item.id) ? { ...item, status: 'pending' } : item,
+            ),
+          };
+        }),
 
       resolveQueueItemClient: (trackCode, clientCode, clientName, clientId, isContinuation, priorCountForClient) =>
         set((state) => ({
@@ -290,7 +357,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
           ),
         })),
 
-      markQueueItemAlreadySent: (trackCode, flight, clientCode) =>
+      markQueueItemAlreadySent: (trackCode, flight, clientCode, crossFlight = false) =>
         set((state) => ({
           entryQueue: state.entryQueue.map((item) =>
             item.trackCode === trackCode
@@ -302,6 +369,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
                   notFound: false,
                   alreadySentClientCode: clientCode?.trim().toUpperCase() || null,
                   alreadySentFlight: flight,
+                  isCrossFlight: crossFlight,
                 }
               : item,
           ),
@@ -429,6 +497,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
         activeFlightName: state.activeFlightName,
         flightTabOrder: state.flightTabOrder,
         notifications: state.notifications,
+        scannerMode: state.scannerMode,
       }),
     },
   ),

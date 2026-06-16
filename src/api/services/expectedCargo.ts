@@ -84,6 +84,12 @@ export interface AlreadySentErrorBody {
   track_code: string;
   client_code?: string | null;
   flight_name: string | null;
+  /**
+   * True when the duplicate is in the SAME flight being scanned (a real re-scan
+   * to block). False when the code is saved under a DIFFERENT flight (shown as a
+   * green info note, not an error).
+   */
+  same_flight?: boolean;
 }
 
 export interface ResolvedClientResponse {
@@ -179,6 +185,22 @@ export interface CreateEmptyFlightRequest {
 export interface CreateEmptyFlightResponse {
   flight_name: string;
   created: boolean;
+}
+
+// ── API 14 — Resolve index (offline scanner snapshot) ─────────────────────────
+
+export interface ResolveIndexEntry {
+  track_code: string;
+  client_code: string;
+  client_id: number | null;
+  client_name: string | null;
+}
+
+export interface ResolveIndexResponse {
+  flight_name: string;
+  entries: ResolveIndexEntry[];
+  already_sent: string[];
+  synced_at: string;
 }
 
 // ── Search params ──────────────────────────────────────────────────────────────
@@ -384,5 +406,13 @@ export async function createEmptyFlight(
   payload: CreateEmptyFlightRequest,
 ): Promise<CreateEmptyFlightResponse> {
   const response = await apiClient.post<CreateEmptyFlightResponse>(`${BASE}/flights`, payload);
+  return response.data;
+}
+
+/** API 14 — Download the offline resolve snapshot (track→client map) for a flight. */
+export async function getResolveIndex(flightName: string): Promise<ResolveIndexResponse> {
+  const response = await apiClient.get<ResolveIndexResponse>(`${BASE}/resolve-index`, {
+    params: { flight_name: flightName },
+  });
   return response.data;
 }

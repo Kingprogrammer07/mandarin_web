@@ -3,15 +3,18 @@ import {
   useRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  memo,
   type ClipboardEvent,
   type KeyboardEvent,
 } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Html5Qrcode } from 'html5-qrcode';
 import {
   Loader2, X, CheckCircle2, AlertCircle, User, Camera, ScanLine,
   Pencil, AlertTriangle, Info, XCircle, PanelBottomClose, PanelBottomOpen, Ban,
-  Undo2, Upload, Square, CheckSquare,
+  Undo2, Upload, Square, CheckSquare, MoreVertical, Download, History, RefreshCw, Wifi, WifiOff,
 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -21,11 +24,14 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
   resolveClientByTrackCode,
+  getResolveIndex,
   type AlreadySentErrorBody,
   type ResolvedClientResponse,
 } from '@/api/services/expectedCargo';
 import { isAxiosError } from 'axios';
 import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expectedCargoStore';
+import { expectedCargoScanStore } from '@/utils/expectedCargoScanStore';
+import { exportQueueToCsv } from '@/utils/expectedCargoQueueExport';
 import {
   getCargoAudioVolume,
   playSuccessSound,
@@ -81,6 +87,30 @@ function createDraftRow(): FastEntryDraftRow {
   return { id: crypto.randomUUID(), trackCode: '' };
 }
 
+/** Build a fresh unresolved auto-fill queue item (mirrors the store's enqueue defaults). */
+function buildAutoFillItem(trackCode: string, flightName: string | null): FastEntryQueueItem {
+  return {
+    id: crypto.randomUUID(),
+    scannedAt: new Date().toISOString(),
+    trackCode,
+    clientCode: '',
+    resolvedClientName: null,
+    resolvedClientId: null,
+    isResolved: false,
+    notFound: false,
+    isAlreadySent: false,
+    alreadySentClientCode: null,
+    alreadySentFlight: null,
+    isContinuation: false,
+    priorCountForClient: 0,
+    isWrongClient: false,
+    conflictClientCode: null,
+    isReviewed: false,
+    status: 'pending',
+    flightName,
+  };
+}
+
 function normalizePastedValue(value: string): string {
   return value
     .trim()
@@ -115,6 +145,7 @@ function getAlreadySentBody(error: unknown): AlreadySentErrorBody | null {
     track_code: body.track_code,
     client_code: typeof body.client_code === 'string' ? body.client_code : null,
     flight_name: typeof body.flight_name === 'string' ? body.flight_name : null,
+    same_flight: typeof body.same_flight === 'boolean' ? body.same_flight : undefined,
   };
 }
 
@@ -201,7 +232,7 @@ interface QueueItemRowProps {
   onToggleReviewed: (id: string) => void;
 }
 
-function QueueItemRow({
+const QueueItemRow = memo(function QueueItemRow({
   item,
   rowNumber,
   isSelected,
@@ -268,19 +299,27 @@ function QueueItemRow({
           ? 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
           : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700';
 
+  // A code already saved under a DIFFERENT flight is informational, not an error:
+  // render it green like a resolved row (it just won't be saved again).
+  const isCrossFlight = item.isAlreadySent && item.isCrossFlight;
+
   const sheetRowStyle = item.isWrongClient || item.notFound
     ? 'bg-red-50/90 dark:bg-red-950/25 border-red-300 dark:border-red-800 text-red-950 dark:text-red-100'
-    : item.isAlreadySent
-      ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800 text-orange-950 dark:text-orange-100'
-      : item.isContinuation
-        ? 'bg-amber-50/90 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-100'
-        : item.isResolved
-          ? 'bg-emerald-50/70 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/70 text-zinc-900 dark:text-zinc-100'
-          : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100';
+    : isCrossFlight
+      ? 'bg-emerald-50/70 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/70 text-zinc-900 dark:text-zinc-100'
+      : item.isAlreadySent
+        ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800 text-orange-950 dark:text-orange-100'
+        : item.isContinuation
+          ? 'bg-amber-50/90 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-100'
+          : item.isResolved
+            ? 'bg-emerald-50/70 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/70 text-zinc-900 dark:text-zinc-100'
+            : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100';
 
   const sheetStatusLabel = item.isWrongClient
     ? `Boshqa mijoz: ${item.conflictClientCode ?? '-'}`
-    : item.isAlreadySent
+    : isCrossFlight
+      ? `Boshqa reysda: ${item.alreadySentFlight ?? '-'}`
+      : item.isAlreadySent
       ? item.alreadySentFlight
         ? `Yuborilgan: ${item.alreadySentClientCode ? `${item.alreadySentClientCode} / ` : ''}${item.alreadySentFlight}`
         : item.alreadySentClientCode
@@ -378,6 +417,8 @@ function QueueItemRow({
       <div className="flex h-11 min-w-0 items-center gap-2 border-r border-inherit px-3">
         {item.isWrongClient ? (
           <AlertCircle className="size-4 shrink-0 text-red-500" />
+        ) : isCrossFlight ? (
+          <Info className="size-4 shrink-0 text-emerald-500" />
         ) : item.isAlreadySent ? (
           <Ban className="size-4 shrink-0 text-orange-500" />
         ) : item.notFound ? (
@@ -619,7 +660,7 @@ function QueueItemRow({
       </div>
     </div>
   );
-}
+});
 
 // ── FastEntryPanel ─────────────────────────────────────────────────────────────
 
@@ -699,9 +740,20 @@ export function FastEntryPanel({
   const lastScanRef = useRef<{ code: string; time: number } | null>(null);
   const SCAN_COOLDOWN_MS = 2000;
 
+  // ── Scan capture decoupling ───────────────────────────────────────────────
+  // Hardware scanners fire several codes per second. To keep the input instant
+  // we never touch React state on the scan event itself: codes are reserved
+  // synchronously (for immediate dedup) then pushed to a buffer that a
+  // microtask drains into ONE batched store update + render.
+  const scanBufferRef = useRef<string[]>([]);
+  const pendingScanCodesRef = useRef<Set<string>>(new Set());
+  const drainScheduledRef = useRef(false);
+
   const {
     entryQueue,
     enqueueEntry,
+    enqueueRawItems,
+    replaceEntryQueue,
     resolveQueueItemClient,
     markQueueItemNotFound,
     markQueueItemAlreadySent,
@@ -722,7 +774,17 @@ export function FastEntryPanel({
     setClientListHidden,
     isClientListHidden,
     addNotification,
+    scannerMode,
+    setScannerMode,
   } = useExpectedCargoStore();
+
+  // ── Offline resolve index (downloaded snapshot for the active flight) ──────
+  type OfflineEntry = { clientCode: string; clientName: string | null; clientId: number | null };
+  const offlineIndexRef = useRef<{ map: Map<string, OfflineEntry>; alreadySent: Set<string> } | null>(null);
+  const offlineIndexFlightRef = useRef<string | null>(null);
+  const scannerModeRef = useRef(scannerMode);
+  useEffect(() => { scannerModeRef.current = scannerMode; }, [scannerMode]);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const openSavedPreview = useCallback((
     clientCode: string,
@@ -860,18 +922,18 @@ export function FastEntryPanel({
       lastScanRef.current = { code: trackCode, time: now };
 
       if (isAutoFillRef.current) {
-        const liveQueue = useExpectedCargoStore.getState().entryQueue;
-        if (liveQueue.some((i) => i.trackCode === trackCode)) return;
-        enqueueEntry({ trackCode, clientCode: '', resolvedClientName: null, resolvedClientId: null, isResolved: false });
-        resolveMutation.mutate(trackCode);
+        // Route through the buffered path so camera bursts coalesce like the
+        // keyboard scanner; dedup + toast are handled inside.
+        enqueueAutoFillTrackCode(trackCode);
       } else {
         setTrackCodeInput(trackCode);
         setSuggestion(null);
         resolveMutation.mutate(trackCode);
       }
     },
+    // enqueueAutoFillTrackCode/resolveMutation are stable enough for the camera path.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enqueueEntry],
+    [],
   );
 
   useEffect(() => {
@@ -918,7 +980,105 @@ export function FastEntryPanel({
     });
   }, []);
 
-  // ── Resolve mutation (used by auto-fill + manual single-code) ────────────
+  // ── Shared resolution appliers (used by BOTH the online mutation and the
+  // offline index path) so behaviour — continuation warning, sounds, toasts —
+  // stays identical regardless of resolve source. ──────────────────────────
+  const applyAutoFillResolved = useCallback((
+    resolved: { client_code: string; full_name: string | null; client_id: number | null },
+    trackCode: string,
+  ) => {
+    const currentQueue = useExpectedCargoStore.getState().entryQueue;
+    const { isContinuation, priorCount } = detectClientSwitchWarning(currentQueue, resolved.client_code);
+
+    resolveQueueItemClient(
+      trackCode,
+      resolved.client_code.toUpperCase(),
+      resolved.full_name,
+      resolved.client_id,
+      isContinuation,
+      priorCount,
+    );
+
+    if (isContinuation) {
+      if (isAutoMergeEnabled) {
+        requestAnimationFrame(() => mergeClientQueueGroup(resolved.client_code));
+      }
+      playWarningSound();
+      const totalCount = priorCount + 1;
+      toast.warning(`${resolved.client_code} - navbat almashdi, tekshiring`, {
+        duration: 5000,
+        description: `Oldingi userdan ketma-ket ${priorCount} ta scan bor edi. Yangi track: ${trackCode}. Keyingi scan kelganda bu sariq belgi avtomatik o'chadi.`,
+        action: {
+          label: 'Ko\'rish',
+          onClick: () => {
+            setClientListHidden(true);
+            setFastEntryOpen(true);
+            setSearchQuery(resolved.client_code);
+            setExpandedClient(resolved.client_code);
+          },
+        },
+      });
+      addNotification({
+        type: 'warning',
+        title: `Navbat almashdi: ${resolved.client_code}`,
+        description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${resolved.client_code}" rowi tekshirish nuqtasi sifatida belgilandi. Jami taxminiy: ${totalCount}.`,
+        navigateTo: { flightName: flightName ?? '', clientCode: resolved.client_code },
+      });
+    } else {
+      playConfiguredSuccessSound();
+    }
+  }, [
+    isAutoMergeEnabled, resolveQueueItemClient, mergeClientQueueGroup, playConfiguredSuccessSound,
+    addNotification, flightName, setClientListHidden, setFastEntryOpen, setSearchQuery, setExpandedClient,
+  ]);
+
+  const applyAutoFillAlreadySent = useCallback((
+    trackCode: string,
+    clientCode: string | null,
+    flight: string | null,
+    crossFlight: boolean,
+  ) => {
+    playWarningSound();
+    markQueueItemAlreadySent(trackCode, flight, clientCode, crossFlight);
+    if (crossFlight) {
+      // Different flight — informational, not an error (green row).
+      toast.info(
+        clientCode ? `${trackCode} — ${clientCode} (boshqa reysda)` : `${trackCode} — boshqa reysda mavjud`,
+        {
+          duration: 3500,
+          description: flight ? `Bazada "${flight}" reysida bor — qayta saqlanmaydi` : 'Bu trek kodi bazada boshqa reysda mavjud',
+          action: clientCode
+            ? { label: 'Ko\'rish', onClick: () => openSavedPreview(clientCode, trackCode, flight) }
+            : undefined,
+        },
+      );
+    } else {
+      toast.warning(
+        clientCode ? `${trackCode} - ${clientCode} allaqachon yuborilgan` : `${trackCode} - allaqachon yuborilgan`,
+        {
+          duration: 4000,
+          description: flight ? `"${flight}" reysida mavjud` : 'Bu trek kodi kutilayotgan yuklarga kiritilgan',
+          action: clientCode
+            ? { label: 'Ko\'rish', onClick: () => openSavedPreview(clientCode, trackCode, flight) }
+            : undefined,
+        },
+      );
+    }
+  }, [markQueueItemAlreadySent, openSavedPreview]);
+
+  const applyAutoFillNotFound = useCallback((trackCode: string) => {
+    playErrorSound();
+    markQueueItemNotFound(trackCode);
+    if (!isScanningRef.current) {
+      requestAnimationFrame(() => trackInputRef.current?.focus());
+    }
+    toast.error(`${trackCode} — mijoz topilmadi`, {
+      duration: 3000,
+      description: 'Mijoz kodini qo\'lda kiriting (qizil qatorda)',
+    });
+  }, [markQueueItemNotFound]);
+
+  // ── Resolve mutation (online path; auto-fill + manual single-code) ────────
 
   const resolveMutation = useMutation({
     mutationFn: (trackCode: string) =>
@@ -926,45 +1086,7 @@ export function FastEntryPanel({
 
     onSuccess: (data, trackCode) => {
       if (isAutoFillRef.current) {
-        const currentQueue = useExpectedCargoStore.getState().entryQueue;
-        const { isContinuation, priorCount } = detectClientSwitchWarning(
-          currentQueue,
-          data.client_code,
-        );
-
-        resolveQueueItemClient(trackCode, data.client_code.toUpperCase(), data.full_name, data.client_id, isContinuation, priorCount);
-
-        if (isContinuation) {
-          if (isAutoMergeEnabled) {
-            requestAnimationFrame(() => mergeClientQueueGroup(data.client_code));
-          }
-          playWarningSound();
-          const totalCount = priorCount + 1;
-          toast.warning(
-            `${data.client_code} - navbat almashdi, tekshiring`,
-            {
-              duration: 5000,
-              description: `Oldingi userdan ketma-ket ${priorCount} ta scan bor edi. Yangi track: ${trackCode}. Keyingi scan kelganda bu sariq belgi avtomatik o'chadi.`,
-              action: {
-                label: 'Ko\'rish',
-                onClick: () => {
-                  setClientListHidden(true);
-                  setFastEntryOpen(true);
-                  setSearchQuery(data.client_code);
-                  setExpandedClient(data.client_code);
-                },
-              },
-            },
-          );
-          addNotification({
-            type: 'warning',
-            title: `Navbat almashdi: ${data.client_code}`,
-            description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${data.client_code}" rowi tekshirish nuqtasi sifatida belgilandi. Jami taxminiy: ${totalCount}.`,
-            navigateTo: { flightName: flightName ?? '', clientCode: data.client_code },
-          });
-        } else {
-          playConfiguredSuccessSound();
-        }
+        applyAutoFillResolved(data, trackCode);
       } else {
         // Manual single-code mode (auto-fill OFF, camera scanning)
         playConfiguredSuccessSound();
@@ -977,45 +1099,25 @@ export function FastEntryPanel({
       if (getApiErrorStatus(err) === 409) {
         const body = getAlreadySentBody(err);
         const alreadySentClientCode = body?.client_code?.toUpperCase() ?? null;
-        playWarningSound();
+        const crossFlight = body?.same_flight === false;
         if (isAutoFillRef.current) {
-          markQueueItemAlreadySent(trackCode, body?.flight_name ?? null, alreadySentClientCode);
+          applyAutoFillAlreadySent(trackCode, alreadySentClientCode, body?.flight_name ?? null, crossFlight);
+        } else {
+          playWarningSound();
+          toast.warning(
+            alreadySentClientCode
+              ? `${trackCode} - ${alreadySentClientCode}${crossFlight ? ' (boshqa reysda)' : ' allaqachon yuborilgan'}`
+              : `${trackCode} - ${crossFlight ? 'boshqa reysda mavjud' : 'allaqachon yuborilgan'}`,
+            { duration: 4000, description: body?.flight_name ? `"${body.flight_name}" reysida mavjud` : undefined },
+          );
         }
-        toast.warning(
-          alreadySentClientCode
-            ? `${trackCode} - ${alreadySentClientCode} allaqachon yuborilgan`
-            : `${trackCode} - allaqachon yuborilgan`,
-          {
-            duration: 4000,
-            description: body?.flight_name
-              ? `"${body.flight_name}" reysida mavjud`
-              : 'Bu trek kodi kutilayotgan yuklarga kiritilgan',
-            action: alreadySentClientCode
-              ? {
-                  label: 'Ko\'rish',
-                  onClick: () => openSavedPreview(
-                    alreadySentClientCode,
-                    trackCode,
-                    body?.flight_name ?? null,
-                  ),
-                }
-              : undefined,
-          },
-        );
         return;
       }
 
-      playErrorSound();
       if (isAutoFillRef.current) {
-        markQueueItemNotFound(trackCode);
-        if (!isScanningRef.current) {
-          requestAnimationFrame(() => trackInputRef.current?.focus());
-        }
-        toast.error(`${trackCode} — mijoz topilmadi`, {
-          duration: 3000,
-          description: 'Mijoz kodini qo\'lda kiriting (qizil qatorda)',
-        });
+        applyAutoFillNotFound(trackCode);
       } else {
+        playErrorSound();
         setSuggestion(null);
         toast.warning("Mijoz topilmadi — qo'lda kiriting", { duration: 2000 });
       }
@@ -1048,26 +1150,71 @@ export function FastEntryPanel({
     });
   }, []);
 
+  // Drain buffered scans on a microtask: one batched store update + one render
+  // for a whole burst, then fire the per-code resolve requests. Keeps the input
+  // thread free even when a hardware scanner fires several codes per second.
+  const scheduleScanDrain = useCallback(() => {
+    if (drainScheduledRef.current) return;
+    drainScheduledRef.current = true;
+    queueMicrotask(() => {
+      drainScheduledRef.current = false;
+      const codes = scanBufferRef.current.splice(0);
+      if (codes.length === 0) return;
+
+      const items = codes.map((code) => buildAutoFillItem(code, flightName));
+      enqueueRawItems(items);
+
+      const offlineIndex = offlineIndexRef.current;
+      const useOffline = scannerModeRef.current === 'offline' && offlineIndex !== null;
+
+      for (const item of items) {
+        pendingScanCodesRef.current.delete(item.trackCode);
+        if (useOffline && offlineIndex) {
+          // Offline: resolve from the downloaded snapshot (O(1), no network).
+          const track = item.trackCode;
+          if (offlineIndex.alreadySent.has(track)) {
+            applyAutoFillAlreadySent(track, offlineIndex.map.get(track)?.clientCode ?? null, flightName, false);
+          } else {
+            const entry = offlineIndex.map.get(track);
+            if (entry) {
+              applyAutoFillResolved(
+                { client_code: entry.clientCode, full_name: entry.clientName, client_id: entry.clientId },
+                track,
+              );
+            } else {
+              applyAutoFillNotFound(track);
+            }
+          }
+        } else {
+          resolveMutation.mutate(item.trackCode);
+        }
+      }
+    });
+  }, [
+    enqueueRawItems, resolveMutation, flightName,
+    applyAutoFillResolved, applyAutoFillAlreadySent, applyAutoFillNotFound,
+  ]);
+
   const enqueueAutoFillTrackCode = useCallback((raw: string) => {
     const trackCode = raw.trim().toUpperCase();
     if (!trackCode) return false;
 
+    // Synchronous dedup against both the live queue and codes already buffered
+    // this tick, so the warning + paste/import counters stay immediate.
     const liveQueue = useExpectedCargoStore.getState().entryQueue;
-    if (liveQueue.some((item) => item.trackCode === trackCode)) {
+    if (
+      liveQueue.some((item) => item.trackCode === trackCode) ||
+      pendingScanCodesRef.current.has(trackCode)
+    ) {
       toast.warning(`${trackCode} allaqachon qo'shilgan`, { duration: 1500 });
       return false;
     }
 
-    enqueueEntry({
-      trackCode,
-      clientCode: '',
-      resolvedClientName: null,
-      resolvedClientId: null,
-      isResolved: false,
-    });
-    resolveMutation.mutate(trackCode);
+    pendingScanCodesRef.current.add(trackCode);
+    scanBufferRef.current.push(trackCode);
+    scheduleScanDrain();
     return true;
-  }, [enqueueEntry, resolveMutation]);
+  }, [scheduleScanDrain]);
 
   const moveFromDraftRow = useCallback((rowId: string, direction: 1 | -1) => {
     const currentIndex = draftRows.findIndex((row) => row.id === rowId);
@@ -1260,7 +1407,6 @@ export function FastEntryPanel({
     if (!isScanningRef.current) {
       requestAnimationFrame(() => trackInputRef.current?.focus());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackCodeInput, entryQueue, enqueueAutoFillTrackCode]);
 
   const handleTrackKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -1533,6 +1679,169 @@ export function FastEntryPanel({
     openSavedPreview(clientCode, trackCode, targetFlightName);
   }, [openSavedPreview]);
 
+  // ── Overflow (kebab) menu: export-before-save + restore-from-backup ───────
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isMenuOpen]);
+
+  // Download the current (unsaved) queue as a spreadsheet — a worker safety net
+  // that does not depend on the server being reachable.
+  const handleExportQueue = useCallback(() => {
+    setIsMenuOpen(false);
+    const queue = useExpectedCargoStore.getState().entryQueue;
+    if (queue.length === 0) {
+      toast.warning("Jadval bo'sh — yuklab olish uchun ma'lumot yo'q");
+      return;
+    }
+    exportQueueToCsv(queue, flightName);
+    toast.success(`${queue.length} ta qator faylga yuklab olindi`);
+  }, [flightName]);
+
+  // Manually rehydrate the queue from the durable IndexedDB backup (in case the
+  // auto-restore on load was missed or the in-memory queue was cleared).
+  const handleRestoreBackup = useCallback(async () => {
+    setIsMenuOpen(false);
+    try {
+      const available = await expectedCargoScanStore.isAvailable();
+      if (!available) {
+        toast.error('Durable backup mavjud emas (brauzer xotirasi yopiq)');
+        return;
+      }
+      const stored = await expectedCargoScanStore.loadItems();
+      if (stored.length === 0) {
+        toast.info("Backupda saqlangan qator yo'q");
+        return;
+      }
+      const restored = stored.map((item) =>
+        item.status === 'saving' ? { ...item, status: 'pending' as const } : item,
+      );
+      replaceEntryQueue(restored);
+      toast.success(`${restored.length} ta qator backupdan tiklandi`);
+    } catch {
+      toast.error('Backupdan tiklashda xatolik');
+    }
+  }, [replaceEntryQueue]);
+
+  // ── Offline index: build in-memory map, download (Sync), restore from IDB ──
+  const applyOfflineIndex = useCallback((payload: {
+    flight_name: string;
+    entries: { track_code: string; client_code: string; client_name: string | null; client_id: number | null }[];
+    already_sent: string[];
+  }) => {
+    const map = new Map<string, OfflineEntry>();
+    for (const entry of payload.entries) {
+      map.set(entry.track_code.toUpperCase(), {
+        clientCode: entry.client_code,
+        clientName: entry.client_name,
+        clientId: entry.client_id,
+      });
+    }
+    offlineIndexRef.current = {
+      map,
+      alreadySent: new Set(payload.already_sent.map((code) => code.toUpperCase())),
+    };
+    offlineIndexFlightRef.current = payload.flight_name.trim().toUpperCase();
+  }, []);
+
+  const syncOfflineIndex = useCallback(async () => {
+    if (!flightName) {
+      toast.warning('Avval reys tanlang');
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const data = await getResolveIndex(flightName);
+      applyOfflineIndex(data);
+      await expectedCargoScanStore.saveResolveIndex({
+        flightName: data.flight_name,
+        entries: data.entries,
+        alreadySent: data.already_sent,
+        syncedAt: data.synced_at,
+      });
+      toast.success(`Offline index yangilandi — ${data.entries.length} ta kod`);
+    } catch {
+      toast.error("Offline indexni yuklab bo'lmadi");
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [flightName, applyOfflineIndex]);
+
+  const handleScannerModeChange = useCallback((offline: boolean) => {
+    setScannerMode(offline ? 'offline' : 'online');
+    if (offline && flightName && offlineIndexFlightRef.current !== flightName.trim().toUpperCase()) {
+      void syncOfflineIndex();
+    }
+  }, [setScannerMode, flightName, syncOfflineIndex]);
+
+  // When offline and the in-memory index isn't loaded for the active flight,
+  // hydrate it from the durable IDB snapshot (so offline survives reloads).
+  useEffect(() => {
+    if (scannerMode !== 'offline' || !flightName) return;
+    const flightKey = flightName.trim().toUpperCase();
+    if (offlineIndexFlightRef.current === flightKey && offlineIndexRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      const cached = await expectedCargoScanStore.loadResolveIndex(flightName);
+      if (cancelled) return;
+      if (cached) {
+        applyOfflineIndex({
+          flight_name: cached.flightName,
+          entries: cached.entries,
+          already_sent: cached.alreadySent,
+        });
+      } else {
+        offlineIndexRef.current = null;
+        offlineIndexFlightRef.current = null;
+        toast.info("Bu reys uchun offline index yo'q — «Sync» bosing", { duration: 4000 });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scannerMode, flightName, applyOfflineIndex]);
+
+  // ── Virtualized queue rendering ──────────────────────────────────────────
+  // The queue can hold 1k+ rows over an 8h shift; rendering all of them froze
+  // the UI on every scan. We render only the visible window. The list sits
+  // inside the shared scroll area (below the input rows), so the virtual items
+  // are offset by scrollMargin — the distance from the scroll top to the list.
+  const queueScrollRef = useRef<HTMLDivElement>(null);
+  const queueListRef = useRef<HTMLDivElement>(null);
+  const [queueScrollMargin, setQueueScrollMargin] = useState(0);
+
+  // Re-measure after every render: layout above the list (stats bar, selection
+  // bar, import panel, camera) can shift it. Two getBoundingClientRect reads are
+  // cheap, and the >1px guard prevents an update loop (so no dep array is needed).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const list = queueListRef.current;
+    const scroll = queueScrollRef.current;
+    if (!list || !scroll) return;
+    const offset =
+      list.getBoundingClientRect().top -
+      scroll.getBoundingClientRect().top +
+      scroll.scrollTop;
+    setQueueScrollMargin((prev) => (Math.abs(prev - offset) > 1 ? offset : prev));
+  });
+
+  const queueVirtualizer = useVirtualizer({
+    count: filteredQueue.length,
+    getScrollElement: () => queueScrollRef.current,
+    estimateSize: () => 44, // QueueItemRow is a fixed h-11 (44px) grid row.
+    overscan: 12,
+    scrollMargin: queueScrollMargin,
+    getItemKey: (index) => filteredQueue[index]?.id ?? index,
+  });
+
   return (
     <div className={cn(
       'border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900',
@@ -1587,6 +1896,23 @@ export function FastEntryPanel({
             </span>
           </label>
 
+          <label
+            className="flex items-center gap-1.5 cursor-pointer select-none"
+            title="Offline rejim: skan local indexdan resolve qilinadi (tarmoqsiz). Yangilash uchun ⋮ → Sync."
+          >
+            <Switch
+              size="sm"
+              checked={scannerMode === 'offline'}
+              onCheckedChange={handleScannerModeChange}
+              className="data-[state=checked]:bg-blue-500"
+            />
+            <span className="flex items-center gap-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+              {scannerMode === 'offline'
+                ? <><WifiOff className="size-3 text-blue-500" /> Offline</>
+                : <><Wifi className="size-3" /> Online</>}
+            </span>
+          </label>
+
           <label className="flex items-center gap-1.5 select-none">
             <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
               Ovoz
@@ -1626,6 +1952,53 @@ export function FastEntryPanel({
             </span>
           )}
 
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen((open) => !open)}
+              title="Ko'proq amallar"
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                isMenuOpen
+                  ? 'text-orange-500 bg-orange-50 dark:bg-orange-950/30'
+                  : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300',
+              )}
+            >
+              <MoreVertical className="size-4" />
+              <span className="sr-only">Ko'proq amallar</span>
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                <button
+                  type="button"
+                  onClick={() => { setIsMenuOpen(false); void syncOfflineIndex(); }}
+                  disabled={isSyncing}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  <RefreshCw className={cn('size-4 shrink-0 text-blue-500', isSyncing && 'animate-spin')} />
+                  Sync (offline indexni yangilash)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportQueue}
+                  className="flex w-full items-center gap-2 border-t border-zinc-100 px-3 py-2.5 text-left text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  <Download className="size-4 shrink-0 text-emerald-500" />
+                  Excel/CSV yuklab olish (saqlashdan oldin)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRestoreBackup}
+                  className="flex w-full items-center gap-2 border-t border-zinc-100 px-3 py-2.5 text-left text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  <History className="size-4 shrink-0 text-blue-500" />
+                  Backupdan tiklash
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setClientListHidden(!isClientListHidden)}
             title={isClientListHidden ? "Preview ro'yxatini ko'rsatish" : "Preview ro'yxatini yashirish"}
@@ -1655,6 +2028,7 @@ export function FastEntryPanel({
 
       {/* ── Input area ────────────────────────────────────────────────────────── */}
       <div
+        ref={queueScrollRef}
         className={cn(
           'px-3 py-3 overflow-y-auto',
           isQueueExpanded ? 'flex-1 min-h-0' : 'max-h-72',
@@ -2026,29 +2400,46 @@ export function FastEntryPanel({
               Jadvalga birinchi track codeni kiriting
             </div>
           ) : (
-            filteredQueue.map((item, index) => (
-              (() => {
+            <div
+              ref={queueListRef}
+              className="relative min-w-[1110px]"
+              style={{ height: queueVirtualizer.getTotalSize() }}
+            >
+              {queueVirtualizer.getVirtualItems().map((virtualRow) => {
+                const item = filteredQueue[virtualRow.index];
+                if (!item) return null;
                 const clientCode = item.clientCode.trim().toUpperCase();
                 const splitSegment = clientCode ? splitClientSegments.get(clientCode) : undefined;
                 return (
-                  <QueueItemRow
+                  <div
                     key={item.id}
-                    item={item}
-                    rowNumber={filteredQueue.length - index}
-                    isSelected={selectedQueueItemIds.includes(item.id)}
-                    clientScanCount={clientScanCounts.get(clientCode) ?? 0}
-                    isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
-                    onToggleSelected={toggleQueueItemSelected}
-                    onRemove={removeFromQueue}
-                    onSetClientCode={setQueueItemClientCode}
-                    onAcceptConflictOwner={acceptQueueItemConflictOwner}
-                    onMergeClientGroup={mergeClientQueueGroup}
-                    onPreviewClient={handlePreviewClient}
-                    onToggleReviewed={toggleQueueItemReviewed}
-                  />
+                    data-index={virtualRow.index}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start - queueScrollMargin}px)`,
+                    }}
+                  >
+                    <QueueItemRow
+                      item={item}
+                      rowNumber={filteredQueue.length - virtualRow.index}
+                      isSelected={selectedQueueItemIds.includes(item.id)}
+                      clientScanCount={clientScanCounts.get(clientCode) ?? 0}
+                      isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
+                      onToggleSelected={toggleQueueItemSelected}
+                      onRemove={removeFromQueue}
+                      onSetClientCode={setQueueItemClientCode}
+                      onAcceptConflictOwner={acceptQueueItemConflictOwner}
+                      onMergeClientGroup={mergeClientQueueGroup}
+                      onPreviewClient={handlePreviewClient}
+                      onToggleReviewed={toggleQueueItemReviewed}
+                    />
+                  </div>
                 );
-              })()
-            ))
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -2272,47 +2663,6 @@ export function FastEntryPanel({
         )}
       </div>
 
-      {/* ── Queue list ────────────────────────────────────────────────────────── */}
-      {false && entryQueue.length > 0 ? (
-        <div className={cn(
-          'px-3 pb-3 overflow-y-auto',
-          isQueueExpanded ? 'flex-1 min-h-0' : 'max-h-40',
-        )}>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="grid min-w-[1060px] grid-cols-[52px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-zinc-200 bg-zinc-50 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-              <div className="flex h-9 items-center justify-center border-r border-inherit font-mono">#</div>
-              <div className="flex h-9 items-center border-r border-inherit px-2">A · Mijoz kodi</div>
-              <div className="flex h-9 items-center border-r border-inherit px-3">B · Track code</div>
-              <div className="flex h-9 items-center justify-center border-r border-inherit px-2">C · Soni</div>
-              <div className="flex h-9 items-center border-r border-inherit px-3">Holat</div>
-              <div className="flex h-9 items-center justify-center px-2">Amal</div>
-            </div>
-            {entryQueue.map((item, index) => (
-              <QueueItemRow
-                key={item.id}
-                item={item}
-                rowNumber={entryQueue.length - index}
-                isSelected={selectedQueueItemIds.includes(item.id)}
-                clientScanCount={clientScanCounts.get(item.clientCode.trim().toUpperCase()) ?? 0}
-                isSplitGroup={false}
-                onToggleSelected={toggleQueueItemSelected}
-                onRemove={removeFromQueue}
-                onSetClientCode={setQueueItemClientCode}
-                onAcceptConflictOwner={acceptQueueItemConflictOwner}
-                onMergeClientGroup={mergeClientQueueGroup}
-                onPreviewClient={handlePreviewClient}
-                onToggleReviewed={toggleQueueItemReviewed}
-              />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="hidden">
-          {isAutoFill
-            ? "Barkodni skanerlang — avtomatik mijozga biriktiriladi"
-            : "Mijoz kodini kiriting, keyin trek kodlarni yozing yoki paste qiling"}
-        </div>
-      )}
     </div>
   );
 }

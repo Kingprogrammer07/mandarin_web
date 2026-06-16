@@ -20,6 +20,9 @@ interface BulkSaveFABProps {
 }
 
 const SAVE_CONCURRENCY = 4;
+// Backend caps track_codes at 500 per request (schemas/expected_cargo.py); a single
+// client can exceed that, so each client group is sliced into chunks of this size.
+const SAVE_CHUNK_SIZE = 500;
 
 function triggerHapticSuccess(): void {
   try {
@@ -59,12 +62,21 @@ function groupQueueByClient(
   }
 
   return {
-    groups: Array.from(groups.entries()).map(([clientCode, group]) => ({
-      flightName,
-      clientCode,
-      trackCodes: group.trackCodes,
-      itemIds: group.itemIds,
-    })),
+    // Slice each client into ≤500-code chunks so the server's per-request cap is
+    // never exceeded. trackCodes and itemIds are sliced in lockstep so a chunk's
+    // confirmed items can be removed precisely on success.
+    groups: Array.from(groups.entries()).flatMap(([clientCode, group]) => {
+      const chunks: Array<{ flightName: string; clientCode: string; trackCodes: string[]; itemIds: string[] }> = [];
+      for (let offset = 0; offset < group.trackCodes.length; offset += SAVE_CHUNK_SIZE) {
+        chunks.push({
+          flightName,
+          clientCode,
+          trackCodes: group.trackCodes.slice(offset, offset + SAVE_CHUNK_SIZE),
+          itemIds: group.itemIds.slice(offset, offset + SAVE_CHUNK_SIZE),
+        });
+      }
+      return chunks;
+    }),
     invalidItems,
   };
 }
@@ -88,7 +100,8 @@ async function runWithConcurrency<T>(
 export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { entryQueue, clearQueue, removeFromQueue } = useExpectedCargoStore();
+  const { entryQueue, removeFromQueue, markItemsSaving, markItemsPending } =
+    useExpectedCargoStore();
 
   const readyItems = entryQueue.filter((i) => !isQueueItemBlocked(i));
   const unreadyItems = entryQueue.filter(isQueueItemBlocked);
@@ -108,6 +121,11 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
       const savedItemIds: string[] = [];
       const savedClientCodes: string[] = [];
 
+      // Durably mark everything we are about to push as `saving` first. If the
+      // tab/computer dies mid-save, these rows survive in IndexedDB and are
+      // restored (reset to pending) on next load for a safe, idempotent re-save.
+      markItemsSaving(groups.flatMap((group) => group.itemIds));
+
       await runWithConcurrency(groups, SAVE_CONCURRENCY, async (group) => {
         try {
           const response = await bulkCreateExpectedCargo({
@@ -118,9 +136,12 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
           totalCreated += response.created_count;
           savedItemIds.push(...group.itemIds);
           savedClientCodes.push(group.clientCode);
+          // Server confirmed (and dedupes via ON CONFLICT) — drop these rows.
           for (const id of group.itemIds) removeFromQueue(id);
         } catch {
           failedCount += 1;
+          // Roll the chunk back to `pending` so it stays in the queue and can be retried.
+          markItemsPending(group.itemIds);
         }
       });
 
@@ -145,9 +166,9 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
         toast.success(`${totalCreated} ta trek kodi saqlandi`);
       }
 
-      if (failedCount === 0 && invalidCount === 0) {
-        clearQueue();
-      } else if (failedCount === 0 && savedItemIds.length > 0) {
+      // No blanket clearQueue: confirmed rows are already removed per-chunk, so
+      // only invalid/blocked or failed rows remain — exactly what should persist.
+      if (failedCount === 0 && invalidCount > 0 && savedItemIds.length > 0) {
         toast.info(`${invalidCount} ta tekshiriladigan qator navbatda qoldi`);
       } else if (failedCount > 0) {
         toast.info('Yuborilmagan qatorlar navbatda saqlanib qoldi');

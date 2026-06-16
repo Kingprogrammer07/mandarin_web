@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ShieldOff, Plane, Plus } from 'lucide-react';
@@ -25,7 +25,8 @@ import { RenameFlightModal } from '@/components/expectedCargo/RenameFlightModal'
 import { DeleteConfirmModal } from '@/components/expectedCargo/DeleteConfirmModal';
 import { ReplaceTrackCodesModal } from '@/components/expectedCargo/ReplaceTrackCodesModal';
 import { NotificationPanel } from '@/components/expectedCargo/NotificationPanel';
-import { expectedCargoQueueStorage } from '@/utils/expectedCargoQueueStorage';
+import { expectedCargoScanStore } from '@/utils/expectedCargoScanStore';
+import type { FastEntryQueueItem } from '@/store/expectedCargoStore';
 
 interface ExpectedCargoPageProps {
   onNavigate: (page: string) => void;
@@ -158,51 +159,117 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     setExpandedClient(null);
   }, [activeFlightName, summarySize, summarySort, setExpandedClient]);
 
-  // Hydrate large scanner queues from IndexedDB. If the current in-memory queue
-  // came from older localStorage persistence, migrate it into IndexedDB once.
+  // Snapshot of what is currently persisted, keyed by id. Lets the reconcile pass
+  // below diff the live queue against IndexedDB by reference identity (zustand
+  // produces new object refs for changed items) and write only the deltas.
+  const persistedRef = useRef<Map<string, FastEntryQueueItem>>(new Map());
+
+  // Load the durable scanner queue from IndexedDB once on mount (migrating the
+  // legacy v1 snapshot transparently). Any item left in `saving` from an
+  // interrupted save is reset to `pending` so the worker can safely re-save —
+  // the server's ON CONFLICT DO NOTHING makes re-saving idempotent.
   useEffect(() => {
     let isCancelled = false;
 
-    expectedCargoQueueStorage.loadQueue()
-      .then((storedQueue) => {
+    (async () => {
+      const available = await expectedCargoScanStore.isAvailable();
+      if (isCancelled) return;
+
+      if (!available) {
+        toast.warning(
+          "Durable backup o'chiq (brauzer xotirasi yopiq). Ma'lumot faqat sahifa ochiq turguncha saqlanadi.",
+        );
+        setHasHydratedQueueBackup(true);
+        return;
+      }
+
+      try {
+        const stored = await expectedCargoScanStore.loadItems();
         if (isCancelled) return;
-        if (storedQueue.length > 0) {
-          replaceEntryQueue(storedQueue);
-        } else if (entryQueue.length > 0) {
-          void expectedCargoQueueStorage.saveQueue(entryQueue);
+
+        if (stored.length > 0) {
+          const interrupted = stored.filter((item) => item.status === 'saving');
+          const restored: FastEntryQueueItem[] = interrupted.length
+            ? stored.map((item) =>
+                item.status === 'saving' ? { ...item, status: 'pending' } : item,
+              )
+            : stored;
+
+          replaceEntryQueue(restored);
+          persistedRef.current = new Map(restored.map((item) => [item.id, item]));
+
+          if (interrupted.length > 0) {
+            await expectedCargoScanStore.putItems(
+              restored.filter((item) => interrupted.some((i) => i.id === item.id)),
+            );
+            toast.info(
+              `${interrupted.length} ta tugallanmagan saqlash tiklandi — qayta saqlang`,
+            );
+          }
         }
-      })
-      .catch(() => {
+      } catch {
         toast.warning("Mahalliy queue backupini o'qib bo'lmadi");
-      })
-      .finally(() => {
+      } finally {
         if (!isCancelled) setHasHydratedQueueBackup(true);
-      });
+      }
+    })();
 
     return () => {
       isCancelled = true;
     };
-    // Run once on page mount. entryQueue is intentionally captured for one-time migration.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replaceEntryQueue]);
 
-  // Keep a durable IndexedDB backup of the queue. Debounced so scanner bursts do
-  // not write on every keystroke/scan synchronously.
+  // Durable write-through: subscribe to the queue and persist only changed/removed
+  // items (microtask-batched to coalesce scanner bursts). This is the backstop for
+  // edits/resolves/removes; the scanner drain additionally pre-writes each scan
+  // before it ever reaches memory. IndexedDB upserts are idempotent, so the
+  // overlap is harmless.
   useEffect(() => {
     if (!hasHydratedQueueBackup) return;
 
-    const timer = window.setTimeout(() => {
-      const task = entryQueue.length > 0
-        ? expectedCargoQueueStorage.saveQueue(entryQueue)
-        : expectedCargoQueueStorage.clearQueue();
+    let isScheduled = false;
 
-      task.catch(() => {
-        toast.warning('Queue backup saqlanmadi. Brauzer xotirasini tekshiring.');
+    const reconcile = (current: FastEntryQueueItem[]): void => {
+      const prev = persistedRef.current;
+      const next = new Map<string, FastEntryQueueItem>();
+      const changed: FastEntryQueueItem[] = [];
+
+      for (const item of current) {
+        next.set(item.id, item);
+        if (prev.get(item.id) !== item) changed.push(item);
+      }
+
+      const removed: string[] = [];
+      for (const id of prev.keys()) {
+        if (!next.has(id)) removed.push(id);
+      }
+
+      persistedRef.current = next;
+
+      if (changed.length > 0) {
+        void expectedCargoScanStore.putItems(changed).catch(() => {
+          toast.warning('Queue backup saqlanmadi. Brauzer xotirasini tekshiring.');
+        });
+      }
+      if (removed.length > 0) {
+        void expectedCargoScanStore.deleteItems(removed).catch(() => {});
+      }
+    };
+
+    const unsubscribe = useExpectedCargoStore.subscribe(() => {
+      if (isScheduled) return;
+      isScheduled = true;
+      queueMicrotask(() => {
+        isScheduled = false;
+        reconcile(useExpectedCargoStore.getState().entryQueue);
       });
-    }, 250);
+    });
 
-    return () => window.clearTimeout(timer);
-  }, [entryQueue, hasHydratedQueueBackup]);
+    // Reconcile once immediately to capture any state that changed during load.
+    reconcile(useExpectedCargoStore.getState().entryQueue);
+
+    return unsubscribe;
+  }, [hasHydratedQueueBackup]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
 
