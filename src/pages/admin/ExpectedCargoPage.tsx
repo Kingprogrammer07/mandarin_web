@@ -103,7 +103,9 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
   const [hasHydratedQueueBackup, setHasHydratedQueueBackup] = useState(false);
   const [summaryPage, setSummaryPage] = useState(1);
   const [summarySize, setSummarySize] = useState(50);
-  const [summarySort, setSummarySort] = useState<ClientSummarySort>('track_count_desc');
+  // Default to save order (newest first) so the preview mirrors how cargo was
+  // just saved rather than reshuffling clients by track count.
+  const [summarySort, setSummarySort] = useState<ClientSummarySort>('created_desc');
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 

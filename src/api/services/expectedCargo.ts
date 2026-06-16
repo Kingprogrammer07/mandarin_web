@@ -161,7 +161,9 @@ export type ClientSummarySort =
   | 'track_count_desc'
   | 'track_count_asc'
   | 'client_code_asc'
-  | 'client_code_desc';
+  | 'client_code_desc'
+  | 'created_desc'
+  | 'created_asc';
 
 // ── API 12 — Flight list ───────────────────────────────────────────────────────
 
