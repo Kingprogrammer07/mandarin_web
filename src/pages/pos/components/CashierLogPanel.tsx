@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { QuickDatePresets } from "@/components/ui/QuickDatePresets";
 import { formatCurrencySum } from "@/lib/format";
-import type { CashierLogResponse, CashierLogProvider } from "@/api/pos";
+import type { CashierLogFilter, CashierLogResponse } from "@/api/pos";
 import { exportCashierLog } from "@/api/pos";
 import {
   getSelectedProviderTotal,
@@ -34,8 +34,8 @@ interface CashierLogPanelProps {
   setLogDateFrom: (v: string) => void;
   logDateTo: string;
   setLogDateTo: (v: string) => void;
-  logProvider: CashierLogProvider | "all";
-  setLogProvider: (v: CashierLogProvider | "all") => void;
+  logProvider: CashierLogFilter | "all";
+  setLogProvider: (v: CashierLogFilter | "all") => void;
   page: number;
   onPageChange: (p: number) => void;
 }
@@ -69,7 +69,9 @@ export function CashierLogPanel({
       const blob = await exportCashierLog({
         date_from: toIsoDateBound(logDateFrom, "start"),
         date_to: toIsoDateBound(logDateTo, "end"),
-        payment_provider: logProvider === "all" ? undefined : logProvider,
+        payment_provider:
+          logProvider === "all" || logProvider === "uzpost" ? undefined : logProvider,
+        payment_source: logProvider === "uzpost" ? "uzpost" : undefined,
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -242,7 +244,7 @@ export function CashierLogPanel({
                       <select
                         value={logProvider}
                         onChange={(e) =>
-                          setLogProvider(e.target.value as CashierLogProvider | "all")
+                          setLogProvider(e.target.value as CashierLogFilter | "all")
                         }
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[12px] font-semibold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-gray-700 dark:text-gray-200"
                       >
@@ -319,7 +321,7 @@ export function CashierLogPanel({
                   <div className="space-y-2">
                     {logData.items.map((item) => (
                       <LogEntry
-                        key={item.id}
+                        key={`${item.entry_kind}-${item.id}`}
                         item={item}
                         onSelect={onEntryClick}
                         currentAdminId={currentAdminId}

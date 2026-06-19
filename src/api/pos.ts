@@ -17,7 +17,9 @@ const getAdminHeaders = () => {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type PaymentProvider = 'cash' | 'click' | 'payme' | 'card' | 'terminal';
-export type CashierLogProvider = PaymentProvider | 'wallet' | 'nbu';
+export type CashierLogProvider = PaymentProvider | 'wallet' | 'nbu' | 'online';
+export type CashierLogSource = 'flight' | 'uzpost';
+export type CashierLogFilter = CashierLogProvider | 'uzpost';
 
 /** Card with collected balance — returned by GET /payments/cards. */
 export interface CardWithBalance {
@@ -83,11 +85,14 @@ export interface BulkPaymentResponse {
 /** A single entry in the shared cashier payment audit log. */
 export interface CashierLogItem {
   id: number;
-  transaction_id: number;
+  entry_kind: 'payment_event' | 'uzpost_nbu' | 'uzpost_notification';
+  transaction_id: number | null;
+  delivery_request_id: number | null;
   client_code: string | null;
   flight: string | null;
   paid_amount: number;
   payment_provider: string;
+  payment_source: CashierLogSource;
   /**
    * Admin DB PK of the cashier who processed this entry.
    * Populated for all entries — used by the frontend to colour-code rows
@@ -123,8 +128,10 @@ export interface CashierLogSummary {
   click: number;
   payme: number;
   nbu: number;
+  online: number;
   wallet: number;
-  /** Cash/card/terminal/click/payme/nbu total. Excludes wallet adjustments. */
+  uzpost: number;
+  /** Real payment-provider total. Excludes wallet adjustments. */
   total: number;
 }
 
@@ -134,6 +141,7 @@ export interface CashierLogParams {
   date_from?: string;
   date_to?: string;
   payment_provider?: CashierLogProvider;
+  payment_source?: CashierLogSource;
 }
 
 /** Manual cashier balance correction request. */
@@ -227,6 +235,7 @@ export async function exportCashierLog(params: {
   date_from?: string;
   date_to?: string;
   payment_provider?: CashierLogProvider;
+  payment_source?: CashierLogSource;
 }): Promise<Blob> {
   const res = await apiClient.get('/api/v1/payments/cashier-log/export', {
     params,

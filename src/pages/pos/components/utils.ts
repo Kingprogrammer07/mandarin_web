@@ -1,5 +1,5 @@
 import type {
-  CashierLogProvider,
+  CashierLogFilter,
   CashierLogSummary,
   PaymentProvider,
 } from '@/api/pos';
@@ -129,7 +129,7 @@ export const PAYMENT_LABEL: Record<string, string> = {
   online: "Online",
 };
 
-export const LOG_PROVIDER_FILTERS: { value: CashierLogProvider | "all"; label: string }[] = [
+export const LOG_PROVIDER_FILTERS: { value: CashierLogFilter | "all"; label: string }[] = [
   { value: "all", label: "Barchasi" },
   { value: "cash", label: "Naqd" },
   { value: "card", label: "Karta" },
@@ -137,7 +137,9 @@ export const LOG_PROVIDER_FILTERS: { value: CashierLogProvider | "all"; label: s
   { value: "click", label: "Click" },
   { value: "payme", label: "Payme" },
   { value: "nbu", label: "NBU" },
+  { value: "online", label: "Online" },
   { value: "wallet", label: "Hamyon" },
+  { value: "uzpost", label: "UzPost" },
 ];
 
 export const DELIVERY_REQUEST_OPTIONS: DeliveryRequestType[] = [
@@ -311,7 +313,7 @@ export function toIsoDateBound(date: string, boundary: "start" | "end"): string 
 
 export function getSelectedProviderTotal(
   summary: CashierLogSummary,
-  provider: CashierLogProvider | "all",
+  provider: CashierLogFilter | "all",
 ): number {
   return provider === "all" ? summary.total : summary[provider];
 }

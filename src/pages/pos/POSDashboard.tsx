@@ -49,7 +49,8 @@ import { PaymentNotificationDrawer } from "@/components/pos/PaymentNotificationD
 import { formatDateTime } from "@/components/pos/PaymentNotificationDrawer";
 import type {
   PaymentProvider,
-  CashierLogProvider,
+  CashierLogFilter,
+  CashierLogParams,
   EditPaymentRequest,
 } from "@/api/pos";
 import {
@@ -346,7 +347,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [recentCodes, setRecentCodes] = useState<string[]>(getRecentSearches);
   const [logDateFrom, setLogDateFrom] = useState("");
   const [logDateTo, setLogDateTo] = useState("");
-  const [logProvider, setLogProvider] = useState<CashierLogProvider | "all">("all");
+  const [logProvider, setLogProvider] = useState<CashierLogFilter | "all">("all");
   const [logPage, setLogPage] = useState(1);
 
   // ── Collapsible left column ───────────────────────────────────────────────
@@ -473,13 +474,15 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     setLogPage(1);
   }, [logDateFrom, logDateTo, logProvider]);
 
-  const cashierLogParams = useMemo(
+  const cashierLogParams = useMemo<CashierLogParams>(
     () => ({
       page: logPage,
       size: 30,
       date_from: toIsoDateBound(logDateFrom, "start"),
       date_to: toIsoDateBound(logDateTo, "end"),
-      payment_provider: logProvider === "all" ? undefined : logProvider,
+      payment_provider:
+        logProvider === "all" || logProvider === "uzpost" ? undefined : logProvider,
+      payment_source: logProvider === "uzpost" ? "uzpost" : undefined,
     }),
     [logPage, logDateFrom, logDateTo, logProvider],
   );

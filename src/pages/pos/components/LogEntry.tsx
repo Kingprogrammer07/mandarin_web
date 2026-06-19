@@ -42,6 +42,18 @@ const PROVIDER_THEME: Record<string, { border: string; bg: string; dot: string; 
     dot: "bg-teal-400",
     labelText: "text-teal-700 dark:text-teal-400",
   },
+  nbu: {
+    border: "border-rose-400 dark:border-rose-500/50",
+    bg: "bg-rose-50/60 dark:bg-rose-500/[0.06]",
+    dot: "bg-rose-400",
+    labelText: "text-rose-700 dark:text-rose-400",
+  },
+  online: {
+    border: "border-violet-400 dark:border-violet-500/50",
+    bg: "bg-violet-50/60 dark:bg-violet-500/[0.06]",
+    dot: "bg-violet-400",
+    labelText: "text-violet-700 dark:text-violet-400",
+  },
 };
 
 function getProviderTheme(provider: string) {
@@ -79,7 +91,7 @@ export function LogEntry({
       }`}
     >
       {/* ── Row 1: client code + name + flight badge ──────────────────── */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-wrap">
         {/* Cashier dot */}
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cashierStyle.dot}`} />
 
@@ -90,8 +102,14 @@ export function LogEntry({
 
         {/* Flight badge — always visible */}
         {item.flight && (
-          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.08] text-[10px] font-bold text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/[0.06]">
+          <span className="min-w-0 max-w-full break-words inline-flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/[0.08] text-[10px] font-bold text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/[0.06]">
             {item.flight}
+          </span>
+        )}
+
+        {item.payment_source === "uzpost" && (
+          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-[9px] font-black uppercase text-emerald-700 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-500/20">
+            UzPost
           </span>
         )}
 
