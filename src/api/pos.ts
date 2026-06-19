@@ -99,6 +99,9 @@ export interface CashierLogItem {
    * and distinguish the current user's entries from colleagues'.
    */
   cashier_id: number | null;
+  /** Resolved system_username of the cashier. Null for automatic NBU entries
+   *  or when the id has no matching admin account. */
+  cashier_name: string | null;
   created_at: string;
 }
 

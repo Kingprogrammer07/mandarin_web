@@ -147,10 +147,10 @@ export function LogEntry({
             {translatePayment(item.payment_provider)}
           </span>
 
-          {/* Cashier label */}
+          {/* Cashier label — prefer username, fall back to raw id */}
           {item.cashier_id !== null && !isOwn && (
             <span className={`text-[9px] font-bold ${cashierStyle.label}`}>
-              #{item.cashier_id}
+              {item.cashier_name ?? `#${item.cashier_id}`}
             </span>
           )}
         </div>
