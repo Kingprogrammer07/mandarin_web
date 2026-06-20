@@ -20,12 +20,20 @@ let profileCache: ExpectedCargoSoundProfile | null = null;
 let cachePromise: Promise<void> | null = null;
 let customSoundCache = new Map<ExpectedCargoSoundEvent, CachedCustomSound>();
 let activeCustomAudio: HTMLAudioElement | null = null;
+let pendingCustomEvent: ExpectedCargoSoundEvent | null = null;
 
 function stopActiveCustomAudio(): void {
+  pendingCustomEvent = null;
   if (!activeCustomAudio) return;
   activeCustomAudio.pause();
   activeCustomAudio.currentTime = 0;
   activeCustomAudio = null;
+}
+
+function playPendingCustomSound(): void {
+  const pendingEvent = pendingCustomEvent;
+  pendingCustomEvent = null;
+  if (pendingEvent) void playExpectedCargoSound(pendingEvent);
 }
 
 function replaceCustomSoundCache(records: ExpectedCargoCustomSound[]): void {
@@ -97,7 +105,10 @@ export async function playExpectedCargoSound(event: ExpectedCargoSoundEvent): Pr
   }
 
   if (activeCustomAudio && !activeCustomAudio.paused) {
-    if (settings.playbackMode === 'finish') return;
+    if (settings.playbackMode === 'finish') {
+      pendingCustomEvent = event;
+      return;
+    }
     stopActiveCustomAudio();
   }
 
@@ -106,6 +117,7 @@ export async function playExpectedCargoSound(event: ExpectedCargoSoundEvent): Pr
   activeCustomAudio = audio;
   audio.addEventListener('ended', () => {
     if (activeCustomAudio === audio) activeCustomAudio = null;
+    playPendingCustomSound();
   }, { once: true });
   try {
     await audio.play();
@@ -113,6 +125,7 @@ export async function playExpectedCargoSound(event: ExpectedCargoSoundEvent): Pr
   } catch {
     if (activeCustomAudio === audio) activeCustomAudio = null;
     playDefaultSound(event, settings.volume);
+    playPendingCustomSound();
   }
 }
 

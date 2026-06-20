@@ -971,7 +971,6 @@ export function FastEntryPanel({
       if (isAutoMergeEnabled) {
         requestAnimationFrame(() => mergeClientQueueGroup(resolved.client_code));
       }
-      void playExpectedCargoSound('warning');
       const totalCount = priorCount + 1;
       toast.warning(`${resolved.client_code} - navbat almashdi, tekshiring`, {
         duration: 5000,
@@ -1559,6 +1558,19 @@ export function FastEntryPanel({
         .map(([clientCode]) => clientCode),
     [splitClientSegments],
   );
+  const previousSplitClientCodesRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const currentSplitClients = new Set(splitClientCodes);
+    const previousSplitClients = previousSplitClientCodesRef.current;
+    previousSplitClientCodesRef.current = currentSplitClients;
+
+    // Initial hydration may restore old split groups from IndexedDB. Only sound
+    // when a new split appears during the current working session.
+    if (!previousSplitClients) return;
+    if (splitClientCodes.some((clientCode) => !previousSplitClients.has(clientCode))) {
+      void playExpectedCargoSound('merge');
+    }
+  }, [splitClientCodes]);
   const splitRowCount = useMemo(
     () =>
       visibleQueue.filter((item) => {
@@ -1628,7 +1640,6 @@ export function FastEntryPanel({
 
   const handleMergeClientGroup = useCallback((clientCode: string) => {
     mergeClientQueueGroup(clientCode);
-    void playExpectedCargoSound('merge');
   }, [mergeClientQueueGroup]);
 
   const handleMergeAllSplitGroups = useCallback(() => {
@@ -1636,7 +1647,6 @@ export function FastEntryPanel({
       mergeClientQueueGroup(clientCode);
     }
     if (splitClientCodes.length > 0) {
-      void playExpectedCargoSound('merge');
       toast.success(`${splitClientCodes.length} ta ajralgan guruh birlashtirildi`, { duration: 1800 });
     }
   }, [mergeClientQueueGroup, splitClientCodes]);
