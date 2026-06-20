@@ -971,6 +971,7 @@ export function FastEntryPanel({
       if (isAutoMergeEnabled) {
         requestAnimationFrame(() => mergeClientQueueGroup(resolved.client_code));
       }
+      void playExpectedCargoSound('warning');
       const totalCount = priorCount + 1;
       toast.warning(`${resolved.client_code} - navbat almashdi, tekshiring`, {
         duration: 5000,
