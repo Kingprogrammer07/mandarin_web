@@ -42,11 +42,11 @@ export function setCargoAudioVolume(value: number) {
   }
 }
 
-export function playSuccessSound() {
+export function playSuccessSound(volumeOverride?: number) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    const volume = getCargoAudioVolume();
+    const volume = clampVolume(volumeOverride ?? getCargoAudioVolume());
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -72,7 +72,7 @@ export function playSuccessSound() {
   }
 }
 
-export function playRusterSuccessSound() {
+export function playRusterSuccessSound(volumeOverride?: number) {
   try {
     const now = Date.now();
     if (now - lastRusterSuccessAt < RUSTER_SUCCESS_COOLDOWN_MS) return;
@@ -92,7 +92,7 @@ export function playRusterSuccessSound() {
 
     rusterSuccessAudio.pause();
     rusterSuccessAudio.currentTime = 0;
-    rusterSuccessAudio.volume = getCargoAudioVolume();
+    rusterSuccessAudio.volume = clampVolume(volumeOverride ?? getCargoAudioVolume());
 
     void rusterSuccessAudio.play().then(() => {
       if (shouldPlayShortSnippet) {
@@ -106,11 +106,11 @@ export function playRusterSuccessSound() {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
       }
     }).catch(() => {
-      playSuccessSound();
+      playSuccessSound(volumeOverride);
     });
   } catch (e) {
     console.error('Audio play failed', e);
-    playSuccessSound();
+    playSuccessSound(volumeOverride);
   }
 }
 
@@ -145,11 +145,11 @@ export function playApplePaySound() {
 }
 
 /** Two-tone descending warning chime — distinct from success (ascending) and error (square). */
-export function playWarningSound() {
+export function playWarningSound(volumeOverride?: number) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    const volume = getCargoAudioVolume();
+    const volume = clampVolume(volumeOverride ?? getCargoAudioVolume());
 
     const playTone = (freq: number, startTime: number, duration: number) => {
       const osc = ctx.createOscillator();
@@ -178,11 +178,11 @@ export function playWarningSound() {
   }
 }
 
-export function playErrorSound() {
+export function playErrorSound(volumeOverride?: number) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    const volume = getCargoAudioVolume();
+    const volume = clampVolume(volumeOverride ?? getCargoAudioVolume());
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();

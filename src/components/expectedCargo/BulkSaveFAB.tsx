@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { bulkCreateExpectedCargo } from '@/api/services/expectedCargo';
 import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expectedCargoStore';
-import { playSuccessSound } from '@/utils/audioUtils';
+import { playExpectedCargoSound } from '@/utils/expectedCargoSoundManager';
 
 interface BulkSaveFABProps {
   flightName: string | null;
@@ -23,14 +23,6 @@ const SAVE_CONCURRENCY = 4;
 // Backend caps track_codes at 500 per request (schemas/expected_cargo.py); a single
 // client can exceed that, so each client group is sliced into chunks of this size.
 const SAVE_CHUNK_SIZE = 500;
-
-function triggerHapticSuccess(): void {
-  try {
-    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
-  } catch {
-    // Not available outside Telegram
-  }
-}
 
 function isQueueItemBlocked(item: FastEntryQueueItem): boolean {
   return item.isWrongClient || item.isAlreadySent || item.notFound || !item.clientCode.trim();
@@ -168,14 +160,13 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
       };
     },
     onSuccess: ({ totalCreated, failedCount, invalidCount, savedItemIds, savedClientCodes }) => {
-      triggerHapticSuccess();
-
       if (failedCount > 0) {
+        void playExpectedCargoSound('warning');
         toast.warning(
           `${totalCreated} ta saqlandi, ${failedCount} ta guruhda xatolik`,
         );
       } else {
-        playSuccessSound();
+        void playExpectedCargoSound('success');
         toast.success(`${totalCreated} ta trek kodi saqlandi`);
       }
 
@@ -207,6 +198,7 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
       }
     },
     onError: (error: Error) => {
+      void playExpectedCargoSound('error');
       toast.error(error.message ?? 'Saqlashda xatolik yuz berdi');
     },
   });

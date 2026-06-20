@@ -15,6 +15,7 @@ import {
   Loader2, X, CheckCircle2, AlertCircle, User, Camera, ScanLine,
   Pencil, AlertTriangle, Info, XCircle, PanelBottomClose, PanelBottomOpen, Ban,
   Undo2, Upload, Square, CheckSquare, MoreVertical, Download, History, RefreshCw, Wifi, WifiOff,
+  Settings2,
 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -33,13 +34,10 @@ import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expected
 import { expectedCargoScanStore } from '@/utils/expectedCargoScanStore';
 import { exportQueueToCsv } from '@/utils/expectedCargoQueueExport';
 import {
-  getCargoAudioVolume,
-  playSuccessSound,
-  playRusterSuccessSound,
-  playErrorSound,
-  playWarningSound,
-  setCargoAudioVolume,
-} from '@/utils/audioUtils';
+  initializeExpectedCargoSounds,
+  playExpectedCargoSound,
+} from '@/utils/expectedCargoSoundManager';
+import { ScannerSoundSettingsModal } from '@/components/expectedCargo/ScannerSoundSettingsModal';
 
 interface FastEntryPanelProps {
   flightName: string | null;
@@ -81,7 +79,6 @@ interface QueueFilterOption {
 
 // Stable DOM id for the Html5Qrcode video container
 const SCANNER_CONTAINER_ID = 'ec-qr-video-container';
-const RUSTER_SUCCESS_SOUND_KEY = 'expected_cargo_ruster_success_sound';
 
 function createDraftRow(): FastEntryDraftRow {
   return { id: crypto.randomUUID(), trackCode: '' };
@@ -677,14 +674,7 @@ export function FastEntryPanel({
   const [isAutoMergeEnabled, setIsAutoMergeEnabled] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
-  const [soundVolume, setSoundVolume] = useState(() => getCargoAudioVolume());
-  const [useRusterSuccessSound, setUseRusterSuccessSound] = useState(() => {
-    try {
-      return localStorage.getItem(RUSTER_SUCCESS_SOUND_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
   const [bulkClientCodeInput, setBulkClientCodeInput] = useState('');
   const [clientCodeInput, setClientCodeInput] = useState('');
   const [isAutoFill, setIsAutoFill] = useState(true);
@@ -710,30 +700,8 @@ export function FastEntryPanel({
   const isScanningRef = useRef(isScanning);
   useEffect(() => { isScanningRef.current = isScanning; }, [isScanning]);
 
-  const useRusterSuccessSoundRef = useRef(useRusterSuccessSound);
-  useEffect(() => { useRusterSuccessSoundRef.current = useRusterSuccessSound; }, [useRusterSuccessSound]);
-
-  const playConfiguredSuccessSound = useCallback(() => {
-    if (useRusterSuccessSoundRef.current) {
-      playRusterSuccessSound();
-      return;
-    }
-    playSuccessSound();
-  }, []);
-
-  const handleRusterSuccessSoundChange = useCallback((checked: boolean) => {
-    useRusterSuccessSoundRef.current = checked;
-    setUseRusterSuccessSound(checked);
-    try {
-      localStorage.setItem(RUSTER_SUCCESS_SOUND_KEY, String(checked));
-    } catch {
-      // Storage can fail in private mode; the in-memory toggle still works.
-    }
-    if (checked) {
-      playRusterSuccessSound();
-    } else {
-      playSuccessSound();
-    }
+  useEffect(() => {
+    void initializeExpectedCargoSounds();
   }, []);
 
   // Prevents the camera from firing the same barcode multiple times in 1 second.
@@ -1003,7 +971,7 @@ export function FastEntryPanel({
       if (isAutoMergeEnabled) {
         requestAnimationFrame(() => mergeClientQueueGroup(resolved.client_code));
       }
-      playWarningSound();
+      void playExpectedCargoSound('warning');
       const totalCount = priorCount + 1;
       toast.warning(`${resolved.client_code} - navbat almashdi, tekshiring`, {
         duration: 5000,
@@ -1025,10 +993,10 @@ export function FastEntryPanel({
         navigateTo: { flightName: flightName ?? '', clientCode: resolved.client_code },
       });
     } else {
-      playConfiguredSuccessSound();
+      void playExpectedCargoSound('success');
     }
   }, [
-    isAutoMergeEnabled, resolveQueueItemClient, mergeClientQueueGroup, playConfiguredSuccessSound,
+    isAutoMergeEnabled, resolveQueueItemClient, mergeClientQueueGroup,
     addNotification, flightName, setClientListHidden, setFastEntryOpen, setSearchQuery, setExpandedClient,
   ]);
 
@@ -1038,7 +1006,7 @@ export function FastEntryPanel({
     flight: string | null,
     crossFlight: boolean,
   ) => {
-    playWarningSound();
+    void playExpectedCargoSound('duplicate');
     markQueueItemAlreadySent(trackCode, flight, clientCode, crossFlight);
     if (crossFlight) {
       // Different flight — informational, not an error (green row).
@@ -1067,7 +1035,7 @@ export function FastEntryPanel({
   }, [markQueueItemAlreadySent, openSavedPreview]);
 
   const applyAutoFillNotFound = useCallback((trackCode: string) => {
-    playErrorSound();
+    void playExpectedCargoSound('error');
     markQueueItemNotFound(trackCode);
     if (!isScanningRef.current) {
       requestAnimationFrame(() => trackInputRef.current?.focus());
@@ -1089,7 +1057,7 @@ export function FastEntryPanel({
         applyAutoFillResolved(data, trackCode);
       } else {
         // Manual single-code mode (auto-fill OFF, camera scanning)
-        playConfiguredSuccessSound();
+        void playExpectedCargoSound('success');
         setSuggestion(data);
         requestAnimationFrame(() => clientInputRef.current?.focus());
       }
@@ -1103,7 +1071,7 @@ export function FastEntryPanel({
         if (isAutoFillRef.current) {
           applyAutoFillAlreadySent(trackCode, alreadySentClientCode, body?.flight_name ?? null, crossFlight);
         } else {
-          playWarningSound();
+          void playExpectedCargoSound('duplicate');
           toast.warning(
             alreadySentClientCode
               ? `${trackCode} - ${alreadySentClientCode}${crossFlight ? ' (boshqa reysda)' : ' allaqachon yuborilgan'}`
@@ -1117,7 +1085,7 @@ export function FastEntryPanel({
       if (isAutoFillRef.current) {
         applyAutoFillNotFound(trackCode);
       } else {
-        playErrorSound();
+        void playExpectedCargoSound('error');
         setSuggestion(null);
         toast.warning("Mijoz topilmadi — qo'lda kiriting", { duration: 2000 });
       }
@@ -1138,11 +1106,6 @@ export function FastEntryPanel({
       requestAnimationFrame(() => trackInputRef.current?.focus());
     }
   };
-
-  const handleSoundVolumeChange = useCallback((value: number) => {
-    setSoundVolume(value);
-    setCargoAudioVolume(value);
-  }, []);
 
   const focusDraftRow = useCallback((rowId: string) => {
     requestAnimationFrame(() => {
@@ -1379,7 +1342,7 @@ export function FastEntryPanel({
     }
 
     if (imported > 0) {
-      playConfiguredSuccessSound();
+      void playExpectedCargoSound('success');
       toast.success(`${imported} ta row import qilindi`, {
         duration: 2000,
         description: duplicates > 0 ? `${duplicates} ta duplicate o'tkazildi` : undefined,
@@ -1389,7 +1352,7 @@ export function FastEntryPanel({
     } else {
       toast.warning("Import uchun yaroqli row topilmadi", { duration: 1800 });
     }
-  }, [enqueueAutoFillTrackCode, enqueueEntry, importText, playConfiguredSuccessSound]);
+  }, [enqueueAutoFillTrackCode, enqueueEntry, importText]);
 
   const handleAutoFillScan = useCallback(() => {
     const raw = trackCodeInput.trim();
@@ -1474,7 +1437,7 @@ export function FastEntryPanel({
 
     if (conflictCount > 0) {
       const unique = [...new Set(conflictOwners)];
-      playWarningSound();
+      void playExpectedCargoSound('warning');
       toast.warning(`${conflictCount} ta xato topildi`, {
         description: unique.length > 0
           ? `Boshqa mijozniki: ${unique.join(', ')}. Navbatga qizil belgi bilan qo'shildi.`
@@ -1483,7 +1446,7 @@ export function FastEntryPanel({
       });
     }
     if (addedCount > 0) {
-      playConfiguredSuccessSound();
+      void playExpectedCargoSound('success');
     }
     if (duplicateCount > 0) {
       toast.info(`${duplicateCount} ta navbatda allaqachon bor — o'tkazib yuborildi`, { duration: 2000 });
@@ -1492,7 +1455,7 @@ export function FastEntryPanel({
     setTrackCodesText('');
     setValidationMap({});
     validatedCodesRef.current = new Set();
-  }, [clientCodeInput, parsedCodes, entryQueue, validationMap, enqueueEntry, playConfiguredSuccessSound]);
+  }, [clientCodeInput, parsedCodes, entryQueue, validationMap, enqueueEntry]);
 
   // ── Derived counts for validation summary ────────────────────────────────
 
@@ -1663,11 +1626,17 @@ export function FastEntryPanel({
     toast.success(`${updatedCount} ta row ${normalized} mijoziga biriktirildi`, { duration: 1800 });
   }, [bulkClientCodeInput, bulkSetSelectedClientCode]);
 
+  const handleMergeClientGroup = useCallback((clientCode: string) => {
+    mergeClientQueueGroup(clientCode);
+    void playExpectedCargoSound('merge');
+  }, [mergeClientQueueGroup]);
+
   const handleMergeAllSplitGroups = useCallback(() => {
     for (const clientCode of splitClientCodes) {
       mergeClientQueueGroup(clientCode);
     }
     if (splitClientCodes.length > 0) {
+      void playExpectedCargoSound('merge');
       toast.success(`${splitClientCodes.length} ta ajralgan guruh birlashtirildi`, { duration: 1800 });
     }
   }, [mergeClientQueueGroup, splitClientCodes]);
@@ -1884,18 +1853,6 @@ export function FastEntryPanel({
             </span>
           </label>
 
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <Switch
-              size="sm"
-              checked={useRusterSuccessSound}
-              onCheckedChange={handleRusterSuccessSoundChange}
-              className="data-[state=checked]:bg-emerald-500"
-            />
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
-              Ruster
-            </span>
-          </label>
-
           <label
             className="flex items-center gap-1.5 cursor-pointer select-none"
             title="Offline rejim: skan local indexdan resolve qilinadi (tarmoqsiz). Yangilash uchun ⋮ → Sync."
@@ -1913,25 +1870,15 @@ export function FastEntryPanel({
             </span>
           </label>
 
-          <label className="flex items-center gap-1.5 select-none">
-            <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-              Ovoz
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(soundVolume * 100)}
-              onChange={(event) => handleSoundVolumeChange(Number(event.target.value) / 100)}
-              onMouseUp={playConfiguredSuccessSound}
-              onTouchEnd={playConfiguredSuccessSound}
-              className="h-1.5 w-24 accent-orange-500"
-              title={`Ovoz: ${Math.round(soundVolume * 100)}%`}
-            />
-            <span className="w-8 text-right font-mono text-[10px] font-bold text-orange-500">
-              {Math.round(soundVolume * 100)}%
-            </span>
-          </label>
+          <button
+            type="button"
+            onClick={() => setIsSoundSettingsOpen(true)}
+            className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-[11px] font-semibold text-zinc-600 hover:border-orange-300 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-orange-700"
+            title="Scanner ovozlarini sozlash"
+          >
+            <Settings2 className="size-3.5" />
+            Ovozlar
+          </button>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -2432,7 +2379,7 @@ export function FastEntryPanel({
                       onRemove={removeFromQueue}
                       onSetClientCode={setQueueItemClientCode}
                       onAcceptConflictOwner={acceptQueueItemConflictOwner}
-                      onMergeClientGroup={mergeClientQueueGroup}
+                      onMergeClientGroup={handleMergeClientGroup}
                       onPreviewClient={handlePreviewClient}
                       onToggleReviewed={toggleQueueItemReviewed}
                     />
@@ -2663,6 +2610,10 @@ export function FastEntryPanel({
         )}
       </div>
 
+      <ScannerSoundSettingsModal
+        open={isSoundSettingsOpen}
+        onOpenChange={setIsSoundSettingsOpen}
+      />
     </div>
   );
 }
