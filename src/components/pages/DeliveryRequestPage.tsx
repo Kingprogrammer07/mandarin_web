@@ -1706,7 +1706,9 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
         return;
       }
       if (httpStatus === 429) {
-        toast.error(t('nbu.error.429'));
+        // Rate-limit reason from the backend is a localized (Uzbek) message
+        // naming the flight + wait window; prefer it over the generic toast.
+        toast.error(detailText || t('nbu.error.429'));
         return;
       }
       // 4xx: the backend detail is a localized (Uzbek) validation message.

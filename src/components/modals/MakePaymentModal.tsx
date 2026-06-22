@@ -533,9 +533,19 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           }
           break;
         }
-        case 429:
-          msg = t('nbu.error.429');
+        case 429: {
+          // Prefer the backend's specific reason (e.g. "Siz M227 reysi uchun
+          // so'nggi 1 soat ichida zayavka yuborgansiz...") over the generic toast.
+          const detail = error?.data?.detail;
+          if (typeof detail === 'object' && detail?.message) {
+            msg = detail.message;
+          } else if (typeof detail === 'string' && detail) {
+            msg = detail;
+          } else {
+            msg = t('nbu.error.429');
+          }
           break;
+        }
         case 502:
           msg = t('nbu.error.502');
           break;
@@ -740,9 +750,19 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           }
           break;
         }
-        case 429:
-          msg = t('nbu.error.429');
+        case 429: {
+          // Prefer the backend's specific reason (e.g. "Siz M227 reysi uchun
+          // so'nggi 1 soat ichida zayavka yuborgansiz...") over the generic toast.
+          const detail = error?.data?.detail;
+          if (typeof detail === 'object' && detail?.message) {
+            msg = detail.message;
+          } else if (typeof detail === 'string' && detail) {
+            msg = detail;
+          } else {
+            msg = t('nbu.error.429');
+          }
           break;
+        }
         case 502:
           msg = t('nbu.error.502');
           break;
