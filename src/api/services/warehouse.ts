@@ -560,6 +560,105 @@ export async function cancelUzPostOrder(requestId: number): Promise<UzPostCancel
   return response.data;
 }
 
+// ── UzPost recovery: reprint + failed-order retry ──────────────────────────
+
+export interface UzPostReprintResponse {
+  delivery_request_id: number;
+  order_number: string;
+  printer_job_id: number | null;
+  printer_status: string | null;
+}
+
+export interface UzPostOrderFailureItem {
+  id: number;
+  delivery_request_id: number | null;
+  transaction_id: number | null;
+  client_code: string | null;
+  full_name: string | null;
+  flight_names: string[];
+  weight_kg: number | null;
+  error_stage: string;
+  error_message: string;
+  status: string;
+  created_at: string;
+  recipient_name: string | null;
+  recipient_index: string | null;
+}
+
+export interface UzPostOrderFailuresResponse {
+  items: UzPostOrderFailureItem[];
+  total_count: number;
+  total_pages: number;
+  page: number;
+  size: number;
+}
+
+export interface UzPostFailureRetryResult {
+  failure_id: number;
+  success: boolean;
+  order_number: string | null;
+  error_stage: string | null;
+  error_message: string | null;
+}
+
+export interface UzPostFailureRetryAllResponse {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  results: UzPostFailureRetryResult[];
+}
+
+export interface UzPostFailuresParams {
+  page?: number;
+  size?: number;
+  failure_status?: string;
+  search?: string;
+}
+
+export async function reprintUzPostOrder(requestId: number): Promise<UzPostReprintResponse> {
+  const response = await apiClient.post<UzPostReprintResponse>(
+    `/api/v1/warehouse/uzpost/orders/${requestId}/reprint`,
+  );
+  return response.data;
+}
+
+export async function getUzPostOrderFailures(
+  params: UzPostFailuresParams = {},
+): Promise<UzPostOrderFailuresResponse> {
+  const response = await apiClient.get<UzPostOrderFailuresResponse>(
+    '/api/v1/warehouse/uzpost/order-failures',
+    {
+      params: {
+        page: params.page ?? 1,
+        size: params.size ?? 20,
+        failure_status: params.failure_status ?? 'pending',
+        ...(params.search ? { search: params.search } : {}),
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function retryUzPostOrderFailure(
+  failureId: number,
+): Promise<UzPostFailureRetryResult> {
+  const response = await apiClient.post<UzPostFailureRetryResult>(
+    `/api/v1/warehouse/uzpost/order-failures/${failureId}/retry`,
+  );
+  return response.data;
+}
+
+export async function retryAllUzPostOrderFailures(
+  limit = 50,
+): Promise<UzPostFailureRetryAllResponse> {
+  const response = await apiClient.post<UzPostFailureRetryAllResponse>(
+    '/api/v1/warehouse/uzpost/order-failures/retry-all',
+    null,
+    { params: { limit } },
+  );
+  return response.data;
+}
+
 export function getUzPostOrdersExportUrl(params: Omit<UzPostOrdersParams, 'page' | 'size'> = {}): string {
   const searchParams = new URLSearchParams();
   if (params.date_from) searchParams.set('date_from', params.date_from);

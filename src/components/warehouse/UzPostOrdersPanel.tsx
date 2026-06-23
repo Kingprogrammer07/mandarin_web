@@ -2,21 +2,32 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Ban,
   Download,
   ExternalLink,
   FileText,
   Loader2,
   PackageCheck,
+  Printer,
   RefreshCw,
+  RotateCcw,
   Search,
 } from "lucide-react";
-import { warehouseKeys, useUzPostOrders } from "../../api/hooks/useWarehouse";
+import {
+  warehouseKeys,
+  useUzPostOrders,
+  useUzPostOrderFailures,
+} from "../../api/hooks/useWarehouse";
 import {
   cancelUzPostOrder,
   downloadUzPostOrdersExport,
   getUzPostOrderDetail,
   getUzPostOrderLabel,
+  reprintUzPostOrder,
+  retryAllUzPostOrderFailures,
+  retryUzPostOrderFailure,
+  type UzPostOrderFailureItem,
   type UzPostOrderItem,
   type UzPostOrdersParams,
 } from "../../api/services/warehouse";
@@ -86,12 +97,14 @@ function OrderCard({
   order,
   onOpenLabel,
   onRefresh,
+  onReprint,
   onCancel,
   isBusy,
 }: {
   order: UzPostOrderItem;
   onOpenLabel: (order: UzPostOrderItem) => void;
   onRefresh: (order: UzPostOrderItem) => void;
+  onReprint: (order: UzPostOrderItem) => void;
   onCancel: (order: UzPostOrderItem) => void;
   isBusy: boolean;
 }) {
@@ -147,6 +160,16 @@ function OrderCard({
           </button>
           <button
             type="button"
+            onClick={() => onReprint(order)}
+            disabled={isBusy || !order.order_number}
+            className={`${actionBadgeBaseClassName} border-violet-200 bg-violet-50 text-violet-700 shadow-sm shadow-violet-500/5 dark:border-violet-400/15 dark:bg-violet-500/10 dark:text-violet-300`}
+            title="Label'ni printerga qayta yuborish"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Qayta chiqarish</span>
+          </button>
+          <button
+            type="button"
             onClick={() => onCancel(order)}
             disabled={isBusy || order.order_status === "cancelled" || !order.order_number}
             className={`${actionBadgeBaseClassName} border-red-200 bg-red-50 text-red-700 shadow-sm shadow-red-500/5 dark:border-red-400/15 dark:bg-red-500/10 dark:text-red-300`}
@@ -173,8 +196,176 @@ function OrderCard({
   );
 }
 
+function FailureCard({
+  failure,
+  onRetry,
+  isBusy,
+}: {
+  failure: UzPostOrderFailureItem;
+  onRetry: (failure: UzPostOrderFailureItem) => void;
+  isBusy: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-red-200 bg-red-50/40 p-4 shadow-sm dark:border-red-500/20 dark:bg-red-500/[0.04]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm font-black text-gray-900 dark:text-white">
+              #{failure.delivery_request_id ?? failure.id}
+            </span>
+            <span className="rounded-xl bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700 dark:bg-red-500/15 dark:text-red-300">
+              {failure.error_stage}
+            </span>
+          </div>
+          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+            {failure.client_code || "—"} · {failure.full_name || "Noma'lum"}
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {failure.flight_names.join(", ") || "Reys yo'q"} · {formatTashkentDateTime(failure.created_at)}
+          </p>
+          <p className="mt-2 line-clamp-2 text-xs text-red-600 dark:text-red-300" title={failure.error_message}>
+            {failure.error_message}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <button
+            type="button"
+            onClick={() => onRetry(failure)}
+            disabled={isBusy}
+            className={`${actionBadgeBaseClassName} border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-500/5 dark:border-emerald-400/15 dark:bg-emerald-500/10 dark:text-emerald-300`}
+            title="UzPost orderni qayta yaratish"
+          >
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            <span>Qayta urinish</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FailuresSection() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [retryingAll, setRetryingAll] = useState(false);
+
+  const params = useMemo(() => ({ page, size: PAGE_SIZE, failure_status: "pending" }), [page]);
+  const { data, isLoading, isFetching } = useUzPostOrderFailures(params);
+
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["warehouse_uzpost_failures"] });
+    await queryClient.invalidateQueries({ queryKey: ["warehouse_uzpost_orders"] });
+  };
+
+  const handleRetry = async (failure: UzPostOrderFailureItem) => {
+    setBusyId(failure.id);
+    try {
+      const res = await retryUzPostOrderFailure(failure.id);
+      if (res.success) {
+        toast.success(`${res.order_number ?? "Order"} yaratildi`);
+      } else {
+        toast.error(res.error_message ?? "Qayta urinish muvaffaqiyatsiz");
+      }
+      await invalidate();
+    } catch (error: unknown) {
+      toast.error((error as { message?: string }).message ?? "Qayta urinishda xatolik");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRetryAll = async () => {
+    setRetryingAll(true);
+    try {
+      const res = await retryAllUzPostOrderFailures(50);
+      toast.success(
+        `${res.attempted} ta urinildi · ${res.succeeded} muvaffaqiyat · ${res.failed} xato`,
+      );
+      await invalidate();
+    } catch (error: unknown) {
+      toast.error((error as { message?: string }).message ?? "Qayta urinishda xatolik");
+    } finally {
+      setRetryingAll(false);
+    }
+  };
+
+  const items = data?.items ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+          <AlertTriangle className="h-4 w-4 text-red-500" />
+          Yaratilmagan orderlar
+          {isFetching && <Loader2 className="h-4 w-4 animate-spin text-red-500" />}
+          <span className="text-xs font-semibold text-gray-400">{data?.total_count ?? 0} ta</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleRetryAll}
+          disabled={retryingAll || items.length === 0}
+          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {retryingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+          Hammasini qayta urinish
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="h-28 animate-pulse rounded-2xl bg-white dark:bg-white/[0.03]" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm font-semibold text-gray-400 dark:border-white/[0.08] dark:bg-white/[0.03]">
+          Yaratilmagan order yo'q 🎉
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((failure) => (
+            <FailureCard
+              key={failure.id}
+              failure={failure}
+              isBusy={busyId === failure.id || retryingAll}
+              onRetry={handleRetry}
+            />
+          ))}
+        </div>
+      )}
+
+      {data && data.total_pages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page <= 1}
+            className="h-10 rounded-xl bg-white px-4 text-sm font-bold text-gray-600 disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300"
+          >
+            Oldingi
+          </button>
+          <span className="text-sm font-bold text-gray-500">
+            {page} / {data.total_pages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.min(data.total_pages, current + 1))}
+            disabled={page >= data.total_pages}
+            className="h-10 rounded-xl bg-white px-4 text-sm font-bold text-gray-600 disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300"
+          >
+            Keyingi
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function UzPostOrdersPanel() {
   const queryClient = useQueryClient();
+  const [view, setView] = useState<"orders" | "failures">("orders");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [orderStatus, setOrderStatus] = useState("");
@@ -227,6 +418,19 @@ export default function UzPostOrdersPanel() {
     }
   };
 
+  const handleReprint = async (order: UzPostOrderItem) => {
+    setBusyRequestId(order.delivery_request_id);
+    try {
+      const res = await reprintUzPostOrder(order.delivery_request_id);
+      toast.success(`${res.order_number} printerga yuborildi`);
+      await invalidateOrders();
+    } catch (error: unknown) {
+      toast.error((error as { message?: string }).message ?? "Printerga yuborishda xatolik");
+    } finally {
+      setBusyRequestId(null);
+    }
+  };
+
   const handleCancel = async (order: UzPostOrderItem) => {
     const confirmed = window.confirm(`${order.order_number} UzPost orderini bekor qilamizmi?`);
     if (!confirmed) return;
@@ -259,116 +463,153 @@ export default function UzPostOrdersPanel() {
     await exportPromise;
   };
 
+  const tabBaseClassName =
+    "flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition active:scale-95";
+
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
-        <div className="grid gap-2 sm:grid-cols-[1fr_140px_150px_150px_auto]">
-          <label className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Order, mijoz kodi, ism, telefon, indeks"
-              className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
-            />
-          </label>
-          <input
-            value={orderStatus}
-            onChange={(event) => {
-              setOrderStatus(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Status"
-            className="h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
-          />
-          <input
-            type="datetime-local"
-            value={dateFrom}
-            onChange={(event) => {
-              setDateFrom(event.target.value);
-              setPage(1);
-            }}
-            className="h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
-          />
-          <input
-            type="datetime-local"
-            value={dateTo}
-            onChange={(event) => {
-              setDateTo(event.target.value);
-              setPage(1);
-            }}
-            className="h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
-          />
-          <button
-            type="button"
-            onClick={handleExport}
-            className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white active:scale-95"
-          >
-            <Download className="h-4 w-4" />
-            Excel
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
-          <PackageCheck className="h-4 w-4 text-orange-500" />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setView("orders")}
+          className={`${tabBaseClassName} ${
+            view === "orders"
+              ? "bg-orange-500 text-white"
+              : "bg-white text-gray-600 dark:bg-white/[0.04] dark:text-gray-300"
+          }`}
+        >
+          <PackageCheck className="h-4 w-4" />
           UzPost orderlar
-          {isFetching && <Loader2 className="h-4 w-4 animate-spin text-orange-500" />}
-        </div>
-        <span className="text-xs font-semibold text-gray-400">{data?.total_count ?? 0} ta</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("failures")}
+          className={`${tabBaseClassName} ${
+            view === "failures"
+              ? "bg-red-500 text-white"
+              : "bg-white text-gray-600 dark:bg-white/[0.04] dark:text-gray-300"
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4" />
+          Yaratilmagan orderlar
+        </button>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((item) => (
-            <div key={item} className="h-28 animate-pulse rounded-2xl bg-white dark:bg-white/[0.03]" />
-          ))}
-        </div>
-      ) : !data || data.items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm font-semibold text-gray-400 dark:border-white/[0.08] dark:bg-white/[0.03]">
-          UzPost order topilmadi
-        </div>
+      {view === "failures" ? (
+        <FailuresSection />
       ) : (
-        <div className="space-y-2">
-          {data.items.map((order) => (
-            <OrderCard
-              key={order.delivery_request_id}
-              order={order}
-              isBusy={busyRequestId === order.delivery_request_id}
-              onOpenLabel={handleOpenLabel}
-              onRefresh={handleRefresh}
-              onCancel={handleCancel}
-            />
-          ))}
-        </div>
-      )}
+        <>
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_140px_150px_150px_auto]">
+              <label className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Order, mijoz kodi, ism, telefon, indeks"
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
+                />
+              </label>
+              <input
+                value={orderStatus}
+                onChange={(event) => {
+                  setOrderStatus(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Status"
+                className="h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
+              />
+              <input
+                type="datetime-local"
+                value={dateFrom}
+                onChange={(event) => {
+                  setDateFrom(event.target.value);
+                  setPage(1);
+                }}
+                className="h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
+              />
+              <input
+                type="datetime-local"
+                value={dateTo}
+                onChange={(event) => {
+                  setDateTo(event.target.value);
+                  setPage(1);
+                }}
+                className="h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold outline-none focus:border-orange-400 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={handleExport}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-white active:scale-95"
+              >
+                <Download className="h-4 w-4" />
+                Excel
+              </button>
+            </div>
+          </div>
 
-      {data && data.total_pages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            disabled={page <= 1}
-            className="h-10 rounded-xl bg-white px-4 text-sm font-bold text-gray-600 disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300"
-          >
-            Oldingi
-          </button>
-          <span className="text-sm font-bold text-gray-500">
-            {page} / {data.total_pages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.min(data.total_pages, current + 1))}
-            disabled={page >= data.total_pages}
-            className="h-10 rounded-xl bg-white px-4 text-sm font-bold text-gray-600 disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300"
-          >
-            Keyingi
-          </button>
-        </div>
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+              <PackageCheck className="h-4 w-4 text-orange-500" />
+              UzPost orderlar
+              {isFetching && <Loader2 className="h-4 w-4 animate-spin text-orange-500" />}
+            </div>
+            <span className="text-xs font-semibold text-gray-400">{data?.total_count ?? 0} ta</span>
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="h-28 animate-pulse rounded-2xl bg-white dark:bg-white/[0.03]" />
+              ))}
+            </div>
+          ) : !data || data.items.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm font-semibold text-gray-400 dark:border-white/[0.08] dark:bg-white/[0.03]">
+              UzPost order topilmadi
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {data.items.map((order) => (
+                <OrderCard
+                  key={order.delivery_request_id}
+                  order={order}
+                  isBusy={busyRequestId === order.delivery_request_id}
+                  onOpenLabel={handleOpenLabel}
+                  onRefresh={handleRefresh}
+                  onReprint={handleReprint}
+                  onCancel={handleCancel}
+                />
+              ))}
+            </div>
+          )}
+
+          {data && data.total_pages > 1 && (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+                className="h-10 rounded-xl bg-white px-4 text-sm font-bold text-gray-600 disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300"
+              >
+                Oldingi
+              </button>
+              <span className="text-sm font-bold text-gray-500">
+                {page} / {data.total_pages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(data.total_pages, current + 1))}
+                disabled={page >= data.total_pages}
+                className="h-10 rounded-xl bg-white px-4 text-sm font-bold text-gray-600 disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300"
+              >
+                Keyingi
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

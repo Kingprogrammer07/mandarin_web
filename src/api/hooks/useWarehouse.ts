@@ -7,11 +7,12 @@ import {
   getMyActivity,
   getAllWarehouseActivity,
   getUzPostOrders,
+  getUzPostOrderFailures,
   searchTransactions,
   searchTransactionsGrouped,
   undoTakeaway,
 } from "../services/warehouse";
-import type { GetFlightTransactionsParams, SearchTransactionsParams, UzPostOrdersParams, WarehouseActivityQueryParams } from "../services/warehouse";
+import type { GetFlightTransactionsParams, SearchTransactionsParams, UzPostFailuresParams, UzPostOrdersParams, WarehouseActivityQueryParams } from "../services/warehouse";
 import { pickupQueueKeys } from "./usePickupQueue";
 
 /** Query key factory for warehouse queries. */
@@ -30,6 +31,8 @@ export const warehouseKeys = {
     ["warehouse_all_activity", params] as const,
   uzpostOrders: (params: UzPostOrdersParams) =>
     ["warehouse_uzpost_orders", params] as const,
+  uzpostFailures: (params: UzPostFailuresParams) =>
+    ["warehouse_uzpost_failures", params] as const,
 };
 
 /** Fetches the list of recent warehouse flights for the flight selector. */
@@ -189,6 +192,14 @@ export const useUzPostOrders = (params: UzPostOrdersParams) => {
   return useQuery({
     queryKey: warehouseKeys.uzpostOrders(params),
     queryFn: () => getUzPostOrders(params),
+    placeholderData: (previousData) => previousData,
+  });
+};
+
+export const useUzPostOrderFailures = (params: UzPostFailuresParams) => {
+  return useQuery({
+    queryKey: warehouseKeys.uzpostFailures(params),
+    queryFn: () => getUzPostOrderFailures(params),
     placeholderData: (previousData) => previousData,
   });
 };
