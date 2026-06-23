@@ -25,6 +25,8 @@ export interface CalculateUzpostResponse {
   wallet_balance: number;
   card: CardInfo | null;
   warning: string | null;
+  /** True when the price is an offline estimate (UzPost pricing API was down). */
+  fallback?: boolean;
 }
 
 export interface DeliverySuccessResponse {

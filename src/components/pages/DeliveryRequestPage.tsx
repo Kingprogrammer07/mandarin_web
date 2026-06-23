@@ -1008,6 +1008,16 @@ function StepUzpostPayment({
         </div>
       )}
 
+      {/* Offline estimate notice — UzPost pricing API was unreachable. */}
+      {calcData?.fallback && (
+        <div className="flex items-start gap-2 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-3 mb-4">
+          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-amber-700 dark:text-amber-300 text-xs">
+            {t('deliveryRequest.steps.uzpost.estimateNote')}
+          </p>
+        </div>
+      )}
+
       {/* Wallet Toggle — shown only after calc completed */}
       {calcData && (
         <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
@@ -1495,7 +1505,14 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
     ) {
       setCalcLoading(true);
       calculateUzpost(selectedFlights, selectedUzpostBranch.id)
-        .then((res) => setCalcData(res))
+        .then((res) => {
+          setCalcData(res);
+          // UzPost pricing API was down → backend returned an offline estimate.
+          // Keep the price (non-blocking) but tell the user it's approximate.
+          if (res.fallback) {
+            toast.warning(t('deliveryRequest.toast.calcFallback'));
+          }
+        })
         .catch((err: unknown) => {
           const e = err as { message?: string };
           toast.error(e?.message || t('deliveryRequest.toast.calcError'));

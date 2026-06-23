@@ -1288,7 +1288,8 @@
         "uploadHint": "JPG, PNG yoki PDF · Max 10 MB",
         "compressingReceipt": "Rasm tayyorlanmoqda...",
         "submitButton": "Jo'natish",
-        "phoneHint": "Agar profildagi raqam noto'g'ri bo'lsa, yangi raqam kiriting."
+        "phoneHint": "Agar profildagi raqam noto'g'ri bo'lsa, yangi raqam kiriting.",
+        "estimateNote": "Taxminiy narx: UzPost narx xizmati vaqtincha ishlamayapti. Yakuniy summa biroz farq qilishi mumkin."
       },
       "success": {
         "title": "Muvaffaqiyatli!",
@@ -1311,6 +1312,7 @@
       "copied": "Nusxalandi!",
       "flightsError": "Reyslarni yuklashda xatolik",
       "calcError": "Hisoblashda xatolik",
+      "calcFallback": "UzPost narx xizmati hozir ishlamayapti. Taxminiy narx ko'rsatildi.",
       "submitError": "Xatolik yuz berdi",
       "captionRequired": "Iltimos, kuryer uchun izoh kiriting"
     },
