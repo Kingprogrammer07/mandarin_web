@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense, useCallback, useMemo, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   ChevronLeft,
@@ -31,7 +31,10 @@ import { CarouselCard } from './dashboard-components/CarouselCard';
 import { CAROUSEL_ITEMS, PRIMARY_ACTIONS, SECONDARY_ACTIONS } from './dashboard-components/constants';
 import type { CarouselItemData } from './dashboard-components/types';
 import { clearNbuReturnParams } from '@/utils/nbuReturnContext';
-import { getPendingDeliveryReview } from '@/api/services/deliveryService';
+import { getPendingDeliveryReview, getPaidFlights } from '@/api/services/deliveryService';
+import { paymentService } from '@/api/services/paymentService';
+import { notificationService } from '@/api/services/notificationService';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
 
 const loadNotificationCenter = () => import('@/components/notifications/NotificationCenter');
 
@@ -116,8 +119,15 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
     };
   }, []);
   const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentFlightName, setPaymentFlightName] = useState<string | null>(null);
+  // Returning from an NBU payment? Open the modal straight from initial state
+  // (lazy init) instead of a setState-in-effect, which avoids a cascading render.
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(
+    () => new URLSearchParams(window.location.search).get('nbuReturn') === 'payment',
+  );
+  const [paymentFlightName, setPaymentFlightName] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('nbuReturn') === 'payment' ? params.get('nbuFlight') : null;
+  });
   const [isOurAddressModalOpen, setIsOurAddressModalOpen] = useState(false);
 
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -161,13 +171,44 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
     retry: 1,
   });
 
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     const idleWindow = window as Window & {
       requestIdleCallback?: (callback: () => void) => number;
       cancelIdleCallback?: (handle: number) => void;
     };
     const prefetch = () => {
+      // Preload the NotificationCenter chunk…
       void loadNotificationCenter();
+
+      // …and warm the data users tap into next, so payment / delivery /
+      // notifications open instantly. Runs on idle, and is gated by the server
+      // (5-min Redis) + client staleTime, so it costs at most ~one fetch per
+      // cache window per user. Failures are swallowed (best-effort warm-up).
+      void queryClient.prefetchQuery({
+        queryKey: ['payment-available-flights'],
+        queryFn: paymentService.getAvailableFlights,
+        staleTime: 5 * 60_000,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: ['notifications', 'list'],
+        queryFn: () => notificationService.getNotifications(1, 20),
+        staleTime: 60_000,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: ['notifications', 'unread'],
+        queryFn: notificationService.getUnreadCount,
+        staleTime: 60_000,
+      });
+
+      // Delivery flights live in a Zustand store (not TanStack). Warm it only
+      // when its 5-min cache is empty so opening the delivery page is instant.
+      if (!useDeliveryStore.getState().getCachedFlights()) {
+        void getPaidFlights()
+          .then((res) => useDeliveryStore.getState().setPaidFlights(res.flights))
+          .catch(() => {});
+      }
     };
 
     if (idleWindow.requestIdleCallback) {
@@ -177,7 +218,7 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
 
     const id = window.setTimeout(prefetch, 1_500);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     const handleOpenPayment = () => {
@@ -190,13 +231,12 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
   }, []);
 
   useEffect(() => {
+    // State was already seeded from the URL (lazy init above); just clean the
+    // params so a refresh / back-nav doesn't re-trigger the payment modal.
     const params = new URLSearchParams(window.location.search);
-    if (params.get('nbuReturn') !== 'payment') return;
-
-    const flightName = params.get('nbuFlight');
-    setPaymentFlightName(flightName);
-    setIsPaymentModalOpen(true);
-    clearNbuReturnParams();
+    if (params.get('nbuReturn') === 'payment') {
+      clearNbuReturnParams();
+    }
   }, []);
 
   const sortedCarouselItems = useMemo((): CarouselItemData[] => {

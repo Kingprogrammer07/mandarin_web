@@ -286,6 +286,7 @@ export default function NotificationCenter() {
     const { data: apiUnreadData } = useQuery({
         queryKey: ['notifications', 'unread'],
         queryFn: notificationService.getUnreadCount,
+        staleTime: 60_000,  // serve prefetched/cached badge instantly, refresh in bg
         refetchInterval: () =>
             typeof document !== 'undefined' && document.visibilityState === 'visible'
                 ? 5 * 60_000
@@ -302,6 +303,7 @@ export default function NotificationCenter() {
         queryKey: ['notifications', 'list'],
         queryFn: () => notificationService.getNotifications(1, 20),
         enabled: isOpen,
+        staleTime: 60_000,  // prefetched on Dashboard idle → opens instantly
     });
 
     // 3. Reports (Web History) - serving as "Report Notifications"
@@ -333,8 +335,13 @@ export default function NotificationCenter() {
     const totalUnreadCount = (apiUnreadData?.count || 0) + reportUnreadCount;
 
     useEffect(() => {
+        // Synchronous resets are intentional: they reset the nudge so the next
+        // appearance starts fresh with the 650ms delay below. The nudge render is
+        // already gated on (totalUnreadCount > 0 && !isOpen), so this can't cause
+        // a visible cascade — hence the rule is suppressed for these two lines.
         if (totalUnreadCount <= 0) {
             lastAnnouncedUnreadCount.current = 0;
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsNudgeVisible(false);
             return undefined;
         }
