@@ -16,9 +16,13 @@ const POLL_INTERVAL_MS = 3 * 60_000;
  */
 export function useVersionWatcher(): void {
   useEffect(() => {
-    void checkForNewVersion();
+    // Initial mount = a fresh app open. If a newer build shipped, reload silently
+    // instead of prompting — the user is entering now, so it's seamless.
+    void checkForNewVersion({ autoReload: true });
 
     const onActive = () => {
+      // Mid-session (tab refocus / Mini App reopen / slow interval): prompt only,
+      // never auto-reload — an active user must not be yanked off the page.
       if (document.visibilityState === "visible") void checkForNewVersion();
     };
 

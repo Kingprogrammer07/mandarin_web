@@ -74,12 +74,44 @@ export function promptForReloadIfStale(deployedBuildId?: string, reason?: unknow
   });
 }
 
+// Session marker: the build id we have already auto-reloaded for. Lets a fresh
+// entry auto-update exactly once; if the reload doesn't clear the mismatch (e.g.
+// a stuck service worker), we fall back to the prompt instead of reload-looping.
+const AUTO_RELOAD_KEY = "app-auto-reloaded-for-build";
+
+function hasAutoReloadedFor(buildId: string): boolean {
+  try {
+    return sessionStorage.getItem(AUTO_RELOAD_KEY) === buildId;
+  } catch {
+    return false;
+  }
+}
+
+/** Persists the auto-reload guard. Returns false if it could not persist — in
+ * that case the caller must NOT auto-reload (no guard ⇒ loop risk). */
+function markAutoReloaded(buildId: string): boolean {
+  try {
+    sessionStorage.setItem(AUTO_RELOAD_KEY, buildId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Fetches `version.json` (never cached) and prompts for reload when the
- * deployed build id differs from the one baked into this bundle. No-ops in
- * dev and swallows transient/offline failures.
+ * Fetches `version.json` (never cached) and reconciles the deployed build id
+ * with the one baked into this bundle. No-ops in dev, swallows offline errors.
+ *
+ * @param options.autoReload  When true (the initial, fresh-entry check) a stale
+ *   bundle is hard-reloaded silently — the user is opening the app anyway, so a
+ *   transparent reload beats nagging them to refresh. Guarded to fire at most
+ *   once per build per session; otherwise it falls back to the prompt. Leave
+ *   false for mid-session checks (focus / interval) so an active user is never
+ *   yanked off the page.
  */
-export async function checkForNewVersion(): Promise<void> {
+export async function checkForNewVersion(
+  options: { autoReload?: boolean } = {},
+): Promise<void> {
   if (CURRENT_BUILD_ID === "dev") return;
 
   try {
@@ -88,12 +120,21 @@ export async function checkForNewVersion(): Promise<void> {
     });
     if (!res.ok) return;
     const data = (await res.json()) as { buildId?: string };
-    if (data.buildId && data.buildId !== CURRENT_BUILD_ID) {
-      promptForReloadIfStale(
-        data.buildId,
-        `deployed ${data.buildId} != running ${CURRENT_BUILD_ID}`,
-      );
+    if (!data.buildId || data.buildId === CURRENT_BUILD_ID) return;
+
+    // Fresh entry → silently pull the new build (guarded against loops).
+    if (options.autoReload && !hasAutoReloadedFor(data.buildId)) {
+      if (markAutoReloaded(data.buildId)) {
+        await hardReloadForUpdate();
+        return;
+      }
+      // Could not persist the guard — fall through to the prompt to be safe.
     }
+
+    promptForReloadIfStale(
+      data.buildId,
+      `deployed ${data.buildId} != running ${CURRENT_BUILD_ID}`,
+    );
   } catch {
     // Offline or transient network error — ignore, retried on next trigger.
   }
