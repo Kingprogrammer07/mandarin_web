@@ -424,6 +424,34 @@ export default function AddCargoForm({
 
   const { toast, ToastRenderer } = useToast();
 
+  /**
+   * Persist a failed upload to IndexedDB so it survives a page refresh and
+   * surfaces in the "Saqlanmagan yuklar" banner / OfflineCargoManager for retry.
+   * Returns true on success. Used for BOTH network and server/DB failures —
+   * the latter previously lived only in in-memory state and was lost on reload.
+   */
+  const persistFailed = useCallback(
+    async (item: QueuedUpload, errorMsg: string): Promise<boolean> => {
+      try {
+        await offlineStorage.saveItem({
+          id: item.id,
+          flightName: item.flightName,
+          clientId: item.clientId,
+          photos: item.photos,
+          weightKg: item.weightKg,
+          pricePerKg: item.pricePerKg,
+          comment: item.comment,
+          error: errorMsg,
+          timestamp: Date.now(),
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [],
+  );
+
   /** Focus client ID input and place cursor at the END of the value */
   const focusClientIdEnd = useCallback(() => {
     const el = clientIdRef.current;
@@ -753,15 +781,21 @@ export default function AddCargoForm({
         const hasResp =
           typeof error === "object" && error !== null && "response" in error;
 
-        if (!hasResp || isNetwork) {
-          if (pending.retryCount < MAX_RETRIES) {
-            const delay = RETRY_BASE_DELAY * Math.pow(2, pending.retryCount);
-            toast({
-              title: "🔄 Qayta urinish...",
-              description: `${pending.clientId} — ${pending.retryCount + 1}/${MAX_RETRIES}`,
-              variant: "warning",
-              duration: delay,
-            });
+        // Transient (network) error with retries left → re-queue AFTER a backoff
+        // delay, but OUTSIDE the processing lock. Previously the delay was
+        // `await`-ed here WHILE holding processingRef; once the ref flipped back
+        // no state change re-fired the effect, so the item froze in "pending"
+        // ("navbatda qotib qoldi") and was lost on the next page refresh.
+        // safeTimeout re-arms the queue once the lock is already released.
+        if ((!hasResp || isNetwork) && pending.retryCount < MAX_RETRIES) {
+          const delay = RETRY_BASE_DELAY * Math.pow(2, pending.retryCount);
+          toast({
+            title: "🔄 Qayta urinish...",
+            description: `${pending.clientId} — ${pending.retryCount + 1}/${MAX_RETRIES}`,
+            variant: "warning",
+            duration: delay,
+          });
+          safeTimeout(() => {
             setUploadQueue((prev) =>
               prev.map((i) =>
                 i.id === pending.id
@@ -769,62 +803,42 @@ export default function AddCargoForm({
                   : i,
               ),
             );
-            await new Promise((r) => setTimeout(r, delay));
-          } else {
-            try {
-              await offlineStorage.saveItem({
-                id: pending.id,
-                flightName: pending.flightName,
-                clientId: pending.clientId,
-                photos: pending.photos,
-                weightKg: pending.weightKg,
-                pricePerKg: pending.pricePerKg,
-                comment: pending.comment,
-                error: msg,
-                timestamp: Date.now(),
-              });
-              if (!mountedRef.current) {
-                processingRef.current = false;
-                return;
-              }
-              toast({
-                title: "⚠️ Internet yo'q",
-                description: `${pending.clientId} — oflayn xotiraga saqlandi.`,
-                variant: "warning",
-                duration: 3000,
-              });
-              setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
-            } catch {
-              if (!mountedRef.current) {
-                processingRef.current = false;
-                return;
-              }
-              setUploadQueue((prev) =>
-                prev.map((i) =>
-                  i.id === pending.id
-                    ? {
-                        ...i,
-                        status: "error",
-                        error: "Offline save failed: " + msg,
-                      }
-                    : i,
-                ),
-              );
-            }
-          }
+          }, delay);
         } else {
-          setUploadQueue((prev) =>
-            prev.map((i) =>
-              i.id === pending.id ? { ...i, status: "error", error: msg } : i,
-            ),
-          );
+          // Retries exhausted OR a server/DB error → PERSIST to IndexedDB so the
+          // cargo survives a page refresh and is recoverable from the
+          // "Saqlanmagan yuklar" banner / manager (retry, edit, delete).
+          const saved = await persistFailed(pending, msg);
+          if (!mountedRef.current) {
+            processingRef.current = false;
+            return;
+          }
+          if (saved) {
+            toast({
+              title: isNetwork ? "⚠️ Internet yo'q" : "⚠️ Saqlanmagan yuklarga qo'shildi",
+              description: `${pending.clientId} — saqlandi, "Saqlanmagan yuklar"dan qayta yuboring.`,
+              variant: "warning",
+              duration: 4000,
+            });
+            setUploadQueue((prev) => prev.filter((i) => i.id !== pending.id));
+          } else {
+            // Even IndexedDB failed (rare: storage full/blocked) → keep it visible
+            // in the live queue as a last resort rather than dropping it silently.
+            setUploadQueue((prev) =>
+              prev.map((i) =>
+                i.id === pending.id
+                  ? { ...i, status: "error", error: "Offline save failed: " + msg }
+                  : i,
+              ),
+            );
+          }
         }
       } finally {
         processingRef.current = false;
       }
     };
     run();
-  }, [uploadQueue, fastMode, onSuccess, toast, t, safeTimeout]);
+  }, [uploadQueue, fastMode, onSuccess, toast, t, safeTimeout, persistFailed]);
 
   /* ── Auto-focus clientId after photos ── */
   useEffect(() => {
