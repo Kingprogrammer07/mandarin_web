@@ -10,6 +10,16 @@ export const updateClientPersonalSchema = z.object({
     .string()
     .max(20, "Telefon raqam uzunligi noto'g'ri")
     .optional(),
+  passport_series: z
+    .string()
+    .max(10, "Pasport seriyasi uzunligi noto'g'ri")
+    .optional()
+    .nullable(),
+  pinfl: z
+    .string()
+    .max(14, "PINFL uzunligi noto'g'ri")
+    .optional()
+    .nullable(),
   date_of_birth: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Sana formati noto'g'ri (YYYY-MM-DD)")

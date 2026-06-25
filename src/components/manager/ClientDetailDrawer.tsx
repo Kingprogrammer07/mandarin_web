@@ -261,6 +261,8 @@ export function ClientDetailDrawer() {
       reset({
         full_name: client.full_name || "",
         phone: client.phone || "",
+        passport_series: client.passport_series || "",
+        pinfl: client.pinfl || "",
         date_of_birth: client.date_of_birth ? String(client.date_of_birth) : "",
         region: client.region || "",
         district: client.district || "",
@@ -375,6 +377,39 @@ export function ClientDetailDrawer() {
                     {errors.phone && (
                       <p className="text-[11px] text-red-500">{errors.phone.message}</p>
                     )}
+                  </div>
+
+                  {/* Passport series + PINFL */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
+                        Pasport seriyasi
+                      </label>
+                      <input
+                        {...register("passport_series")}
+                        placeholder="AA1234567"
+                        className={BASE_INPUT}
+                      />
+                      {errors.passport_series && (
+                        <p className="text-[11px] text-red-500">
+                          {errors.passport_series.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
+                        PINFL
+                      </label>
+                      <input
+                        {...register("pinfl")}
+                        placeholder="14 raqam"
+                        inputMode="numeric"
+                        className={BASE_INPUT}
+                      />
+                      {errors.pinfl && (
+                        <p className="text-[11px] text-red-500">{errors.pinfl.message}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Date of birth */}
