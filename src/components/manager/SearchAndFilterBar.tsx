@@ -40,7 +40,7 @@ export default function SearchAndFilterBar({
   const currentOption = SEARCH_TYPE_OPTIONS.find((o) => o.value === searchType)!;
 
   return (
-    <div className="flex gap-2 items-center">
+    <div className="flex flex-wrap gap-2 items-center">
       {/* Search type segmented control */}
       <div className="flex rounded-xl border border-gray-200 dark:border-white/[0.08] bg-gray-100 dark:bg-white/[0.04] p-0.5 flex-shrink-0">
         {SEARCH_TYPE_OPTIONS.map((opt) => (
@@ -58,8 +58,9 @@ export default function SearchAndFilterBar({
         ))}
       </div>
 
-      {/* Search input */}
-      <div className="relative flex-1">
+      {/* Search input — min width keeps it usable; the strict toggle wraps
+          below it on very narrow screens instead of squeezing the field. */}
+      <div className="relative flex-1 min-w-[150px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
         <input
           key={searchType}

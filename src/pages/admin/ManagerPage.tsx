@@ -31,8 +31,9 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
 
   const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
   const [isDark, setIsDark] = useState(getInitialTheme);
-  // Targeted search type: 'name' searches full_name only, 'code' searches client code only
-  const [searchType, setSearchType] = useState<SearchType>('name');
+  // Targeted search type: 'code' searches client code only, 'name' full_name only.
+  // Default to 'code' — staff most often look clients up by their cargo code.
+  const [searchType, setSearchType] = useState<SearchType>('code');
   const [strictSearch, setStrictSearch] = useState(false);
 
   // Apply theme on mount and when toggled
@@ -173,21 +174,25 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
                 </button>
               )}
 
-              <RoleSwitcher onNavigate={onNavigate} />
-              <button
-                onClick={toggleTheme}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
-                title={isDark ? "Kunduzgi rejim" : "Tungi rejim"}
-              >
-                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={onLogout}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                title="Chiqish"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              {/* Role / theme / logout live in the fixed bottom bar on mobile —
+                  keep the header uncluttered on small screens. */}
+              <div className="hidden md:flex items-center gap-1">
+                <RoleSwitcher onNavigate={onNavigate} />
+                <button
+                  onClick={toggleTheme}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+                  title={isDark ? "Kunduzgi rejim" : "Tungi rejim"}
+                >
+                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={onLogout}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                  title="Chiqish"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -202,8 +207,9 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="max-w-5xl mx-auto px-4 py-4">
+      {/* Main content — extra bottom padding on mobile so the fixed bottom bar
+          never covers the last row / pagination. */}
+      <div className="max-w-5xl mx-auto px-4 pt-4 pb-24 md:pb-4">
         <ClientsDataTable
           clients={data?.items ?? []}
           isLoading={isLoading && !isQueryEmpty}
@@ -216,17 +222,27 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
         />
       </div>
 
-      {/* Mobile bottom bar with RoleSwitcher */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/90 dark:bg-[#0f0f0f]/90 backdrop-blur-xl border-t border-gray-200 dark:border-white/[0.06] px-4 py-2">
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
+      {/* Mobile bottom bar — role switch + theme + logout (hidden in header on
+          mobile). Respects the iOS safe-area inset. */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/90 dark:bg-[#0f0f0f]/90 backdrop-blur-xl border-t border-gray-200 dark:border-white/[0.06] px-4 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <div className="flex items-center justify-between gap-2 max-w-5xl mx-auto">
           <RoleSwitcher onNavigate={onNavigate} />
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-red-500/80 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Chiqish
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-center w-9 h-9 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors"
+              title={isDark ? "Kunduzgi rejim" : "Tungi rejim"}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-red-500/80 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Chiqish
+            </button>
+          </div>
         </div>
       </div>
 
