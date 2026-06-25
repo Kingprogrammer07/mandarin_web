@@ -161,8 +161,9 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
                 </button>
               )}
 
-              {/* Delivery request — visible for managers and super-admins */}
-              {(jwtClaims.isSuperAdmin || jwtClaims.permissions.has('delivery_requests:create') || jwtClaims.role_name === 'manager') && (
+              {/* Delivery request — permission-gated (manager role already carries
+                  delivery_requests:create via seeders; no role-name hardcode). */}
+              {(jwtClaims.isSuperAdmin || jwtClaims.permissions.has('delivery_requests:create')) && (
                 <button
                   onClick={() => onNavigate('admin-delivery-request')}
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"

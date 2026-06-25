@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UpdateClientPersonalFormValues } from "../../schemas/clientSchemas";
-import type { GetClientFinancesParams, SearchClientsParams } from "../services/adminClients";
+import type {
+  GetClientFinancesParams,
+  SearchClientsParams,
+  UpdatePassportImagesPayload,
+} from "../services/adminClients";
 import {
   searchClientsPaginated,
   getClientDetail,
@@ -8,6 +12,8 @@ import {
   getClientFinances,
   getTransactionPaymentDetail,
   getClientFlights,
+  getClientPassportImages,
+  updateClientPassportImages,
 } from "../services/adminClients";
 
 export const useClientsList = (params: SearchClientsParams) => {
@@ -80,6 +86,39 @@ export const useUpdateClientPersonal = () => {
         queryKey: ["admin_client_detail", variables.clientId],
       });
       queryClient.invalidateQueries({ queryKey: ["admin_clients_list"] });
+    },
+  });
+};
+
+export const useClientPassportImages = (clientId: number | null) => {
+  return useQuery({
+    queryKey: ["admin_client_passport_images", clientId],
+    queryFn: () => getClientPassportImages(clientId as number),
+    enabled: !!clientId,
+    // Resolved Telegram/S3 URLs are short-lived (≈1h); refetch on remount so a
+    // re-opened drawer never shows a stale/expired image link.
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useUpdateClientPassportImages = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      clientId,
+      payload,
+    }: {
+      clientId: number;
+      payload: UpdatePassportImagesPayload;
+    }) => updateClientPassportImages(clientId, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin_client_passport_images", variables.clientId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["admin_client_detail", variables.clientId],
+      });
     },
   });
 };

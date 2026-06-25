@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useManagerStore } from "../../store/useManagerStore";
 import { getAdminJwtClaims } from "../../api/services/adminManagement";
+import { ClientPassportEditor } from "./ClientPassportEditor";
 import {
   useClientDetail,
   useClientFinances,
@@ -456,6 +457,10 @@ export function ClientDetailDrawer() {
                   </div>
                 </form>
               )}
+
+              {/* Passport images — separate endpoint (multipart), own save button.
+                  Keyed by client so switching clients resets the pending files. */}
+              <ClientPassportEditor key={selectedClientId} clientId={selectedClientId} />
             </div>
           )}
 

@@ -1,5 +1,6 @@
-import { apiClient } from '../client';
+import { apiClient, apiClientFormData } from '../client';
 import type { UpdateClientPersonalFormValues } from "../../schemas/clientSchemas";
+import type { PassportImagesMetadataResponse } from "./client";
 
 export interface ClientSearchItem {
   id: number;
@@ -192,5 +193,44 @@ export async function getClientFlights(
   client_id: number,
 ): Promise<ClientFlightsResponse> {
   const response = await apiClient.get(`/api/v1/admin/clients/${client_id}/flights`);
+  return response.data;
+}
+
+/** Front/back passport images to replace. Omit a slot to keep the existing image. */
+export interface UpdatePassportImagesPayload {
+  front?: File | null;
+  back?: File | null;
+}
+
+/** RBAC passport view (clients:read) — used by the manager client drawer. */
+export async function getClientPassportImages(
+  client_id: number,
+  resolve_urls = true,
+): Promise<PassportImagesMetadataResponse> {
+  const response = await apiClient.get<PassportImagesMetadataResponse>(
+    `/api/v1/admin/clients/${client_id}/passport-images`,
+    { params: { resolve_urls } },
+  );
+  return response.data;
+}
+
+/**
+ * RBAC passport replace (clients:update) — per slot.
+ *
+ * Sends only the slots that changed; the backend merges with the client's
+ * existing images so an unchanged slot is preserved (never wiped).
+ */
+export async function updateClientPassportImages(
+  client_id: number,
+  payload: UpdatePassportImagesPayload,
+): Promise<PassportImagesMetadataResponse> {
+  const formData = new FormData();
+  if (payload.front) formData.append("front_image", payload.front);
+  if (payload.back) formData.append("back_image", payload.back);
+
+  const response = await apiClientFormData.put<PassportImagesMetadataResponse>(
+    `/api/v1/admin/clients/${client_id}/passport-images`,
+    formData,
+  );
   return response.data;
 }
