@@ -72,6 +72,10 @@ type CreateAdminFormValues = z.infer<typeof createAdminSchema>;
 type EditAdminFormValues = z.infer<typeof editAdminSchema>;
 type PinResetFormValues = z.infer<typeof pinResetSchema>;
 
+/** Client picker search mode. `code` is an exact (strict) match over the client's
+ *  active codes (extra_code / client_code / legacy_code). */
+type ClientSearchMode = 'code' | 'name' | 'phone';
+
 type DetailTab = 'info' | 'logs' | 'pin' | 'danger';
 
 // Friendly Uzbek labels for the most common audit actions (per-admin log view).
@@ -281,6 +285,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
 
   // Client picker — admin = promoted existing client (client_id is NOT NULL in DB),
   // so instead of typing a raw code the operator searches and selects the client.
+  const [searchMode, setSearchMode] = useState<ClientSearchMode>('code');
   const [clientQuery, setClientQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState<ClientSearchItem | null>(null);
@@ -291,8 +296,17 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
   }, [clientQuery]);
 
   const { data: searchData, isFetching: isSearching } = useQuery<ClientSearchResponse>({
-    queryKey: ['admin-create-client-search', debouncedQuery],
-    queryFn: () => searchClientsPaginated({ q: debouncedQuery, size: 8 }),
+    queryKey: ['admin-create-client-search', searchMode, debouncedQuery],
+    // `code` mode is a strict (exact) match over the client's active codes; name/phone
+    // stay partial. Strict code avoids fuzzy noise when promoting a specific client.
+    queryFn: () =>
+      searchClientsPaginated(
+        searchMode === 'code'
+          ? { code: debouncedQuery, strict: true, size: 8 }
+          : searchMode === 'phone'
+            ? { phone: debouncedQuery, size: 8 }
+            : { name: debouncedQuery, size: 8 },
+      ),
     enabled: debouncedQuery.length >= 2,
   });
 
@@ -356,15 +370,44 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
             </button>
           </div>
         ) : (
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              value={clientQuery}
-              onChange={(e) => setClientQuery(e.target.value)}
-              placeholder="Ism, kod yoki telefon bo'yicha qidiring..."
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
-            />
-            {debouncedQuery.length >= 2 && (
+          <div>
+            {/* Search-mode toggle — Kod is a strict/exact match over active codes. */}
+            <div className="flex items-center gap-1 p-1 mb-2 rounded-xl bg-gray-100 dark:bg-white/[0.04]">
+              {([
+                { key: 'code', label: 'Kod' },
+                { key: 'name', label: 'Ism' },
+                { key: 'phone', label: 'Telefon' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setSearchMode(opt.key)}
+                  className={`flex-1 h-7 rounded-lg text-[12px] font-medium transition-colors ${
+                    searchMode === opt.key
+                      ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                value={clientQuery}
+                onChange={(e) => setClientQuery(e.target.value)}
+                placeholder={
+                  searchMode === 'code'
+                    ? 'Mijoz kodi (aniq) — masalan ST123'
+                    : searchMode === 'phone'
+                      ? 'Telefon raqami'
+                      : 'Mijoz ismi'
+                }
+                className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
+              />
+              {debouncedQuery.length >= 2 && (
               <div className="mt-1.5 max-h-52 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] divide-y divide-gray-100 dark:divide-white/[0.04]">
                 {isSearching ? (
                   <div className="flex items-center justify-center py-4">
@@ -392,6 +435,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
                 )}
               </div>
             )}
+            </div>
           </div>
         )}
         {errors.client_code && (
