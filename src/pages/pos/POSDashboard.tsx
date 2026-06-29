@@ -87,6 +87,10 @@ import { PosPickupQueuePreviewCard } from "./components/PosPickupQueuePreviewCar
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+// Stable fallback so the notification drawers don't receive a fresh object literal
+// every render (would defeat their memoization once they are memoized).
+const EMPTY_TAB_COUNTS = { flight: 0, zayafka: 0 } as const;
+
 interface POSDashboardProps {
   onNavigate: (page: string) => void;
   onLogout: () => void;
@@ -106,12 +110,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     return saved ? Math.max(320, Math.min(800, parseInt(saved, 10))) : 480;
   });
 
+  // Persist column widths, debounced — a drag emits many deltas; write once it settles
+  // instead of a synchronous localStorage write on every mousemove.
   useEffect(() => {
-    localStorage.setItem("pos_left_width", String(leftWidth));
+    const t = setTimeout(() => localStorage.setItem("pos_left_width", String(leftWidth)), 300);
+    return () => clearTimeout(t);
   }, [leftWidth]);
 
   useEffect(() => {
-    localStorage.setItem("pos_center_width", String(centerWidth));
+    const t = setTimeout(() => localStorage.setItem("pos_center_width", String(centerWidth)), 300);
+    return () => clearTimeout(t);
   }, [centerWidth]);
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
@@ -168,9 +176,11 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const { data: tabCounts } = useQuery({
     queryKey: ['pos-tab-counts'],
     queryFn: () => posNotificationService.getTabCounts(),
+    // Refreshed instantly by the `pos_notification.changed` SSE event; this poll
+    // is only a long safety net.
     refetchInterval: () =>
       typeof document !== 'undefined' && document.visibilityState === 'visible'
-        ? 60_000
+        ? 180_000
         : false,
     refetchIntervalInBackground: false,
   });
@@ -197,18 +207,23 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   }, []);
 
   // Super-admins have no explicit permissions in their JWT — they bypass all checks.
-  const hasPerm = useCallback(
-    (slug: string) => jwtClaims.isSuperAdmin || jwtClaims.permissions.has(slug),
-    [jwtClaims],
-  );
-
-  const canRead    = hasPerm("pos:read");
-  const canProcess = hasPerm("pos:process");
-  const canAdjust  = hasPerm("pos:adjust");
-  const canUpdateStatus = hasPerm("pos:update_status");
-  // Super-admins always have full access; others need at least one POS permission
-  const hasPosAccess =
-    jwtClaims.isSuperAdmin || canRead || canProcess || canAdjust || canUpdateStatus;
+  // Resolved once per jwtClaims change instead of recomputing five booleans every render.
+  const { canRead, canProcess, canAdjust, canUpdateStatus, hasPosAccess } = useMemo(() => {
+    const has = (slug: string) =>
+      jwtClaims.isSuperAdmin || jwtClaims.permissions.has(slug);
+    const r = has("pos:read");
+    const p = has("pos:process");
+    const a = has("pos:adjust");
+    const u = has("pos:update_status");
+    return {
+      canRead: r,
+      canProcess: p,
+      canAdjust: a,
+      canUpdateStatus: u,
+      // Super-admins always have full access; others need at least one POS permission
+      hasPosAccess: jwtClaims.isSuperAdmin || r || p || a || u,
+    };
+  }, [jwtClaims]);
 
   // ── Calculator modal ──────────────────────────────────────────────────────
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -250,6 +265,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const handleSearchRef = useRef<(code: string) => void>(() => {});
   const sendMessageRef  = useRef<(msg: BroadcastMessage) => void>(() => {});
   const removePendingNotifRef = useRef<(id: string) => void>(() => {});
+  // Re-submits an amount-edit with force=true after the cashier confirms an
+  // already-taken-away downgrade. Kept in a ref so editMut.onError (defined far
+  // above the handler) always calls the latest version without a stale closure.
+  const editForceRetryRef = useRef<(reason: string) => void>(() => {});
 
   const removePendingNotif = useCallback((id: string) => {
     setPendingNotifs((prev) => {
@@ -376,12 +395,29 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [receivedInput, setReceivedInput] = useState("");
   const [flightDropdownOpen, setFlightDropdownOpen] = useState(false);
   const [editNote, setEditNote] = useState("");
+  // Editable confirmed amount in notification edit mode (paid notifications).
+  const [editAmount, setEditAmount] = useState("");
 
   // ── Notification-driven flight auto-select & info card ─────────────────────
   const pendingFlightRef = useRef<{ flight: string; clientCode: string; source: 'flight' | 'zayafka' } | null>(null);
   const [activeNotifData, setActiveNotifData] = useState<PosNotificationItem | null>(null);
   const activeNotifRef = useRef<PosNotificationItem | null>(null);
   useEffect(() => { activeNotifRef.current = activeNotifData; }, [activeNotifData]);
+
+  // Pre-fill the editable amount once per opened paid notification (survives syncs,
+  // so a background refetch of the same notification won't clobber the cashier's input).
+  const lastEditPrefillId = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      activeNotifData?.payment_status === "paid" &&
+      activeNotifData.id !== lastEditPrefillId.current
+    ) {
+      setEditAmount(String(Math.round(activeNotifData.amount_paid || 0)));
+      lastEditPrefillId.current = activeNotifData.id;
+    } else if (!activeNotifData) {
+      lastEditPrefillId.current = null;
+    }
+  }, [activeNotifData]);
 
   // ── Notification reject state ──────────────────────────────────────────────
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -453,15 +489,30 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         void handleSearch(clientInfo.client_code);
       }
     },
-    onError: (err: unknown) => {
-      type PosError = { message?: string; data?: { detail?: { error?: string } | string } };
+    onError: (err: unknown, variables: EditPaymentRequest) => {
+      type PosError = {
+        message?: string;
+        data?: { detail?: { error?: string; code?: string } | string };
+      };
       const apiErr = err as PosError;
       const detail = apiErr?.data?.detail;
-      if (detail && typeof detail === "object" && detail.error) {
-        toast.error(detail.error);
-      } else {
-        toast.error(apiErr.message ?? "O'zgartirishda xatolik yuz berdi");
+      const code = detail && typeof detail === "object" ? detail.code : undefined;
+      const message = detail && typeof detail === "object" ? detail.error : undefined;
+
+      // Already-taken-away cargo downgrade: require an explicit reason, then retry
+      // with force=true (the reason is stored as the edit note / audit trail).
+      if (code === "CARGO_ALREADY_TAKEN" && !variables.force) {
+        const reason = window.prompt(
+          "Yuk allaqachon olib ketilgan. Summani kamaytirish qarz hosil qiladi.\n" +
+            "Tasdiqlash uchun sabab kiriting:",
+        );
+        if (reason && reason.trim()) {
+          editForceRetryRef.current(reason.trim());
+        }
+        return;
       }
+
+      toast.error(message ?? apiErr.message ?? "O'zgartirishda xatolik yuz berdi");
     },
   });
 
@@ -494,13 +545,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   } = useQuery({
     queryKey: ["cashier-log", cashierLogParams],
     queryFn: () => getCashierLog(cashierLogParams),
-    // Cashier log refreshes are also delivered live via SSE (see
-    // useEventSource); polling exists only as a fallback. 30 s with a
-    // visibility gate is a safe floor.
+    // Cashier log refreshes are delivered live via SSE (pos_notification.changed)
+    // and by pay/edit mutation invalidation; polling is only a fallback, so a
+    // longer visibility-gated floor keeps it fresh without steady background load.
     staleTime: 30_000,
     refetchInterval: () =>
       typeof document !== 'undefined' && document.visibilityState === 'visible'
-        ? 30_000
+        ? 60_000
         : false,
     refetchIntervalInBackground: false,
     // Only fire if the admin actually has pos:read — prevents a 403 for adjust-only roles
@@ -552,6 +603,17 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       totalAmount: items.reduce((s, c) => s + c.total_payment, 0),
     }));
   }, [cargos]);
+
+  // Label for the flight-selector trigger — memoized so the filter+Set scan does
+  // not run inline on every render (e.g. each search keystroke / received-amount digit).
+  const flightSelectorLabel = useMemo(() => {
+    if (selectedIds.size === 0) return "Reys tanlang";
+    const selectedArr = cargos.filter((c) => selectedIds.has(c.cargo_id));
+    const uniqueFlights = [...new Set(selectedArr.map((c) => c.flight_name))];
+    if (uniqueFlights.length === 1) return uniqueFlights[0];
+    if (selectedIds.size === cargos.length) return "Barcha reyslar";
+    return `${selectedIds.size} ta yuk`;
+  }, [selectedIds, cargos]);
   // ── Bulk payment mutation ─────────────────────────────────────────────────
   const payMut = useMutation({
     mutationFn: processBulkPayment,
@@ -725,6 +787,12 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     () => handleSearch(clientInfo?.client_code),
     [handleSearch, clientInfo?.client_code],
   );
+  // Stable callbacks for CashierLogPanel so its React.memo isn't busted each render.
+  const handleLogRefresh = useCallback(() => { void refetchLog(); }, [refetchLog]);
+  const handleLogEntryClick = useCallback(
+    (code: string) => handleSearch(code),
+    [handleSearch],
+  );
 
   const handleLeftResize = useCallback(
     (d: number) => setLeftWidth((w) => Math.max(200, Math.min(480, w + d))),
@@ -750,6 +818,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     setLiveBalance(null);
     setActiveNotifData(null);
     setEditNote("");
+    setEditAmount("");
     pendingFlightRef.current = null;
 
     setTimeout(() => searchRef.current?.focus(), 50);
@@ -814,8 +883,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
 
   const toggleFlight = useCallback((flightName: string) => {
     const flightItems = flightGroups.find(g => g.flightName === flightName)?.items ?? [];
-    const allSelected = flightItems.every(c => selectedIds.has(c.cargo_id));
+    // Read current selection via the functional updater so this callback does not
+    // close over `selectedIds` — keeps a stable identity across selection toggles.
     setSelectedIds(prev => {
+      const allSelected = flightItems.every(c => prev.has(c.cargo_id));
       const next = new Set(prev);
       for (const item of flightItems) {
         if (allSelected) next.delete(item.cargo_id);
@@ -823,7 +894,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       }
       return next;
     });
-  }, [flightGroups, selectedIds]);
+  }, [flightGroups]);
 
   // ── Confirmation flow ─────────────────────────────────────────────────────
   const handleOpenConfirm = () => {
@@ -865,21 +936,51 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     });
   };
 
-  const handleEditSave = () => {
+  const submitEditPayment = (opts?: { force?: boolean; noteOverride?: string }) => {
     const notif = activeNotifRef.current;
     if (!notif || !clientInfo) return;
-    if (!["cash", "click", "payme", "card"].includes(paymentType)) {
+    if (!["cash", "click", "payme", "card", "terminal"].includes(paymentType)) {
       toast.error("Noto'g'ri to'lov turi");
       return;
     }
+
+    const force = opts?.force ?? false;
+    const noteValue = (opts?.noteOverride ?? editNote).trim();
+    const currentAmount = Math.round(notif.amount_paid ?? 0);
+    const parsedAmount = Math.round(parseFloat(editAmount.replace(/\s/g, "")) || 0);
+    const amountValid = parsedAmount > 0;
+    const amountChanged = amountValid && parsedAmount !== currentAmount;
+    const typeChanged = paymentType !== (notif.payment_type ?? "");
+    const noteProvided = noteValue.length > 0;
+
+    if (!force && !amountChanged && !typeChanged && !noteProvided) {
+      toast.info("O'zgarish yo'q");
+      return;
+    }
+    if (editAmount.trim() !== "" && !amountValid) {
+      toast.error("Noto'g'ri summa");
+      return;
+    }
+
+    // Send `amount` whenever the type or amount changed so the backend re-attributes
+    // the cashier-log provider totals; null only for a pure note edit (legacy path).
+    const sendAmount = amountChanged || typeChanged || force;
     editMut.mutate({
       client_code: clientInfo.client_code,
       flight_name: notif.flight_name,
       payment_type: paymentType,
-      note: editNote.trim() || null,
+      note: noteValue || null,
       notification_id: notif.id,
+      amount: sendAmount ? parsedAmount : null,
+      expected_current_amount: sendAmount ? currentAmount : null,
+      force,
     });
   };
+
+  const handleEditSave = () => submitEditPayment();
+  // Wire the force-retry path used by editMut.onError on CARGO_ALREADY_TAKEN.
+  editForceRetryRef.current = (reason: string) =>
+    submitEditPayment({ force: true, noteOverride: reason });
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
@@ -991,7 +1092,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 isLoading={paymentLoading}
                 activeTab={notifTab}
                 onTabChange={handleNotifTabChange}
-                tabCounts={tabCounts ?? { flight: 0, zayafka: 0 }}
+                tabCounts={tabCounts ?? EMPTY_TAB_COUNTS}
                 onRefresh={refetchNotifications}
                 onClientAndFlightClick={handleClientAndFlightClick}
               />
@@ -1045,8 +1146,8 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 <CashierLogPanel
                   logData={logData}
                   logLoading={logLoading}
-                  onRefresh={() => refetchLog()}
-                  onEntryClick={(code) => handleSearch(code)}
+                  onRefresh={handleLogRefresh}
+                  onEntryClick={handleLogEntryClick}
                   currentAdminId={jwtClaims.admin_id}
                   logDateFrom={logDateFrom}
                   setLogDateFrom={setLogDateFrom}
@@ -1262,7 +1363,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                           <div className="flex items-center justify-between">
                             <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                               {activeNotifData?.payment_status === "paid"
-                                ? "To'lovni o'zgartirish (faqat to'lov turi va izoh)"
+                                ? "To'lovni o'zgartirish (summa, to'lov turi va izoh)"
                                 : "To'lovni tekshirish va tasdiqlash"}
                             </p>
                             {activeNotifData && (
@@ -1338,15 +1439,17 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                value={receivedInput.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
+                                value={(activeNotifData?.payment_status === "paid" ? editAmount : receivedInput).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
                                 onChange={(e) => {
                                   const raw = e.target.value.replace(/\s/g, "");
                                   const normalized = normalizeNumber(raw);
-                                  if (normalized !== null) setReceivedInput(normalized);
+                                  if (normalized !== null) {
+                                    if (activeNotifData?.payment_status === "paid") setEditAmount(normalized);
+                                    else setReceivedInput(normalized);
+                                  }
                                 }}
                                 onFocus={(e) => e.target.select()}
                                 placeholder={String(Math.round(netAfterWallet || activeNotifAmounts?.payable || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
-                                disabled={activeNotifData?.payment_status === "paid"}
                                 className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-gray-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                               />
                             </div>
@@ -1384,14 +1487,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                     className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-left transition-all hover:border-gray-300 dark:hover:border-white/[0.15]"
                                   >
                                     <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                                      {(() => {
-                                        if (selectedIds.size === 0) return "Reys tanlang";
-                                        const selectedArr = cargos.filter((c) => selectedIds.has(c.cargo_id));
-                                        const uniqueFlights = [...new Set(selectedArr.map((c) => c.flight_name))];
-                                        if (uniqueFlights.length === 1) return uniqueFlights[0];
-                                        if (selectedIds.size === cargos.length) return "Barcha reyslar";
-                                        return `${selectedIds.size} ta yuk`;
-                                      })()}
+                                      {flightSelectorLabel}
                                     </span>
                                     <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${flightDropdownOpen ? "rotate-180" : ""}`} />
                                   </button>
@@ -1582,6 +1678,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                               <span className="font-bold text-gray-700 dark:text-gray-300">To'lash:</span>
                               <span className="font-black text-orange-600 dark:text-orange-400">{formatCurrencySum(netAfterWallet)}</span>
                             </div>
+                            {/* Change due — only for cash when the cashier enters more than owed */}
+                            {paymentType === "cash" && receivedAmount > netAfterWallet && (
+                              <div className="flex items-center justify-between text-[13px] pt-1 border-t border-gray-100 dark:border-white/[0.06]">
+                                <span className="font-bold text-blue-600 dark:text-blue-400">Qaytim:</span>
+                                <span className="font-black text-blue-600 dark:text-blue-400">{formatCurrencySum(receivedAmount - netAfterWallet)}</span>
+                              </div>
+                            )}
                           </div>
                           )}
 
@@ -1699,7 +1802,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 isLoading={paymentLoading}
                 activeTab={notifTab}
                 onTabChange={handleNotifTabChange}
-                tabCounts={tabCounts ?? { flight: 0, zayafka: 0 }}
+                tabCounts={tabCounts ?? EMPTY_TAB_COUNTS}
                 onRefresh={refetchNotifications}
                 onClientAndFlightClick={handleClientAndFlightClick}
               />

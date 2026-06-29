@@ -64,26 +64,10 @@ const DEFAULT_FILTERS: NotificationFilters = {
   source: "flight",
 };
 
-function usePageVisibility(): boolean {
-  const [isVisible, setIsVisible] = useState(() => document.visibilityState === "visible");
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      setIsVisible(document.visibilityState === "visible");
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
-
-  return isVisible;
-}
-
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePaymentNotifications(): UsePaymentNotificationsReturn {
   const queryClient = useQueryClient();
-  const isVisible = usePageVisibility();
   const isOnPosRoute = window.location.pathname === "/pos";
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<NotificationFilters>(DEFAULT_FILTERS);
@@ -100,7 +84,17 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
     queryFn: () => posNotificationService.getNotifications(page, 20, filters),
     enabled: isOnPosRoute,
     staleTime: 20_000,
-    refetchInterval: isVisible && isOnPosRoute ? 30_000 : false,
+    // SSE (useEventSource) + the 5s broadcast debounce are the primary freshness
+    // path; this poll is a visibility-gated safety net only. Using the callback
+    // form (instead of a usePageVisibility state hook) avoids re-rendering the
+    // whole dashboard on every tab focus/blur.
+    refetchInterval: () =>
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible" &&
+      window.location.pathname === "/pos"
+        ? 90_000
+        : false,
+    refetchIntervalInBackground: false,
   });
 
   const notifications = data?.items ?? [];

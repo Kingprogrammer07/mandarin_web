@@ -36,40 +36,20 @@ export const PROVIDER_CHIP: Record<string, string> = {
 };
 
 /**
- * Deterministic color palette assigned to other cashiers' log rows.
+ * Deterministic color palette assigned to other cashiers' log entries.
  * Index is derived from `cashier_id % PEER_CASHIER_PALETTE.length`.
+ * Only `dot` + `label` are consumed (LogEntry draws its own provider border).
  */
 export const PEER_CASHIER_PALETTE = [
-  {
-    row: "border-l-2 border-blue-400 bg-blue-50/40 dark:bg-blue-500/[0.06]",
-    dot: "bg-blue-400",
-    label: "text-blue-500 dark:text-blue-400",
-  },
-  {
-    row: "border-l-2 border-purple-400 bg-purple-50/40 dark:bg-purple-500/[0.06]",
-    dot: "bg-purple-400",
-    label: "text-purple-500 dark:text-purple-400",
-  },
-  {
-    row: "border-l-2 border-teal-400 bg-teal-50/40 dark:bg-teal-500/[0.06]",
-    dot: "bg-teal-400",
-    label: "text-teal-500 dark:text-teal-400",
-  },
-  {
-    row: "border-l-2 border-rose-400 bg-rose-50/40 dark:bg-rose-500/[0.06]",
-    dot: "bg-rose-400",
-    label: "text-rose-500 dark:text-rose-400",
-  },
-  {
-    row: "border-l-2 border-indigo-400 bg-indigo-50/40 dark:bg-indigo-500/[0.06]",
-    dot: "bg-indigo-400",
-    label: "text-indigo-500 dark:text-indigo-400",
-  },
+  { dot: "bg-blue-400", label: "text-blue-500 dark:text-blue-400" },
+  { dot: "bg-purple-400", label: "text-purple-500 dark:text-purple-400" },
+  { dot: "bg-teal-400", label: "text-teal-500 dark:text-teal-400" },
+  { dot: "bg-rose-400", label: "text-rose-500 dark:text-rose-400" },
+  { dot: "bg-indigo-400", label: "text-indigo-500 dark:text-indigo-400" },
 ] as const;
 
-/** Style applied to the current user's own log rows. */
+/** Style applied to the current user's own log entries. */
 export const OWN_CASHIER_STYLE = {
-  row: "border-l-2 border-orange-400 bg-orange-50/40 dark:bg-orange-500/[0.06]",
   dot: "bg-orange-400",
   label: "text-orange-500 dark:text-orange-400",
 } as const;
@@ -78,9 +58,9 @@ export const OWN_CASHIER_STYLE = {
 export function resolveCashierStyle(
   cashierId: number | null,
   currentAdminId: number | null,
-): { row: string; dot: string; label: string } {
+): { dot: string; label: string } {
   if (cashierId === null) {
-    return { row: "", dot: "bg-gray-300 dark:bg-gray-600", label: "text-gray-400" };
+    return { dot: "bg-gray-300 dark:bg-gray-600", label: "text-gray-400" };
   }
   if (cashierId === currentAdminId) {
     return OWN_CASHIER_STYLE;

@@ -243,7 +243,7 @@ const ReadOnlyRow = memo(function ReadOnlyRow({ item, onEdit, onDelete, isDeleti
   );
 });
 
-export function PosPickupQueuePreviewCard() {
+function PosPickupQueuePreviewCardBase() {
   const { data, isLoading } = usePosPickupQueueList();
   const updateMut = useUpdatePosPickupQueue();
   const cancelMut = useCancelPosPickupQueue();
@@ -442,3 +442,7 @@ export function PosPickupQueuePreviewCard() {
 function cn(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
 }
+
+// Memoized: this card takes no props, so it should only re-render on its own
+// query/state changes — not on every POSDashboard render (search keystrokes etc.).
+export const PosPickupQueuePreviewCard = memo(PosPickupQueuePreviewCardBase);

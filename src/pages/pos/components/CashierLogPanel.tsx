@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -40,7 +40,7 @@ interface CashierLogPanelProps {
   onPageChange: (p: number) => void;
 }
 
-export function CashierLogPanel({
+function CashierLogPanelBase({
   logData,
   logLoading,
   onRefresh,
@@ -370,3 +370,7 @@ export function CashierLogPanel({
     </div>
   );
 }
+
+// Fully controlled, prop-heavy panel — memoized with stable callbacks from the
+// parent so it doesn't re-render on unrelated POSDashboard state (search, etc.).
+export const CashierLogPanel = memo(CashierLogPanelBase);

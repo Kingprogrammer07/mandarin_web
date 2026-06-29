@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import { motion } from "framer-motion";
 import { Send, Package } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ interface WarehouseRequestCardProps {
   activeClientCode?: string | null;
 }
 
-export function WarehouseRequestCard({ canProcess, activeClientCode }: WarehouseRequestCardProps) {
+function WarehouseRequestCardBase({ canProcess, activeClientCode }: WarehouseRequestCardProps) {
   const [clientCode, setClientCode] = useState("");
   const [pickupMethod, setPickupMethod] = useState<PickupMethod>("self_pickup");
   const [priority, setPriority] = useState<PickupQueuePriority>("normal");
@@ -157,3 +157,7 @@ export function WarehouseRequestCard({ canProcess, activeClientCode }: Warehouse
     </div>
   );
 }
+
+// Memoized so a POSDashboard re-render (e.g. search keystroke) doesn't re-render
+// this card; its props (canProcess, activeClientCode) change rarely.
+export const WarehouseRequestCard = memo(WarehouseRequestCardBase);

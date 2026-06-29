@@ -1207,7 +1207,7 @@ function Pagination({
 
 // ─── Main Drawer Component ────────────────────────────────────────────────────
 
-export function PaymentNotificationDrawer({
+function PaymentNotificationDrawerBase({
   notifications,
   total,
   page,
@@ -1494,3 +1494,7 @@ export function PaymentNotificationDrawer({
     </>
   );
 }
+
+// Memoized: rendered twice (mobile + desktop inline) with stable callbacks, so it
+// skips re-render on unrelated POSDashboard state and only updates on real data.
+export const PaymentNotificationDrawer = memo(PaymentNotificationDrawerBase);

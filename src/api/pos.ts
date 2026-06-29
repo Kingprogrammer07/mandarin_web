@@ -184,6 +184,12 @@ export interface EditPaymentRequest {
   payment_type: PaymentProvider;
   note: string | null;
   notification_id: number;
+  /** New confirmed total (UZS). Omit/null = type/note-only edit (legacy path). */
+  amount?: number | null;
+  /** Amount the UI believes is currently confirmed — optimistic lock (409 STALE_AMOUNT). */
+  expected_current_amount?: number | null;
+  /** Confirm an amount decrease that un-pays an already-taken-away cargo. */
+  force?: boolean;
 }
 
 export interface EditPaymentResponse {
@@ -193,6 +199,11 @@ export interface EditPaymentResponse {
   flight_name: string;
   payment_type: string;
   edited_count: number;
+  old_amount?: number | null;
+  new_amount?: number | null;
+  delta?: number;
+  new_payment_status?: string | null;
+  created_event_ids?: number[];
   message: string;
 }
 

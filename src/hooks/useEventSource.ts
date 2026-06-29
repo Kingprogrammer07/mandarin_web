@@ -66,6 +66,168 @@ function buildSseUrl(): string | null {
   return `${base}/api/v1/pos/notifications/stream?access_token=${encodeURIComponent(token)}`;
 }
 
+// ─── Shared, ref-counted connection ────────────────────────────────────────────
+// A single browser tab opens exactly ONE EventSource + BroadcastChannel for the
+// POS stream, regardless of how many components call useEventSource (POSDashboard
+// + usePaymentNotifications previously opened two separate connections receiving
+// identical pushes). All consumers register a subscriber; the shared connection
+// fans each message out to every subscriber, deduplicated once by `_id`.
+
+type Subscriber = (msg: BroadcastMessage) => void;
+
+const subscribers = new Set<Subscriber>();
+const seenIds = new Set<string>();
+let sharedES: EventSource | null = null;
+let sharedBC: BroadcastChannel | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
+let refCount = 0;
+let storageHandler: ((e: StorageEvent) => void) | null = null;
+let visibilityHandler: (() => void) | null = null;
+
+function dispatchShared(wire: WireMessage): void {
+  if (!wire || !wire._id || seenIds.has(wire._id)) return;
+  seenIds.add(wire._id);
+  // Prevent unbounded growth — keep only the 50 most recent IDs.
+  if (seenIds.size > 50) {
+    const [oldest] = seenIds;
+    seenIds.delete(oldest);
+  }
+  const { _id, ...msg } = wire;
+  void _id;
+  // Snapshot so a subscriber unsubscribing mid-dispatch can't break iteration.
+  for (const sub of Array.from(subscribers)) {
+    try {
+      sub(msg as BroadcastMessage);
+    } catch {
+      // One faulty consumer must not stop delivery to the others.
+    }
+  }
+}
+
+function connectShared(): void {
+  const url = buildSseUrl();
+  if (!url) {
+    if (import.meta.env.DEV) {
+      console.debug("[POS] SSE: no admin token, skipping connection");
+    }
+    return;
+  }
+
+  if (sharedES) sharedES.close();
+
+  const es = new EventSource(url);
+  sharedES = es;
+
+  es.onopen = () => {
+    reconnectAttempt = 0;
+    if (import.meta.env.DEV) console.debug("[POS] SSE connected");
+  };
+
+  es.onmessage = (event) => {
+    // Keep-alive messages start with ":"
+    if (event.data.startsWith(":")) return;
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload._id) {
+        dispatchShared(payload as WireMessage);
+      } else {
+        // Server may send payload without _id — wrap it.
+        dispatchShared({ ...payload, _id: makeId() } as WireMessage);
+      }
+    } catch {
+      // Ignore malformed SSE data.
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
+    sharedES = null;
+
+    if (refCount === 0) return; // torn down — don't reconnect
+    if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      if (import.meta.env.DEV) {
+        console.debug("[POS] SSE: max reconnect attempts reached, giving up");
+      }
+      return;
+    }
+    // Skip reconnect while the tab is hidden — the visibility listener re-opens.
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      return;
+    }
+    // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+    const delay = Math.min(1000 * 2 ** reconnectAttempt, 30_000);
+    reconnectAttempt += 1;
+    if (import.meta.env.DEV) {
+      console.debug(`[POS] SSE error, reconnecting in ${delay}ms`);
+    }
+    reconnectTimer = setTimeout(connectShared, delay);
+  };
+}
+
+function startShared(): void {
+  connectShared();
+
+  // ── Layer 2: BroadcastChannel (same browser, different tabs) ──────────────
+  if (typeof BroadcastChannel !== "undefined" && !sharedBC) {
+    sharedBC = new BroadcastChannel(BC_CHANNEL_NAME);
+    sharedBC.onmessage = (event: MessageEvent<WireMessage>) =>
+      dispatchShared(event.data);
+  }
+
+  // ── Layer 3: localStorage storage event (same-browser fallback) ───────────
+  storageHandler = (e: StorageEvent) => {
+    if (e.key !== STORAGE_KEY || !e.newValue) return;
+    try {
+      dispatchShared(JSON.parse(e.newValue) as WireMessage);
+    } catch {
+      // Ignore malformed JSON written by unrelated code.
+    }
+  };
+  window.addEventListener("storage", storageHandler);
+
+  // ── Re-open SSE when the tab becomes visible again ────────────────────────
+  visibilityHandler = () => {
+    if (document.visibilityState !== "visible") return;
+    if (sharedES) return;
+    reconnectAttempt = 0;
+    connectShared();
+  };
+  document.addEventListener("visibilitychange", visibilityHandler);
+}
+
+function stopShared(): void {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  sharedES?.close();
+  sharedES = null;
+  sharedBC?.close();
+  sharedBC = null;
+  if (storageHandler) {
+    window.removeEventListener("storage", storageHandler);
+    storageHandler = null;
+  }
+  if (visibilityHandler) {
+    document.removeEventListener("visibilitychange", visibilityHandler);
+    visibilityHandler = null;
+  }
+  reconnectAttempt = 0;
+  seenIds.clear();
+}
+
+function sendShared(msg: BroadcastMessage): void {
+  const wire: WireMessage = { ...msg, _id: makeId() };
+  // ── Layer 2 & 3: same-device same-browser ─────────────────────────────────
+  sharedBC?.postMessage(wire);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(wire));
+  } catch {
+    // localStorage unavailable in strict private-browsing contexts.
+  }
+}
+
 /**
  * Cross-device cashier notification hub.
  *
@@ -84,172 +246,35 @@ function buildSseUrl(): string | null {
  *    restricted (some mobile WebViews).
  *
  * All three channels share deduplication via `_id` so a message received on
- * multiple channels is dispatched to the consumer exactly once.
+ * multiple channels is dispatched to each consumer exactly once. Multiple
+ * callers in the same tab share ONE underlying connection (ref-counted).
  */
 export function useEventSource(
   onMessage?: (msg: BroadcastMessage) => void,
 ): { sendMessage: (msg: BroadcastMessage) => void } {
-  const bcRef = useRef<BroadcastChannel | null>(null);
-  const esRef = useRef<EventSource | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectAttemptRef = useRef(0);
-
-  // Always points to the latest callback without causing the effect to re-run.
+  // Always points to the latest callback without re-subscribing.
   const onMessageRef = useRef(onMessage);
   useLayoutEffect(() => {
     onMessageRef.current = onMessage;
   });
 
-  // Tracks processed IDs to prevent duplicate delivery across channels.
-  const seenIdsRef = useRef<Set<string>>(new Set());
-
-  const dispatch = useCallback((wire: WireMessage) => {
-    if (seenIdsRef.current.has(wire._id)) return;
-    seenIdsRef.current.add(wire._id);
-
-    // Prevent unbounded growth — keep only the 50 most recent IDs.
-    if (seenIdsRef.current.size > 50) {
-      const [oldest] = seenIdsRef.current;
-      seenIdsRef.current.delete(oldest);
-    }
-
-    // Strip internal transport field before handing to the consumer.
-    const { _id, ...msg } = wire;
-    void _id;
-    onMessageRef.current?.(msg as BroadcastMessage);
-  }, []);
-
   useEffect(() => {
-    const connect = () => {
-      const url = buildSseUrl();
-      if (!url) {
-        if (import.meta.env.DEV) {
-          console.debug("[POS] SSE: no admin token, skipping connection");
-        }
-        return;
-      }
-
-      if (esRef.current) {
-        esRef.current.close();
-      }
-
-      const es = new EventSource(url);
-      esRef.current = es;
-
-      es.onopen = () => {
-        reconnectAttemptRef.current = 0;
-        if (import.meta.env.DEV) {
-          console.debug("[POS] SSE connected");
-        }
-      };
-
-      es.onmessage = (event) => {
-        // Keep-alive messages start with ":"
-        if (event.data.startsWith(":")) return;
-
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload._id) {
-            dispatch(payload as WireMessage);
-          } else {
-            // Server may send payload without _id — wrap it.
-            dispatch({ ...payload, _id: makeId() } as WireMessage);
-          }
-        } catch {
-          // Ignore malformed SSE data.
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        esRef.current = null;
-
-        if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
-          if (import.meta.env.DEV) {
-            console.debug("[POS] SSE: max reconnect attempts reached, giving up");
-          }
-          return;
-        }
-
-        // Skip reconnect while the tab is hidden — the SSE stream will be
-        // re-established by the visibility listener below when the user
-        // brings the page back.
-        if (
-          typeof document !== "undefined" &&
-          document.visibilityState !== "visible"
-        ) {
-          return;
-        }
-
-        // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
-        const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30_000);
-        reconnectAttemptRef.current += 1;
-
-        if (import.meta.env.DEV) {
-          console.debug(`[POS] SSE error, reconnecting in ${delay}ms`);
-        }
-
-        reconnectTimerRef.current = setTimeout(connect, delay);
-      };
-    };
-
-    connect();
-
-    // ── Layer 2: BroadcastChannel (same browser, different tabs) ────────────
-    let bc: BroadcastChannel | null = null;
-    if (typeof BroadcastChannel !== "undefined") {
-      bc = new BroadcastChannel(BC_CHANNEL_NAME);
-      bcRef.current = bc;
-      bc.onmessage = (event: MessageEvent<WireMessage>) => dispatch(event.data);
-    }
-
-    // ── Layer 3: localStorage storage event (same-browser fallback) ─────────
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || !e.newValue) return;
-      try {
-        dispatch(JSON.parse(e.newValue) as WireMessage);
-      } catch {
-        // Ignore malformed JSON written by unrelated code.
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-
-    // ── Re-open SSE when the tab becomes visible again ──────────────────────
-    // Pairs with the visibility skip inside onerror: avoids the dead-quiet
-    // state where a backgrounded tab dropped the connection and never tries
-    // to recover after the user comes back.
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") return;
-      if (esRef.current) return;
-      reconnectAttemptRef.current = 0;
-      connect();
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
+    const subscriber: Subscriber = (msg) => onMessageRef.current?.(msg);
+    subscribers.add(subscriber);
+    refCount += 1;
+    if (refCount === 1) startShared();
 
     return () => {
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
+      subscribers.delete(subscriber);
+      refCount -= 1;
+      if (refCount <= 0) {
+        refCount = 0;
+        stopShared();
       }
-      esRef.current?.close();
-      esRef.current = null;
-      bc?.close();
-      bcRef.current = null;
-      window.removeEventListener("storage", handleStorage);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [dispatch]);
-
-  const sendMessage = useCallback((msg: BroadcastMessage) => {
-    const wire: WireMessage = { ...msg, _id: makeId() };
-
-    // ── Layer 2 & 3: same-device same-browser ───────────────────────────────
-    bcRef.current?.postMessage(wire);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(wire));
-    } catch {
-      // localStorage unavailable in strict private-browsing contexts.
-    }
   }, []);
+
+  const sendMessage = useCallback((msg: BroadcastMessage) => sendShared(msg), []);
 
   return { sendMessage };
 }
