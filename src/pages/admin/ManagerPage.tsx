@@ -14,6 +14,10 @@ import { refreshAdminToken } from '../../api/services/adminAuth';
 import RoleSwitcher from '../../components/admin/RoleSwitcher';
 import type { ClientSearchResponse } from '../../api/services/adminClients';
 import { useGuideTour } from '../../hooks/useGuideTour';
+import {
+  isAdminAgreementAccepted,
+  ADMIN_AGREEMENT_ACCEPTED_EVENT,
+} from '../../components/admin/adminAgreement';
 import { pickVisible } from '../../utils/tour';
 import type { DriveStep } from 'driver.js';
 import { useTranslation } from 'react-i18next';
@@ -48,6 +52,9 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
   // Overflow ("more") menu for the secondary nav icons on narrow screens.
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  // The one-time admin agreement shows on this page; hold the tour until it's
+  // accepted so the two overlays never collide.
+  const [agreementOk, setAgreementOk] = useState(isAdminAgreementAccepted);
   // Targeted search type: 'code' searches client code only, 'name' full_name only.
   // Default to 'code' — staff most often look clients up by their cargo code.
   const [searchType, setSearchType] = useState<SearchType>('code');
@@ -149,7 +156,15 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
     });
     return steps;
   }, [t, canCreateClient]);
-  useGuideTour('manager', buildManagerTour, !!jwtClaims.role_name);
+  useGuideTour('manager', buildManagerTour, !!jwtClaims.role_name && agreementOk);
+
+  // Start the tour the moment the agreement is accepted (same page, no reload).
+  useEffect(() => {
+    if (agreementOk) return;
+    const onAccepted = () => setAgreementOk(true);
+    window.addEventListener(ADMIN_AGREEMENT_ACCEPTED_EVENT, onAccepted);
+    return () => window.removeEventListener(ADMIN_AGREEMENT_ACCEPTED_EVENT, onAccepted);
+  }, [agreementOk]);
 
   // Close the overflow menu on any outside click.
   useEffect(() => {

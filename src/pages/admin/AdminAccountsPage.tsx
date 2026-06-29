@@ -6,9 +6,14 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import {
   Loader2, Plus, Shield, UserCircle, ChevronLeft, ChevronRight,
-  AlertTriangle, Trash2, KeyRound, Info, X, Check,
+  AlertTriangle, Trash2, KeyRound, Info, X, Check, Search, Clock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import { searchClientsPaginated } from '../../api/services/adminClients';
+import type { ClientSearchItem, ClientSearchResponse } from '../../api/services/adminClients';
+import { getAdminAuditLogs } from '../../api/services/adminManagement';
+import type { AuditLogResponse, AuditLogListResponse } from '../../api/services/adminManagement';
 
 // import LightSelect from '../../components/ui/LightSelect';
 // import type { LightSelectOption as SelectOption } from '../../components/ui/LightSelect';
@@ -48,7 +53,7 @@ function useIsDesktop(): boolean {
 // ─── Zod Schemas ─────────────────────────────────────────────────────────────
 
 const createAdminSchema = z.object({
-  client_code: z.string().min(1, "Mijoz kodini kiriting"),
+  client_code: z.string().min(1, "Mijozni tanlang"),
   system_username: z.string().min(3, "Kamida 3 ta belgi"),
   pin: z.string().min(4, "Kamida 4 ta raqam").max(64),
   role_ids: z.array(z.number()).min(1, "Kamida bitta rol tanlang"),
@@ -67,7 +72,37 @@ type CreateAdminFormValues = z.infer<typeof createAdminSchema>;
 type EditAdminFormValues = z.infer<typeof editAdminSchema>;
 type PinResetFormValues = z.infer<typeof pinResetSchema>;
 
-type DetailTab = 'info' | 'pin' | 'danger';
+type DetailTab = 'info' | 'logs' | 'pin' | 'danger';
+
+// Friendly Uzbek labels for the most common audit actions (per-admin log view).
+const LOG_ACTION_LABELS: Record<string, string> = {
+  CREATED_CLIENT: 'Mijoz yaratdi',
+  UPDATED_CLIENT: 'Mijozni tahrirladi',
+  DELETED_CLIENT: "Mijozni o'chirdi",
+  UPDATED_CLIENT_PASSPORT_IMAGES: 'Pasport rasmini yangiladi',
+  CREATED_DELIVERY_REQUEST: 'Zayavka qoldirdi',
+  POS_BULK_PAYMENT: "Kassa: yuk to'lovi",
+  POS_ADJUST_BALANCE: 'Kassa: balans tahriri',
+  LOGIN_SUCCESS: 'Tizimga kirdi',
+  PASSKEY_LOGIN_SUCCESS: 'Tizimga kirdi (Passkey)',
+  LOGIN_FAILED: 'Kirish xatosi',
+  LOGOUT: 'Tizimdan chiqdi',
+  CHANGED_OWN_PIN: "PIN o'zgartirdi",
+  CREATED_ADMIN: 'Admin yaratdi',
+  UPDATED_ADMIN: 'Adminni tahrirladi',
+  UPDATED_ADMIN_STATUS: 'Admin holatini o\'zgartirdi',
+  DELETED_ADMIN: "Adminni o'chirdi",
+  RESET_ADMIN_PIN: 'PIN reset qildi',
+};
+
+function logActionLabel(action: string): string {
+  return LOG_ACTION_LABELS[action] ?? action;
+}
+
+function formatLogDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+}
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -234,7 +269,7 @@ interface CreateAdminFormProps {
 const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProps) => {
   const queryClient = useQueryClient();
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<CreateAdminFormValues>({
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<CreateAdminFormValues>({
     resolver: zodResolver(createAdminSchema),
     defaultValues: {
       client_code: '',
@@ -243,6 +278,35 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
       role_ids: [],
     },
   });
+
+  // Client picker — admin = promoted existing client (client_id is NOT NULL in DB),
+  // so instead of typing a raw code the operator searches and selects the client.
+  const [clientQuery, setClientQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selectedClient, setSelectedClient] = useState<ClientSearchItem | null>(null);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(clientQuery.trim()), 350);
+    return () => clearTimeout(id);
+  }, [clientQuery]);
+
+  const { data: searchData, isFetching: isSearching } = useQuery<ClientSearchResponse>({
+    queryKey: ['admin-create-client-search', debouncedQuery],
+    queryFn: () => searchClientsPaginated({ q: debouncedQuery, size: 8 }),
+    enabled: debouncedQuery.length >= 2,
+  });
+
+  const handleSelectClient = (item: ClientSearchItem) => {
+    setSelectedClient(item);
+    setValue('client_code', item.primary_code, { shouldValidate: true });
+    setClientQuery('');
+    setDebouncedQuery('');
+  };
+
+  const handleClearClient = () => {
+    setSelectedClient(null);
+    setValue('client_code', '', { shouldValidate: true });
+  };
 
   const { mutate: create, isPending } = useMutation({
     mutationFn: createAdminAccount,
@@ -262,16 +326,74 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-4">
-      {/* Portal target removed — multi-select uses native checkboxes */}
+      {/* Client picker — search an existing client; the admin is created from it. */}
       <div>
         <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-          Mijoz kodi
+          Mijoz{' '}
+          <span className="font-normal text-gray-400 dark:text-gray-500">
+            (admin shu mavjud mijoz asosida yaratiladi)
+          </span>
         </label>
-        <input
-          {...register('client_code')}
-          placeholder="M-000000"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
-        />
+
+        {selectedClient ? (
+          <div className="flex items-center justify-between gap-2 p-3 rounded-xl border border-orange-200 dark:border-orange-500/20 bg-orange-50/60 dark:bg-orange-500/10">
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
+                {selectedClient.full_name}
+              </p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                {selectedClient.primary_code}
+                {selectedClient.phone ? ` · ${selectedClient.phone}` : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearClient}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+              aria-label="Boshqa mijoz tanlash"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              value={clientQuery}
+              onChange={(e) => setClientQuery(e.target.value)}
+              placeholder="Ism, kod yoki telefon bo'yicha qidiring..."
+              className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
+            />
+            {debouncedQuery.length >= 2 && (
+              <div className="mt-1.5 max-h-52 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] divide-y divide-gray-100 dark:divide-white/[0.04]">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                  </div>
+                ) : (searchData?.items?.length ?? 0) === 0 ? (
+                  <p className="text-[12px] text-gray-400 text-center py-4">Mijoz topilmadi</p>
+                ) : (
+                  searchData!.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectClient(item)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
+                    >
+                      <p className="text-[13px] font-medium text-gray-900 dark:text-white truncate">
+                        {item.full_name}
+                      </p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                        {item.primary_code}
+                        {item.phone ? ` · ${item.phone}` : ''}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {errors.client_code && (
           <p className="mt-1 text-[11px] text-red-500">{errors.client_code.message}</p>
         )}
@@ -385,6 +507,105 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
 });
 CreateAdminForm.displayName = 'CreateAdminForm';
 
+// ─── Per-admin Audit Logs Tab ─────────────────────────────────────────────────
+
+const AdminLogsTab = memo(({ adminId }: { adminId: number }) => {
+  const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const { data, isLoading, isFetching } = useQuery<AuditLogListResponse>({
+    queryKey: ['admin-audit-logs', adminId, page],
+    queryFn: () => getAdminAuditLogs(adminId, { page, size: 20 }),
+    placeholderData: (prev) => prev,
+  });
+
+  const logs: AuditLogResponse[] = data?.items ?? [];
+  const totalPages = data?.total_pages ?? 0;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2.5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl dark:bg-white/[0.05]" />
+        ))}
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="text-center py-10">
+        <Clock className="w-9 h-9 mx-auto mb-2 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+        <p className="text-[13px] text-gray-400">Faoliyat tarixi yo&apos;q</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {logs.map((log) => {
+        const isOpen = expandedId === log.id;
+        const hasDetails = log.details && Object.keys(log.details).length > 0;
+        return (
+          <div
+            key={log.id}
+            className="rounded-xl border border-gray-100 dark:border-white/[0.06] bg-white dark:bg-white/[0.03] p-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-gray-900 dark:text-white">
+                  {logActionLabel(log.action)}
+                </p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
+                  {formatLogDateTime(log.created_at)}
+                  {log.ip_address ? ` · ${log.ip_address}` : ''}
+                </p>
+              </div>
+              {hasDetails && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : log.id)}
+                  className="text-[11px] font-medium text-orange-500 hover:text-orange-600 shrink-0"
+                >
+                  {isOpen ? 'Yopish' : "Ko'rish"}
+                </button>
+              )}
+            </div>
+            {isOpen && hasDetails && (
+              <pre className="mt-2 p-2.5 rounded-lg bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] text-[11px] leading-relaxed text-gray-600 dark:text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap break-all">
+                {JSON.stringify(log.details, null, 2)}
+              </pre>
+            )}
+          </div>
+        );
+      })}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-1">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1 || isFetching}
+            className="w-8 h-8 rounded-lg border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-40 flex items-center justify-center"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-[12px] text-gray-500 dark:text-gray-400">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || isFetching}
+            className="w-8 h-8 rounded-lg border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-40 flex items-center justify-center"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+AdminLogsTab.displayName = 'AdminLogsTab';
+
 // ─── Detail Sheet ─────────────────────────────────────────────────────────────
 
 interface AdminDetailSheetProps {
@@ -497,9 +718,10 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
   if (!admin) return null;
 
   const tabs: { key: DetailTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'info', label: "Ma'lumotlar", icon: <Info className="w-3.5 h-3.5" /> },
+    { key: 'info', label: "Ma'lumot", icon: <Info className="w-3.5 h-3.5" /> },
+    { key: 'logs', label: 'Faoliyat', icon: <Clock className="w-3.5 h-3.5" /> },
     { key: 'pin', label: 'PIN', icon: <KeyRound className="w-3.5 h-3.5" /> },
-    { key: 'danger', label: 'Xavfli zona', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+    { key: 'danger', label: 'Xavfli', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
   ];
 
   const sheetContent = (
@@ -669,6 +891,22 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                   disabled={isTogglingStatus}
                 />
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'logs' && (
+            <motion.div
+              key="logs"
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.15 }}
+              className="p-4"
+            >
+              <h3 className="text-[12px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
+                Audit jurnali — bu admin harakatlari
+              </h3>
+              <AdminLogsTab adminId={admin.id} />
             </motion.div>
           )}
 
@@ -879,10 +1117,26 @@ export default function AdminAccountsPage() {
   const [selectedAdmin, setSelectedAdmin] = useState<AdminAccountResponse | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
+  // Filters — role + active status. Backend supports both; changing either resets the page.
+  const [roleFilter, setRoleFilter] = useState<number | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all');
+  const isActiveParam =
+    statusFilter === 'all' ? undefined : statusFilter === 'active';
+
   const { data: accountsData, isLoading: isLoadingAccounts } = useQuery<AdminAccountListResponse>({
-    queryKey: ['admin-accounts', page],
-    queryFn: () => getAdminAccounts({ page }),
+    queryKey: ['admin-accounts', page, roleFilter, statusFilter],
+    queryFn: () => getAdminAccounts({ page, role_id: roleFilter, is_active: isActiveParam }),
   });
+
+  const handleRoleFilterChange = useCallback((value: number | undefined) => {
+    setRoleFilter(value);
+    setPage(1);
+  }, []);
+
+  const handleStatusFilterChange = useCallback((value: 'all' | 'active' | 'blocked') => {
+    setStatusFilter(value);
+    setPage(1);
+  }, []);
 
   const { data: rolesData, isLoading: isLoadingRoles } = useQuery<RoleResponse[]>({
     queryKey: ['roles'],
@@ -950,6 +1204,47 @@ export default function AdminAccountsPage() {
         </button>
       </div>
 
+      {/* Filter bar — role + status */}
+      <div className="bg-white dark:bg-[#111] rounded-2xl border border-black/[0.05] dark:border-white/[0.06] p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <Shield className="w-4 h-4 text-gray-400 shrink-0" />
+          <select
+            value={roleFilter ?? ''}
+            onChange={(e) =>
+              handleRoleFilterChange(e.target.value ? Number(e.target.value) : undefined)
+            }
+            className="flex-1 min-w-0 h-9 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white text-[13px] focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all"
+          >
+            <option value="">Barcha rollar</option>
+            {roles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-gray-100 dark:bg-white/[0.04] shrink-0">
+          {([
+            { key: 'all', label: 'Barchasi' },
+            { key: 'active', label: 'Faol' },
+            { key: 'blocked', label: 'Bloklangan' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => handleStatusFilterChange(opt.key)}
+              className={`px-3 h-7 rounded-lg text-[12px] font-medium transition-colors ${
+                statusFilter === opt.key
+                  ? 'bg-white dark:bg-white/[0.1] text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Content */}
       <div className="space-y-4">
         {/* Desktop table */}
@@ -1015,6 +1310,17 @@ export default function AdminAccountsPage() {
                 />
               ))}
         </div>
+
+        {/* Empty state — no admins match the current filters */}
+        {!isLoadingAccounts && admins.length === 0 && (
+          <div className="text-center py-12 bg-white dark:bg-[#111] rounded-2xl border border-dashed border-gray-200 dark:border-white/[0.08]">
+            <UserCircle className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+            <p className="text-[14px] font-medium text-gray-500 dark:text-gray-400">Admin topilmadi</p>
+            <p className="text-[12px] text-gray-400 dark:text-gray-600 mt-1">
+              Filtrlarni o&apos;zgartirib ko&apos;ring
+            </p>
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (

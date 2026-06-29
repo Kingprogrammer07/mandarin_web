@@ -3,6 +3,11 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { ShieldCheck, Check } from "lucide-react";
+import {
+  ADMIN_AGREEMENT_STORAGE_KEY,
+  ADMIN_AGREEMENT_ACCEPTED_EVENT,
+  isAdminAgreementAccepted,
+} from "./adminAgreement";
 
 /**
  * One-time admin agreement.
@@ -14,11 +19,8 @@ import { ShieldCheck, Check } from "lucide-react";
  * English (the app itself only ships uz+ru i18n, so the agreement carries its own
  * three-language copy with a language switcher).
  *
- * Bump `AGREEMENT_VERSION` whenever the terms change to re-prompt every admin.
+ * Bump `ADMIN_AGREEMENT_VERSION` (in ./adminAgreement) whenever the terms change.
  */
-
-const AGREEMENT_VERSION = "v1";
-const STORAGE_KEY = `admin_agreement_accepted_${AGREEMENT_VERSION}`;
 
 type Lang = "uz" | "ru" | "en";
 
@@ -95,22 +97,22 @@ export default function AdminAgreementModal({
   currentPage,
 }: AdminAgreementModalProps) {
   const { i18n } = useTranslation();
-  const [accepted, setAccepted] = useState<boolean>(
-    () => localStorage.getItem(STORAGE_KEY) === "1",
-  );
+  const [accepted, setAccepted] = useState<boolean>(isAdminAgreementAccepted);
   const [checked, setChecked] = useState(false);
   const [lang, setLang] = useState<Lang>(() =>
     i18n.language === "ru" ? "ru" : i18n.language === "en" ? "en" : "uz",
   );
 
-  // Show only for an authenticated admin, never on the login screen itself.
+  // Show only for an authenticated admin, and only on the manager page — that is
+  // where staff actually edit client/financial data, so the responsibility prompt
+  // belongs there (and avoids interrupting every other admin screen).
   const adminToken = localStorage.getItem("access_token");
   const adminRole = localStorage.getItem("admin_role");
   const shouldShow =
     !accepted &&
     !!adminToken &&
     !!adminRole &&
-    currentPage !== "admin-login";
+    currentPage === "manager-page";
 
   const copy = useMemo(() => COPY[lang], [lang]);
 
@@ -118,8 +120,10 @@ export default function AdminAgreementModal({
 
   const handleAccept = () => {
     if (!checked) return;
-    localStorage.setItem(STORAGE_KEY, "1");
+    localStorage.setItem(ADMIN_AGREEMENT_STORAGE_KEY, "1");
     setAccepted(true);
+    // Tell the page the prompt is gone so the guided tour can start now.
+    window.dispatchEvent(new Event(ADMIN_AGREEMENT_ACCEPTED_EVENT));
   };
 
   return createPortal(
