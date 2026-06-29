@@ -28,7 +28,7 @@ export function PassportUploadSection({
       name="passportImages"
       render={() => (
         <FormItem>
-          <FormLabel className="text-gray-700 font-medium">
+          <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">
             {t('client.passportImages')} <span className="text-red-500">*</span>
           </FormLabel>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

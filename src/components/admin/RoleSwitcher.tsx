@@ -8,9 +8,15 @@ interface RoleSwitcherProps {
   // Kept for call-site compatibility; navigation is now driven by App via the
   // "auth:role-switched" event so the role swap and the route change stay in sync.
   onNavigate?: (page: string) => void;
+  /** Open the menu upward — needed in the fixed mobile bottom bar where a
+   *  downward menu would render off-screen. */
+  dropUp?: boolean;
+  /** Horizontal anchor of the menu. Left for a left-aligned (bottom-bar) trigger,
+   *  right for the desktop header. Defaults to right. */
+  menuAlign?: "left" | "right";
 }
 
-export default function RoleSwitcher(_props: RoleSwitcherProps) {
+export default function RoleSwitcher({ dropUp = false, menuAlign = "right" }: RoleSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [claims, setClaims] = useState(() => getAdminJwtClaims());
   const ref = useRef<HTMLDivElement>(null);
@@ -81,7 +87,11 @@ export default function RoleSwitcher(_props: RoleSwitcherProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.08] shadow-lg z-50 py-1">
+        <div
+          className={`absolute w-44 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.08] shadow-lg z-50 py-1 ${
+            menuAlign === "left" ? "left-0" : "right-0"
+          } ${dropUp ? "bottom-full mb-1.5" : "mt-1.5"}`}
+        >
           {roleNames.map((role) => (
             <button
               key={role}

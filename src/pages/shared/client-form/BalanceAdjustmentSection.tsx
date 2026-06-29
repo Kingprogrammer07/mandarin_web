@@ -18,17 +18,17 @@ interface BalanceAdjustmentSectionProps {
 
 export function BalanceAdjustmentSection({ form, currentBalance }: BalanceAdjustmentSectionProps) {
   return (
-    <div className="p-4 border border-orange-200 rounded-xl bg-white space-y-4">
+    <div className="p-4 border border-orange-200 dark:border-white/[0.08] rounded-xl bg-white dark:bg-white/[0.03] space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Balans boshqaruvi</h3>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Balans boshqaruvi</h3>
         {currentBalance !== null && (
           <span
             className={`text-lg font-bold ${
               currentBalance > 0
-                ? 'text-green-600'
+                ? 'text-green-600 dark:text-green-400'
                 : currentBalance < 0
-                  ? 'text-red-600'
-                  : 'text-gray-500'
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-500 dark:text-gray-400'
             }`}
           >
             Joriy balans: {currentBalance.toFixed(2)} so'm
@@ -41,10 +41,10 @@ export function BalanceAdjustmentSection({ form, currentBalance }: BalanceAdjust
         name="adjustment_type"
         render={({ field }) => (
           <FormItem>
-            <FormLabel className="text-gray-700 font-medium">Amal turi</FormLabel>
+            <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Amal turi</FormLabel>
             <Select onValueChange={field.onChange} value={field.value || ''}>
               <FormControl>
-                <SelectTrigger className="bg-orange-50/50">
+                <SelectTrigger className="bg-orange-50/50 dark:bg-white/[0.04] dark:border-white/[0.08] text-gray-900 dark:text-white">
                   <SelectValue placeholder="Tanlang..." />
                 </SelectTrigger>
               </FormControl>
@@ -65,13 +65,13 @@ export function BalanceAdjustmentSection({ form, currentBalance }: BalanceAdjust
             name="adjustment_amount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-700 font-medium">Miqdor (so'm)</FormLabel>
+                <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Miqdor (so'm)</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
                     inputMode="decimal"
                     placeholder="0.00"
-                    className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400"
+                    className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     {...field}
                     onChange={(event) => {
                       const normalized = normalizeNumber(event.target.value);
@@ -88,12 +88,12 @@ export function BalanceAdjustmentSection({ form, currentBalance }: BalanceAdjust
             name="adjustment_reason"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-gray-700 font-medium">Sabab</FormLabel>
+                <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Sabab</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
                     placeholder="Sababni yozing..."
-                    className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400"
+                    className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     {...field}
                   />
                 </FormControl>

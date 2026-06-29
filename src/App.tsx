@@ -25,6 +25,7 @@ import { useMaintenanceStore } from "./store/useMaintenanceStore";
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
 const LoginForm = lazy(() => import("./components/LoginForm"));
 const AdminLoginForm = lazy(() => import("./components/AdminLoginForm"));
+const AdminAgreementModal = lazy(() => import("./components/admin/AdminAgreementModal"));
 const AdminAccountsPage = lazy(() => import("./pages/admin/AdminAccountsPage"));
 const AdminRolesPage = lazy(() => import("./pages/admin/AdminRolesPage"));
 const AdminProfilePage = lazy(() => import("./pages/admin/AdminProfilePage"));
@@ -824,6 +825,11 @@ function AppContent() {
           : "bg-[#f8fafc] dark:bg-[#06080d]"
       }`}
     >
+      {/* One-time admin responsibility agreement (self-gates; shows once after login). */}
+      <Suspense fallback={null}>
+        <AdminAgreementModal currentPage={currentPage} userRole={userRole} />
+      </Suspense>
+
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {!isAdminArea && (
           <>

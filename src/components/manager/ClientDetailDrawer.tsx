@@ -1,5 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
+import type { DriveStep } from "driver.js";
 import { useForm, Controller, useWatch } from "react-hook-form";
+import { useGuideTour } from "../../hooks/useGuideTour";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X, User, Wallet, Save, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
@@ -35,11 +38,12 @@ const FILTER_OPTIONS: { value: FinancesFilterType; label: string }[] = [
 ];
 
 const BASE_INPUT =
-  "w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] " +
+  "w-full h-11 md:h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] " +
   "bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white " +
   "placeholder-gray-400 dark:placeholder-gray-600 " +
   "focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 " +
-  "text-[13px] transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+  // 16px on mobile prevents iOS Safari / Telegram WebView auto-zoom on focus.
+  "text-[16px] md:text-[13px] transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
 const BASE_SELECT =
   BASE_INPUT + " appearance-none cursor-pointer";
@@ -185,7 +189,26 @@ export function ClientDetailDrawer() {
   const { isSuperAdmin, permissions } = getAdminJwtClaims();
   const canReadFinances = isSuperAdmin || permissions.has('clients:finance_read') || permissions.has('clients:finance_update');
 
-  const [activeTab, setActiveTab] = useState<"profile" | "finances">("profile");
+  // Mobile → bottom-sheet (slide up); desktop → right panel (slide in from right).
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Active tab is clientId-stamped (same idiom as the finance filters below) so it
+  // resets to "profile" when the selected client changes — without a setState effect.
+  const [activeTabState, setActiveTabState] = useState<{
+    clientId: number | null;
+    value: "profile" | "finances";
+  }>({ clientId: selectedClientId, value: "profile" });
+  const activeTab =
+    activeTabState.clientId === selectedClientId ? activeTabState.value : "profile";
+  const setActiveTab = (value: "profile" | "finances") =>
+    setActiveTabState({ clientId: selectedClientId, value });
 
   // Finances filter state
   const [filterTypeState, setFilterTypeState] = useState<{
@@ -214,7 +237,12 @@ export function ClientDetailDrawer() {
   const selectedFlight = selectedFlightState.clientId === selectedClientId ? selectedFlightState.value : "";
   const financesPage = financesPageState.clientId === selectedClientId ? financesPageState.value : 1;
 
-  const { data: client, isLoading: isClientLoading } = useClientDetail(selectedClientId);
+  const {
+    data: client,
+    isLoading: isClientLoading,
+    isError: isClientError,
+    refetch: refetchClient,
+  } = useClientDetail(selectedClientId);
   const { data: flightsData } = useClientFlights(selectedClientId);
   const { data: finances, isLoading: isFinancesLoading } = useClientFinances(
     selectedClientId,
@@ -245,7 +273,7 @@ export function ClientDetailDrawer() {
     reset,
     control,
     setValue,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<UpdateClientPersonalFormValues>({
     resolver: zodResolver(updateClientPersonalSchema),
   });
@@ -271,6 +299,33 @@ export function ClientDetailDrawer() {
     }
   }, [client, reset]);
 
+  // One-time tour of the client drawer (tabs + save).
+  const buildClientTour = useCallback((): DriveStep[] => [
+    {
+      element: '[data-tour="client-tabs"]',
+      popover: {
+        title: t("tour.managerClient.tabs.title"),
+        description: t("tour.managerClient.tabs.desc"),
+      },
+    },
+    {
+      element: '[data-tour="client-save"]',
+      popover: {
+        title: t("tour.managerClient.save.title"),
+        description: t("tour.managerClient.save.desc"),
+      },
+    },
+  ], [t]);
+  useGuideTour(
+    "manager-client",
+    buildClientTour,
+    !!selectedClientId &&
+      !!client &&
+      !isClientLoading &&
+      !isClientError &&
+      activeTab === "profile",
+  );
+
   if (!selectedClientId) return null;
 
   const availableDistricts = selectedRegion ? (DISTRICTS[selectedRegion] ?? []) : [];
@@ -286,16 +341,38 @@ export function ClientDetailDrawer() {
     );
   };
 
+  // Guard against losing unsaved profile edits when closing via backdrop / X.
+  const handleClose = () => {
+    if (isDirty && activeTab === "profile") {
+      const ok = window.confirm(
+        "Saqlanmagan o'zgarishlar bor. Chiqib ketilsinmi?",
+      );
+      if (!ok) return;
+    }
+    setSelectedClientId(null);
+  };
+
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] transition-opacity"
-        onClick={() => setSelectedClientId(null)}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100]"
+        onClick={handleClose}
       />
 
-      {/* Drawer panel */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white dark:bg-[#111] shadow-2xl flex flex-col z-[101]">
+      {/* Drawer panel — mobile bottom-sheet (slide up) / desktop right panel (slide in). */}
+      <motion.div
+        initial={isMobile ? { y: "100%" } : { x: "100%" }}
+        animate={isMobile ? { y: 0 } : { x: 0 }}
+        transition={{ type: "spring", damping: 32, stiffness: 320 }}
+        className="fixed inset-x-0 bottom-0 max-h-[94vh] rounded-t-3xl bg-white dark:bg-[#111] shadow-2xl flex flex-col z-[101] md:inset-x-auto md:inset-y-0 md:right-0 md:left-auto md:w-full md:max-w-2xl md:max-h-none md:rounded-none"
+      >
+        {/* Grab handle (mobile only) */}
+        <div className="md:hidden flex justify-center pt-2 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
+        </div>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] flex-shrink-0">
@@ -311,7 +388,7 @@ export function ClientDetailDrawer() {
             </p>
           </div>
           <button
-            onClick={() => setSelectedClientId(null)}
+            onClick={handleClose}
             className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ml-3 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors"
             aria-label="Yopish"
           >
@@ -320,7 +397,7 @@ export function ClientDetailDrawer() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 dark:border-white/[0.06] flex-shrink-0 bg-white dark:bg-[#111]">
+        <div data-tour="client-tabs" className="flex border-b border-gray-100 dark:border-white/[0.06] flex-shrink-0 bg-white dark:bg-[#111]">
           {([
             { key: "profile" as const, Icon: User, label: "Shaxsiy ma'lumotlar", visible: true },
             { key: "finances" as const, Icon: Wallet, label: "Moliya holati", visible: canReadFinances },
@@ -354,6 +431,19 @@ export function ClientDetailDrawer() {
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Skeleton key={i} className="h-10 w-full rounded-xl" />
                   ))}
+                </div>
+              ) : isClientError ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                  <p className="text-[13px] text-gray-500 dark:text-gray-400">
+                    Ma&apos;lumotlarni yuklab bo&apos;lmadi
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => refetchClient()}
+                    className="px-4 h-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition-colors"
+                  >
+                    Qayta urinish
+                  </button>
                 </div>
               ) : (
                 <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -418,8 +508,8 @@ export function ClientDetailDrawer() {
                       Tug&apos;ilgan sana
                     </label>
                     <input
+                      type="date"
                       {...register("date_of_birth")}
-                      placeholder="YYYY-MM-DD"
                       className={BASE_INPUT}
                     />
                     {errors.date_of_birth && (
@@ -636,7 +726,7 @@ export function ClientDetailDrawer() {
                       clientId: selectedClientId,
                       value: Math.max(1, financesPage - 1),
                     })}
-                    className="w-9 h-9 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                    className="w-11 h-11 md:w-9 md:h-9 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -649,7 +739,7 @@ export function ClientDetailDrawer() {
                       clientId: selectedClientId,
                       value: financesPage + 1,
                     })}
-                    className="w-9 h-9 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                    className="w-11 h-11 md:w-9 md:h-9 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -661,11 +751,12 @@ export function ClientDetailDrawer() {
 
         {/* Sticky save footer — profile tab only */}
         {activeTab === "profile" && (
-          <div className="px-5 py-4 border-t border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] flex-shrink-0">
+          <div className="px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#111] flex-shrink-0">
             <button
               type="submit"
               form="profile-form"
-              disabled={isUpdating}
+              data-tour="client-save"
+              disabled={isUpdating || !isDirty}
               className="w-full h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[13px] font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
@@ -673,7 +764,7 @@ export function ClientDetailDrawer() {
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
     </>
   );
 }

@@ -20,6 +20,7 @@ export const useClientsList = (params: SearchClientsParams) => {
   const hasQuery =
     (params.code?.trim().length ?? 0) > 0 ||
     (params.name?.trim().length ?? 0) > 0 ||
+    (params.phone?.trim().length ?? 0) > 0 ||
     (params.q?.trim().length ?? 0) > 0;
 
   return useQuery({

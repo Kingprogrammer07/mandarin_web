@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Phone, Search, MapPin, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,16 @@ export default function UzpostDeliveryForm({
         String(b.index).includes(q),
     );
   }, [branches, query]);
+
+  // UzPost has hundreds of branches — virtualize so only on-screen rows mount.
+  const listRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 76,
+    overscan: 6,
+  });
 
   return (
     <div className="space-y-5">
@@ -80,43 +91,69 @@ export default function UzpostDeliveryForm({
           <p className="text-sm text-red-500 py-2">{t("common.error", "Xatolik yuz berdi")}</p>
         )}
 
-        <div className="max-h-60 overflow-y-auto space-y-1 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-1">
+        <div
+          ref={listRef}
+          className="max-h-60 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-1"
+        >
           {filtered.length === 0 && !isLoading && (
             <p className="text-sm text-gray-500 py-4 text-center">
               {t("adminDeliveryRequest.uzpostForm.noBranches", "Filial topilmadi")}
             </p>
           )}
-          {filtered.map((branch) => {
-            const isSelected = selectedBranch?.id === branch.id;
-            return (
-              <button
-                key={branch.id}
-                onClick={() => onBranchChange(isSelected ? null : branch)}
-                className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                  isSelected
-                    ? "bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20"
-                    : "hover:bg-gray-50 dark:hover:bg-white/[0.04] border border-transparent"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">{branch.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {branch.address}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                      Indeks: {branch.index}
-                    </p>
+          {filtered.length > 0 && (
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                position: "relative",
+                width: "100%",
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const branch = filtered[virtualRow.index];
+                const isSelected = selectedBranch?.id === branch.id;
+                return (
+                  <div
+                    key={branch.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <button
+                      onClick={() => onBranchChange(isSelected ? null : branch)}
+                      className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 text-sm transition-colors ${
+                        isSelected
+                          ? "bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20"
+                          : "hover:bg-gray-50 dark:hover:bg-white/[0.04] border border-transparent"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">{branch.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {branch.address}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                            Indeks: {branch.index}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center mt-0.5">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
                   </div>
-                  {isSelected && (
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center mt-0.5">
-                      <Check className="w-3 h-3" />
-                    </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

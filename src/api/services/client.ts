@@ -47,6 +47,10 @@ export interface ClientCreateRequest {
   referrer_telegram_id?: number;
   referrer_client_code?: string;
   client_code?: string;
+  /** Named passport slots — sent independently so each lands in the right slot. */
+  front_image?: File | null;
+  back_image?: File | null;
+  /** Legacy positional upload — kept for backward-compat callers. */
   passport_images?: File[];
   adjustment_amount?: number;
   adjustment_reason?: string;
@@ -140,7 +144,9 @@ export async function createClient(data: ClientCreateRequest): Promise<Client> {
   if (data.referrer_telegram_id) formData.append('referrer_telegram_id', data.referrer_telegram_id.toString());
   if (data.referrer_client_code) formData.append('referrer_client_code', data.referrer_client_code);
   if (data.client_code) formData.append('client_code', data.client_code);
-  // Passport images
+  // Named passport slots (preferred) + legacy positional fallback.
+  if (data.front_image) formData.append('front_image', data.front_image);
+  if (data.back_image) formData.append('back_image', data.back_image);
   if (data.passport_images && data.passport_images.length > 0) {
     data.passport_images.forEach((file) => {
       formData.append('passport_images', file);
@@ -181,7 +187,10 @@ export async function updateClient(id: number, data: ClientCreateRequest): Promi
   if (data.adjustment_reason) formData.append('adjustment_reason', data.adjustment_reason);
   if (data.adjustment_type) formData.append('adjustment_type', data.adjustment_type.toString());
 
-  // Passport images - faqat yangi rasm yuklangan bo'lsa yuborish
+  // Passport — faqat yangi rasm yuklangan bo'lsa yuborish. Nomlangan slotlar
+  // (front/back) slot-aware: yuborilmagan slot serverda saqlanadi.
+  if (data.front_image) formData.append('front_image', data.front_image);
+  if (data.back_image) formData.append('back_image', data.back_image);
   if (data.passport_images && data.passport_images.length > 0) {
     data.passport_images.forEach((file) => {
       formData.append('passport_images', file);

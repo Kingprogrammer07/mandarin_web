@@ -245,6 +245,18 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       setTimeout(() => setSubmitStatus('idle'), 3000);
       return;
     }
+    // Slot 0 is the front. Block a back-only upload when no front exists — neither a
+    // newly chosen file nor an already-stored preview — otherwise the back would land
+    // in the front slot. Applies to both create and edit.
+    const hasFront = Boolean(frontImage || frontImagePreview);
+    if (backImage && !hasFront) {
+      setSubmitStatus('error');
+      setSubmitMessage(
+        t('client.validation.frontBeforeBack', "Avval pasport old tomonini yuklang."),
+      );
+      setTimeout(() => setSubmitStatus('idle'), 3000);
+      return;
+    }
     if (mode === 'edit' && (!data.passportImages || data.passportImages.length === 0)) {
       if (!frontImagePreview && !backImagePreview) {
         setSubmitStatus('error');
@@ -270,7 +282,10 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       if (data.phone) requestData.phone = `+998${data.phone}`;
       if (data.referrer_telegram_id) requestData.referrer_telegram_id = parseInt(data.referrer_telegram_id, 10);
       if (data.referrer_client_code) requestData.referrer_client_code = data.referrer_client_code.trim().toUpperCase();
-      if (data.passportImages && data.passportImages.length > 0) requestData.passport_images = data.passportImages;
+      // Named slots: each goes to its own backend field so re-uploading just one
+      // (e.g. only the back on edit) never overwrites/mislabels the other.
+      if (frontImage) requestData.front_image = frontImage;
+      if (backImage) requestData.back_image = backImage;
 
       if (mode === 'edit' && data.adjustment_amount && data.adjustment_type) {
         requestData.adjustment_amount = parseFloat(data.adjustment_amount);
@@ -321,16 +336,16 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
       )}
 
       <div className="w-full max-w-3xl mx-auto px-4 sm:px-6">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 sm:p-8 lg:p-10 border border-orange-200/50 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-orange-400/10 rounded-full blur-3xl -z-10" />
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl -z-10" />
+        <div className="bg-white/95 dark:bg-white/[0.03] backdrop-blur-md rounded-2xl shadow-xl dark:shadow-black/40 p-5 sm:p-8 lg:p-10 border border-orange-200/50 dark:border-white/[0.08] relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-64 h-64 bg-orange-400/10 dark:bg-orange-500/10 rounded-full blur-3xl -z-10" />
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber-400/10 dark:bg-amber-500/10 rounded-full blur-3xl -z-10" />
 
           <div className="mb-8">
             <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent mb-2">
               {t(mode === 'add' ? 'client.addTitle' : 'client.editTitle')}
             </h1>
             {mode === 'edit' && clientData?.full_name && (
-              <p className="text-gray-600 text-lg">
+              <p className="text-gray-600 dark:text-gray-400 text-lg">
                 {clientData.full_name} {clientData.client_code && `(${clientData.client_code})`}
               </p>
             )}
@@ -341,11 +356,11 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Telegram ID */}
               <FormField control={form.control} name="telegram_id" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <Hash className="w-4 h-4 text-orange-500" /> {t('client.telegramId')}
                   </FormLabel>
                   <FormControl>
-                    <Input {...field} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400" placeholder={t('client.telegramIdPlaceholder')} />
+                    <Input {...field} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder={t('client.telegramIdPlaceholder')} />
                   </FormControl>
                   {form.formState.errors.telegram_id && <p className="text-red-500 text-sm">{t(form.formState.errors.telegram_id.message as string)}</p>}
                 </FormItem>
@@ -354,12 +369,12 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Client Code */}
               <FormField control={form.control} name="client_code" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <Hash className="w-4 h-4 text-orange-500" /> {t('client.clientId')}
                   </FormLabel>
                   <FormControl>
                     <Input {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
-                      className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400 uppercase" placeholder={t('client.clientIdPlaceholder')} />
+                      className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 uppercase" placeholder={t('client.clientIdPlaceholder')} />
                   </FormControl>
                   {form.formState.errors.client_code && <p className="text-red-500 text-sm">{t(form.formState.errors.client_code.message as string)}</p>}
                 </FormItem>
@@ -368,11 +383,11 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Full Name */}
               <FormField control={form.control} name="full_name" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <User className="w-4 h-4 text-orange-500" /> {t('client.fullName')} <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input {...field} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400" placeholder={t('client.fullNamePlaceholder')} maxLength={256} />
+                    <Input {...field} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder={t('client.fullNamePlaceholder')} maxLength={256} />
                   </FormControl>
                   {form.formState.errors.full_name && <p className="text-red-500 text-sm">{t(form.formState.errors.full_name.message as string)}</p>}
                 </FormItem>
@@ -381,10 +396,10 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Passport Series */}
               <FormField control={form.control} name="passport_series" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">{t('client.passportSeries')}</FormLabel>
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">{t('client.passportSeries')}</FormLabel>
                   <FormControl>
                     <Input placeholder={t('client.passportSeriesPlaceholder')} {...field} onChange={(e) => field.onChange(handlePassportInput(e.target.value))}
-                      maxLength={9} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400 uppercase" />
+                      maxLength={9} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 uppercase" />
                   </FormControl>
                   {form.formState.errors.passport_series && <p className="text-red-500 text-sm">{t(form.formState.errors.passport_series.message as string)}</p>}
                 </FormItem>
@@ -393,10 +408,10 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* PINFL */}
               <FormField control={form.control} name="pinfl" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">{t('client.pinfl')}</FormLabel>
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">{t('client.pinfl')}</FormLabel>
                   <FormControl>
                     <Input placeholder={t('client.pinflPlaceholder')} {...field} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
-                      maxLength={14} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400" />
+                      maxLength={14} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" />
                   </FormControl>
                   {form.formState.errors.pinfl && <p className="text-red-500 text-sm">{t(form.formState.errors.pinfl.message as string)}</p>}
                 </FormItem>
@@ -405,13 +420,13 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Date of Birth */}
               <FormField control={form.control} name="date_of_birth" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel className="text-gray-700 font-medium">{t('client.dateOfBirth')}</FormLabel>
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">{t('client.dateOfBirth')}</FormLabel>
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <div className="relative">
                       <Input placeholder="DD/MM/YYYY" value={field.value ? format(field.value, 'dd/MM/yyyy') : dateInputValue}
                         onChange={(e) => handleDateInput(e.target.value, field.onChange)}
                         onFocus={() => { if (!dateInputValue && !field.value) setDateInputValue(''); }}
-                        className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400 pr-10" />
+                        className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 pr-10" />
                       <PopoverTrigger asChild>
                         <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full hover:bg-orange-50">
                           <CalendarIcon className="h-4 w-4 text-orange-500" />
@@ -430,12 +445,12 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Region */}
               <FormField control={form.control} name="region" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <Globe className="w-4 h-4 text-orange-500" /> {t('client.region')}
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ''}>
                     <FormControl>
-                      <SelectTrigger className="w-full bg-orange-50/50 border-orange-200 focus:border-orange-500 focus:ring-orange-500">
+                      <SelectTrigger className="w-full bg-orange-50/50 dark:bg-white/[0.04] border-orange-200 dark:border-white/[0.08] text-gray-900 dark:text-white focus:border-orange-500 focus:ring-orange-500">
                         <SelectValue placeholder={t('client.regionPlaceholder')} />
                       </SelectTrigger>
                     </FormControl>
@@ -452,12 +467,12 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* District */}
               <FormField control={form.control} name="district" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-orange-500" /> {t('client.district')}
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedRegion}>
                     <FormControl>
-                      <SelectTrigger className="w-full bg-orange-50/50 border-orange-200 focus:border-orange-500 focus:ring-orange-500">
+                      <SelectTrigger className="w-full bg-orange-50/50 dark:bg-white/[0.04] border-orange-200 dark:border-white/[0.08] text-gray-900 dark:text-white focus:border-orange-500 focus:ring-orange-500">
                         <SelectValue placeholder={t('client.districtPlaceholder')} />
                       </SelectTrigger>
                     </FormControl>
@@ -475,8 +490,8 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
                           <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> Hisoblanmoqda...
                         </span>
                       ) : previewCode ? (
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
-                          <Hash className="w-3.5 h-3.5" /> Kutilayotgan kod: <span className="font-bold text-green-800 tracking-wide">{previewCode}</span>
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400 rounded-md text-sm">
+                          <Hash className="w-3.5 h-3.5" /> Kutilayotgan kod: <span className="font-bold text-green-800 dark:text-green-300 tracking-wide">{previewCode}</span>
                         </div>
                       ) : previewError ? <span className="text-red-500 text-sm">{previewError}</span> : null}
                     </div>
@@ -486,8 +501,8 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
 
               {/* Auto-update code toggle */}
               {selectedDistrict && (
-                <div className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50/50 px-4 py-3">
-                  <span className="text-sm font-medium text-gray-700">{t('client.autoUpdateCode', 'Kod avto-yangilansinmi?')}</span>
+                <div className="flex items-center justify-between rounded-lg border border-orange-200 dark:border-white/[0.08] bg-orange-50/50 dark:bg-white/[0.04] px-4 py-3">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('client.autoUpdateCode', 'Kod avto-yangilansinmi?')}</span>
                   <Switch checked={autoUpdateCode} onCheckedChange={(checked) => {
                     setAutoUpdateCode(checked);
                     if (checked && previewCode) form.setValue('client_code', previewCode, { shouldValidate: true, shouldDirty: true });
@@ -499,11 +514,11 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Address */}
               <FormField control={form.control} name="address" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-orange-500" /> {t('client.address')}
                   </FormLabel>
                   <FormControl>
-                    <textarea {...field} rows={4} className="w-full px-3 py-2 bg-orange-50/50 border border-orange-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:border-orange-500 focus:ring-orange-500 focus:outline-none resize-none"
+                    <textarea {...field} rows={4} className="w-full px-3 py-2 bg-orange-50/50 dark:bg-white/[0.04] border border-orange-200 dark:border-white/[0.08] rounded-lg text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500 focus:outline-none resize-none"
                       placeholder={t('client.addressPlaceholder')} maxLength={512} />
                   </FormControl>
                   {form.formState.errors.address && <p className="text-red-500 text-sm">{t(form.formState.errors.address.message as string)}</p>}
@@ -513,13 +528,13 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Phone */}
               <FormField control={form.control} name="phone" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium flex items-center gap-2">
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
                     <Phone className="w-4 h-4 text-orange-500" /> {t('client.phone')}
                   </FormLabel>
                   <FormControl>
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-700 font-medium">+998</span>
-                      <Input {...field} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400" placeholder={t('client.phonePlaceholder')} maxLength={9} />
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">+998</span>
+                      <Input {...field} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder={t('client.phonePlaceholder')} maxLength={9} />
                     </div>
                   </FormControl>
                   {form.formState.errors.phone && <p className="text-red-500 text-sm">{t(form.formState.errors.phone.message as string)}</p>}
@@ -540,9 +555,9 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Referrer Telegram ID */}
               <FormField control={form.control} name="referrer_telegram_id" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">{t('client.referrerTelegramId')}</FormLabel>
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">{t('client.referrerTelegramId')}</FormLabel>
                   <FormControl>
-                    <Input {...field} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400" placeholder={t('client.referrerTelegramIdPlaceholder')} />
+                    <Input {...field} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder={t('client.referrerTelegramIdPlaceholder')} />
                   </FormControl>
                   {form.formState.errors.referrer_telegram_id && <p className="text-red-500 text-sm">{t(form.formState.errors.referrer_telegram_id.message as string)}</p>}
                 </FormItem>
@@ -551,9 +566,9 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Referrer Client Code */}
               <FormField control={form.control} name="referrer_client_code" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">{t('client.referrerClientCode')}</FormLabel>
+                  <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">{t('client.referrerClientCode')}</FormLabel>
                   <FormControl>
-                    <Input {...field} className="bg-orange-50/50 text-gray-900 placeholder:text-gray-400 uppercase" placeholder={t('client.referrerClientCodePlaceholder')} />
+                    <Input {...field} className="bg-orange-50/50 dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 uppercase" placeholder={t('client.referrerClientCodePlaceholder')} />
                   </FormControl>
                   {form.formState.errors.referrer_client_code && <p className="text-red-500 text-sm">{t(form.formState.errors.referrer_client_code.message as string)}</p>}
                 </FormItem>
@@ -562,8 +577,8 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {/* Registration Date (Edit mode only) */}
               {mode === 'edit' && clientData?.created_at && (
                 <div>
-                  <label className="text-gray-700 font-medium mb-2 block">{t('client.registrationDate')}</label>
-                  <p className="text-gray-600 bg-orange-50/50 px-3 py-2 rounded-lg border border-orange-200">{clientData.created_at}</p>
+                  <label className="text-gray-700 dark:text-gray-300 font-medium mb-2 block">{t('client.registrationDate')}</label>
+                  <p className="text-gray-600 dark:text-gray-400 bg-orange-50/50 dark:bg-white/[0.04] px-3 py-2 rounded-lg border border-orange-200 dark:border-white/[0.08]">{clientData.created_at}</p>
                 </div>
               )}
 
@@ -571,7 +586,7 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
               {mode === 'edit' && <BalanceAdjustmentSection form={form} currentBalance={currentBalance} />}
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap gap-4 pt-6 border-t border-orange-200">
+              <div className="flex flex-wrap gap-4 pt-6 border-t border-orange-200 dark:border-white/[0.08]">
                 <Button type="submit" className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all" disabled={submitStatus === 'loading'}>
                   {t('client.submit')}
                 </Button>

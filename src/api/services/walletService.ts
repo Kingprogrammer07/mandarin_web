@@ -58,10 +58,20 @@ export interface RefundRequest {
     new_card?: NewCardInput;
 }
 
-export interface ActiveCardResponse {
+export interface WalletActiveCard {
     card_number: string;
-    holder_name: string;
-    bank_name?: string;
+    holder_name?: string | null;
+}
+
+export interface WalletPaymentLink {
+    name: string;
+    slug: string;
+    url: string;
+}
+
+export interface WalletPaymentOptionsResponse {
+    active_card: WalletActiveCard | null;
+    payment_links: WalletPaymentLink[];
 }
 
 export const walletService = {
@@ -101,9 +111,11 @@ export const walletService = {
         return response.data;
     },
 
-    // Active Card (for debt payment)
-    getActiveCompanyCard: async (): Promise<ActiveCardResponse> => {
-        const response = await apiClient.get<ActiveCardResponse>('/api/v1/payments/active-cards/random');
+    // Debt-payment options (active company card + active payment links) —
+    // user-authenticated. The admin-only /payments/active-cards/random returns 401
+    // for clients, which the global interceptor turns into a forced logout.
+    getPaymentOptions: async (): Promise<WalletPaymentOptionsResponse> => {
+        const response = await apiClient.get<WalletPaymentOptionsResponse>('/api/v1/wallet/payment-options');
         return response.data;
     }
 };

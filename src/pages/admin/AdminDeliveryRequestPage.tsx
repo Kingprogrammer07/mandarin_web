@@ -20,6 +20,15 @@ import type { UzpostBranch } from "@/types/uzpostBranch";
 type DeliveryType = "self_pickup" | "yandex" | "mandarin" | "bts" | "uzpost";
 type Step = "client" | "flights" | "type" | "form" | "success";
 
+/** Literal fallbacks for the delivery-type label (used if a translation is missing). */
+const DELIVERY_TYPE_FALLBACK: Record<DeliveryType, string> = {
+  self_pickup: "O'zi olib ketish",
+  yandex: "Yandex",
+  mandarin: "Mandarin Dostavka",
+  bts: "BTS",
+  uzpost: "UzPost",
+};
+
 export default function AdminDeliveryRequestPage() {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>("client");
@@ -361,15 +370,7 @@ export default function AdminDeliveryRequestPage() {
             >
               <div className="bg-white dark:bg-white/[0.04] rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-5">
-                  {deliveryType === "uzpost"
-                    ? "UzPost"
-                    : deliveryType === "self_pickup"
-                    ? "O'zi olib ketish"
-                    : deliveryType === "yandex"
-                    ? "Yandex"
-                    : deliveryType === "mandarin"
-                    ? "Mandarin Dostavka"
-                    : "BTS"}{" "}
+                  {t(`adminDeliveryRequest.deliveryType.labels.${deliveryType}`, DELIVERY_TYPE_FALLBACK[deliveryType])}{" "}
                   — {t("adminDeliveryRequest.form.title", "Zayavka ma'lumotlari")}
                 </h2>
 

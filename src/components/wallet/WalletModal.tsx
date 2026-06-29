@@ -9,11 +9,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
     Upload, Loader2, CreditCard, CheckCircle, AlertCircle, Wallet,
     Copy, Check, X, Plane, Calendar, ChevronDown, ArrowDownToLine,
-    Receipt, Bell, TrendingDown
+    Receipt, Bell, TrendingDown, ExternalLink, Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { walletService, type PaymentReminderItem } from '@/api/services/walletService';
+import {
+    walletService,
+    type PaymentReminderItem,
+    type WalletPaymentLink,
+} from '@/api/services/walletService';
+import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -122,6 +127,42 @@ const ReminderCard = memo(({ reminder, idx, onPay }: { reminder: PaymentReminder
 });
 ReminderCard.displayName = 'ReminderCard';
 
+// --- Payment link brand badge + button (Click / Payme / Uzum / ...) ---
+const LINK_BRANDS: Record<string, { bg: string; label: string }> = {
+    click: { bg: 'linear-gradient(135deg,#00B9F1,#0088CC)', label: 'C' },
+    payme: { bg: 'linear-gradient(135deg,#1AC47D,#14A868)', label: 'P' },
+    uzum: { bg: 'linear-gradient(135deg,#9B27AF,#7B1FA2)', label: 'U' },
+    apelsin: { bg: 'linear-gradient(135deg,#FF6B35,#E55A2B)', label: 'A' },
+};
+
+const DebtPaymentLinkButton = memo(({ link }: { link: WalletPaymentLink }) => {
+    const brand = LINK_BRANDS[link.slug.toLowerCase()] ?? {
+        bg: 'linear-gradient(135deg,#F59E0B,#D97706)',
+        label: link.name[0]?.toUpperCase() ?? '?',
+    };
+    return (
+        <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-white/10
+                bg-white dark:bg-white/[0.03]
+                hover:border-amber-300 dark:hover:border-amber-500/30 hover:shadow-sm
+                active:scale-[0.97] transition-all"
+        >
+            <div
+                className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-base text-white shadow-sm"
+                style={{ background: brand.bg }}
+            >
+                {brand.label}
+            </div>
+            <span className="flex-1 font-bold text-sm text-gray-900 dark:text-white">{link.name}</span>
+            <ExternalLink className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+        </a>
+    );
+});
+DebtPaymentLinkButton.displayName = 'DebtPaymentLinkButton';
+
 // --- Main WalletModal ---
 export function WalletModal({ isOpen, onClose }: WalletModalProps) {
     const { t } = useTranslation();
@@ -146,12 +187,24 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
     const hasDebt = debt < 0;
     const reminders = walletData?.reminders ?? [];
 
-    // Fetch active company card ONLY if debt exists
-    const { data: activeCard, isLoading: isActiveCardLoading } = useQuery({
-        queryKey: ['activeCompanyCard'],
-        queryFn: walletService.getActiveCompanyCard,
+    // Fetch debt-payment options (active company card + payment links) — only if debt exists
+    const { data: paymentOptions, isLoading: isOptionsLoading } = useQuery({
+        queryKey: ['walletPaymentOptions'],
+        queryFn: walletService.getPaymentOptions,
         enabled: isOpen && hasDebt,
     });
+    const activeCard = paymentOptions?.active_card ?? null;
+    const paymentLinks = paymentOptions?.payment_links ?? [];
+
+    // NBU availability — drives the "pay online via a flight" bridge to the reminders
+    // tab. NBU is flight-scoped, so it cannot settle a generic debt directly here.
+    const { data: nbuStatus } = useQuery({
+        queryKey: ['nbu-status'],
+        queryFn: nbuPaymentService.getStatus,
+        enabled: isOpen && hasDebt,
+        staleTime: 5 * 60_000,
+    });
+    const nbuEnabled = nbuStatus?.enabled === true;
 
     const { data: cardsData } = useQuery({
         queryKey: ['walletCards'],
@@ -460,91 +513,134 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                                                         </div>
                                                     </div>
 
-                                                    {/* Active Company Card */}
-                                                    {isActiveCardLoading ? (
+                                                    {/* Debt-payment methods: links + card. NBU is flight-scoped → bridge to reminders. */}
+                                                    {isOptionsLoading ? (
                                                         <div className="h-40 w-full bg-gray-100 dark:bg-white/5 animate-pulse rounded-xl" />
-                                                    ) : activeCard ? (
-                                                        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-900 via-blue-900 to-blue-800 p-5 text-white shadow-xl">
-                                                            <div className="absolute top-0 right-0 h-40 w-40 translate-x-12 translate-y-[-2rem] rounded-full bg-white/10 blur-3xl" />
-                                                            <div className="absolute bottom-0 left-0 h-32 w-32 translate-x-[-2rem] translate-y-12 rounded-full bg-blue-400/20 blur-2xl" />
-                                                            <div className="relative z-10">
-                                                                <div className="flex justify-between items-start mb-5">
-                                                                    <div className="h-8 w-12 rounded bg-white/20 backdrop-blur-sm" />
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="text-white hover:bg-white/20 hover:text-white"
-                                                                        onClick={() => copyToClipboard(activeCard.card_number)}
-                                                                    >
-                                                                        {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
-                                                                        {copied ? t('wallet.modal.copySuccess', "Nusxalandi") : t('wallet.modal.copyAction', "Nusxalash")}
-                                                                    </Button>
-                                                                </div>
-                                                                <div className="space-y-3">
-                                                                    <div>
-                                                                        <p className="text-xs text-blue-200 uppercase mb-1">{t('wallet.cards.cardNumber', "Karta raqami")}</p>
-                                                                        <p className="font-mono text-lg tracking-widest truncate">{activeCard.card_number.replace(/(\d{4})/g, '$1 ').trim()}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="text-xs text-blue-200 uppercase mb-1">{t('wallet.cards.cardHolder', "Egasi")}</p>
-                                                                        <p className="font-medium uppercase tracking-wide truncate">{activeCard.holder_name}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
+                                                    ) : (!activeCard && paymentLinks.length === 0) ? (
                                                         <div className="text-center p-6 border border-dashed rounded-xl bg-white dark:bg-white/5 border-gray-200 dark:border-gray-800">
                                                             <AlertCircle className="h-10 w-10 text-orange-500 mx-auto mb-3" />
                                                             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('wallet.modal.paymentPaused', "To'lov qabul qilish vaqtincha to'xtatilgan")}</h4>
                                                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                                {t('wallet.modal.noActiveCard', "Hozirda faol karta mavjud emas.")}
+                                                                {t('wallet.modal.noPaymentMethods', "Hozirda faol to'lov usuli mavjud emas.")}
                                                             </p>
-                                                        </div>
-                                                    )}
-
-                                                    {activeCard && (
-                                                        <>
-                                                            <div className="space-y-3">
-                                                                <Label className="text-sm font-semibold">{t('wallet.modal.uploadReceipt', "To'lov chekini yuklash")}</Label>
-                                                                <div
-                                                                    onClick={() => fileInputRef.current?.click()}
-                                                                    className={cn(
-                                                                        "border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors",
-                                                                        file
-                                                                            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10"
-                                                                            : "border-gray-200 hover:border-orange-400 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"
-                                                                    )}
+                                                            {nbuEnabled && reminders.length > 0 && (
+                                                                <button
+                                                                    onClick={() => setActiveTab('reminders')}
+                                                                    className="mt-3 text-sm font-semibold text-sky-600 dark:text-sky-400 hover:underline"
                                                                 >
-                                                                    <input
-                                                                        type="file"
-                                                                        ref={fileInputRef}
-                                                                        onChange={handleFileChange}
-                                                                        accept="image/*,application/pdf"
-                                                                        className="hidden"
-                                                                    />
-                                                                    {file ? (
-                                                                        <>
-                                                                            <CheckCircle className="h-8 w-8 text-emerald-500 mb-2" />
-                                                                            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{file.name}</p>
-                                                                            <p className="text-xs text-emerald-500 mt-1">{t('wallet.modal.clickToChange', "O'zgartirish uchun bosing")}</p>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Upload className="h-7 w-7 text-gray-400 mb-2" />
-                                                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{t('wallet.modal.clickToSelect', "Chekni tanlash uchun bosing")}</p>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                                                    {t('wallet.modal.payViaFlightNbu', "Online karta (NBU) bilan reys to'lovini qiling →")}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {/* NBU bridge — NBU needs a flight, so send the user to the reminders tab */}
+                                                            {nbuEnabled && reminders.length > 0 && (
+                                                                <button
+                                                                    onClick={() => setActiveTab('reminders')}
+                                                                    className="w-full flex items-center justify-between p-3.5 rounded-xl border border-sky-200 dark:border-sky-500/20 bg-sky-50 dark:bg-sky-500/5 hover:bg-sky-100 dark:hover:bg-sky-500/10 transition-colors text-left"
+                                                                >
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <div className="w-9 h-9 rounded-lg bg-white dark:bg-white/5 flex items-center justify-center shrink-0">
+                                                                            <CreditCard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{t('wallet.modal.payOnlineCard', "Online karta orqali to'lash")}</p>
+                                                                            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t('wallet.modal.payOnlineCardHint', "Eslatmalardan reysni tanlang")}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <ChevronDown className="w-4 h-4 text-sky-500 -rotate-90 shrink-0" />
+                                                                </button>
+                                                            )}
 
-                                                            <Button
-                                                                onClick={handlePayDebt}
-                                                                disabled={!file || payDebtMutation.isPending}
-                                                                className="w-full h-12 text-base rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white shadow-lg shadow-red-500/20"
-                                                            >
-                                                                {payDebtMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : null}
-                                                                {t('wallet.modal.sendReceipt', "Chekni yuborish")}
-                                                            </Button>
+                                                            {/* Active payment links (Click, Payme, Uzum, ...) */}
+                                                            {paymentLinks.length > 0 && (
+                                                                <div className="space-y-2">
+                                                                    <Label className="text-sm font-semibold flex items-center gap-1.5">
+                                                                        <Link2 className="w-4 h-4 text-gray-400" />
+                                                                        {t('wallet.modal.paymentLinks', "To'lov havolalari")}
+                                                                    </Label>
+                                                                    {paymentLinks.map((link) => (
+                                                                        <DebtPaymentLinkButton key={link.slug} link={link} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Manual transfer: active company card + receipt upload */}
+                                                            {activeCard && (
+                                                                <>
+                                                                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-900 via-blue-900 to-blue-800 p-5 text-white shadow-xl">
+                                                                        <div className="absolute top-0 right-0 h-40 w-40 translate-x-12 translate-y-[-2rem] rounded-full bg-white/10 blur-3xl" />
+                                                                        <div className="absolute bottom-0 left-0 h-32 w-32 translate-x-[-2rem] translate-y-12 rounded-full bg-blue-400/20 blur-2xl" />
+                                                                        <div className="relative z-10">
+                                                                            <div className="flex justify-between items-start mb-5">
+                                                                                <div className="h-8 w-12 rounded bg-white/20 backdrop-blur-sm" />
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="text-white hover:bg-white/20 hover:text-white"
+                                                                                    onClick={() => copyToClipboard(activeCard.card_number)}
+                                                                                >
+                                                                                    {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+                                                                                    {copied ? t('wallet.modal.copySuccess', "Nusxalandi") : t('wallet.modal.copyAction', "Nusxalash")}
+                                                                                </Button>
+                                                                            </div>
+                                                                            <div className="space-y-3">
+                                                                                <div>
+                                                                                    <p className="text-xs text-blue-200 uppercase mb-1">{t('wallet.cards.cardNumber', "Karta raqami")}</p>
+                                                                                    <p className="font-mono text-lg tracking-widest truncate">{activeCard.card_number.replace(/(\d{4})/g, '$1 ').trim()}</p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-xs text-blue-200 uppercase mb-1">{t('wallet.cards.cardHolder', "Egasi")}</p>
+                                                                                    <p className="font-medium uppercase tracking-wide truncate">{activeCard.holder_name}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="space-y-3">
+                                                                        <Label className="text-sm font-semibold">{t('wallet.modal.uploadReceipt', "To'lov chekini yuklash")}</Label>
+                                                                        <div
+                                                                            onClick={() => fileInputRef.current?.click()}
+                                                                            className={cn(
+                                                                                "border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors",
+                                                                                file
+                                                                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10"
+                                                                                    : "border-gray-200 hover:border-orange-400 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"
+                                                                            )}
+                                                                        >
+                                                                            <input
+                                                                                type="file"
+                                                                                ref={fileInputRef}
+                                                                                onChange={handleFileChange}
+                                                                                accept="image/*,application/pdf"
+                                                                                className="hidden"
+                                                                            />
+                                                                            {file ? (
+                                                                                <>
+                                                                                    <CheckCircle className="h-8 w-8 text-emerald-500 mb-2" />
+                                                                                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{file.name}</p>
+                                                                                    <p className="text-xs text-emerald-500 mt-1">{t('wallet.modal.clickToChange', "O'zgartirish uchun bosing")}</p>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <Upload className="h-7 w-7 text-gray-400 mb-2" />
+                                                                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{t('wallet.modal.clickToSelect', "Chekni tanlash uchun bosing")}</p>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <Button
+                                                                        onClick={handlePayDebt}
+                                                                        disabled={!file || payDebtMutation.isPending}
+                                                                        className="w-full h-12 text-base rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white shadow-lg shadow-red-500/20"
+                                                                    >
+                                                                        {payDebtMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : null}
+                                                                        {t('wallet.modal.sendReceipt', "Chekni yuborish")}
+                                                                    </Button>
+                                                                </>
+                                                            )}
                                                         </>
                                                     )}
                                                 </motion.div>

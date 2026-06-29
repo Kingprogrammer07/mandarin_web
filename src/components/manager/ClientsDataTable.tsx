@@ -56,7 +56,7 @@ const LoginBadge = memo(({ isLoggedIn }: { isLoggedIn: boolean }) => (
     <span
       className={`w-1.5 h-1.5 rounded-full ${isLoggedIn ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-gray-500'}`}
     />
-    {isLoggedIn ? 'Faol' : 'Kirмagan'}
+    {isLoggedIn ? 'Faol' : 'Kirmagan'}
   </span>
 ));
 LoginBadge.displayName = 'LoginBadge';
@@ -66,10 +66,12 @@ const MobileClientCard = memo(
     client,
     isSelected,
     onClick,
+    dataTour,
   }: {
     client: ClientRecord;
     isSelected: boolean;
     onClick: () => void;
+    dataTour?: string;
   }) => {
     const { t } = useTranslation();
 
@@ -83,6 +85,7 @@ const MobileClientCard = memo(
     return (
     <div
       onClick={onClick}
+      data-tour={dataTour}
       className={`relative bg-white dark:bg-[#111] p-4 rounded-[18px] border cursor-pointer transition-all active:opacity-80 ${
         isSelected
           ? 'border-orange-500/40 dark:border-orange-500/30 shadow-sm'
@@ -157,6 +160,26 @@ export default memo(function ClientsDataTable({
 
   const showPagination = (totalPages ?? 0) > 1;
 
+  // A typed query that returned zero clients — distinct from the initial
+  // "type to search" prompt above (otherwise the page renders a blank area).
+  if (!isLoading && clients.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center mb-3">
+          <svg className="w-6 h-6 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+          </svg>
+        </div>
+        <p className="text-[14px] text-gray-400 dark:text-gray-500">
+          Hech narsa topilmadi
+        </p>
+        <p className="text-[12px] text-gray-300 dark:text-gray-600 mt-1">
+          Boshqa kod yoki ism bilan urinib ko&apos;ring
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {/* Mobile cards */}
@@ -180,12 +203,13 @@ export default memo(function ClientsDataTable({
                 </div>
               </div>
             ))
-          : clients.map((client) => (
+          : clients.map((client, idx) => (
               <MobileClientCard
                 key={client.id}
                 client={client}
                 isSelected={selectedClientId === client.id}
                 onClick={() => setSelectedClientId(client.id)}
+                dataTour={idx === 0 ? 'manager-row' : undefined}
               />
             ))}
       </div>
@@ -219,9 +243,10 @@ export default memo(function ClientsDataTable({
                     ))}
                   </tr>
                 ))
-              : clients.map((client) => (
+              : clients.map((client, idx) => (
                   <tr
                     key={client.id}
+                    data-tour={idx === 0 ? 'manager-row' : undefined}
                     onClick={() => setSelectedClientId(client.id)}
                     className={`border-b border-black/[0.04] dark:border-white/[0.04] cursor-pointer transition-colors ${
                       selectedClientId === client.id

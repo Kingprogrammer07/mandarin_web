@@ -217,7 +217,8 @@
       "clientCodeInvalid": "Mijoz kodi noto'g'ri formatda (masalan: SS123)",
       "referrerTelegramIdInvalid": "Telegram ID faqat raqamlardan iborat bo'lishi kerak",
       "referrerClientCodeInvalid": "Taklif qilgan foydalanuvchi kodi noto'g'ri formatda (masalan: SS123)",
-      "districtRequired": "Iltimos, tumanni tanlang"
+      "districtRequired": "Iltimos, tumanni tanlang",
+      "frontBeforeBack": "Avval pasport old tomonini yuklang."
     },
     "messages": {
       "loadingAdd": "Mijoz qo'shilmoqda...",
@@ -899,6 +900,11 @@
       "copyAction": "Nusxalash",
       "paymentPaused": "To'lov qabul qilish vaqtincha to'xtatilgan",
       "noActiveCard": "Hozirda faol karta mavjud emas. Keyinroq urinib ko'ring yoki administratorga murojaat qiling.",
+      "noPaymentMethods": "Hozirda faol to'lov usuli mavjud emas.",
+      "payViaFlightNbu": "Online karta (NBU) bilan reys to'lovini qiling →",
+      "payOnlineCard": "Online karta orqali to'lash",
+      "payOnlineCardHint": "Eslatmalardan reysni tanlang",
+      "paymentLinks": "To'lov havolalari",
       "uploadReceipt": "To'lov chekini yuklang",
       "clickToChange": "O'zgartirish uchun bosing",
       "clickToSelect": "Chekni tanlash uchun bosing",
@@ -1655,7 +1661,14 @@
       "amount": "Summa"
     },
     "deliveryType": {
-      "title": "Yetkazish turini tanlang"
+      "title": "Yetkazish turini tanlang",
+      "labels": {
+        "self_pickup": "O'zi olib ketish",
+        "yandex": "Yandex",
+        "mandarin": "Mandarin Dostavka",
+        "bts": "BTS",
+        "uzpost": "UzPost"
+      }
     },
     "standardForm": {
       "phoneLabel": "Qabul qiluvchi telefon",
@@ -1677,6 +1690,8 @@
     "submit": {
       "button": "Zayavkani yuborish",
       "sending": "Yuborilmoqda...",
+      "success": "Zayavka muvaffaqiyatli yuborildi!",
+      "error": "Zayavka yuborishda xatolik",
       "successTitle": "Zayavka yuborildi!",
       "successDesc": "Mijoz nomidan yetkazib berish so'rovi muvaffaqiyatli yaratildi.",
       "newRequest": "Yangi zayavka"
@@ -1804,6 +1819,34 @@
     "next": "Keyingi",
     "prev": "Orqaga",
     "done": "Tushunarli",
+    "manager": {
+      "search": {
+        "title": "Mijozni qidirish",
+        "desc": "Mijoz kodi, ismi yoki telefoni bo'yicha qidiring. Qidiruv turini almashtirishingiz mumkin."
+      },
+      "row": {
+        "title": "Mijoz kartasi",
+        "desc": "Mijozni bosing — to'liq ma'lumot, moliya holati va tahrirlash oynasi ochiladi."
+      },
+      "create": {
+        "title": "Yangi mijoz",
+        "desc": "Bu yerdan yangi mijoz qo'shasiz."
+      },
+      "nav": {
+        "title": "Boshqaruv",
+        "desc": "Karusel, reys jadvali, zayafka qoldirish va rol almashtirish shu yerda — huquqlaringizga qarab ko'rinadi."
+      }
+    },
+    "managerClient": {
+      "tabs": {
+        "title": "Bo'limlar",
+        "desc": "Shaxsiy ma'lumotlar va moliya holati o'rtasida almashing."
+      },
+      "save": {
+        "title": "Saqlash",
+        "desc": "O'zgartirishlardan keyin shu tugma bilan saqlang. Saqlanmagan o'zgarish bo'lsa, yopishda eslatiladi."
+      }
+    },
     "dashboard": {
       "search": {
         "title": "Track kod qidiruvi",

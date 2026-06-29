@@ -6,6 +6,8 @@ type DeliveryType = "self_pickup" | "yandex" | "mandarin" | "bts" | "uzpost";
 
 interface DeliveryOption {
   id: DeliveryType;
+  /** i18n key for the label; `label` is the literal fallback. */
+  labelKey: string;
   label: string;
   descKey: string;
   icon: React.ReactNode;
@@ -22,6 +24,7 @@ interface DeliveryTypeSelectorProps {
 const OPTIONS: DeliveryOption[] = [
   {
     id: "self_pickup",
+    labelKey: "adminDeliveryRequest.deliveryType.labels.self_pickup",
     label: "O'zi olib ketish",
     descKey: "deliveryRequest.options.self_pickup",
     icon: <Store className="w-7 h-7" />,
@@ -31,6 +34,7 @@ const OPTIONS: DeliveryOption[] = [
   },
   {
     id: "yandex",
+    labelKey: "adminDeliveryRequest.deliveryType.labels.yandex",
     label: "Yandex",
     descKey: "deliveryRequest.options.yandex",
     icon: <Zap className="w-7 h-7" />,
@@ -40,6 +44,7 @@ const OPTIONS: DeliveryOption[] = [
   },
   {
     id: "mandarin",
+    labelKey: "adminDeliveryRequest.deliveryType.labels.mandarin",
     label: "Mandarin Dostavka",
     descKey: "deliveryRequest.options.mandarin",
     icon: <Package className="w-7 h-7" />,
@@ -49,6 +54,7 @@ const OPTIONS: DeliveryOption[] = [
   },
   {
     id: "bts",
+    labelKey: "adminDeliveryRequest.deliveryType.labels.bts",
     label: "BTS",
     descKey: "deliveryRequest.options.bts",
     icon: <Truck className="w-7 h-7" />,
@@ -58,6 +64,7 @@ const OPTIONS: DeliveryOption[] = [
   },
   {
     id: "uzpost",
+    labelKey: "adminDeliveryRequest.deliveryType.labels.uzpost",
     label: "UzPost",
     descKey: "deliveryRequest.options.uzpost",
     icon: <Mail className="w-7 h-7" />,
@@ -104,7 +111,7 @@ export default function DeliveryTypeSelector({
                 </div>
                 <div>
                   <p className="font-semibold text-sm text-gray-900 dark:text-white">
-                    {option.label}
+                    {t(option.labelKey, option.label)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     {t(option.descKey)}
