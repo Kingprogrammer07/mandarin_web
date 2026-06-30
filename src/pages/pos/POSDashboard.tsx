@@ -746,7 +746,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   useEffect(() => { searchInputRef.current = searchInput; }, [searchInput]);
 
   const handleSearch = useCallback(
-    async (overrideCode?: string) => {
+    async (overrideCode?: string, opts?: { keepNotif?: boolean }) => {
       const query = (overrideCode ?? searchInputRef.current).trim().toUpperCase();
       if (!query) return;
 
@@ -756,6 +756,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       setSelectedIds(new Set());
       setUseWallet(false);
       setLiveBalance(null);
+      // A fresh manual search must drop any pinned "Ko'rish" payment view, otherwise
+      // the previous notification stays rendered in the middle while the new client
+      // loads (UI looks like it didn't refresh). The "Ko'rish" path passes keepNotif
+      // because it sets activeNotifData itself just before calling search.
+      if (!opts?.keepNotif) {
+        setActiveNotifData(null);
+        setEditNote("");
+        setEditAmount("");
+        pendingFlightRef.current = null;
+      }
 
       try {
         const res = await searchClients(query);
@@ -784,7 +794,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const handleCloseProfile = useCallback(() => setShowProfile(false), []);
   const handleBalanceUpdate = useCallback((newBalance: number) => setLiveBalance(newBalance), []);
   const handleRefreshClient = useCallback(
-    () => handleSearch(clientInfo?.client_code),
+    // Refreshing the SAME client keeps any open payment view (keepNotif) — refresh
+    // should re-pull data, not blow away the cashier's current "Ko'rish" context.
+    () => handleSearch(clientInfo?.client_code, { keepNotif: true }),
     [handleSearch, clientInfo?.client_code],
   );
   // Stable callbacks for CashierLogPanel so its React.memo isn't busted each render.
@@ -838,7 +850,9 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       const matchedType = PAYMENT_TYPES.find((t) => t.id === freshNotif.payment_type);
       // "online" (Telegram bot payments) has no POS equivalent — default to click
       setPaymentType(matchedType ? matchedType.id : "click");
-      await handleSearch(code);
+      // keepNotif: this flow just set activeNotifData / pendingFlightRef above — the
+      // search must preserve them rather than wipe the payment view it's about to show.
+      await handleSearch(code, { keepNotif: true });
     },
     [handleSearch],
   );
