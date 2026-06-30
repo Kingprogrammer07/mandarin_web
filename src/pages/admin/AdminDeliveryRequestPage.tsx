@@ -104,6 +104,10 @@ export default function AdminDeliveryRequestPage() {
   const isStandard = deliveryType && deliveryType !== "uzpost";
   const isUzpost = deliveryType === "uzpost";
 
+  // UzPost requires a destination branch — block submit until one is picked.
+  // Standard types accept optional phone/location, so nothing extra is required.
+  const canSubmit = isUzpost ? Boolean(uzpostBranch) : Boolean(deliveryType);
+
 
 
   const handleSubmit = useCallback(() => {
@@ -326,19 +330,16 @@ export default function AdminDeliveryRequestPage() {
                 )}
               </div>
 
-              {/* Sticky bottom action */}
-              <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-md border-t border-gray-200 dark:border-white/10 z-20">
-                <div className="max-w-5xl mx-auto">
-                  <Button
-                    onClick={() => setStep("type")}
-                    disabled={!canProceedToType}
-                    className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold disabled:opacity-50"
-                  >
-                    {t("adminDeliveryRequest.actions.continue", "Davom etish")}
-                    <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
-                  </Button>
-                </div>
-              </div>
+              {/* Inline action — flows with content so it never overlaps or leaves
+                  a gap above the (context-dependent) bottom nav. */}
+              <Button
+                onClick={() => setStep("type")}
+                disabled={!canProceedToType}
+                className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold disabled:opacity-50"
+              >
+                {t("adminDeliveryRequest.actions.continue", "Davom etish")}
+                <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+              </Button>
             </motion.div>
           )}
 
@@ -393,14 +394,17 @@ export default function AdminDeliveryRequestPage() {
                     onBranchChange={setUzpostBranch}
                   />
                 )}
-              </div>
-
-              {/* Sticky bottom action */}
-              <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-md border-t border-gray-200 dark:border-white/10 z-20">
-                <div className="max-w-5xl mx-auto">
+                {/* Inline submit — inside the card so it flows with content and never
+                    overlaps or leaves a gap above the (context-dependent) bottom nav. */}
+                <div className="mt-6 pt-5 border-t border-gray-100 dark:border-white/10">
+                  {isUzpost && !uzpostBranch && (
+                    <p className="text-[12px] text-amber-600 dark:text-amber-400 mb-2 text-center">
+                      {t("adminDeliveryRequest.uzpostForm.branchRequired", "Yuborish uchun UzPost filialini tanlang")}
+                    </p>
+                  )}
                   <Button
                     onClick={handleSubmit}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !canSubmit}
                     className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold disabled:opacity-50"
                   >
                     {isSubmitting ? (

@@ -1682,7 +1682,8 @@
       "branchLabel": "UzPost filialini tanlash",
       "walletLabel": "Hamyon balansidan foydalanish",
       "receiptLabel": "To'lov cheki (ixtiyoriy)",
-      "uploadReceipt": "Chekni yuklash"
+      "uploadReceipt": "Chekni yuklash",
+      "branchRequired": "Yuborish uchun UzPost filialini tanlang"
     },
     "form": {
       "title": "Zayavka ma'lumotlari"

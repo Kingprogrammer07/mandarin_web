@@ -1682,7 +1682,8 @@
       "branchLabel": "Выберите отделение UzPost",
       "walletLabel": "Использовать баланс кошелька",
       "receiptLabel": "Чек об оплате (опционально)",
-      "uploadReceipt": "Загрузить чек"
+      "uploadReceipt": "Загрузить чек",
+      "branchRequired": "Для отправки выберите отделение UzPost"
     },
     "form": {
       "title": "Данные заявки"
