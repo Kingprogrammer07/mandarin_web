@@ -579,10 +579,16 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     enabled: canProcess,
     staleTime: 2 * 60_000,
   });
-  const activeCards = useMemo(() => (cardsData ?? []).filter((c) => c.is_active), [cardsData]);
+  // POS is admin-only: the cashier records which card a customer paid into, so show
+  // EVERY card regardless of is_active. Deactivation only hides cards from end-users
+  // (the Mini App) — it must NOT hide them from the cashier. Active cards first.
+  const selectableCards = useMemo(
+    () => [...(cardsData ?? [])].sort((a, b) => Number(b.is_active) - Number(a.is_active)),
+    [cardsData],
+  );
   const selectedCard = useMemo(
-    () => activeCards.find((c) => c.id === selectedCardId) ?? null,
-    [activeCards, selectedCardId],
+    () => selectableCards.find((c) => c.id === selectedCardId) ?? null,
+    [selectableCards, selectedCardId],
   );
 
   const cargos: UnpaidCargoItem[] = useMemo(
@@ -1582,12 +1588,12 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                   Kartani tanlang
                                 </p>
                                 <div className="space-y-1.5">
-                                  {activeCards.length === 0 ? (
+                                  {selectableCards.length === 0 ? (
                                     <p className="text-[12px] text-gray-400 dark:text-gray-500 text-center py-2">
-                                      Faol kartalar yo'q
+                                      Karta yo'q
                                     </p>
                                   ) : (
-                                    activeCards.map((card) => {
+                                    selectableCards.map((card) => {
                                       const isSelected = selectedCardId === card.id;
                                       return (
                                         <button
@@ -1601,8 +1607,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                           }`}
                                         >
                                           <div className="min-w-0">
-                                            <p className="text-[13px] font-black text-gray-900 dark:text-white font-mono tracking-wider leading-tight">
+                                            <p className="text-[13px] font-black text-gray-900 dark:text-white font-mono tracking-wider leading-tight flex items-center gap-1.5">
                                               {maskCard(card.card_number)}
+                                              {!card.is_active && (
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-200 dark:bg-white/[0.1] text-gray-500 dark:text-gray-400 uppercase tracking-normal">
+                                                  Nofaol
+                                                </span>
+                                              )}
                                             </p>
                                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                                               {card.full_name}

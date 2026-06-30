@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo } from "react";
+import { useState, useCallback, memo } from "react";
 import { motion } from "framer-motion";
 import { Send, Package } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -16,17 +16,22 @@ interface WarehouseRequestCardProps {
 }
 
 function WarehouseRequestCardBase({ canProcess, activeClientCode }: WarehouseRequestCardProps) {
-  const [clientCode, setClientCode] = useState("");
+  const [clientCode, setClientCode] = useState(activeClientCode ?? "");
   const [pickupMethod, setPickupMethod] = useState<PickupMethod>("self_pickup");
   const [priority, setPriority] = useState<PickupQueuePriority>("normal");
   const [note, setNote] = useState("");
 
-  // Avtomatik to'ldirish: qidirilgan mijoz kodi bo'lsa inputga qo'yish
-  useEffect(() => {
-    if (activeClientCode) {
-      setClientCode(activeClientCode);
-    }
-  }, [activeClientCode]);
+  // Mirror the actively-searched client WITHOUT an effect: when the active client
+  // changes — including being cleared (activeClientCode → null) — reset the input
+  // during render (React's "adjust state on prop change" pattern). The old
+  // `if (activeClientCode)` effect skipped the clear case, leaving a stale code
+  // stuck in the input, and an unconditional effect trips the cascade lint rule.
+  const normalizedActive = activeClientCode ?? "";
+  const [lastActive, setLastActive] = useState(normalizedActive);
+  if (normalizedActive !== lastActive) {
+    setLastActive(normalizedActive);
+    setClientCode(normalizedActive);
+  }
 
   const mut = useMutation({
     mutationFn: createPosPickupQueueByClientCode,
