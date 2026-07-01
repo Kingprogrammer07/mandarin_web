@@ -1628,7 +1628,13 @@
     "payRemaining": "Qoldiqni to'lash",
     "formatError": "Faqat rasm (JPG, PNG, HEIC) yoki PDF yuklang",
     "sizeError": "Fayl hajmi 10MB dan oshmasin",
-    "reportNotReadyDesc": "Yukingiz hali O'zbekiston omborlariga yetib kelmagan bo'lishi mumkin"
+    "reportNotReadyDesc": "Yukingiz hali O'zbekiston omborlariga yetib kelmagan bo'lishi mumkin",
+    "archive": "Arxiv",
+    "archiveTitle": "Arxiv — hisobot yuborilmagan",
+    "flightsBack": "Reyslar",
+    "archiveEmpty": "Arxivda reys yo'q",
+    "noReadyFlights": "Hisoboti tayyor reys yo'q",
+    "noReadyFlightsHint": "Hisobot yuborilmagan reyslar arxivda"
   },
   "adminDeliveryRequest": {
     "title": "Yetkazib berish zayavkasi",

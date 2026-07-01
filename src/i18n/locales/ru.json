@@ -1628,7 +1628,13 @@
     "payRemaining": "Оплатить остаток",
     "formatError": "Загружайте только изображения (JPG, PNG, HEIC) или PDF",
     "sizeError": "Размер файла не должен превышать 10 МБ",
-    "reportNotReadyDesc": "Ваш груз, возможно, ещё не прибыл на склады Узбекистана"
+    "reportNotReadyDesc": "Ваш груз, возможно, ещё не прибыл на склады Узбекистана",
+    "archive": "Архив",
+    "archiveTitle": "Архив — отчёт не отправлен",
+    "flightsBack": "Рейсы",
+    "archiveEmpty": "В архиве нет рейсов",
+    "noReadyFlights": "Нет рейсов с готовым отчётом",
+    "noReadyFlightsHint": "Рейсы без отчёта — в архиве"
   },
   "adminDeliveryRequest": {
     "title": "Заявка на доставку",

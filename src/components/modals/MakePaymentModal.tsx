@@ -40,6 +40,7 @@ import {
   WalletCards,
   Search,
   ExternalLink,
+  Archive,
 } from 'lucide-react';
 import {
   paymentService,
@@ -298,6 +299,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [step, setStep] = useState<WizardStep>(0);
   const [direction, setDirection] = useState(1);
   const [selectedFlightName, setSelectedFlightName] = useState<string | null>(null);
+  // Archive view — flights whose report isn't sent yet (total_payment == null) are
+  // hidden from the main list and revealed only when the user opens the archive.
+  const [showArchive, setShowArchive] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [isPartial, setIsPartial] = useState(false);
@@ -355,6 +359,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setStep(0);
     setDirection(1);
     setSelectedFlightName(null);
+    setShowArchive(false);
     setPaymentMethod(null);
     setUseWallet(false);
     setIsPartial(false);
@@ -859,6 +864,11 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     }
 
     const flights = flightsData?.flights ?? [];
+    // Split by report readiness: "ready" flights carry a computed total_payment;
+    // "pending" (report not sent) ones don't and are tucked into the archive view.
+    const readyFlights = flights.filter((f) => f.total_payment != null);
+    const pendingFlights = flights.filter((f) => f.total_payment == null);
+    const visibleFlights = showArchive ? pendingFlights : readyFlights;
 
     if (flights.length === 0) {
       return (
@@ -877,10 +887,57 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     }
     return (
       <div className="space-y-3">
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-          {t('makePayment.selectFlight')}
-        </p>
-        {flights.map((flight) => (
+        {/* Header row — title + archive toggle for report-not-sent flights */}
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            {showArchive
+              ? t('makePayment.archiveTitle', "Arxiv — hisobot yuborilmagan")
+              : t('makePayment.selectFlight')}
+          </p>
+          {(pendingFlights.length > 0 || showArchive) && (
+            <button
+              onClick={() => setShowArchive((v) => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-bold
+                bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-300
+                hover:bg-gray-200 dark:hover:bg-white/[0.1] active:scale-95 transition-all shrink-0"
+            >
+              {showArchive ? (
+                <>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  {t('makePayment.flightsBack', 'Reyslar')}
+                </>
+              ) : (
+                <>
+                  <Archive className="w-3.5 h-3.5" />
+                  {t('makePayment.archive', 'Arxiv')} ({pendingFlights.length})
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
+        {visibleFlights.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center space-y-2">
+            <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+              {showArchive ? (
+                <Archive className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+              ) : (
+                <Plane className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+              )}
+            </div>
+            <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 max-w-[260px]">
+              {showArchive
+                ? t('makePayment.archiveEmpty', "Arxivda reys yo'q")
+                : t('makePayment.noReadyFlights', "Hisoboti tayyor reys yo'q")}
+            </p>
+            {!showArchive && pendingFlights.length > 0 && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 max-w-[260px]">
+                {t('makePayment.noReadyFlightsHint', "Hisobot yuborilmagan reyslar arxivda")}
+              </p>
+            )}
+          </div>
+        ) : (
+          visibleFlights.map((flight) => (
           <motion.button
             key={flight.flight_name}
             whileTap={{ scale: 0.97 }}
@@ -965,7 +1022,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               </div>
             </div>
           </motion.button>
-        ))}
+          ))
+        )}
       </div>
     );
   };
