@@ -174,6 +174,10 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState<TabKey>('reminders');
     const [paymentFlight, setPaymentFlight] = useState<string | null>(null);
+    // Opens the full payment wizard at flight-selection (no preselected flight) —
+    // used by the "Qarzni to'lash" CTA so the user pays via the standard flow
+    // (NBU / online / cash / wallet) instead of the manual receipt upload.
+    const [showPayment, setShowPayment] = useState(false);
 
     // Fetch balance (new schema)
     const { data: walletData, isLoading: isBalanceLoading } = useQuery({
@@ -513,6 +517,28 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                                                         </div>
                                                     </div>
 
+                                                    {/* Primary CTA — pay through the full wizard (pick a flight →
+                                                        NBU / online / cash / wallet) instead of the manual receipt upload. */}
+                                                    <button
+                                                        onClick={() => setShowPayment(true)}
+                                                        className="w-full flex items-center justify-center gap-2 h-12 rounded-xl
+                                                            bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700
+                                                            text-white font-bold text-[15px] shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all"
+                                                    >
+                                                        <CreditCard className="w-5 h-5" />
+                                                        {t('wallet.modal.payDebtCta', "Qarzni to'lash")}
+                                                    </button>
+
+                                                    {!isOptionsLoading && (activeCard || paymentLinks.length > 0) && (
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                                                            <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                                                                {t('wallet.modal.orManually', "yoki qo'lda")}
+                                                            </span>
+                                                            <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                                                        </div>
+                                                    )}
+
                                                     {/* Debt-payment methods: links + card. NBU is flight-scoped → bridge to reminders. */}
                                                     {isOptionsLoading ? (
                                                         <div className="h-40 w-full bg-gray-100 dark:bg-white/5 animate-pulse rounded-xl" />
@@ -771,12 +797,16 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                 )}
             </AnimatePresence>
 
-            {/* Payment Modal for reminders — renders on top without closing WalletModal */}
+            {/* Payment Modal — renders on top without closing WalletModal. Opened
+                either with a preselected flight (reminders) or at flight-selection
+                (the "Qarzni to'lash" CTA → showPayment). */}
             <MakePaymentModal
-                isOpen={!!paymentFlight}
+                isOpen={!!paymentFlight || showPayment}
                 onClose={() => {
                     setPaymentFlight(null);
+                    setShowPayment(false);
                     queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
+                    queryClient.invalidateQueries({ queryKey: ['walletPaymentOptions'] });
                 }}
                 preselectedFlightName={paymentFlight}
             />

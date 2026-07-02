@@ -926,7 +926,9 @@
       "noDebt": "Sizda qarz yo'q",
       "allClear": "Hamma to'lovlar bajarilgan!",
       "noActions": "Hozircha hech qanday amal talab qilinmaydi.",
-      "comingSoon": "Ushbu xizmat tez kunda ishga tushadi"
+      "comingSoon": "Ushbu xizmat tez kunda ishga tushadi",
+      "payDebtCta": "Qarzni to'lash",
+      "orManually": "yoki qo'lda"
     }
   },
   "reports": {
