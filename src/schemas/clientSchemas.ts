@@ -6,6 +6,12 @@ export const updateClientPersonalSchema = z.object({
     .min(1, "Harflar kiritilishi shart")
     .max(256, "Juda uzun qiymat")
     .optional(),
+  // Client code — routed server-side to the active alias (extra_code / client_code)
+  // and checked for uniqueness. Empty is filtered out by the service before send.
+  client_code: z
+    .string()
+    .max(32, "Mijoz kodi juda uzun")
+    .optional(),
   phone: z
     .string()
     .max(20, "Telefon raqam uzunligi noto'g'ri")

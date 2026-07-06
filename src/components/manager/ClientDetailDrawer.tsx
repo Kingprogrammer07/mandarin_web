@@ -288,6 +288,7 @@ export function ClientDetailDrawer() {
     if (client) {
       reset({
         full_name: client.full_name || "",
+        client_code: client.primary_code || "",
         phone: client.phone || "",
         passport_series: client.passport_series || "",
         pinfl: client.pinfl || "",
@@ -336,7 +337,11 @@ export function ClientDetailDrawer() {
       { clientId: selectedClientId, data },
       {
         onSuccess: () => toast.success("Mijoz ma'lumotlari yangilandi"),
-        onError: () => toast.error("Ma'lumotlarni yangilashda xatolik"),
+        onError: (err: unknown) => {
+          // Prefer the backend's specific reason (e.g. code-in-use / has-transactions).
+          const e = err as { data?: { detail?: string }; message?: string };
+          toast.error(e?.data?.detail || e?.message || "Ma'lumotlarni yangilashda xatolik");
+        },
       },
     );
   };
@@ -447,6 +452,28 @@ export function ClientDetailDrawer() {
                 </div>
               ) : (
                 <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                  {/* Client code — routed server-side (extra_code / client_code) + unique */}
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
+                      Mijoz kodi
+                    </label>
+                    <input
+                      {...register("client_code")}
+                      onChange={(e) =>
+                        setValue(
+                          "client_code",
+                          e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""),
+                          { shouldValidate: true, shouldDirty: true },
+                        )
+                      }
+                      placeholder="ST123"
+                      className={BASE_INPUT + " font-mono uppercase"}
+                    />
+                    {errors.client_code && (
+                      <p className="text-[11px] text-red-500">{errors.client_code.message}</p>
+                    )}
+                  </div>
+
                   {/* Full name */}
                   <div className="space-y-1.5">
                     <label className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
