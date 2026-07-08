@@ -51,6 +51,7 @@ import type {
   PaymentProvider,
   CashierLogFilter,
   CashierLogParams,
+  CashierLogItem,
   EditPaymentRequest,
 } from "@/api/pos";
 import {
@@ -512,7 +513,24 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         return;
       }
 
-      toast.error(message ?? apiErr.message ?? "O'zgartirishda xatolik yuz berdi");
+      // Clear Uzbek messages for the backend's known refusal codes — so a pencil that
+      // turns out uneditable (e.g. mixed/NBU/wallet) reads plainly, not as a crash.
+      const CODE_MESSAGES: Record<string, string> = {
+        STALE_AMOUNT: "Boshqa kassir bu to'lovni o'zgartirdi. Yangilab qayta urining.",
+        NBU_EVENT_IMMUTABLE: "NBU / online to'lovni tahrirlab bo'lmaydi.",
+        WALLET_FUNDED_NOT_EDITABLE: "Hamyondan to'langan to'lovni tahrirlab bo'lmaydi.",
+        AMBIGUOUS_MULTI_TX: "Bu reysda bir nechta tranzaksiya bor — bu yerdan tahrirlab bo'lmaydi.",
+        MIXED_PROVIDER_NOT_EDITABLE: "Aralash to'lov turlari — tahrirlab bo'lmaydi.",
+      };
+      if (code === "STALE_AMOUNT") {
+        queryClient.invalidateQueries({ queryKey: ["cashier-log"] });
+      }
+      toast.error(
+        (code && CODE_MESSAGES[code]) ??
+          message ??
+          apiErr.message ??
+          "O'zgartirishda xatolik yuz berdi",
+      );
     },
   });
 
@@ -863,6 +881,33 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     [handleSearch],
   );
 
+  // Edit a confirmed payment straight from a cashier-log row: resolve the row back
+  // to its paid flight-notification (the log has no notification_id), then reuse the
+  // existing paid-notification edit mode. If no notification backs the row, it isn't
+  // editable through /payments/edit → tell the user instead of opening a dead form.
+  const handleLogEntryEdit = useCallback(
+    async (item: CashierLogItem) => {
+      if (!item.client_code || !item.flight) return;
+      try {
+        const res = await posNotificationService.getNotifications(1, 1, {
+          client_code: item.client_code,
+          flight: item.flight,
+          strict: true,
+          source: "flight",
+        });
+        const notif = res.items[0];
+        if (!notif) {
+          toast.error("Bu to'lov uchun bildirishnoma topilmadi — tahrirlab bo'lmaydi");
+          return;
+        }
+        await handleClientAndFlightClick(notif.client_code, notif.flight_name, notif);
+      } catch {
+        toast.error("Tahrirlashni ochishda xatolik");
+      }
+    },
+    [handleClientAndFlightClick],
+  );
+
   // ── Cargo selection ───────────────────────────────────────────────────────
   // Auto-select all cargos when data loads (unless a pending flight select is queued)
   useEffect(() => {
@@ -1168,6 +1213,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                   logLoading={logLoading}
                   onRefresh={handleLogRefresh}
                   onEntryClick={handleLogEntryClick}
+                  onEntryEdit={canProcess ? handleLogEntryEdit : undefined}
                   currentAdminId={jwtClaims.admin_id}
                   logDateFrom={logDateFrom}
                   setLogDateFrom={setLogDateFrom}

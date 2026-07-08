@@ -1,7 +1,25 @@
 
+import { Pencil } from 'lucide-react';
 import { formatCurrencySum, formatTashkentDateTime } from '@/lib/format';
 import { resolveCashierStyle, PROVIDER_CHIP, translatePayment } from './utils';
 import type { CashierLogItem } from '@/api/pos';
+
+/** Providers whose confirmed amount/type can be corrected via POST /payments/edit
+ *  (NBU / online / wallet are immutable server-side). */
+const EDITABLE_PROVIDERS = new Set(['cash', 'card', 'click', 'payme']);
+
+/** A log row is editable only when it's a positive flight payment on an editable
+ *  provider (mirrors the backend's edit_payment refusals so we don't offer a
+ *  pencil that would just 422). Ambiguous cases still surface as a save error. */
+function isLogEntryEditable(item: CashierLogItem): boolean {
+  return (
+    item.paid_amount > 0 &&
+    !!item.client_code &&
+    !!item.flight &&
+    item.payment_source !== 'uzpost' &&
+    EDITABLE_PROVIDERS.has((item.payment_provider ?? '').toLowerCase())
+  );
+}
 
 // ─── Provider color theme (full border + subtle bg) ───────────────────────────
 
@@ -71,10 +89,13 @@ function getProviderTheme(provider: string) {
 export function LogEntry({
   item,
   onSelect,
+  onEdit,
   currentAdminId,
 }: {
   item: CashierLogItem;
   onSelect: (code: string) => void;
+  /** When provided (admin has pos:process), an eligible row shows an edit pencil. */
+  onEdit?: (item: CashierLogItem) => void;
   /** The current user's Admin DB PK — used to colour-code own vs. peer entries. */
   currentAdminId: number | null;
 }) {
@@ -82,6 +103,7 @@ export function LogEntry({
   const isOwn = item.cashier_id !== null && item.cashier_id === currentAdminId;
   const cashierStyle = resolveCashierStyle(item.cashier_id, currentAdminId);
   const theme = getProviderTheme(item.payment_provider);
+  const canEdit = !!onEdit && isLogEntryEditable(item);
 
   return (
     <div
@@ -155,10 +177,28 @@ export function LogEntry({
           )}
         </div>
 
-        {/* Time — right bottom */}
-        <span className="text-[10px] text-gray-400 dark:text-gray-600 shrink-0">
-          {formatTashkentDateTime(item.created_at)}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Edit pencil — corrects a wrongly-confirmed amount/type. stopPropagation
+              so it doesn't also trigger the row's onSelect (search). */}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit!(item);
+              }}
+              title="Summani/turini tahrirlash"
+              aria-label="To'lovni tahrirlash"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {/* Time — right bottom */}
+          <span className="text-[10px] text-gray-400 dark:text-gray-600">
+            {formatTashkentDateTime(item.created_at)}
+          </span>
+        </div>
       </div>
     </div>
   );

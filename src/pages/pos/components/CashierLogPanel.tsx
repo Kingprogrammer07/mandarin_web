@@ -29,6 +29,8 @@ interface CashierLogPanelProps {
   logLoading: boolean;
   onRefresh: () => void;
   onEntryClick: (code: string) => void;
+  /** When provided, eligible log rows show an edit pencil (admin has pos:process). */
+  onEntryEdit?: (item: CashierLogResponse["items"][number]) => void;
   currentAdminId: number | null;
   logDateFrom: string;
   setLogDateFrom: (v: string) => void;
@@ -45,6 +47,7 @@ function CashierLogPanelBase({
   logLoading,
   onRefresh,
   onEntryClick,
+  onEntryEdit,
   currentAdminId,
   logDateFrom,
   setLogDateFrom,
@@ -324,6 +327,7 @@ function CashierLogPanelBase({
                         key={`${item.entry_kind}-${item.id}`}
                         item={item}
                         onSelect={onEntryClick}
+                        onEdit={onEntryEdit}
                         currentAdminId={currentAdminId}
                       />
                     ))}
