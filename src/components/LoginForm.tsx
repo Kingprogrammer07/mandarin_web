@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { regions, DISTRICTS } from '@/lib/validation';
 import TranslatedFormMessage from './TranslatedFormMessage';
+import PrivacyPolicyModal from './legal/PrivacyPolicyModal';
 import { triggerSuccessHaptic } from '@/utils/haptics';
 
 const loginSchema = z.object({
@@ -39,6 +40,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
   const [submitMessage, setSubmitMessage] = useState('');
 
   const [showAddressDrawer, setShowAddressDrawer] = useState(false);
+  const [showPolicy, setShowPolicy] = useState(false);
   const [credentials, setCredentials] = useState<{ clientCode: string; phoneNumber: string } | null>(null);
 
   const [mounted, setMounted] = useState(false);
@@ -286,6 +288,19 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                     {t('login.register')}
                   </button>
                 </p>
+                {/* Login implies acceptance — existing users already consented at
+                    registration; the link keeps the policy accessible. */}
+                <p className="mt-2 text-[11px] font-semibold leading-snug text-gray-400 dark:text-[#fff8ed]/40">
+                  {t('login.consent.prefix', 'Kirish orqali siz ')}
+                  <button
+                    type="button"
+                    onClick={() => setShowPolicy(true)}
+                    className="font-black text-orange-600/90 underline decoration-orange-400/40 underline-offset-2 dark:text-amber-300/90"
+                  >
+                    {t('login.consent.link', 'Maxfiylik siyosati')}
+                  </button>
+                  {t('login.consent.suffix', 'ga rozilik bildirasiz')}
+                </p>
               </div>
             </form>
           </Form>
@@ -402,6 +417,8 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
         </AnimatePresence>,
         document.body,
       )}
+
+      <PrivacyPolicyModal open={showPolicy} onClose={() => setShowPolicy(false)} />
     </>
   );
 }

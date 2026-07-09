@@ -80,6 +80,8 @@ export interface RegisterRequest {
   date_of_birth: string; // YYYY-MM-DD format
   telegram_id: number;
   passport_images: File[];
+  /** Accepted Privacy Policy + User Agreement version (legal consent audit). */
+  privacy_policy_version?: string;
 }
 
 export interface RegisterResponse {
@@ -128,6 +130,9 @@ export async function register(data: RegisterRequest): Promise<RegisterResponse>
   formData.append('phone_number', data.phone_number);
   formData.append('date_of_birth', data.date_of_birth);
   formData.append('telegram_id', data.telegram_id.toString());
+  if (data.privacy_policy_version) {
+    formData.append('privacy_policy_version', data.privacy_policy_version);
+  }
 
   data.passport_images.forEach((file) => {
     formData.append('passport_images', file);

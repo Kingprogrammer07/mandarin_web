@@ -88,7 +88,13 @@
     },
     "district": "Район / Город",
     "districtPlaceholder": "Выберите район или город",
-    "supportedFormats": "PNG · JPG · WEBP · HEIC"
+    "supportedFormats": "PNG · JPG · WEBP · HEIC",
+    "consent": {
+      "prefix": "Я согласен(на) с ",
+      "link": "Политикой конфиденциальности и Пользовательским соглашением",
+      "suffix": "",
+      "required": "Для продолжения примите условия."
+    }
   },
   "regions": {
     "tashkent_city": "город Ташкент",
@@ -137,6 +143,11 @@
       "title": "Введите адрес проживания",
       "subtitle": "Выберите регион и район, чтобы продолжить",
       "submit": "Сохранить и войти"
+    },
+    "consent": {
+      "prefix": "Входя, вы соглашаетесь с ",
+      "link": "Политикой конфиденциальности",
+      "suffix": ""
     }
   },
   "import": {

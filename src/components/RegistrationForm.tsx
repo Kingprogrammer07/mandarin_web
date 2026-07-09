@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUpload from './ImageUpload';
 import TranslatedFormMessage from './TranslatedFormMessage';
+import PrivacyPolicyModal, { PRIVACY_POLICY_VERSION } from './legal/PrivacyPolicyModal';
 import { DISTRICTS, formSchema, regions, type RegistrationFormData } from '@/lib/validation';
 
 interface RegistrationFormProps {
@@ -37,6 +38,10 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
+  // Explicit, required consent to the Privacy Policy + User Agreement before the
+  // account (with passport/KYC data) is created.
+  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+  const [showPolicy, setShowPolicy] = useState(false);
 
   useEffect(() => {
     if (sessionStorage.getItem('access_token') && onNavigateToLogin) {
@@ -89,6 +94,12 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
   );
 
   const onSubmit = async (data: RegistrationFormData) => {
+    if (!agreedToPolicy) {
+      setSubmitStatus('error');
+      setSubmitMessage(t('form.consent.required', "Davom etish uchun shartlarga rozilik bering."));
+      setTimeout(() => setSubmitStatus('idle'), 2500);
+      return;
+    }
     setSubmitStatus('loading');
     setSubmitMessage(t('form.messages.loading'));
     try {
@@ -106,6 +117,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
         date_of_birth: format(data.dateOfBirth, 'yyyy-MM-dd'),
         telegram_id: telegramData.user.id,
         passport_images: data.passportImages,
+        privacy_policy_version: PRIVACY_POLICY_VERSION,
       };
 
       const response = await registerApi(registerData);
@@ -509,37 +521,80 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
               )}
 
               {currentStep === 3 && (
-                <FormField control={form.control} name="passportImages" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className={labelClass}>{t('form.passportImages')}</FormLabel>
-                    <div className="space-y-3">
-                      <ImageUpload
-                        label={t('form.passportImagesFront')}
-                        value={frontImage}
-                        variant="compact"
-                        onChange={(file) => {
-                          setFrontImage(file);
-                          field.onChange([file, backImage].filter((item): item is File => item !== null));
+                <>
+                  <FormField control={form.control} name="passportImages" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={labelClass}>{t('form.passportImages')}</FormLabel>
+                      <div className="space-y-3">
+                        <ImageUpload
+                          label={t('form.passportImagesFront')}
+                          value={frontImage}
+                          variant="compact"
+                          onChange={(file) => {
+                            setFrontImage(file);
+                            field.onChange([file, backImage].filter((item): item is File => item !== null));
+                          }}
+                          error={
+                            form.formState.errors.passportImages?.message
+                              ? t(form.formState.errors.passportImages.message)
+                              : undefined
+                          }
+                        />
+                        <ImageUpload
+                          label={t('form.passportImagesBack')}
+                          value={backImage}
+                          variant="compact"
+                          onChange={(file) => {
+                            setBackImage(file);
+                            field.onChange([frontImage, file].filter((item): item is File => item !== null));
+                          }}
+                        />
+                      </div>
+                      <TranslatedFormMessage />
+                    </FormItem>
+                  )} />
+
+                  {/* Required consent — Privacy Policy + User Agreement */}
+                  <button
+                    type="button"
+                    onClick={() => setAgreedToPolicy((v) => !v)}
+                    className="flex w-full items-start gap-2.5 rounded-[16px] border border-gray-900/[0.07] bg-white/60 p-3 text-left dark:border-white/[0.09] dark:bg-white/[0.03]"
+                  >
+                    <span
+                      className={[
+                        'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-[7px] border-2 transition-colors',
+                        agreedToPolicy
+                          ? 'border-orange-500 bg-orange-500 text-white'
+                          : 'border-gray-300 dark:border-white/25',
+                      ].join(' ')}
+                    >
+                      {agreedToPolicy && (
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.3 3.3 6.8-6.8a1 1 0 011.4 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="text-[12px] font-bold leading-snug text-gray-700 dark:text-[#fff8ed]/78">
+                      {t('form.consent.prefix', 'Men ')}
+                      <span
+                        role="link"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowPolicy(true);
                         }}
-                        error={
-                          form.formState.errors.passportImages?.message
-                            ? t(form.formState.errors.passportImages.message)
-                            : undefined
-                        }
-                      />
-                      <ImageUpload
-                        label={t('form.passportImagesBack')}
-                        value={backImage}
-                        variant="compact"
-                        onChange={(file) => {
-                          setBackImage(file);
-                          field.onChange([frontImage, file].filter((item): item is File => item !== null));
-                        }}
-                      />
-                    </div>
-                    <TranslatedFormMessage />
-                  </FormItem>
-                )} />
+                        className="cursor-pointer font-black text-orange-600 underline decoration-orange-400/50 underline-offset-2 dark:text-amber-300"
+                      >
+                        {t('form.consent.link', 'Maxfiylik siyosati va Foydalanuvchi kelishuvi')}
+                      </span>
+                      {t('form.consent.suffix', 'ga roziman')}
+                    </span>
+                  </button>
+                </>
               )}
 
               <div className="grid grid-cols-2 gap-3 pt-2">
@@ -574,7 +629,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                 ) : (
                   <Button
                     type="submit"
-                    disabled={submitStatus === 'loading'}
+                    disabled={submitStatus === 'loading' || !agreedToPolicy}
                     className="h-13 rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[14px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.22)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t('form.submit')}
@@ -597,6 +652,8 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
           </div>
         </div>
       </div>
+
+      <PrivacyPolicyModal open={showPolicy} onClose={() => setShowPolicy(false)} />
     </>
   );
 }

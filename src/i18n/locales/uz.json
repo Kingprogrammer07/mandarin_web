@@ -88,7 +88,13 @@
     },
     "district": "Tuman / Shahar",
     "districtPlaceholder": "Tuman yoki shaharni tanlang",
-    "supportedFormats": "PNG · JPG · WEBP · HEIC"
+    "supportedFormats": "PNG · JPG · WEBP · HEIC",
+    "consent": {
+      "prefix": "Men ",
+      "link": "Maxfiylik siyosati va Foydalanuvchi kelishuvi",
+      "suffix": "ga roziman",
+      "required": "Davom etish uchun shartlarga rozilik bering."
+    }
   },
   "regions": {
     "tashkent_city": "Toshkent shahri",
@@ -137,6 +143,11 @@
       "title": "Yashash manzilingizni kiriting",
       "subtitle": "Davom etish uchun viloyat va tumaningizni belgilang",
       "submit": "Saqlash va kirish"
+    },
+    "consent": {
+      "prefix": "Kirish orqali siz ",
+      "link": "Maxfiylik siyosati",
+      "suffix": "ga rozilik bildirasiz"
     }
   },
   "import": {
