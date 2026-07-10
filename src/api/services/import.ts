@@ -7,25 +7,35 @@ export interface ImportResponse {
 }
 
 /**
- * O'zbekiston bazasiga Excel import qilish
+ * O'zbekiston bazasiga Excel import qilish.
+ * @param flightName Operator kiritgan reys nomi — barcha qatorlarga qo'llanadi.
  */
-export async function importUzDatabase(file: File): Promise<ImportResponse> {
+export async function importUzDatabase(
+  file: File,
+  flightName: string,
+): Promise<ImportResponse> {
   const formData = new FormData();
   formData.append('excel_file', file);
+  formData.append('flight_name', flightName);
 
   const response = await apiClientFormData.post<ImportResponse>(
-    '/api/v1/import/uz', 
+    '/api/v1/import/uz',
     formData
   );
   return response.data;
 }
 
 /**
- * Xitoy bazasiga Excel import qilish
+ * Xitoy bazasiga Excel import qilish.
+ * @param flightName Operator kiritgan reys nomi — barcha qatorlarga qo'llanadi.
  */
-export async function importChinaDatabase(file: File): Promise<ImportResponse> {
+export async function importChinaDatabase(
+  file: File,
+  flightName: string,
+): Promise<ImportResponse> {
   const formData = new FormData();
   formData.append('excel_file', file);
+  formData.append('flight_name', flightName);
 
   const response = await apiClientFormData.post<ImportResponse>(
     '/api/v1/import/china',
@@ -39,11 +49,12 @@ export async function importChinaDatabase(file: File): Promise<ImportResponse> {
  */
 export async function importExcel(
   file: File,
-  databaseType: 'uz' | 'china'
+  databaseType: 'uz' | 'china',
+  flightName: string,
 ): Promise<ImportResponse> {
   if (databaseType === 'uz') {
-    return importUzDatabase(file);
+    return importUzDatabase(file, flightName);
   } else {
-    return importChinaDatabase(file);
+    return importChinaDatabase(file, flightName);
   }
 }

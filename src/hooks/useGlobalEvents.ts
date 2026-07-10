@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '@/config/config';
-import { useMaintenanceStore } from '@/store/useMaintenanceStore';
 
 /**
  * Single app-wide SSE connection that replaces per-resource HTTP polling.
@@ -57,15 +56,16 @@ function dispatchEvent(evt: AppEvent, qc: QueryClient): void {
       break;
 
     case 'maintenance.toggled': {
-      const value = evt.value === true;
-      // Drive the maintenance overlay directly; also refresh the admin
-      // settings page query if mounted.
-      const store = useMaintenanceStore.getState();
-      if (value) {
-        store.triggerMaintenance();
-      } else {
-        store.clearMaintenance();
-      }
+      // Admin-toggled maintenance is a SEPARATE mechanism from the server-down
+      // detector. It is driven entirely by the `maintenance-status` query
+      // (see useMaintenanceWatcher → MaintenanceOverlay / admin banner), which
+      // we refetch here so every client reacts in real time.
+      //
+      // We deliberately do NOT touch `useMaintenanceStore`: that store is
+      // exclusively the transient "backend unreachable" signal set by the axios
+      // interceptor (client.ts) and rendered as the full-screen MaintenancePage
+      // ("Texnik ishlar ketmoqda"). Flipping it here made that server-down page
+      // wrongly cover the app whenever an admin merely enabled maintenance.
       qc.invalidateQueries({ queryKey: ['maintenance-status'], refetchType: 'active' });
       qc.invalidateQueries({ queryKey: ['system-maintenance'], refetchType: 'active' });
       break;

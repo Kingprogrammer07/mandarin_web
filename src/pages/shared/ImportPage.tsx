@@ -26,6 +26,7 @@ export default function ImportPage() {
 
   // Import tab state
   const [activeDbTab, setActiveDbTab] = useState<DatabaseType>('china');
+  const [flightName, setFlightName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -94,10 +95,15 @@ export default function ImportPage() {
       setSubmitMessage(t('import.messages.invalidFile'));
       return;
     }
+    if (!flightName.trim()) {
+      setSubmitStatus('error');
+      setSubmitMessage(t('import.messages.flightRequired'));
+      return;
+    }
     setSubmitStatus('loading');
     setSubmitMessage(t('import.messages.loading'));
     try {
-      const response = await importExcel(selectedFile, activeDbTab);
+      const response = await importExcel(selectedFile, activeDbTab, flightName.trim());
       setSubmitStatus('success');
       setSubmitMessage(response.message || t('import.messages.success'));
       setSelectedFile(null);
@@ -260,6 +266,23 @@ export default function ImportPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+                {/* Flight name — stamped on every imported row (sheet names ignored). */}
+                <div className="space-y-2">
+                  <label htmlFor="import-flight-name" className="block text-sm font-semibold text-gray-700">
+                    {t('import.flightNameLabel')}
+                    <span className="text-orange-500"> *</span>
+                  </label>
+                  <input
+                    id="import-flight-name"
+                    type="text"
+                    value={flightName}
+                    onChange={(e) => setFlightName(e.target.value)}
+                    placeholder={t('import.flightNamePlaceholder')}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 font-medium outline-none transition-all focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 placeholder:text-gray-400"
+                    autoComplete="off"
+                  />
+                </div>
+
                 <div
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -309,7 +332,7 @@ export default function ImportPage() {
 
                 <Button
                   type="submit"
-                  disabled={!selectedFile || submitStatus === 'loading'}
+                  disabled={!selectedFile || !flightName.trim() || submitStatus === 'loading'}
                   className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-6 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {t('import.submit')}

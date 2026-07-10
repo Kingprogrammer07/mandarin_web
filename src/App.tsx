@@ -766,7 +766,16 @@ function AppContent() {
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  // Operational staff consoles — POS cashier, warehouse scanner, expected-cargo
+  // scanner. Staff work here continuously and must NEVER be interrupted by either
+  // maintenance mechanism: the admin-toggled server flag (`isMaintenance`) OR the
+  // transient server-down signal (502/503/504/network) that flips the store-driven
+  // `isMaintenanceMode`. Resolved from `currentPage` state (reliable) rather than
+  // window.pathname, which can lag behind in the custom history router.
+  const isOperationalConsole = isPOSPage || isWarehousePage || isExpectedCargoPage;
+
   const isExemptFromMaintenance =
+    isOperationalConsole ||
     window.location.pathname.startsWith('/admin') ||
     window.location.pathname === '/pos' ||
     window.location.pathname.startsWith('/flights') ||
@@ -778,17 +787,17 @@ function AppContent() {
   const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && !isExemptFromMaintenance;
   const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && !isExemptFromMaintenance;
 
-  // Operational consoles (POS cashier, warehouse) must keep working when a
-  // transient server-down signal (502/503/504/network) flips the store-driven
-  // `isMaintenanceMode`. Suppress the full-screen MaintenancePage on these pages
-  // so a brief backend blip never blocks a cashier mid-transaction. The page is
-  // resolved from `currentPage` state (reliable) rather than window.pathname.
-  const isServerDownMaintenanceExemptPage = isPOSPage || isWarehousePage;
+  // The store-driven full-screen MaintenancePage ("Texnik ishlar ketmoqda") is
+  // likewise suppressed on operational consoles so a brief backend blip never
+  // covers a cashier/warehouse operator mid-task. `client.ts` already prevents
+  // the store from being flipped on these routes; this is the second layer that
+  // also covers the case where the store was flipped on another page first.
+  const isServerDownMaintenanceExemptPage = isOperationalConsole;
 
   if (showMaintenanceOverlay) {
     return (
       <>
-        {isMaintenanceMode && <MaintenancePage />}
+        {isMaintenanceMode && !isServerDownMaintenanceExemptPage && <MaintenancePage />}
         <MaintenanceOverlay />
         <Toaster position="top-center" richColors />
       </>

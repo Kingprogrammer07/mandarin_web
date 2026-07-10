@@ -7,11 +7,31 @@ import { useMaintenanceStore } from '@/store/useMaintenanceStore';
 // Status codes that reliably mean the backend is down (gateway / proxy errors).
 const SERVER_DOWN_STATUSES = new Set([502, 503, 504]);
 
+// Operational staff consoles — POS cashier, warehouse scanner, expected-cargo
+// scanner. These pages poll continuously, so a stray 502/503/504 or network
+// blip is expected and must NEVER flip the store-driven full-screen
+// MaintenancePage ("Texnik ishlar ketmoqda") that would cover an operator
+// mid-task. We suppress the trigger at the source here so the store is never
+// even polluted; the admin-toggled maintenance flag is separately exempted for
+// the same routes in App.tsx (`isOperationalConsole`).
+const MAINTENANCE_EXEMPT_PATH_PREFIXES = ['/pos', '/admin/warehouse', '/admin/expected-cargo'];
+
+function isOnMaintenanceExemptPage(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return MAINTENANCE_EXEMPT_PATH_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
 function triggerMaintenanceIfServerDown(
   status: number | undefined,
   isNetworkDown: boolean,
   endpointUrl: string,
 ): void {
+  // Operational consoles are never maintenance-gated — see the constant above.
+  if (isOnMaintenanceExemptPage()) return;
+
   // Never trigger for silent auth-warmup endpoints — those fail transiently
   // during Android WebView cold-start and would produce false positives.
   const isSilent =

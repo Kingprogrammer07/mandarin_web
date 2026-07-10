@@ -162,8 +162,11 @@
       "loading": "Fayl yuklanmoqda...",
       "success": "Fayl muvaffaqiyatli import qilindi!",
       "error": "Import qilishda xatolik yuz berdi",
-      "invalidFile": "Faqat .xlsx formatdagi fayllar qabul qilinadi"
-    }
+      "invalidFile": "Faqat .xlsx formatdagi fayllar qabul qilinadi",
+      "flightRequired": "Reys nomini kiriting"
+    },
+    "flightNameLabel": "Reys nomi",
+    "flightNamePlaceholder": "Masalan: M240"
   },
   "client": {
     "addTitle": "Mijoz qo'shish",
