@@ -197,7 +197,7 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                             {t('tracking.resultLabel')}
                         </p>
                         <h3 className="truncate font-mono text-2xl font-black tracking-normal text-gray-950 dark:text-white">
-                            {item.track_code}
+                            {item.track_code_2 || item.track_code}
                         </h3>
                         <div className="flex flex-wrap items-center gap-2">
                             <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass}`}>

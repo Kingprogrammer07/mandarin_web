@@ -62,6 +62,8 @@ export interface CargoUpdateResponse {
 export interface CargoItemResponse {
   id: number;
   track_code: string;
+  /** Corrected/alternate code (Excel column C). Display this if present — same parcel. */
+  track_code_2?: string | null;
   flight_name?: string;
   client_id?: string;
 

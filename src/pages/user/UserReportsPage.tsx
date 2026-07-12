@@ -350,14 +350,14 @@ const ReportHistoryItem = memo(({ report, onTrackClick, onImageClick }: ReportHi
                         {visibleCargoItems.map((item, i) => (
                             <button
                                 key={i}
-                                onClick={() => onTrackClick(item.track_code)}
+                                onClick={() => onTrackClick(item.track_code_2 || item.track_code)}
                                 className="w-full bg-gray-50 dark:bg-black/20 rounded-2xl p-3 text-left active:scale-[0.99] hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-all"
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0 flex items-center gap-2">
                                         <Tag className="w-3.5 h-3.5 text-orange-500" />
                                         <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
-                                            {item.track_code}
+                                            {item.track_code_2 || item.track_code}
                                         </span>
                                     </div>
                                     <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">

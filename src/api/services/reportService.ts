@@ -2,6 +2,8 @@ import { apiClient } from '../client';
 
 export interface CargoItemDetail {
     track_code: string;
+    /** Corrected/alternate code (Excel column C). Display this if present — same parcel. */
+    track_code_2?: string | null;
     weight_kg: number;
     price_per_kg: number;
     total_payment: number;
