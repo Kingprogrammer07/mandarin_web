@@ -17,6 +17,12 @@ export interface UpdateTrackingRequest {
   step_4_status?: string | null;
 }
 
+export interface DeleteFlightCargoItemsResponse {
+  flight_name: string;
+  deleted_count: number;
+  message: string;
+}
+
 /**
  * Oxirgi 20 ta reysning tracking statuslarini olish
  */
@@ -35,6 +41,18 @@ export async function updateFlightTrackingSteps(
   const response = await apiClient.put<FlightTrackingStatus>(
     `/api/v1/admin/flights/${encodeURIComponent(flightName)}/steps`,
     data,
+  );
+  return response.data;
+}
+
+/**
+ * Reysga tegishli barcha cargo_items qatorlarini o'chirish
+ */
+export async function deleteFlightCargoItems(
+  flightName: string,
+): Promise<DeleteFlightCargoItemsResponse> {
+  const response = await apiClient.delete<DeleteFlightCargoItemsResponse>(
+    `/api/v1/admin/flights/${encodeURIComponent(flightName)}/cargo-items`,
   );
   return response.data;
 }

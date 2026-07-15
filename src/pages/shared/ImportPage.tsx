@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, FileSpreadsheet, Database, RefreshCw, Plane, Save, CheckCircle2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Database, RefreshCw, Plane, Save, CheckCircle2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import StatusAnimation from '@/components/StatusAnimation';
 import { importExcel } from '@/api/services/import';
 import {
+  deleteFlightCargoItems,
   getFlightTrackingStatuses,
   updateFlightTrackingSteps,
   type FlightTrackingStatus,
   type UpdateTrackingRequest,
 } from '@/api/services/tracking';
+import { useConfirm } from '@/hooks/useConfirm';
 
 type DatabaseType = 'uz' | 'china';
 type MainTab = 'import' | 'tracking';
@@ -36,7 +39,9 @@ export default function ImportPage() {
   const [flights, setFlights] = useState<FlightTrackingStatus[]>([]);
   const [loadingFlights, setLoadingFlights] = useState(false);
   const [savingFlight, setSavingFlight] = useState<string | null>(null);
+  const [deletingFlight, setDeletingFlight] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<FlightTrackingStatus>>>({});
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const fetchFlights = useCallback(async () => {
     setLoadingFlights(true);
@@ -187,8 +192,36 @@ export default function ImportPage() {
     }
   };
 
+  const handleDeleteFlight = async (flight: FlightTrackingStatus) => {
+    const confirmed = await confirm({
+      message: `"${flight.flight_name}" reysi cargo_items bazasidan o'chirilsinmi?`,
+      description: "Bu reys bo'yicha import qilingan barcha track kodlar o'chiriladi. Amalni ortga qaytarib bo'lmaydi.",
+      confirmLabel: "O'chirish",
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    setDeletingFlight(flight.flight_name);
+    try {
+      const result = await deleteFlightCargoItems(flight.flight_name);
+      setFlights((prev) => prev.filter((item) => item.flight_name !== flight.flight_name));
+      setPendingChanges((prev) => {
+        const next = { ...prev };
+        delete next[flight.flight_name];
+        return next;
+      });
+      toast.success(`${result.deleted_count} ta cargo_items qatori o'chirildi`);
+    } catch (err) {
+      console.error('Failed to delete flight cargo items:', err);
+      toast.error("Reysni o'chirishda xatolik yuz berdi");
+    } finally {
+      setDeletingFlight(null);
+    }
+  };
+
   return (
     <>
+      <ConfirmDialog />
       {submitStatus !== 'idle' && (
         <StatusAnimation status={submitStatus} message={submitMessage} onComplete={handleAnimationComplete} />
       )}
@@ -370,7 +403,7 @@ export default function ImportPage() {
                         <th className="px-4 py-3 text-center">2-step (Yo'lda)</th>
                         <th className="px-4 py-3 text-center">3-step (Bojxona)</th>
                         <th className="px-4 py-3 text-center">4-step (Saralash)</th>
-                        <th className="px-4 py-3 text-center"></th>
+                        <th className="px-4 py-3 text-center">Amallar</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -405,7 +438,8 @@ export default function ImportPage() {
                                 </select>
                               </td>
                             ))}
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleSaveFlight(flight)}
@@ -425,6 +459,21 @@ export default function ImportPage() {
                                 )}
                                 {savingFlight === flight.flight_name ? 'Saqlanmoqda...' : changed ? 'Saqlash' : 'Saqlangan'}
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFlight(flight)}
+                                disabled={deletingFlight === flight.flight_name || savingFlight === flight.flight_name}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                title="cargo_items dan o'chirish"
+                              >
+                                {deletingFlight === flight.flight_name ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3" />
+                                )}
+                                {deletingFlight === flight.flight_name ? "O'chirilmoqda..." : "O'chirish"}
+                              </button>
+                              </div>
                             </td>
                           </tr>
                         );
