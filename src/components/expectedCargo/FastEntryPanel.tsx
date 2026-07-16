@@ -787,13 +787,43 @@ export function FastEntryPanel({
   ]);
 
   const firstDraftRowId = draftRows[0]?.id;
+  const focusBarcodeInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (!firstDraftRowId) return;
+      draftInputRefs.current.get(firstDraftRowId)?.focus({ preventScroll: true });
+    });
+  }, [firstDraftRowId]);
+
+  useEffect(() => {
+    const handleDocumentButtonClick = (event: globalThis.MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('button')) return;
+
+      // Let dialogs, menus, and intentionally focused form controls keep focus.
+      requestAnimationFrame(() => {
+        const activeElement = document.activeElement;
+        const isFormControl =
+          activeElement instanceof HTMLInputElement
+          || activeElement instanceof HTMLTextAreaElement
+          || activeElement instanceof HTMLSelectElement;
+        const isOverlayControl = activeElement?.closest(
+          '[role="dialog"], [role="menu"], [role="listbox"]',
+        );
+        if (isFormControl || isOverlayControl) return;
+        focusBarcodeInput();
+      });
+    };
+
+    document.addEventListener('click', handleDocumentButtonClick);
+    return () => document.removeEventListener('click', handleDocumentButtonClick);
+  }, [focusBarcodeInput]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      const firstDraftInput = firstDraftRowId ? draftInputRefs.current.get(firstDraftRowId) : null;
-      (firstDraftInput ?? trackInputRef.current)?.focus();
+      focusBarcodeInput();
     }, 80);
     return () => clearTimeout(timer);
-  }, [firstDraftRowId]);
+  }, [focusBarcodeInput]);
 
   // ── Parse textarea lines ──────────────────────────────────────────────────
 

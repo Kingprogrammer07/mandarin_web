@@ -96,10 +96,10 @@ function SummaryControls({
           value={sort}
           onChange={(event) => onSortChange(event.target.value as ClientSummarySort)}
           className="h-8 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 text-[11px] font-medium text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-orange-400"
-          title="Trek kod soni bo'yicha saralash"
+          title="Saqlangan ma'lumotlarni saralash"
         >
-          <option value="created_desc">Saqlangan tartibi: yangidan</option>
-          <option value="created_asc">Saqlangan tartibi: eskidan</option>
+          <option value="created_desc">Saqlangan tartib: oxirgi skan tepada</option>
+          <option value="created_asc">Saqlangan tartib: birinchi skan tepada</option>
           <option value="track_count_desc">Trek soni: ko'pdan kamga</option>
           <option value="track_count_asc">Trek soni: kamdan ko'pga</option>
           <option value="client_code_asc">Mijoz kodi: A-Z</option>
