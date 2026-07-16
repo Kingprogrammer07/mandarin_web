@@ -411,6 +411,22 @@ const StepFlightSelection = memo(
 // STEP 3A — Standard Confirmation (Yandex/Mandarin/BTS)
 // ============================================
 
+// Native Telegram confirm dialog when available, else the browser confirm.
+function askConfirm(message: string): Promise<boolean> {
+  const tg = (
+    window as unknown as {
+      Telegram?: {
+        WebApp?: { showConfirm?: (m: string, cb: (ok: boolean) => void) => void };
+      };
+    }
+  ).Telegram?.WebApp;
+  if (tg?.showConfirm) {
+    return new Promise<boolean>((resolve) => tg.showConfirm!(message, (ok) => resolve(ok)));
+  }
+  return Promise.resolve(window.confirm(message));
+}
+
+
 interface StepStandardProps {
   deliveryType: DeliveryType;
   selectedFlights: string[];
@@ -424,6 +440,8 @@ interface StepStandardProps {
   mapLocation: { latitude: number; longitude: number } | null;
   onMapConfirm: (location: { latitude: number; longitude: number }) => void;
   onMapClear: () => void;
+  includeAddress: boolean;
+  onIncludeAddressChange: (value: boolean) => void;
 }
 
 const StepStandardConfirm = memo(
@@ -440,6 +458,8 @@ const StepStandardConfirm = memo(
     mapLocation,
     onMapConfirm,
     onMapClear,
+    includeAddress,
+    onIncludeAddressChange,
   }: StepStandardProps) => {
     const { t } = useTranslation();
     const typeLabel = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.label ?? deliveryType;
@@ -469,6 +489,37 @@ const StepStandardConfirm = memo(
             {t('deliveryRequest.steps.confirm.phoneHint')}
           </p>
         </div>
+
+        {/* Optional: include the client's residential address in the admin note.
+            Off by default so home addresses aren't shared unless the user wants. */}
+        <button
+          type="button"
+          onClick={() => onIncludeAddressChange(!includeAddress)}
+          className="w-full flex items-center justify-between gap-3 rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md text-left"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+                {t('deliveryRequest.steps.confirm.includeAddressLabel')}
+              </span>
+              <span className="block text-[11px] text-gray-400 dark:text-gray-500">
+                {t('deliveryRequest.steps.confirm.includeAddressHint')}
+              </span>
+            </span>
+          </span>
+          <span
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+              includeAddress ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/20'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${
+                includeAddress ? 'left-[22px]' : 'left-0.5'
+              }`}
+            />
+          </span>
+        </button>
 
         {/* Caption / Courier Note */}
         <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
@@ -1462,6 +1513,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
   const [standardPhone, setStandardPhone] = useState('');
   const [standardCaption, setStandardCaption] = useState('');
   const [standardMapLocation, setStandardMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [includeAddress, setIncludeAddress] = useState(false);
 
   // UzPost phone state
   const [uzpostPhone, setUzpostPhone] = useState('');
@@ -1631,6 +1683,11 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
       toast.error(t('deliveryRequest.toast.captionRequired'));
       return;
     }
+    // When opting to share the home address, confirm the intent explicitly.
+    if (includeAddress) {
+      const ok = await askConfirm(t('deliveryRequest.confirmSendAddress'));
+      if (!ok) return;
+    }
     setSubmitting(true);
     try {
       const phoneToSend = standardPhone.trim() || null;
@@ -1640,7 +1697,8 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
         phoneToSend,
         standardCaption.trim(),
         standardMapLocation?.latitude ?? 0,
-        standardMapLocation?.longitude ?? 0
+        standardMapLocation?.longitude ?? 0,
+        includeAddress
       );
       setCurrentStep(4);
     } catch (err: unknown) {
@@ -1660,7 +1718,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
     } finally {
       setSubmitting(false);
     }
-  }, [deliveryType, selectedFlights, standardPhone, standardCaption, standardMapLocation, t, refetchProfile]);
+  }, [deliveryType, selectedFlights, standardPhone, standardCaption, standardMapLocation, includeAddress, t, refetchProfile]);
 
   const handleUzpostSubmit = useCallback(
     async (walletUsed: number, file: File | null, phoneNumber: string) => {
@@ -1927,6 +1985,8 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
           mapLocation={standardMapLocation}
           onMapConfirm={setStandardMapLocation}
           onMapClear={() => setStandardMapLocation(null)}
+          includeAddress={includeAddress}
+          onIncludeAddressChange={setIncludeAddress}
         />
       )}
 

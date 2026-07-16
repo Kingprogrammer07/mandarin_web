@@ -106,7 +106,8 @@ export async function submitStandardDelivery(
   phoneNumber: string | null,
   caption: string,
   latitude: number,
-  longitude: number
+  longitude: number,
+  includeAddress: boolean = false
 ): Promise<DeliverySuccessResponse> {
   const response = await apiClient.post<DeliverySuccessResponse>(
     '/api/user/delivery/request/standard',
@@ -117,7 +118,43 @@ export async function submitStandardDelivery(
       caption,
       latitude,
       longitude,
+      include_address: includeAddress,
     }
+  );
+  return response.data;
+}
+
+/** Fields a client may edit on a PENDING delivery request. */
+export interface EditDeliveryRequestBody {
+  phone_number?: string | null;
+  caption?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  include_address?: boolean | null;
+}
+
+/**
+ * Cancel the caller's own PENDING delivery request.
+ */
+export async function cancelDeliveryRequest(
+  requestId: number
+): Promise<DeliverySuccessResponse> {
+  const response = await apiClient.post<DeliverySuccessResponse>(
+    `/api/user/delivery/${requestId}/cancel`
+  );
+  return response.data;
+}
+
+/**
+ * Edit the caller's own PENDING delivery request (partial update).
+ */
+export async function editDeliveryRequest(
+  requestId: number,
+  body: EditDeliveryRequestBody
+): Promise<DeliverySuccessResponse> {
+  const response = await apiClient.patch<DeliverySuccessResponse>(
+    `/api/user/delivery/${requestId}`,
+    body
   );
   return response.data;
 }

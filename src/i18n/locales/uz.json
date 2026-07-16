@@ -1278,7 +1278,9 @@
         "captionLabel": "Kuryer uchun izoh",
         "captionPlaceholder": "Manzilingiz haqida to'liq ma'lumotni yozing (kirish kodi, qavat, orientir)",
         "captionHint": "Bu izoh kuryerga yuboriladi. Iltimos, manzilingizni aniq yozing.",
-        "mapLabel": "Joylashuvni xaritadan tanlash"
+        "mapLabel": "Joylashuvni xaritadan tanlash",
+        "includeAddressLabel": "Yashash manzilimni qo'shish",
+        "includeAddressHint": "Yoqilsa, uy manzilingiz operatorlarga ko'rsatiladi"
       },
       "uzpost": {
         "calcTitle": "Hisob-kitob",
@@ -1355,7 +1357,8 @@
       "savedSuggestionHint": "Oxirgi zayavkangizda shu joylashuv ishlatilgan.",
       "useSavedLocation": "Shu manzilni tanlash",
       "chooseOtherLocation": "Boshqa manzil"
-    }
+    },
+    "confirmSendAddress": "Rostan ham yashash manzilingizni yubormoqchimisiz?"
   },
   "deliveryHistory": {
     "title": "Zayavkalar tarixi",
@@ -1384,7 +1387,17 @@
       "uzpostLabel": "UzPost cheki (PDF yorlig'i)",
       "viewPaymentReceipt": "To'lov chekini ko'rish",
       "paymentReceiptAlt": "To'lov cheki",
-      "currencyUzs": "so'm"
+      "currencyUzs": "so'm",
+      "cancelConfirm": "Zayavkani bekor qilmoqchimisiz?",
+      "cancelled": "Zayavka bekor qilindi",
+      "edited": "Zayavka yangilandi",
+      "actionError": "Amalni bajarib bo'lmadi",
+      "edit": "Tahrirlash",
+      "cancel": "Bekor qilish",
+      "save": "Saqlash",
+      "cancelEdit": "Yopish",
+      "editPhonePlaceholder": "Telefon raqami",
+      "editCaptionPlaceholder": "Izoh (manzil, qavat, ko'rsatma)"
     },
     "loadingMore": "Yuklanmoqda...",
     "loadMore": "Yana yuklash",

@@ -1278,7 +1278,9 @@
         "captionLabel": "Комментарий для курьера",
         "captionPlaceholder": "Напишите полную информацию об адресе (код подъезда, этаж, ориентир)",
         "captionHint": "Этот комментарий отправится курьеру. Пожалуйста, укажите адрес точно.",
-        "mapLabel": "Выбрать местоположение на карте"
+        "mapLabel": "Выбрать местоположение на карте",
+        "includeAddressLabel": "Добавить мой адрес проживания",
+        "includeAddressHint": "Если включено, ваш домашний адрес увидят операторы"
       },
       "uzpost": {
         "calcTitle": "Расчёт",
@@ -1355,7 +1357,8 @@
       "savedSuggestionHint": "Это местоположение использовалось в последней заявке.",
       "useSavedLocation": "Использовать этот адрес",
       "chooseOtherLocation": "Другой адрес"
-    }
+    },
+    "confirmSendAddress": "Вы действительно хотите отправить свой адрес проживания?"
   },
   "deliveryHistory": {
     "title": "История заявок",
@@ -1384,7 +1387,17 @@
       "uzpostLabel": "Чек UzPost (PDF-ярлык)",
       "viewPaymentReceipt": "Посмотреть чек оплаты",
       "paymentReceiptAlt": "Чек оплаты",
-      "currencyUzs": "сум"
+      "currencyUzs": "сум",
+      "cancelConfirm": "Отменить заявку?",
+      "cancelled": "Заявка отменена",
+      "edited": "Заявка обновлена",
+      "actionError": "Не удалось выполнить действие",
+      "edit": "Изменить",
+      "cancel": "Отменить",
+      "save": "Сохранить",
+      "cancelEdit": "Закрыть",
+      "editPhonePlaceholder": "Номер телефона",
+      "editCaptionPlaceholder": "Комментарий (адрес, этаж, инструкции)"
     },
     "loadingMore": "Загрузка...",
     "loadMore": "Загрузить ещё",

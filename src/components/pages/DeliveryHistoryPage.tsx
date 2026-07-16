@@ -16,12 +16,32 @@ import {
   CreditCard,
   Loader2,
   X,
+  Trash2,
+  Pencil,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   getDeliveryHistory,
+  cancelDeliveryRequest,
+  editDeliveryRequest,
   type DeliveryRequestHistoryItem,
 } from '@/api/services/deliveryService';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
+
+// Native Telegram confirm dialog when available, else the browser confirm.
+function askConfirm(message: string): Promise<boolean> {
+  const tg = (
+    window as unknown as {
+      Telegram?: {
+        WebApp?: { showConfirm?: (m: string, cb: (ok: boolean) => void) => void };
+      };
+    }
+  ).Telegram?.WebApp;
+  if (tg?.showConfirm) {
+    return new Promise<boolean>((resolve) => tg.showConfirm!(message, (ok) => resolve(ok)));
+  }
+  return Promise.resolve(window.confirm(message));
+}
 
 // ============================================
 // TYPES
@@ -144,8 +164,44 @@ const EmptyState = memo(() => {
 // REQUEST CARD
 // ============================================
 
-const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
+const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryItem; onChanged: () => void }) => {
   const { t, i18n } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editCaption, setEditCaption] = useState(item.caption ?? '');
+  const [editPhone, setEditPhone] = useState(item.phone ?? '');
+
+  const handleCancel = async () => {
+    const ok = await askConfirm(t('deliveryHistory.card.cancelConfirm'));
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await cancelDeliveryRequest(item.id);
+      toast.success(t('deliveryHistory.card.cancelled'));
+      onChanged();
+    } catch (e: unknown) {
+      toast.error((e as { message?: string })?.message || t('deliveryHistory.card.actionError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    setBusy(true);
+    try {
+      await editDeliveryRequest(item.id, {
+        caption: editCaption.trim() || null,
+        phone_number: editPhone.trim() || null,
+      });
+      toast.success(t('deliveryHistory.card.edited'));
+      setEditing(false);
+      onChanged();
+    } catch (e: unknown) {
+      toast.error((e as { message?: string })?.message || t('deliveryHistory.card.actionError'));
+    } finally {
+      setBusy(false);
+    }
+  };
   const numberLocale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
   // Our generated payment receipt — fetched on demand (auth-scoped blob) and
   // shown in a lightweight image overlay.
@@ -346,6 +402,67 @@ const RequestCard = memo(({ item }: { item: DeliveryRequestHistoryItem }) => {
         document.body,
       )}
 
+      {/* Pending: client can edit or cancel until an admin processes it */}
+      {item.status === 'pending' && (
+        <div className="mt-3">
+          {editing ? (
+            <div className="rounded-xl bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/10 p-3 space-y-2">
+              <input
+                type="tel"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder={t('deliveryHistory.card.editPhonePlaceholder')}
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] px-3 py-2 text-sm outline-none focus:border-amber-500"
+              />
+              <textarea
+                value={editCaption}
+                onChange={(e) => setEditCaption(e.target.value)}
+                placeholder={t('deliveryHistory.card.editCaptionPlaceholder')}
+                rows={2}
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] px-3 py-2 text-sm outline-none focus:border-amber-500 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleSaveEdit}
+                  className="flex-1 rounded-lg bg-amber-500 text-white text-sm font-bold py-2 disabled:opacity-60"
+                >
+                  {busy ? '…' : t('deliveryHistory.card.save')}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setEditing(false)}
+                  className="rounded-lg border border-gray-200 dark:border-white/10 text-sm font-semibold px-4 py-2"
+                >
+                  {t('deliveryHistory.card.cancelEdit')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setEditing(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-semibold py-2 text-gray-700 dark:text-gray-200 disabled:opacity-60"
+              >
+                <Pencil className="w-3.5 h-3.5" /> {t('deliveryHistory.card.edit')}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleCancel}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 dark:border-red-500/30 text-sm font-semibold py-2 text-red-600 dark:text-red-400 disabled:opacity-60"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> {t('deliveryHistory.card.cancel')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Admin comment for rejected */}
       {item.status === 'rejected' && item.admin_comment && (
         <div className="mt-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 flex items-start gap-2.5">
@@ -381,6 +498,7 @@ export default function DeliveryHistoryPage({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [reloadKey, setReloadKey] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -422,7 +540,7 @@ export default function DeliveryHistoryPage({ onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [page, t]);
+  }, [page, reloadKey, t]);
 
   return (
     <div className="pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -459,7 +577,14 @@ export default function DeliveryHistoryPage({ onBack }: Props) {
         <>
           <div className="space-y-3">
             {requests.map((item) => (
-              <RequestCard key={item.id} item={item} />
+              <RequestCard
+                key={item.id}
+                item={item}
+                onChanged={() => {
+                  setPage(1);
+                  setReloadKey((k) => k + 1);
+                }}
+              />
             ))}
           </div>
 
