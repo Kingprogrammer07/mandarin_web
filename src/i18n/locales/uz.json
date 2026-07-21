@@ -1783,6 +1783,9 @@
       "body": "Karta muvaffaqiyatli saqlandi. Endi kelgusi to'lovlarni qayta kirita olmasdan amalga oshirishingiz mumkin.",
       "homeButton": "Davom etish"
     },
+    "reauth": {
+      "confirm": "To'lov amalga oshmadi. Ko'pincha kartani uzib qayta ulash yordam beradi. Hozir qayta ulaysizmi? Bekor qilsangiz, keyinroq to'lashingiz mumkin."
+    },
     "payOnlineNbu": "Bank kartasi orqali to'lash",
     "error": {
       "400": "Mijoz kodi tayinlanmagan",

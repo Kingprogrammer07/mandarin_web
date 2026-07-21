@@ -52,6 +52,7 @@ import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
 import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 import { playApplePaySound } from '@/utils/audioUtils';
 import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
 import { useGuideTour } from '@/hooks/useGuideTour';
@@ -514,6 +515,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       setChargingCardId(null);
     },
     onError: (err: unknown) => {
+      // Dead/failing saved-card token (NBU 3008/5000) → offer the user "unbind +
+      // re-bind now" vs "pay later" instead of a dead-end toast.
+      if (isCardReauthError(err)) {
+        setChargingCardId(null);
+        setConfirmChargeCard(null);
+        void promptCardReauth(err);
+        return;
+      }
       const error = err as { status?: number; data?: { detail?: string | { message?: string } }; message?: string };
       const status = error?.status ?? 0;
       let msg: string;

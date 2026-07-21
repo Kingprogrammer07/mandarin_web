@@ -50,6 +50,7 @@ import {
   type SavedCardItem,
 } from '@/api/services/nbuPaymentService';
 import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 
 const UzpostBranchPicker = lazy(() =>
   import('@/components/delivery/UzpostBranchPicker').then((module) => ({
@@ -1854,6 +1855,12 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
           toast.error(res.error || "To'lov amalga oshmadi. Boshqa usulni sinab ko'ring.");
         }
       } catch (err: unknown) {
+        // Dead/failing saved-card token (NBU 3008/5000) → offer "unbind +
+        // re-bind now" vs "pay later" instead of a dead-end error.
+        if (isCardReauthError(err)) {
+          void promptCardReauth(err);
+          return;
+        }
         showUzpostApiError(err);
       } finally {
         setSubmitting(false);
