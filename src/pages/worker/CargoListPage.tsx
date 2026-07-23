@@ -11,6 +11,7 @@ import {
 import { useToast } from '@/hooks/useToast';
 import { useConfirm } from '@/hooks/useConfirm';
 import EditCargoModal from '@/components/EditCargoModal';
+import CargoComparisonModal from '@/components/CargoComparisonModal';
 import { offlineStorage, type FailedItem } from '@/utils/offlineStorage';
 import OfflineCargoManager from '@/components/OfflineCargoManager';
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
@@ -590,6 +591,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
   const canCreate = hasPerm('flights:create');
   const canUpdate = hasPerm('flights:update');
   const canDelete = hasPerm('flights:delete');
+  const canCompareCargo = hasPerm('expected_cargo:manage');
   const [photos, setPhotos] = useState<CargoPhoto[]>([]);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -602,6 +604,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingCargo, setEditingCargo] = useState<CargoPhoto | null>(null);
   const [showOfflineManager, setShowOfflineManager] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [failedItems, setFailedItems] = useState<FailedItem[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -617,6 +620,14 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
 
   const { toast, ToastRenderer } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
+
+  const handleComparisonError = useCallback((message: string) => {
+    toast({ title: 'Solishtirishda xatolik', description: message, variant: 'error' });
+  }, [toast]);
+
+  const handleComparisonSuccess = useCallback((message: string) => {
+    toast({ title: 'Muvaffaqiyatli', description: message, variant: 'success' });
+  }, [toast]);
 
   // Silently refresh the admin token on mount so permissions reflect
   // the latest role assignments without requiring a re-login.
@@ -876,6 +887,12 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {canCompareCargo && (
+                  <button onClick={() => setShowComparisonModal(true)}
+                    className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/15 border border-purple-200/60 dark:border-purple-500/20 active:scale-[0.98] rounded-xl transition-all">
+                    <ArrowUpDown className="w-3.5 h-3.5" />Solishtirish
+                  </button>
+                )}
                 <button onClick={handleExportExcel} disabled={isExporting}
                   className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/20 active:scale-[0.98] disabled:opacity-60 rounded-xl transition-all">
                   {isExporting
@@ -1044,6 +1061,14 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
       {editingCargo && (
         <EditCargoModal cargo={editingCargo} onClose={() => setEditingCargo(null)} onSuccess={handleEditSuccess} />
       )}
+
+      <CargoComparisonModal
+        open={showComparisonModal}
+        currentFlightName={flightName}
+        onClose={() => setShowComparisonModal(false)}
+        onError={handleComparisonError}
+        onSuccess={handleComparisonSuccess}
+      />
     </>
   );
 }

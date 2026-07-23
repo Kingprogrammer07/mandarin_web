@@ -207,6 +207,69 @@ export interface ResolveIndexResponse {
   synced_at: string;
 }
 
+export interface CargoItemFlightOption {
+  flight_name: string;
+  cargo_item_count: number;
+  last_created_at: string | null;
+}
+
+export interface CargoCompareOptionsResponse {
+  expected_flights: FlightListItem[];
+  cargo_item_flights: CargoItemFlightOption[];
+  suggested_expected_flight_name: string | null;
+}
+
+export interface CargoCompareRequest {
+  expected_flight_name: string;
+  cargo_item_flight_names: string[];
+  flight_cargo_flight_name: string;
+}
+
+export interface CargoCompareSummary {
+  expected_track_count: number;
+  expected_client_count: number;
+  cargo_item_row_count: number;
+  cargo_item_track_count: number;
+  flight_cargo_client_count: number;
+  track_mismatch_count: number;
+  client_mismatch_count: number;
+  client_mismatch_row_count: number;
+}
+
+export interface CargoCompareFilters {
+  expected_flight_name: string;
+  cargo_item_flight_names: string[];
+  flight_cargo_flight_name: string;
+}
+
+export interface CargoCompareItemRow {
+  cargo_item_id: number | null;
+  flight_name: string | null;
+  client_code: string | null;
+  item_name_cn: string | null;
+  item_name_ru: string | null;
+  quantity: string | null;
+  weight_kg: string | null;
+  box_number: string | null;
+  track_code: string | null;
+  track_code_2: string | null;
+  checkin_status: string | null;
+  created_at: string | null;
+  missing_codes: string[];
+}
+
+export interface CargoCompareClientMismatchRow extends CargoCompareItemRow {
+  flight_cargo_flight_name: string;
+  missing_client_code: string;
+}
+
+export interface CargoCompareResponse {
+  filters: CargoCompareFilters;
+  summary: CargoCompareSummary;
+  track_mismatches: CargoCompareItemRow[];
+  client_mismatches: CargoCompareClientMismatchRow[];
+}
+
 // ── Search params ──────────────────────────────────────────────────────────────
 
 export interface SearchExpectedCargoParams {
@@ -419,4 +482,51 @@ export async function getResolveIndex(flightName: string): Promise<ResolveIndexR
     params: { flight_name: flightName },
   });
   return response.data;
+}
+
+/** API 15a — Return flight options for the comparison modal. */
+export async function getCargoCompareOptions(
+  expectedFlightName?: string,
+): Promise<CargoCompareOptionsResponse> {
+  const response = await apiClient.get<CargoCompareOptionsResponse>(`${BASE}/compare/options`, {
+    params: {
+      cargo_flight_limit: 10,
+      ...(expectedFlightName ? { expected_flight_name: expectedFlightName } : {}),
+    },
+  });
+  return response.data;
+}
+
+/** API 15b — Compare selected expected-cargo and cargo-item flights. */
+export async function compareCargoManifests(
+  payload: CargoCompareRequest,
+): Promise<CargoCompareResponse> {
+  const response = await apiClient.post<CargoCompareResponse>(`${BASE}/compare`, payload);
+  return response.data;
+}
+
+function parseFilename(disposition: string | null): string | null {
+  if (!disposition) return null;
+  const match = /filename="?([^"]+)"?/i.exec(disposition);
+  return match?.[1] ?? null;
+}
+
+/** API 15c — Download comparison result as a two-sheet Excel workbook. */
+export async function exportCargoComparisonExcel(
+  payload: CargoCompareRequest,
+): Promise<void> {
+  const response = await apiClient.post<Blob>(`${BASE}/compare/export`, payload, {
+    responseType: 'blob',
+  });
+  const filename =
+    parseFilename(response.headers['content-disposition'] as string | null)
+    || `cargo_compare_${payload.expected_flight_name.replace(/\s/g, '_')}.xlsx`;
+  const blobUrl = URL.createObjectURL(new Blob([response.data]));
+  const anchor = document.createElement('a');
+  anchor.href = blobUrl;
+  anchor.setAttribute('download', filename);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(blobUrl);
 }
