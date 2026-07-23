@@ -42,12 +42,16 @@ interface CameraZoomCapability {
   step: number;
 }
 
-type CameraTrackCapabilities = MediaTrackCapabilities & {
+type CameraSupportedConstraints = MediaTrackSupportedConstraints & {
   torch?: boolean;
+};
+
+type CameraTrackCapabilities = Omit<MediaTrackCapabilities, 'torch' | 'zoom'> & {
+  torch?: boolean | boolean[];
   zoom?: CameraNumericCapability;
 };
 
-type CameraTrackSettings = MediaTrackSettings & {
+type CameraTrackSettings = Omit<MediaTrackSettings, 'torch' | 'zoom'> & {
   torch?: boolean;
   zoom?: number;
 };
@@ -55,6 +59,12 @@ type CameraTrackSettings = MediaTrackSettings & {
 type CameraConstraintSet = MediaTrackConstraintSet & {
   torch?: boolean;
   zoom?: number;
+};
+
+type CameraMediaTrackConstraints = MediaTrackConstraints & {
+  torch?: boolean;
+  zoom?: number;
+  advanced?: CameraConstraintSet[];
 };
 
 const normalizeZoomCapability = (
@@ -81,6 +91,24 @@ const clampZoom = (value: number, range: CameraZoomCapability): number => {
 
 const formatZoomValue = (value: number): string => {
   return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+};
+
+const isTorchCapabilityEnabled = (capabilities: CameraTrackCapabilities): boolean => {
+  const torch = capabilities.torch;
+  if (Array.isArray(torch)) return torch.includes(true);
+  return torch === true;
+};
+
+const canAttemptTorch = (capabilities: CameraTrackCapabilities): boolean => {
+  if (isTorchCapabilityEnabled(capabilities)) return true;
+  if (capabilities.torch === false) return false;
+
+  const supportedConstraints =
+    typeof navigator !== 'undefined' && navigator.mediaDevices?.getSupportedConstraints
+      ? (navigator.mediaDevices.getSupportedConstraints() as CameraSupportedConstraints)
+      : null;
+
+  return supportedConstraints?.torch === true;
 };
 
 // ─── Public API exposed via ref ───────────────────────────────────────
@@ -123,6 +151,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
     const [isTorchSupported, setIsTorchSupported] = useState(false);
     const [isTorchOn, setIsTorchOn] = useState(false);
     const [isTorchChanging, setIsTorchChanging] = useState(false);
+    const [cameraControlError, setCameraControlError] = useState<string | null>(null);
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
     // ─── Refs ──────────────────────────────────────────────────────────
@@ -205,6 +234,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
       setIsTorchSupported(false);
       setIsTorchOn(false);
       setIsTorchChanging(false);
+      setCameraControlError(null);
     }, []);
 
     const syncCameraControls = useCallback(
@@ -231,9 +261,10 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
           setZoomValue(1);
         }
 
-        setIsTorchSupported(capabilities.torch === true);
+        setIsTorchSupported(canAttemptTorch(capabilities));
         setIsTorchOn(Boolean(settings.torch));
         setIsTorchChanging(false);
+        setCameraControlError(null);
       },
       [resetCameraControls]
     );
@@ -324,6 +355,9 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
 
               if (video.videoWidth > 0 && video.videoHeight > 0) {
                 setIsCameraReady(true);
+                if (streamRef.current) {
+                  syncCameraControls(streamRef.current);
+                }
                 resolve(true);
                 return;
               }
@@ -387,6 +421,9 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
             if (!video || !streamRef.current || !mountedRef.current) return;
             if (video.videoWidth > 0 && video.videoHeight > 0) {
               setIsCameraReady(true);
+              if (streamRef.current) {
+                syncCameraControls(streamRef.current);
+              }
               return;
             }
             if (pollAttempts >= maxPollAttempts) {
@@ -428,19 +465,40 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         const track = getActiveVideoTrack();
         if (!track || !isTorchSupported) return false;
 
-        const advanced: CameraConstraintSet[] = [{ torch: enabled }];
+        const attempts: CameraMediaTrackConstraints[] = [
+          { advanced: [{ torch: enabled }] },
+          { torch: enabled },
+        ];
         setIsTorchChanging(true);
+        setCameraControlError(null);
 
         try {
-          await track.applyConstraints({ advanced });
-          if (mountedRef.current) {
-            setIsTorchOn(enabled);
+          let lastError: unknown = null;
+
+          for (const constraints of attempts) {
+            try {
+              await track.applyConstraints(constraints);
+              const settings = track.getSettings() as CameraTrackSettings;
+              if (mountedRef.current) {
+                setIsTorchOn(typeof settings.torch === 'boolean' ? settings.torch : enabled);
+              }
+              return true;
+            } catch (error) {
+              lastError = error;
+            }
           }
-          return true;
+
+          throw lastError;
         } catch (error) {
           console.warn('Torch toggle failed:', error);
-          if (mountedRef.current && enabled) {
-            setIsTorchOn(false);
+          if (mountedRef.current) {
+            const settings = track.getSettings() as CameraTrackSettings;
+            setIsTorchOn(Boolean(settings.torch));
+            setCameraControlError(
+              t('camera.flashError', {
+                defaultValue: "Chiroqni yoqib bo'lmadi. Browser yoki qurilma qo'llamasligi mumkin.",
+              })
+            );
           }
           return false;
         } finally {
@@ -449,7 +507,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
           }
         }
       },
-      [getActiveVideoTrack, isTorchSupported]
+      [getActiveVideoTrack, isTorchSupported, t]
     );
 
     const toggleTorch = useCallback(() => {
@@ -724,6 +782,12 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
                       {formatZoomValue(zoomValue)}x
                     </span>
                   </div>
+                </div>
+              )}
+
+              {isCameraReady && cameraControlError && (
+                <div className="absolute left-4 right-4 bottom-44 z-20 rounded-xl border border-yellow-300/30 bg-black/70 px-3 py-2 text-center text-xs font-semibold text-yellow-100 shadow-xl backdrop-blur-md">
+                  {cameraControlError}
                 </div>
               )}
             </div>
