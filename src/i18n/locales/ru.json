@@ -357,7 +357,11 @@
     "preparingCamera": "Подготовка камеры...",
     "changePhoto": "Изменить фото",
     "removePhoto": "Удалить фото",
-    "selectFromGallery": "Выбрать из галереи"
+    "selectFromGallery": "Выбрать из галереи",
+    "zoom": "Масштаб",
+    "flashOn": "Включить фонарик",
+    "flashOff": "Выключить фонарик",
+    "flashNotSupported": "Фонарик не поддерживается"
   },
   "stats": {
     "title": "Бизнес Аналитика",

@@ -357,7 +357,11 @@
     "preparingCamera": "Kamera tayyorlanmoqda...",
     "changePhoto": "Rasmni o'zgartirish",
     "removePhoto": "Rasmni o'chirish",
-    "selectFromGallery": "Galereyadan tanlang"
+    "selectFromGallery": "Galereyadan tanlang",
+    "zoom": "Zoom",
+    "flashOn": "Chiroqni yoqish",
+    "flashOff": "Chiroqni o'chirish",
+    "flashNotSupported": "Chiroq qo'llab-quvvatlanmaydi"
   },
   "stats": {
     "title": "Biznes Analitika",

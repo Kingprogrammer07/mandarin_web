@@ -1,5 +1,15 @@
 import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Camera, X, Upload, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Camera,
+  X,
+  Upload,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Flashlight,
+  FlashlightOff,
+  ZoomIn,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -17,6 +27,61 @@ const JPEG_QUALITY = 0.7;
 
 /** Hardware sync delay before requesting a new stream (ms) */
 const HARDWARE_SYNC_DELAY = 100;
+
+const DEFAULT_ZOOM_STEP = 0.1;
+
+interface CameraNumericCapability {
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+interface CameraZoomCapability {
+  min: number;
+  max: number;
+  step: number;
+}
+
+type CameraTrackCapabilities = MediaTrackCapabilities & {
+  torch?: boolean;
+  zoom?: CameraNumericCapability;
+};
+
+type CameraTrackSettings = MediaTrackSettings & {
+  torch?: boolean;
+  zoom?: number;
+};
+
+type CameraConstraintSet = MediaTrackConstraintSet & {
+  torch?: boolean;
+  zoom?: number;
+};
+
+const normalizeZoomCapability = (
+  range: CameraNumericCapability | undefined
+): CameraZoomCapability | null => {
+  if (!range) return null;
+
+  const min = typeof range.min === 'number' && Number.isFinite(range.min) ? range.min : 1;
+  const max = typeof range.max === 'number' && Number.isFinite(range.max) ? range.max : min;
+
+  if (max <= min) return null;
+
+  const step =
+    typeof range.step === 'number' && Number.isFinite(range.step) && range.step > 0
+      ? range.step
+      : DEFAULT_ZOOM_STEP;
+
+  return { min, max, step };
+};
+
+const clampZoom = (value: number, range: CameraZoomCapability): number => {
+  return Math.min(range.max, Math.max(range.min, value));
+};
+
+const formatZoomValue = (value: number): string => {
+  return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+};
 
 // ─── Public API exposed via ref ───────────────────────────────────────
 export interface MultiPhotoUploadHandle {
@@ -53,6 +118,11 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
     const [isCameraVisible, setIsCameraVisible] = useState(false);
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [isCapturing, setIsCapturing] = useState(false);
+    const [zoomCapability, setZoomCapability] = useState<CameraZoomCapability | null>(null);
+    const [zoomValue, setZoomValue] = useState(1);
+    const [isTorchSupported, setIsTorchSupported] = useState(false);
+    const [isTorchOn, setIsTorchOn] = useState(false);
+    const [isTorchChanging, setIsTorchChanging] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
     // ─── Refs ──────────────────────────────────────────────────────────
@@ -125,6 +195,49 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
       return streamRef.current.getTracks().some((t) => t.readyState === 'live');
     }, []);
 
+    const getActiveVideoTrack = useCallback((): MediaStreamTrack | null => {
+      return streamRef.current?.getVideoTracks().find((track) => track.readyState === 'live') ?? null;
+    }, []);
+
+    const resetCameraControls = useCallback(() => {
+      setZoomCapability(null);
+      setZoomValue(1);
+      setIsTorchSupported(false);
+      setIsTorchOn(false);
+      setIsTorchChanging(false);
+    }, []);
+
+    const syncCameraControls = useCallback(
+      (stream: MediaStream) => {
+        const track = stream.getVideoTracks().find((candidate) => candidate.readyState === 'live');
+
+        if (!track || typeof track.getCapabilities !== 'function') {
+          resetCameraControls();
+          return;
+        }
+
+        const capabilities = track.getCapabilities() as CameraTrackCapabilities;
+        const settings = track.getSettings() as CameraTrackSettings;
+        const nextZoomCapability = normalizeZoomCapability(capabilities.zoom);
+
+        setZoomCapability(nextZoomCapability);
+        if (nextZoomCapability) {
+          const nextZoom =
+            typeof settings.zoom === 'number' && Number.isFinite(settings.zoom)
+              ? clampZoom(settings.zoom, nextZoomCapability)
+              : nextZoomCapability.min;
+          setZoomValue(nextZoom);
+        } else {
+          setZoomValue(1);
+        }
+
+        setIsTorchSupported(capabilities.torch === true);
+        setIsTorchOn(Boolean(settings.torch));
+        setIsTorchChanging(false);
+      },
+      [resetCameraControls]
+    );
+
     const stopMediaStream = useCallback(() => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -134,7 +247,8 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         videoRef.current.srcObject = null;
       }
       setIsCameraReady(false);
-    }, []);
+      resetCameraControls();
+    }, [resetCameraControls]);
 
     // ─── Core stream initializer (reusable) ───────────────────────────
 
@@ -184,6 +298,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         }
 
         streamRef.current = stream;
+        syncCameraControls(stream);
 
         // Attach to video element after DOM paint
         return new Promise<boolean>((resolve) => {
@@ -243,7 +358,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         stopMediaStream();
         return false;
       }
-    }, [stopMediaStream]);
+    }, [stopMediaStream, syncCameraControls]);
 
     // ─── Open camera (warm-start aware) ────────────────────────────────
 
@@ -258,6 +373,9 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         // FIX: Re-attach srcObject if missing (e.g. after fastMode OFF→ON)
         const video = videoRef.current;
         const stream = streamRef.current;
+        if (stream) {
+          syncCameraControls(stream);
+        }
         if (video && stream && !video.srcObject) {
           video.srcObject = stream;
           video.play().catch((err) => console.warn('Video play() failed:', err));
@@ -294,7 +412,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         setIsCameraVisible(false);
         document.body.style.overflow = '';
       }
-    }, [fastMode, isStreamAlive, stopMediaStream, initStream]);
+    }, [fastMode, isStreamAlive, stopMediaStream, initStream, syncCameraControls]);
 
     // ─── Prepare stream (background, no modal) ─────────────────────────
 
@@ -305,10 +423,80 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
       await initStream();
     }, [isStreamAlive, initStream]);
 
+    const applyTorch = useCallback(
+      async (enabled: boolean): Promise<boolean> => {
+        const track = getActiveVideoTrack();
+        if (!track || !isTorchSupported) return false;
+
+        const advanced: CameraConstraintSet[] = [{ torch: enabled }];
+        setIsTorchChanging(true);
+
+        try {
+          await track.applyConstraints({ advanced });
+          if (mountedRef.current) {
+            setIsTorchOn(enabled);
+          }
+          return true;
+        } catch (error) {
+          console.warn('Torch toggle failed:', error);
+          if (mountedRef.current && enabled) {
+            setIsTorchOn(false);
+          }
+          return false;
+        } finally {
+          if (mountedRef.current) {
+            setIsTorchChanging(false);
+          }
+        }
+      },
+      [getActiveVideoTrack, isTorchSupported]
+    );
+
+    const toggleTorch = useCallback(() => {
+      void applyTorch(!isTorchOn);
+    }, [applyTorch, isTorchOn]);
+
+    const applyZoom = useCallback(
+      async (nextValue: number) => {
+        const track = getActiveVideoTrack();
+        if (!track || !zoomCapability) return;
+
+        const nextZoom = clampZoom(nextValue, zoomCapability);
+        setZoomValue(nextZoom);
+
+        const advanced: CameraConstraintSet[] = [{ zoom: nextZoom }];
+
+        try {
+          await track.applyConstraints({ advanced });
+          const settings = track.getSettings() as CameraTrackSettings;
+          if (mountedRef.current && typeof settings.zoom === 'number' && Number.isFinite(settings.zoom)) {
+            setZoomValue(clampZoom(settings.zoom, zoomCapability));
+          }
+        } catch (error) {
+          console.warn('Camera zoom failed:', error);
+          const settings = track.getSettings() as CameraTrackSettings;
+          if (mountedRef.current && typeof settings.zoom === 'number' && Number.isFinite(settings.zoom)) {
+            setZoomValue(clampZoom(settings.zoom, zoomCapability));
+          }
+        }
+      },
+      [getActiveVideoTrack, zoomCapability]
+    );
+
+    const handleZoomChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        void applyZoom(Number(event.target.value));
+      },
+      [applyZoom]
+    );
+
     // ─── Close / hide camera ───────────────────────────────────────────
 
     const closeCamera = useCallback(() => {
       if (fastMode) {
+        if (isTorchOn) {
+          void applyTorch(false);
+        }
         // WARM START: hide modal, keep stream alive
         setIsCameraVisible(false);
         document.body.style.overflow = '';
@@ -318,7 +506,7 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
         setIsCameraVisible(false);
         document.body.style.overflow = '';
       }
-    }, [fastMode, stopMediaStream]);
+    }, [applyTorch, fastMode, isTorchOn, stopMediaStream]);
 
     // ─── Capture photo ─────────────────────────────────────────────────
 
@@ -475,6 +663,66 @@ const MultiPhotoUpload = forwardRef<MultiPhotoUploadHandle, MultiPhotoUploadProp
                   <div className="text-center">
                     <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-white text-sm">{t('camera.preparingCamera')}</p>
+                  </div>
+                </div>
+              )}
+
+              {isCameraReady && (
+                <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+1rem)] z-20 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    disabled={!isTorchSupported || isTorchChanging}
+                    aria-label={
+                      !isTorchSupported
+                        ? t('camera.flashNotSupported')
+                        : isTorchOn
+                          ? t('camera.flashOff')
+                          : t('camera.flashOn')
+                    }
+                    title={
+                      !isTorchSupported
+                        ? t('camera.flashNotSupported')
+                        : isTorchOn
+                          ? t('camera.flashOff')
+                          : t('camera.flashOn')
+                    }
+                    className={[
+                      "flex min-h-11 min-w-11 items-center justify-center rounded-full border backdrop-blur-sm transition-all",
+                      isTorchOn
+                        ? "border-yellow-200 bg-yellow-400 text-black shadow-lg shadow-yellow-400/30"
+                        : "border-white/30 bg-white/10 text-white hover:bg-white/20",
+                      !isTorchSupported || isTorchChanging
+                        ? "cursor-not-allowed opacity-45"
+                        : "active:scale-95",
+                    ].join(" ")}
+                  >
+                    {isTorchOn ? (
+                      <FlashlightOff className="h-5 w-5" />
+                    ) : (
+                      <Flashlight className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {isCameraReady && zoomCapability && (
+                <div className="absolute left-4 right-4 bottom-28 z-20 rounded-2xl border border-white/15 bg-black/55 px-4 py-3 text-white shadow-2xl backdrop-blur-md">
+                  <div className="flex items-center gap-3">
+                    <ZoomIn className="h-5 w-5 shrink-0 text-white/90" />
+                    <input
+                      type="range"
+                      min={zoomCapability.min}
+                      max={zoomCapability.max}
+                      step={zoomCapability.step}
+                      value={zoomValue}
+                      onChange={handleZoomChange}
+                      aria-label={t('camera.zoom')}
+                      className="h-2 flex-1 accent-orange-500"
+                    />
+                    <span className="w-12 text-right text-sm font-semibold tabular-nums">
+                      {formatZoomValue(zoomValue)}x
+                    </span>
                   </div>
                 </div>
               )}
