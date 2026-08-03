@@ -67,6 +67,28 @@ export interface ButtonIcons {
   updated_by: string | null;
 }
 
+/** One plain emoji and the premium one shown in its place in message text. */
+export interface MessageEmojiEntry {
+  emoji: string;
+  emoji_id: string;
+}
+
+export interface MessageEmoji {
+  enabled: boolean;
+  entries: MessageEmojiEntry[];
+  /** Telegram refused the decoration; it is off regardless of `enabled`. */
+  auto_disabled: boolean;
+  auto_disabled_reason: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface MessageEmojiUpdate {
+  enabled?: boolean;
+  /** Full replacement map; `{}` clears it. */
+  mapping?: Record<string, string>;
+}
+
 export interface ButtonIconsUpdate {
   enabled?: boolean;
   icons?: Record<string, { emoji_id?: string; style?: string }>;
@@ -378,6 +400,19 @@ export const systemService = {
   async updateButtonIcons(body: ButtonIconsUpdate): Promise<ButtonIcons> {
     const { data } = await apiClient.put<ButtonIcons>(
       '/api/v1/system/button-icons',
+      body,
+    );
+    return data;
+  },
+
+  async getMessageEmoji(): Promise<MessageEmoji> {
+    const { data } = await apiClient.get<MessageEmoji>('/api/v1/system/message-emoji');
+    return data;
+  },
+
+  async updateMessageEmoji(body: MessageEmojiUpdate): Promise<MessageEmoji> {
+    const { data } = await apiClient.put<MessageEmoji>(
+      '/api/v1/system/message-emoji',
       body,
     );
     return data;

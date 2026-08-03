@@ -9,6 +9,7 @@ import BroadcastComposer from '@/components/admin/BroadcastComposer';
 import SmsSettingsSection from '@/components/admin/SmsSettingsSection';
 import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
+import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
 import {
   Wrench,
   CreditCard,
@@ -516,6 +517,7 @@ export default function SystemSettingsPage() {
 
       {/* Opt-in decoration; the bot disables it itself if Telegram refuses. */}
       <ButtonIconsSection />
+      <MessageEmojiSection />
       </>
       )}
 
