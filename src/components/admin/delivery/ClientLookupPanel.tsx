@@ -28,7 +28,6 @@ export default function ClientLookupPanel({
   const { data, isLoading } = useGroupedWarehouseSearch(
     {
       code: searchTerm.trim().toUpperCase() || undefined,
-      payment_status: "paid",
       taken_status: "not_taken",
       page: 1,
       size: 20,

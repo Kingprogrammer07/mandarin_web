@@ -1,4 +1,4 @@
-import { Check, Plane } from "lucide-react";
+import { Check, Plane, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,10 @@ export default function FlightSelector({
           const isSelected = selectedFlights.includes(flight.flight_name);
           const cargoCount = flight.transactions.length;
 
+          const hasUnpaid = flight.transactions.some(tx => tx.payment_status === "unpaid" || tx.payment_status === "pending");
+          const hasPartial = flight.transactions.some(tx => tx.payment_status === "partial");
+          const allPaid = flight.transactions.every(tx => tx.payment_status === "paid");
+
           return (
             <motion.button
               key={flight.flight_name}
@@ -81,8 +85,27 @@ export default function FlightSelector({
                   variant="secondary"
                   className="rounded-md text-xs bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
                 >
-                  {flight.total_weight_kg.toFixed(1)} kg
+                  {flight.total_weight_kg.toFixed(2)} kg
                 </Badge>
+                {allPaid ? (
+                  <Badge variant="secondary" className="rounded-md text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                    ✅ To'langan
+                  </Badge>
+                ) : hasUnpaid ? (
+                  <Badge variant="secondary" className="rounded-md text-xs bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400">
+                    ❌ To'lanmagan
+                  </Badge>
+                ) : hasPartial ? (
+                  <Badge variant="secondary" className="rounded-md text-xs bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                    ⚠️ Bo'lib to'langan
+                  </Badge>
+                ) : null}
+                {flight.total_remaining_amount > 0 && (
+                  <Badge variant="secondary" className="rounded-md text-xs bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {flight.total_remaining_amount.toLocaleString()} so'm qarz
+                  </Badge>
+                )}
               </div>
             </motion.button>
           );

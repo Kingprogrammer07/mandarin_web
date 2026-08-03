@@ -91,9 +91,23 @@ export default function CargoPreviewList({
                               {Number(tx.vazn).toFixed(2)} kg
                             </span>
                           </div>
-                          <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                            <Banknote className="w-3 h-3" />
-                            {tx.summa.toLocaleString()}
+                          <div className="flex items-center gap-2">
+                            {tx.payment_status === 'paid' ? (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium text-[10px] bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded">To'langan</span>
+                            ) : tx.payment_status === 'partial' ? (
+                              <span className="text-amber-600 dark:text-amber-400 font-medium text-[10px] bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded">Qisman</span>
+                            ) : (
+                              <span className="text-red-600 dark:text-red-400 font-medium text-[10px] bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded">To'lanmagan</span>
+                            )}
+                            {tx.remaining_amount > 0 && (
+                              <span className="text-orange-600 dark:text-orange-400 font-medium text-[10px]">
+                                {tx.remaining_amount.toLocaleString()} qarz
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                              <Banknote className="w-3 h-3" />
+                              {tx.summa.toLocaleString()}
+                            </div>
                           </div>
                         </div>
                       ))}

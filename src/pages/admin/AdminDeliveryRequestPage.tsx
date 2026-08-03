@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, CheckCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle, RotateCcw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ClientLookupPanel from "@/components/admin/delivery/ClientLookupPanel";
 import FlightSelector from "@/components/admin/delivery/FlightSelector";
@@ -100,6 +100,17 @@ export default function AdminDeliveryRequestPage() {
   }, [selectedClient]);
 
   const canProceedToType = selectedFlights.length > 0;
+
+  const hasUnpaidCargo = useMemo(() => {
+    if (!selectedClient) return false;
+    return selectedClient.flights
+      .filter((f) => selectedFlights.includes(f.flight_name))
+      .some((f) =>
+        f.transactions.some(
+          (tx) => tx.payment_status !== "paid",
+        ),
+      );
+  }, [selectedClient, selectedFlights]);
 
   const isStandard = deliveryType && deliveryType !== "uzpost";
   const isUzpost = deliveryType === "uzpost";
@@ -332,6 +343,19 @@ export default function AdminDeliveryRequestPage() {
 
               {/* Inline action — flows with content so it never overlaps or leaves
                   a gap above the (context-dependent) bottom nav. */}
+              {hasUnpaidCargo && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 mb-4">
+                  <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      {t("adminDeliveryRequest.unpaidWarning.title", "To'lanmagan yuklar mavjud")}
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      {t("adminDeliveryRequest.unpaidWarning.description", "Zayavka yaratiladi. To'lov yetkazib berishda undiriladi.")}
+                    </p>
+                  </div>
+                </div>
+              )}
               <Button
                 onClick={() => setStep("type")}
                 disabled={!canProceedToType}
