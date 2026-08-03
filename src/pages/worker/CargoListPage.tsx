@@ -888,22 +888,28 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                {canCreate && (
+                  <button onClick={onAddCargo}
+                    className="flex items-center justify-center gap-1.5 h-9 px-4 text-[12px] font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:scale-[0.98] rounded-xl shadow-md shadow-orange-500/25 transition-all border-0 w-full sm:w-auto">
+                    <Plus className="w-3.5 h-3.5" />Yuk qo'shish
+                  </button>
+                )}
                 {canCompareCargo && (
                   <button onClick={() => setShowComparisonModal(true)}
-                    className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/15 border border-purple-200/60 dark:border-purple-500/20 active:scale-[0.98] rounded-xl transition-all">
+                    className="flex items-center justify-center gap-1.5 h-9 px-3 text-[12px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/15 border border-purple-200/60 dark:border-purple-500/20 active:scale-[0.98] rounded-xl transition-all flex-1 sm:flex-initial">
                     <ArrowUpDown className="w-3.5 h-3.5" />Solishtirish
                   </button>
                 )}
                 {canCompareCargo && flightName && (
                   <button onClick={() => setShowWeightModal(true)}
                     title="Manifest va hisobot og'irliklarini mijoz bo'yicha solishtirish"
-                    className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-100 dark:hover:bg-sky-500/15 border border-sky-200/60 dark:border-sky-500/20 active:scale-[0.98] rounded-xl transition-all">
+                    className="flex items-center justify-center gap-1.5 h-9 px-3 text-[12px] font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-100 dark:hover:bg-sky-500/15 border border-sky-200/60 dark:border-sky-500/20 active:scale-[0.98] rounded-xl transition-all flex-1 sm:flex-initial">
                     <Scale className="w-3.5 h-3.5" />Og'irlik
                   </button>
                 )}
                 <button onClick={handleExportExcel} disabled={isExporting}
-                  className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/20 active:scale-[0.98] disabled:opacity-60 rounded-xl transition-all">
+                  className="flex items-center justify-center gap-1.5 h-9 px-3 text-[12px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/20 active:scale-[0.98] disabled:opacity-60 rounded-xl transition-all flex-1 sm:flex-initial">
                   {isExporting
                     ? <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                     : <Download className="w-3.5 h-3.5" />}
@@ -911,14 +917,8 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
                 </button>
                 {onNavigateToNotifications && (hasPerm('flights:update') || jwtClaims.isSuperAdmin) && (
                   <button onClick={onNavigateToNotifications}
-                    className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/15 border border-blue-200/60 dark:border-blue-500/20 active:scale-[0.98] rounded-xl transition-all">
+                    className="flex items-center justify-center gap-1.5 h-9 px-3 text-[12px] font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/15 border border-blue-200/60 dark:border-blue-500/20 active:scale-[0.98] rounded-xl transition-all flex-1 sm:flex-initial">
                     <Send className="w-3.5 h-3.5" />Bildirishnoma
-                  </button>
-                )}
-                {canCreate && (
-                  <button onClick={onAddCargo}
-                    className="flex items-center gap-1.5 h-9 px-4 text-[12px] font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 active:scale-[0.98] rounded-xl shadow-md shadow-orange-500/25 transition-all border-0">
-                    <Plus className="w-3.5 h-3.5" />Yuk qo'shish
                   </button>
                 )}
               </div>
@@ -1085,6 +1085,16 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
         onError={handleComparisonError}
         onSuccess={handleComparisonSuccess}
       />
+      {canCreate && (
+        <button
+          onClick={onAddCargo}
+          className="sm:hidden fixed bottom-6 right-5 z-40 flex items-center gap-2 h-12 px-5 text-xs font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-95 active:scale-95 rounded-full shadow-lg shadow-orange-500/40 border border-orange-400/30 backdrop-blur-md transition-all"
+          aria-label="Yuk qo'shish"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>Yuk qo'shish</span>
+        </button>
+      )}
     </>
   );
 }
