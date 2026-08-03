@@ -71,6 +71,16 @@ export function ClientSummaryRow({
             <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
               {item.client_code}
             </span>
+            {/* Only meaningful on a global search: with a flight selected this
+                is always 1, and a badge saying "1 flight" is noise. */}
+            {item.flight_count > 1 && (
+              <span
+                title={`${item.flight_count} ta reysda uchraydi`}
+                className="ml-1.5 shrink-0 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"
+              >
+                {item.flight_count} reys
+              </span>
+            )}
           </div>
 
           {/* Col 3: track code count + optional edit actions */}

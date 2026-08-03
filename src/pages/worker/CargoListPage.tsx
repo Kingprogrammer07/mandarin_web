@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import {
   ArrowLeft, Plus, Package, Trash2, Edit2, Search, X,
   ChevronLeft, ChevronRight, CheckCircle, Clock, SlidersHorizontal,
-  ArrowUpDown, ImageIcon, Download, RefreshCw, AlertTriangle, Lock, LogOut, Send
+  ArrowUpDown, ImageIcon, Download, RefreshCw, AlertTriangle, Lock, LogOut, Send, Scale
 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { useConfirm } from '@/hooks/useConfirm';
 import EditCargoModal from '@/components/EditCargoModal';
 import CargoComparisonModal from '@/components/CargoComparisonModal';
+import WeightComparisonModal from '@/components/WeightComparisonModal';
 import { offlineStorage, type FailedItem } from '@/utils/offlineStorage';
 import OfflineCargoManager from '@/components/OfflineCargoManager';
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
@@ -605,6 +606,7 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
   const [editingCargo, setEditingCargo] = useState<CargoPhoto | null>(null);
   const [showOfflineManager, setShowOfflineManager] = useState(false);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [showWeightModal, setShowWeightModal] = useState(false);
   const [failedItems, setFailedItems] = useState<FailedItem[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -893,6 +895,13 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
                     <ArrowUpDown className="w-3.5 h-3.5" />Solishtirish
                   </button>
                 )}
+                {canCompareCargo && flightName && (
+                  <button onClick={() => setShowWeightModal(true)}
+                    title="Manifest va hisobot og'irliklarini mijoz bo'yicha solishtirish"
+                    className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-100 dark:hover:bg-sky-500/15 border border-sky-200/60 dark:border-sky-500/20 active:scale-[0.98] rounded-xl transition-all">
+                    <Scale className="w-3.5 h-3.5" />Og'irlik
+                  </button>
+                )}
                 <button onClick={handleExportExcel} disabled={isExporting}
                   className="flex items-center gap-1.5 h-9 px-3 text-[12px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 border border-emerald-200/60 dark:border-emerald-500/20 active:scale-[0.98] disabled:opacity-60 rounded-xl transition-all">
                   {isExporting
@@ -1060,6 +1069,13 @@ export default function CargoListPage({ flightName, onBack, onAddCargo, onNaviga
 
       {editingCargo && (
         <EditCargoModal cargo={editingCargo} onClose={() => setEditingCargo(null)} onSuccess={handleEditSuccess} />
+      )}
+
+      {showWeightModal && flightName && (
+        <WeightComparisonModal
+          flightName={flightName}
+          onClose={() => setShowWeightModal(false)}
+        />
       )}
 
       <CargoComparisonModal

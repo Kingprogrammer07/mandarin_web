@@ -147,6 +147,8 @@ export interface PaginatedClientStatsResponse {
 
 export interface ClientSummaryItem {
   client_code: string;
+  /** Flights this client's codes span. Always 1 for a flight-scoped search. */
+  flight_count: number;
   total_track_codes: number;
 }
 
@@ -442,9 +444,15 @@ export async function getStatsByClient(
   return response.data;
 }
 
-/** API 11 — Return each client's track code count within a specific flight (collapsed list). */
+/**
+ * API 11 — each client's track code count, for one flight or across all of them.
+ *
+ * Pass `null` as the flight to search globally. That is the case a warehouse
+ * worker actually has: a parcel in hand, its track code readable, and no idea
+ * which flight tab it was filed under.
+ */
 export async function getClientSummaryByFlight(
-  flightName: string,
+  flightName: string | null,
   page = 1,
   size = 200,
   search?: string,
@@ -452,7 +460,7 @@ export async function getClientSummaryByFlight(
 ): Promise<PaginatedClientSummaryResponse> {
   const response = await apiClient.get<PaginatedClientSummaryResponse>(`${BASE}/summary`, {
     params: {
-      flight_name: flightName,
+      ...(flightName ? { flight_name: flightName } : {}),
       page,
       size,
       sort,
@@ -521,6 +529,93 @@ export async function exportCargoComparisonExcel(
   const filename =
     parseFilename(response.headers['content-disposition'] as string | null)
     || `cargo_compare_${payload.expected_flight_name.replace(/\s/g, '_')}.xlsx`;
+  const blobUrl = URL.createObjectURL(new Blob([response.data]));
+  const anchor = document.createElement('a');
+  anchor.href = blobUrl;
+  anchor.setAttribute('download', filename);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(blobUrl);
+}
+
+// ---------------------------------------------------------------------------
+// API 19 — Per-client weight reconciliation (manifest vs report)
+// ---------------------------------------------------------------------------
+
+/** `match` = within tolerance; the others say which side weighs more. */
+export type WeightStatus = 'match' | 'manifest_heavier' | 'report_heavier';
+
+export interface WeightComparisonRow {
+  client_code: string;
+  manifest_parcels: number;
+  manifest_weight: number;
+  /** Manifest rows whose weight was not a number, so counted as 0. */
+  manifest_unreadable: number;
+  report_rows: number;
+  report_weight: number;
+  /** manifest_weight − report_weight */
+  difference: number;
+  status: WeightStatus;
+}
+
+export interface WeightComparisonSummary {
+  clients: number;
+  matched: number;
+  mismatched: number;
+  manifest_heavier: number;
+  report_heavier: number;
+  manifest_weight: number;
+  report_weight: number;
+  difference: number;
+  unreadable_rows: number;
+  tolerance_kg: number;
+}
+
+export interface WeightParcelRow {
+  client_code: string;
+  track_code: string;
+  item_name: string;
+  weight: number;
+  readable: boolean;
+}
+
+export interface WeightComparisonResponse {
+  flight_name: string;
+  summary: WeightComparisonSummary;
+  rows: WeightComparisonRow[];
+  parcels: WeightParcelRow[];
+}
+
+/** API 19a — Per-client totals from both sides of one flight. */
+export async function getWeightComparison(
+  flightName: string,
+  toleranceKg?: number,
+): Promise<WeightComparisonResponse> {
+  const response = await apiClient.get<WeightComparisonResponse>(`${BASE}/compare/weights`, {
+    params: {
+      flight_name: flightName,
+      ...(toleranceKg !== undefined ? { tolerance_kg: toleranceKg } : {}),
+    },
+  });
+  return response.data;
+}
+
+/** API 19b — The same numbers as a two-sheet workbook. */
+export async function exportWeightComparisonExcel(
+  flightName: string,
+  toleranceKg?: number,
+): Promise<void> {
+  const response = await apiClient.get<Blob>(`${BASE}/compare/weights/export`, {
+    params: {
+      flight_name: flightName,
+      ...(toleranceKg !== undefined ? { tolerance_kg: toleranceKg } : {}),
+    },
+    responseType: 'blob',
+  });
+  const filename =
+    parseFilename(response.headers['content-disposition'] as string | null)
+    || `ogirlik_solishtirish_${flightName.replace(/\s/g, '_')}.xlsx`;
   const blobUrl = URL.createObjectURL(new Blob([response.data]));
   const anchor = document.createElement('a');
   anchor.href = blobUrl;

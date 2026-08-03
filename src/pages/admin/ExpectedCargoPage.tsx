@@ -100,6 +100,7 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     clientCode: string;
   } | null>(null);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [isGlobalSearch, setIsGlobalSearch] = useState(false);
   const [hasHydratedQueueBackup, setHasHydratedQueueBackup] = useState(false);
   const [summaryPage, setSummaryPage] = useState(1);
   const [summarySize, setSummarySize] = useState(50);
@@ -115,11 +116,18 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     staleTime: 60_000,
   });
 
+  // Global search drops the flight scope. It only makes sense with something
+  // typed — an unscoped, unfiltered list of every client on every flight is
+  // both slow and useless — so the flight tab stays in charge until then.
+  const isGlobalActive = isGlobalSearch && searchQuery.trim().length > 0;
+  const summaryScope = isGlobalActive ? null : activeFlightName;
+
   const summaryQuery = useQuery({
     queryKey: [
       'expectedCargo',
       'summary',
-      activeFlightName,
+      summaryScope,
+      isGlobalActive,
       summaryPage,
       summarySize,
       searchQuery.trim(),
@@ -127,13 +135,13 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     ],
     queryFn: () =>
       getClientSummaryByFlight(
-        activeFlightName!,
+        summaryScope,
         summaryPage,
         summarySize,
         searchQuery,
         summarySort,
       ),
-    enabled: !!activeFlightName,
+    enabled: isGlobalActive || !!activeFlightName,
     staleTime: 30_000,
   });
 
@@ -457,6 +465,11 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
         isFastEntryOpen={isFastEntryOpen}
         queueCount={entryQueue.length}
         onSearchChange={handleSearchChange}
+        isGlobalSearch={isGlobalSearch}
+        onToggleGlobalSearch={() => {
+          setIsGlobalSearch((current) => !current);
+          setSummaryPage(1);
+        }}
         onToggleEditMode={toggleEditMode}
         onToggleFastEntry={() => setFastEntryOpen(!isFastEntryOpen)}
         onExport={handleExport}

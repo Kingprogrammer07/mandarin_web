@@ -1,4 +1,4 @@
-import { Search, Pencil, X, FileDown, ScanBarcode, ChevronLeft, Moon, Sun, Trash2, DatabaseBackup, MoreVertical } from 'lucide-react';
+import { Search, Pencil, X, FileDown, ScanBarcode, ChevronLeft, Moon, Sun, Trash2, DatabaseBackup, MoreVertical, Globe } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,9 @@ interface ExpectedCargoHeaderProps {
   isFastEntryOpen: boolean;
   queueCount: number;
   onSearchChange: (query: string) => void;
+  /** True when the search runs across every flight rather than the open tab. */
+  isGlobalSearch: boolean;
+  onToggleGlobalSearch: () => void;
   onToggleEditMode: () => void;
   onToggleFastEntry: () => void;
   onExport: () => void;
@@ -35,6 +38,8 @@ export function ExpectedCargoHeader({
   isFastEntryOpen,
   queueCount,
   onSearchChange,
+  isGlobalSearch,
+  onToggleGlobalSearch,
   onToggleEditMode,
   onToggleFastEntry,
   onExport,
@@ -162,23 +167,55 @@ export function ExpectedCargoHeader({
 
       {/* Search row — always visible for quick client lookups */}
       <div className="px-3 pb-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Mijoz kodi yoki trek kodi bo'yicha qidirish..."
-            className="pl-9 h-9 text-sm bg-[#ffffff] dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:ring-orange-500"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-            >
-              <X className="size-4" />
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={
+                isGlobalSearch
+                  ? "Barcha reyslardan qidirish — mijoz kodi yoki trek kodi..."
+                  : "Mijoz kodi yoki trek kodi bo'yicha qidirish..."
+              }
+              className="pl-9 h-9 text-sm bg-[#ffffff] dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:ring-orange-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          {/* A parcel in hand has a readable track code but no visible flight,
+              so the tab the worker happens to have open is the wrong scope for
+              exactly the lookup they need most. */}
+          <button
+            type="button"
+            onClick={onToggleGlobalSearch}
+            title={
+              isGlobalSearch
+                ? 'Faqat ochiq reysdan qidirishga qaytish'
+                : 'Barcha reyslardan qidirish'
+            }
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-bold transition-all active:scale-[0.98] ${
+              isGlobalSearch
+                ? 'border-orange-300 bg-orange-500 text-white dark:border-orange-400/40'
+                : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+            }`}
+          >
+            <Globe className="size-3.5" />
+            Global
+          </button>
         </div>
+        {isGlobalSearch && (
+          <p className="mt-1.5 text-[11px] font-semibold text-orange-600 dark:text-orange-300">
+            Barcha reyslar bo'yicha qidirilmoqda — natijada mijoz nechta reysda
+            borligi ko'rsatiladi.
+          </p>
+        )}
       </div>
 
       {/* Edit mode banner */}
