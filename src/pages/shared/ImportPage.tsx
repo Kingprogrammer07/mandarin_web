@@ -12,6 +12,7 @@ import {
   updateFlightTrackingSteps,
   type FlightTrackingStatus,
   type StepAutoStatus,
+  type TrackingStepStatus,
   type UpdateTrackingRequest,
 } from '@/api/services/tracking';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -20,8 +21,10 @@ import CampaignSender from '@/components/admin/CampaignSender';
 
 type DatabaseType = 'uz' | 'china';
 type MainTab = 'import' | 'tracking';
+type StepSelectValue = TrackingStepStatus | 'auto';
 
-const STEP_OPTIONS = [
+const STEP_OPTIONS: Array<{ value: StepSelectValue; label: string }> = [
+  { value: 'auto', label: 'Avtomatik' },
   { value: 'pending', label: 'Kutilmoqda' },
   { value: 'available', label: 'Mavjud' },
   { value: 'nodata', label: "Ma'lumot yo'q" },
@@ -29,12 +32,32 @@ const STEP_OPTIONS = [
 
 /** The three overridable steps, with the response fields that describe each. */
 const TRACKING_STEPS = [
-  { number: 2, title: "2-step (Yo'lda)", statusKey: 'step_2_status', autoKey: 'step_2_auto', manualKey: 'step_2_is_manual' },
-  { number: 3, title: '3-step (Bojxona)', statusKey: 'step_3_status', autoKey: 'step_3_auto', manualKey: 'step_3_is_manual' },
-  { number: 4, title: '4-step (Saralash)', statusKey: 'step_4_status', autoKey: 'step_4_auto', manualKey: 'step_4_is_manual' },
+  {
+    number: 2,
+    title: "2-step (Yo'lda)",
+    statusKey: 'step_2_status',
+    autoKey: 'step_2_auto',
+    manualKey: 'step_2_is_manual',
+  },
+  {
+    number: 3,
+    title: '3-step (Bojxona)',
+    statusKey: 'step_3_status',
+    autoKey: 'step_3_auto',
+    manualKey: 'step_3_is_manual',
+  },
+  {
+    number: 4,
+    title: '4-step (Saralash)',
+    statusKey: 'step_4_status',
+    autoKey: 'step_4_auto',
+    manualKey: 'step_4_is_manual',
+  },
 ] as const;
 
 type StepStatusKey = (typeof TRACKING_STEPS)[number]['statusKey'];
+type TrackingStep = (typeof TRACKING_STEPS)[number];
+type PendingTrackingChanges = Partial<Record<StepStatusKey, StepSelectValue>>;
 
 const AUTO_STATUS_LABELS: Record<StepAutoStatus['status'], string> = {
   available: "to'liq",
@@ -90,7 +113,7 @@ export default function ImportPage() {
   const [deletingFlight, setDeletingFlight] = useState<string | null>(null);
   // Keyed "<flight>:<step>" — only the one button being cleared should spin.
   const [clearingStep, setClearingStep] = useState<string | null>(null);
-  const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<FlightTrackingStatus>>>({});
+  const [pendingChanges, setPendingChanges] = useState<Record<string, PendingTrackingChanges>>({});
   const { confirm, ConfirmDialog } = useConfirm();
 
   const fetchFlights = useCallback(async () => {
@@ -186,7 +209,11 @@ export default function ImportPage() {
     setSelectedFile(null);
   };
 
-  const updatePendingChange = (flightName: string, step: StepStatusKey, value: string) => {
+  const updatePendingChange = (
+    flightName: string,
+    step: StepStatusKey,
+    value: StepSelectValue,
+  ) => {
     setPendingChanges((prev) => ({
       ...prev,
       [flightName]: {
@@ -196,17 +223,30 @@ export default function ImportPage() {
     }));
   };
 
-  const getDisplayStatus = (flight: FlightTrackingStatus, step: StepStatusKey) => {
-    return pendingChanges[flight.flight_name]?.[step] ?? flight[step];
+  const getBaseSelectValue = (
+    flight: FlightTrackingStatus,
+    step: TrackingStep,
+  ): StepSelectValue => {
+    return flight[step.manualKey] ? flight[step.statusKey] : 'auto';
+  };
+
+  const getDisplayStatus = (
+    flight: FlightTrackingStatus,
+    step: TrackingStep,
+  ): StepSelectValue => {
+    return (
+      pendingChanges[flight.flight_name]?.[step.statusKey] ??
+      getBaseSelectValue(flight, step)
+    );
   };
 
   const hasChanges = (flight: FlightTrackingStatus) => {
     const changes = pendingChanges[flight.flight_name];
     if (!changes) return false;
-    return (
-      (changes.step_2_status !== undefined && changes.step_2_status !== flight.step_2_status) ||
-      (changes.step_3_status !== undefined && changes.step_3_status !== flight.step_3_status) ||
-      (changes.step_4_status !== undefined && changes.step_4_status !== flight.step_4_status)
+    return TRACKING_STEPS.some(
+      (step) =>
+        changes[step.statusKey] !== undefined &&
+        changes[step.statusKey] !== getBaseSelectValue(flight, step),
     );
   };
 
@@ -217,25 +257,42 @@ export default function ImportPage() {
     setSavingFlight(flight.flight_name);
     try {
       const payload: UpdateTrackingRequest = {};
-      if (changes.step_2_status !== undefined) payload.step_2_status = changes.step_2_status;
-      if (changes.step_3_status !== undefined) payload.step_3_status = changes.step_3_status;
-      if (changes.step_4_status !== undefined) payload.step_4_status = changes.step_4_status;
+      const clearSteps: number[] = [];
 
-      await updateFlightTrackingSteps(flight.flight_name, payload);
-      setFlights((prev) =>
-        prev.map((f) =>
-          f.flight_name === flight.flight_name
-            ? { ...f, ...changes }
-            : f
-        )
-      );
+      for (const step of TRACKING_STEPS) {
+        const selected = changes[step.statusKey];
+        if (selected === undefined || selected === getBaseSelectValue(flight, step)) {
+          continue;
+        }
+
+        if (selected === 'auto') {
+          if (flight[step.manualKey]) {
+            clearSteps.push(step.number);
+          }
+          continue;
+        }
+
+        payload[step.statusKey] = selected;
+      }
+
+      for (const stepNumber of clearSteps) {
+        await clearFlightTrackingStep(flight.flight_name, stepNumber);
+      }
+
+      if (Object.keys(payload).length > 0) {
+        await updateFlightTrackingSteps(flight.flight_name, payload);
+      }
+
       setPendingChanges((prev) => {
         const next = { ...prev };
         delete next[flight.flight_name];
         return next;
       });
+      toast.success('Tracking statuslari saqlandi');
+      await fetchFlights();
     } catch (err) {
       console.error('Failed to save flight tracking:', err);
+      toast.error('Tracking statuslarini saqlab bo\'lmadi');
     } finally {
       setSavingFlight(null);
     }
@@ -496,16 +553,24 @@ export default function ImportPage() {
                               </p>
                             </td>
                             {TRACKING_STEPS.map((step) => {
-                              const displayed = getDisplayStatus(flight, step.statusKey);
-                              const isManual = flight[step.manualKey];
+                              const displayed = getDisplayStatus(flight, step);
+                              const isManual = flight[step.manualKey] && displayed !== 'auto';
                               const clearKey = `${flight.flight_name}:${step.number}`;
                               return (
                                 <td key={step.number} className="px-4 py-3 text-center align-top">
                                   <select
                                     value={displayed}
-                                    onChange={(e) => updatePendingChange(flight.flight_name, step.statusKey, e.target.value)}
+                                    onChange={(e) =>
+                                      updatePendingChange(
+                                        flight.flight_name,
+                                        step.statusKey,
+                                        e.target.value as StepSelectValue,
+                                      )
+                                    }
                                     className={`px-2 py-1 rounded-md border text-xs font-medium outline-none focus:ring-2 focus:ring-orange-500/20 dark:[color-scheme:dark] ${
-                                      displayed === 'available'
+                                      displayed === 'auto'
+                                        ? 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-500/15 dark:border-sky-400/30 dark:text-sky-200'
+                                        : displayed === 'available'
                                         ? 'bg-green-50 border-green-200 text-green-700 dark:bg-emerald-500/15 dark:border-emerald-400/30 dark:text-emerald-200'
                                         : displayed === 'pending'
                                         ? 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-amber-400/15 dark:border-amber-300/30 dark:text-amber-200'

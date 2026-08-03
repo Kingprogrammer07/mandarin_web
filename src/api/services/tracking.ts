@@ -1,5 +1,7 @@
 import { apiClient } from '@/api/client';
 
+export type TrackingStepStatus = 'available' | 'pending' | 'nodata';
+
 /**
  * What the automatic rule says about one step, ignoring any manual override.
  *
@@ -17,9 +19,9 @@ export interface StepAutoStatus {
 export interface FlightTrackingStatus {
   flight_name: string;
   /** What clients currently see — the override when one is set. */
-  step_2_status: string;
-  step_3_status: string;
-  step_4_status: string;
+  step_2_status: TrackingStepStatus;
+  step_3_status: TrackingStepStatus;
+  step_4_status: TrackingStepStatus;
   step_2_is_manual: boolean;
   step_3_is_manual: boolean;
   step_4_is_manual: boolean;
@@ -40,9 +42,9 @@ export interface ClearFlightTrackingStepResponse {
 }
 
 export interface UpdateTrackingRequest {
-  step_2_status?: string | null;
-  step_3_status?: string | null;
-  step_4_status?: string | null;
+  step_2_status?: TrackingStepStatus | null;
+  step_3_status?: TrackingStepStatus | null;
+  step_4_status?: TrackingStepStatus | null;
 }
 
 export interface DeleteFlightCargoItemsResponse {
