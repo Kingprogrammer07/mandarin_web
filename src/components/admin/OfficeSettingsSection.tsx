@@ -58,6 +58,29 @@ function toForm(office: OfficeInfo): OfficeForm {
 const inputClass =
   'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-orange-400 dark:border-white/10 dark:bg-white/5 dark:text-white';
 
+function parseTimeToMinutes(value: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function validateWorkingHours(hours: Record<WeekdayKey, OfficeDayHours>): string | null {
+  for (const day of WEEKDAY_ORDER) {
+    const cfg = hours[day];
+    if (cfg.closed) continue;
+
+    const opens = parseTimeToMinutes(cfg.open);
+    const closes = parseTimeToMinutes(cfg.close);
+    if (opens == null || closes == null) {
+      return `${WEEKDAY_LABELS[day]}: ish vaqti HH:MM formatida bo'lishi kerak`;
+    }
+    if (closes <= opens) {
+      return `${WEEKDAY_LABELS[day]}: yopilish vaqti ochilishdan keyin bo'lishi kerak. Masalan, 18:30.`;
+    }
+  }
+  return null;
+}
+
 /**
  * Admin editor for the office card shown in the Mini App, the cash-payment
  * screen and the bot. Kept in its own component so SystemSettingsPage stays
@@ -118,6 +141,11 @@ function OfficeEditor({ office }: { office: OfficeInfo }) {
     const lng = form.longitude.trim() ? Number(form.longitude) : null;
     if ((form.latitude.trim() && Number.isNaN(lat)) || (form.longitude.trim() && Number.isNaN(lng))) {
       toast.error('Koordinata noto\'g\'ri — masalan: 41.284025');
+      return;
+    }
+    const workingHoursError = validateWorkingHours(form.working_hours);
+    if (workingHoursError) {
+      toast.error(workingHoursError);
       return;
     }
     saveMutation.mutate({
