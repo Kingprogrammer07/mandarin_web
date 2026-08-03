@@ -38,25 +38,60 @@ export default function ImageUpload({
   const [status, setStatus] = useState<UploadStatus>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Object URLs are owned here, not by the effect's cleanup.
+  //
+  // Revoking inside the cleanup looked correct but broke previews in practice:
+  // any re-run of the effect (StrictMode's double-invoke, a remount when the
+  // wizard steps back and forward) revoked a URL the <img> was still showing,
+  // leaving one passport side as a broken image while the other rendered. The
+  // ref lets us revoke exactly one URL — the one being replaced — and release
+  // the last one on unmount.
+  const objectUrlRef = useRef<string | null>(null);
+
+  const releaseObjectUrl = React.useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!value) {
+      releaseObjectUrl();
       setPreview(null);
       setStatus('idle');
-      return undefined;
+      return;
     }
 
     if (typeof value === 'string') {
+      releaseObjectUrl();
       setPreview(value);
       setStatus('ready');
-      return undefined;
+      return;
     }
 
+    releaseObjectUrl();
     const objectUrl = URL.createObjectURL(value);
+    objectUrlRef.current = objectUrl;
     setPreview(objectUrl);
     setStatus('ready');
+  }, [value, releaseObjectUrl]);
 
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [value]);
+  // Release the last URL only when the component really goes away.
+  React.useEffect(() => releaseObjectUrl, [releaseObjectUrl]);
+
+  /**
+   * Self-heal a dead preview: if the browser drops the blob (revoked early by a
+   * race, or restored from bfcache) rebuild it from the File we still hold, so
+   * the user never stares at a broken thumbnail they cannot fix.
+   */
+  const handlePreviewError = React.useCallback(() => {
+    if (!(value instanceof File)) return;
+    releaseObjectUrl();
+    const rebuilt = URL.createObjectURL(value);
+    objectUrlRef.current = rebuilt;
+    setPreview(rebuilt);
+  }, [value, releaseObjectUrl]);
 
   const resetFileInput = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -169,7 +204,12 @@ export default function ImageUpload({
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/12 dark:bg-[#10151f] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]">
           <div className={`${isCompact ? 'h-[112px]' : 'h-[184px]'} relative overflow-hidden bg-slate-100 dark:bg-black/20`}>
-            <img src={preview ?? undefined} alt={label} className="size-full object-cover" />
+            <img
+              src={preview ?? undefined}
+              alt={label}
+              onError={handlePreviewError}
+              className="size-full object-cover"
+            />
             <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
               <CheckCircle2 className="size-3.5" />
               {t('form.upload.ready')}

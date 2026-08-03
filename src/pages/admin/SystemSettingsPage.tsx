@@ -3,6 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import OfficeSettingsSection from '@/components/admin/OfficeSettingsSection';
+import TemplateEditorSection from '@/components/admin/TemplateEditorSection';
+import BroadcastComposer from '@/components/admin/BroadcastComposer';
+import SmsSettingsSection from '@/components/admin/SmsSettingsSection';
+import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
+import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import {
   Wrench,
   CreditCard,
@@ -16,7 +22,9 @@ import {
   CheckSquare,
   Square,
   BarChart3,
+  MapPin,
   Send,
+  Truck,
 } from 'lucide-react';
 import {
   systemService,
@@ -42,6 +50,35 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+/**
+ * The page is one long scroll of ten unrelated panels, so grouping them costs
+ * nothing and saves the operator from hunting. Order matters: the tabs people
+ * open daily come first, infrastructure last.
+ */
+const SYSTEM_TABS = [
+  { key: 'messages', label: 'Xabarlar', icon: Send },
+  { key: 'office', label: 'Ofis', icon: MapPin },
+  { key: 'payments', label: "To'lovlar", icon: CreditCard },
+  { key: 'delivery', label: 'Yetkazish', icon: Truck },
+  { key: 'system', label: 'Tizim', icon: Wrench },
+] as const;
+
+type SystemTab = (typeof SYSTEM_TABS)[number]['key'];
+
+const TAB_STORAGE_KEY = 'system-settings-tab';
+
+function readStoredTab(): SystemTab {
+  try {
+    const stored = localStorage.getItem(TAB_STORAGE_KEY);
+    if (SYSTEM_TABS.some((entry) => entry.key === stored)) {
+      return stored as SystemTab;
+    }
+  } catch {
+    // Private mode or a blocked storage API — fall back to the default tab.
+  }
+  return 'messages';
+}
+
 function getMutationErrorMessage(error: unknown, fallback: string): string {
   if (typeof error !== 'object' || error === null) return fallback;
 
@@ -61,6 +98,18 @@ function getMutationErrorMessage(error: unknown, fallback: string): string {
 export default function SystemSettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // Seeded from storage, not synced by an effect: an operator working through
+  // stuck payments should land back on that tab after a reload.
+  const [tab, setTabState] = useState<SystemTab>(readStoredTab);
+  const setTab = useCallback((next: SystemTab) => {
+    setTabState(next);
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      // Remembering the tab is a convenience, never a requirement.
+    }
+  }, []);
+
   const [showRedisInfo, setShowRedisInfo] = useState(false);
   const [showRedisClients, setShowRedisClients] = useState(false);
   const [showNbuPending, setShowNbuPending] = useState(false);
@@ -388,11 +437,90 @@ export default function SystemSettingsPage() {
   const isNbuOn = nbuData?.enabled === true;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 p-4 md:p-6">
-      <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6">
+    <div className="max-w-5xl mx-auto space-y-6 p-4 md:p-6">
+      <h1 className="text-2xl font-black text-gray-900 dark:text-white">
         Tizim sozlamalari
       </h1>
 
+      {/* Sticky so the tabs stay reachable inside the long panels below. */}
+      <div className="sticky top-0 z-20 -mx-4 bg-white/90 px-4 py-2 backdrop-blur md:-mx-6 md:px-6 dark:bg-[#0a0e15]/90">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          {SYSTEM_TABS.map(({ key, label, icon: Icon }) => {
+            const isActive = tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black transition-colors ${
+                  isActive
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/[0.06] dark:text-white/60 dark:hover:bg-white/10'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {tab === 'office' && (
+      <>
+      {/* Office card — address/hours/phones shown to customers everywhere. */}
+      <OfficeSettingsSection />
+      </>
+      )}
+
+      {tab === 'messages' && (
+      <>
+      {/* Answers "where do I send from?" once, at the top, instead of leaving
+          the operator to infer it from five section headings. */}
+      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-400/20 dark:bg-sky-400/10">
+        <p className="mb-2 text-sm font-black text-sky-900 dark:text-sky-200">
+          Xabarni qayerdan yuboriladi
+        </p>
+        <ul className="space-y-1.5 text-[13px] font-medium text-sky-900/85 dark:text-sky-100/80">
+          <li>
+            <b>Reys keldi degan xabar</b> — Import sahifasida, Excel yuklangandan
+            keyin o'zi ochiladi. Avtomatik, chastota cheki qo'llanmaydi.
+          </li>
+          <li>
+            <b>Sog'inch xati, eslatma, yangilik, reklama</b> — quyidagi
+            <b> Qo'lda xabar yuborish</b> bo'limi. Auditoriya bo'yicha yoki aniq
+            mijoz kodi / telefon ro'yxati bo'yicha.
+          </li>
+          <li>
+            <b>SMS</b> — o'sha bo'limda kanal sifatida tanlanadi. Avval quyidagi
+            <b> SMS shlyuzi</b> sozlanishi kerak.
+          </li>
+        </ul>
+      </div>
+
+      {/* Write once, choose who gets it. Sits above the template editor because
+          this is the screen an operator comes here to use; templates are the
+          rarer "change the wording of an automatic message" task. */}
+      <BroadcastComposer />
+
+      {/* Automatic messages — only their wording is editable here. */}
+      <TemplateEditorSection />
+
+      {/* Gateway config sits with the messaging tools, not under infrastructure:
+          whoever sends the SMS is the one who needs to turn it on. */}
+      <SmsSettingsSection />
+
+      {/* Video guide links — the bot offers each one at its own moment. */}
+      <VideoGuidesSection />
+
+      {/* Opt-in decoration; the bot disables it itself if Telegram refuses. */}
+      <ButtonIconsSection />
+      </>
+      )}
+
+      {tab === 'system' && (
+      <>
       {/* Maintenance Toggle */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5 shadow-sm">
         <div className="flex items-center justify-between">
@@ -420,7 +548,11 @@ export default function SystemSettingsPage() {
           </button>
         </div>
       </div>
+      </>
+      )}
 
+      {tab === 'payments' && (
+      <>
       {/* NBU Toggle */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5 shadow-sm">
         <div className="flex items-center justify-between">
@@ -448,7 +580,11 @@ export default function SystemSettingsPage() {
           </button>
         </div>
       </div>
+      </>
+      )}
 
+      {tab === 'system' && (
+      <>
       {/* Redis Info */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
         <button
@@ -494,7 +630,11 @@ export default function SystemSettingsPage() {
           )}
         </AnimatePresence>
       </div>
+      </>
+      )}
 
+      {tab === 'payments' && (
+      <>
       {/* Hourly NBU Report */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
         <div className="p-5 space-y-4">
@@ -581,7 +721,11 @@ export default function SystemSettingsPage() {
           </p>
         </div>
       </div>
+      </>
+      )}
 
+      {tab === 'payments' && (
+      <>
       {/* NBU Stuck Payments */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
         <button
@@ -779,7 +923,11 @@ export default function SystemSettingsPage() {
           )}
         </AnimatePresence>
       </div>
+      </>
+      )}
 
+      {tab === 'delivery' && (
+      <>
       {/* UzPost Pending Requests */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
         <button
@@ -1005,7 +1153,11 @@ export default function SystemSettingsPage() {
           )}
         </AnimatePresence>
       </div>
+      </>
+      )}
 
+      {tab === 'system' && (
+      <>
       {/* Redis Clients */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
         <button
@@ -1051,6 +1203,8 @@ export default function SystemSettingsPage() {
           )}
         </AnimatePresence>
       </div>
+      </>
+      )}
     </div>
   );
 }

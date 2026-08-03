@@ -864,7 +864,39 @@
     "copied": "nusxalandi",
     "saving": "Saqlanmoqda...",
     "save": "Saqlash",
-    "close": "Yopish"
+    "close": "Yopish",
+    "loading": "Yuklanmoqda...",
+    "retry": "Qayta urinish",
+    "cancel": "Bekor qilish"
+  },
+  "application": {
+    "submittedData": "Yuborilgan ma'lumot",
+    "statusUnavailable": "Ariza holatini hozir tekshirib bo'lmadi. Ariza yuborilgan — biroz kutib, qayta urinib ko'ring.",
+    "edit": {
+      "action": "Tuzatish",
+      "title": "Arizani tuzatish",
+      "body": "Xato ma'lumotni to'g'rilang. Tuzatilgan ariza adminlarga qaytadan yuboriladi.",
+      "photosHint": "Rasmni almashtirmoqchi bo'lsangizgina yangisini tanlang. Tegmasangiz eskisi qoladi.",
+      "save": "Saqlash",
+      "saved": "Ariza yangilandi",
+      "saveFailed": "Saqlab bo'lmadi",
+      "nothingChanged": "Hech narsa o'zgartirilmadi"
+    },
+    "withdraw": {
+      "action": "Bekor qilish",
+      "confirm": "Arizani bekor qilasizmi? Ma'lumotlaringiz o'chiriladi va qaytadan ro'yxatdan o'tishingiz kerak bo'ladi.",
+      "failed": "Arizani bekor qilib bo'lmadi"
+    },
+    "approved": {
+      "title": "Arizangiz tasdiqlandi",
+      "body": "Mijoz kodingiz: {{code}}. Endi tizimga kirishingiz mumkin.",
+      "login": "Tizimga kirish"
+    },
+    "none": {
+      "title": "Ariza topilmadi",
+      "body": "Sizda faol ariza yo'q. Ro'yxatdan o'tishni boshlang.",
+      "register": "Ro'yxatdan o'tish"
+    }
   },
   "passport": {
     "addNew": "Yangi pasport",
@@ -897,7 +929,9 @@
       "errorLength": "Karta raqami 16 ta raqamdan iborat bo'lishi kerak",
       "confirmDelete": "Kartani o'chirishni tasdiqlaysizmi?",
       "refundTitle": "Qaytarish kartasi",
-      "refundHint": "Bu karta orqali siz pul qaytarib olasiz"
+      "refundHint": "Bu karta orqali siz pul qaytarib olasiz",
+      "noRefundCards": "Qaytarish kartasi qo'shilmagan",
+      "refundAddPrompt": "Bu karta faqat pul qaytarilganda ishlatiladi. To’lov uchun yuqoridagi “To’lov kartalari” bo’limidan foydalaning."
     },
     "tabs": {
       "reminders": "Eslatmalar",
@@ -1267,7 +1301,9 @@
         "empty": "Hozircha reyslar topilmadi",
         "emptyDesc": "To'langan reyslaringiz yo'q",
         "flightLabel": "Reys",
-        "continueButton": "Davom etish"
+        "continueButton": "Davom etish",
+        "emptyHint": "Zayavka qoldirish uchun avval yuk to'lovini amalga oshiring.",
+        "emptyCta": "To'lov qilish"
       },
       "confirm": {
         "title": "Tasdiqlash",
@@ -1667,7 +1703,9 @@
     "flightsBack": "Reyslar",
     "archiveEmpty": "Arxivda reys yo'q",
     "noReadyFlights": "Hisoboti tayyor reys yo'q",
-    "noReadyFlightsHint": "Hisobot yuborilmagan reyslar arxivda"
+    "noReadyFlightsHint": "Hisobot yuborilmagan reyslar arxivda",
+    "payCashHint": "Ofisga kelib naqd — admin tasdiqlaydi",
+    "belowNbuMinimum": "Onlayn to‘lov uchun eng kam summa 1 000 so‘m. Bu qarzni ofisda naqd to‘lashingiz mumkin."
   },
   "adminDeliveryRequest": {
     "title": "Yetkazib berish zayavkasi",
@@ -1825,7 +1863,9 @@
       "save": "Saqlash",
       "cancel": "Bekor qilish",
       "bindContinue": "Davom etish",
-      "namedCardFallback": "Saqlangan karta"
+      "namedCardFallback": "Saqlangan karta",
+      "sectionHintLong": "Yuk to'lovini shu karta bilan bir bosishda to'laysiz",
+      "bindNotice": "Tugmani bossangiz bank (NBU) sahifasiga o‘tasiz — u yerda karta raqami va amal qilish muddatini kiritasiz. Sahifa ruscha bo‘ladi. Karta ma’lumotlari bizda saqlanmaydi."
     },
     "confirm": {
       "title": "To'lovni tasdiqlang",
@@ -1844,7 +1884,8 @@
       "title": "1 daqiqada zayavka qoldiring",
       "body": "Yukingiz tezda yetkazib beriladi",
       "button": "Zayavka qoldirish"
-    }
+    },
+    "payOnlineNbuHint": "Yangi karta bilan — bank sahifasiga o‘tasiz (sahifa ruscha)"
   },
   "maintenance": {
     "title": "Texnik ishlar olib borilmoqda",
@@ -1996,6 +2037,46 @@
     "submit": "Yuborish",
     "thanks": "Rahmat! Sharhingiz qabul qilindi.",
     "mockThanks": "(Test) Sharh yuborildi — rahmat!",
-    "error": "Sharh yuborishda xatolik. Qayta urinib ko'ring."
+    "error": "Sharh yuborishda xatolik. Qayta urinib ko'ring.",
+    "promptCard": {
+      "title": "Yetkazib berishni baholang",
+      "subtitle": "Bir daqiqa vaqtingizni oling — xizmatni yaxshilashga yordam beradi"
+    }
+  },
+  "office": {
+    "loading": "Yuklanmoqda...",
+    "open": "Ochiq",
+    "openUntil": "Ochiq — {{time}} gacha",
+    "closedNow": "Hozir yopiq",
+    "closedShort": "Yopiq",
+    "closedHoliday": "Bugun dam olish kuni",
+    "opensAt": "ochiladi: {{when}}",
+    "hoursTitle": "Ish vaqti",
+    "contactsTitle": "Bog'lanish",
+    "callHint": "Bosing va qo'ng'iroq qiling",
+    "adminChat": "Admin bilan yozishish",
+    "dayOff": "Dam olish",
+    "visitTitle": "Ofisga borishdan oldin",
+    "closedWarning": "Ofis hozir yopiq. Iltimos, ish vaqtida keling yoki telefon qiling.",
+    "route": "Yo'l ko'rsatish",
+    "weekday": {
+      "mon": "Dushanba",
+      "tue": "Seshanba",
+      "wed": "Chorshanba",
+      "thu": "Payshanba",
+      "fri": "Juma",
+      "sat": "Shanba",
+      "sun": "Yakshanba"
+    },
+    "homeTitle": "Bizning ofis"
+  },
+  "registrationPending": {
+    "title": "Arizangiz qabul qilindi",
+    "body": "Ma'lumotlaringiz tekshiruvga yuborildi. Tasdiqlangach, mijoz kodingiz Telegram bot orqali yuboriladi.",
+    "etaTitle": "Tekshiruv qancha vaqt oladi?",
+    "etaBody": "Odatda 5 daqiqadan 1 soatgacha. Shu vaqt ichida qayta ariza yubormang — arizangiz allaqachon navbatda.",
+    "contactHint": "Ma'lumotlarda xatolik bo'lsa yoki uzoq javob kelmasa — biz bilan bog'laning:",
+    "contactAdmin": "Admin bilan bog'lanish",
+    "continue": "Tushunarli"
   }
 }

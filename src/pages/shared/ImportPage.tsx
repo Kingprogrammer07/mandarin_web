@@ -1,18 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, FileSpreadsheet, Database, RefreshCw, Plane, Save, CheckCircle2, Trash2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Database, RefreshCw, Plane, RotateCcw, Save, CheckCircle2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import StatusAnimation from '@/components/StatusAnimation';
 import { importExcel } from '@/api/services/import';
 import {
+  clearFlightTrackingStep,
   deleteFlightCargoItems,
   getFlightTrackingStatuses,
   updateFlightTrackingSteps,
   type FlightTrackingStatus,
+  type StepAutoStatus,
   type UpdateTrackingRequest,
 } from '@/api/services/tracking';
 import { useConfirm } from '@/hooks/useConfirm';
+import { NATIVE_OPTION_CLASS } from '@/components/ui/select-styles';
+import CampaignSender from '@/components/admin/CampaignSender';
 
 type DatabaseType = 'uz' | 'china';
 type MainTab = 'import' | 'tracking';
@@ -23,6 +27,48 @@ const STEP_OPTIONS = [
   { value: 'nodata', label: "Ma'lumot yo'q" },
 ];
 
+/** The three overridable steps, with the response fields that describe each. */
+const TRACKING_STEPS = [
+  { number: 2, title: "2-step (Yo'lda)", statusKey: 'step_2_status', autoKey: 'step_2_auto', manualKey: 'step_2_is_manual' },
+  { number: 3, title: '3-step (Bojxona)', statusKey: 'step_3_status', autoKey: 'step_3_auto', manualKey: 'step_3_is_manual' },
+  { number: 4, title: '4-step (Saralash)', statusKey: 'step_4_status', autoKey: 'step_4_auto', manualKey: 'step_4_is_manual' },
+] as const;
+
+type StepStatusKey = (typeof TRACKING_STEPS)[number]['statusKey'];
+
+const AUTO_STATUS_LABELS: Record<StepAutoStatus['status'], string> = {
+  available: "to'liq",
+  partial: 'qisman',
+  pending: 'jarayonda',
+  nodata: "ma'lumot yo'q",
+};
+
+/**
+ * What the warehouse data says, next to what the operator forced.
+ *
+ * Without this the two were indistinguishable: an override set during a delay
+ * looked identical to a status the system worked out itself, so nobody knew
+ * when it was safe to let go of it.
+ */
+function AutoSignalHint({ auto, isManual }: { auto: StepAutoStatus | null; isManual: boolean }) {
+  if (!auto) return null;
+
+  const unit = auto.unit === 'client' ? 'mijoz' : 'yuk';
+  // The override is actively hiding a finished signal — the case worth flagging.
+  const hidesCompletion = isManual && auto.status === 'available';
+
+  return (
+    <div className="mt-1 space-y-0.5 text-[11px] font-semibold leading-tight">
+      <p className="text-gray-500">
+        avtomatik: {auto.matched}/{auto.total} {unit} · {AUTO_STATUS_LABELS[auto.status]}
+      </p>
+      {hidesCompletion && (
+        <p className="text-amber-600">avtomatika tayyor deydi — qo'lda qiymat ustun turibdi</p>
+      )}
+    </div>
+  );
+}
+
 export default function ImportPage() {
   const { t } = useTranslation();
   const [mainTab, setMainTab] = useState<MainTab>('import');
@@ -30,6 +76,8 @@ export default function ImportPage() {
   // Import tab state
   const [activeDbTab, setActiveDbTab] = useState<DatabaseType>('china');
   const [flightName, setFlightName] = useState('');
+  // Set once an import succeeds — reveals the notification sender for that flight.
+  const [importedFlight, setImportedFlight] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -40,6 +88,8 @@ export default function ImportPage() {
   const [loadingFlights, setLoadingFlights] = useState(false);
   const [savingFlight, setSavingFlight] = useState<string | null>(null);
   const [deletingFlight, setDeletingFlight] = useState<string | null>(null);
+  // Keyed "<flight>:<step>" — only the one button being cleared should spin.
+  const [clearingStep, setClearingStep] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<FlightTrackingStatus>>>({});
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -112,11 +162,10 @@ export default function ImportPage() {
       setSubmitStatus('success');
       setSubmitMessage(response.message || t('import.messages.success'));
       setSelectedFile(null);
-      setTimeout(() => {
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.close();
-        }
-      }, 2000);
+      // Hand the operator straight to the notification step instead of closing
+      // the app: telling clients their cargo moved is the point of the import,
+      // and a 2-second auto-close made that impossible without reopening.
+      setImportedFlight(flightName.trim());
     } catch (error: unknown) {
       console.error('Import error:', error);
       const errorMessage =
@@ -137,7 +186,7 @@ export default function ImportPage() {
     setSelectedFile(null);
   };
 
-  const updatePendingChange = (flightName: string, step: 'step_2_status' | 'step_3_status' | 'step_4_status', value: string) => {
+  const updatePendingChange = (flightName: string, step: StepStatusKey, value: string) => {
     setPendingChanges((prev) => ({
       ...prev,
       [flightName]: {
@@ -147,7 +196,7 @@ export default function ImportPage() {
     }));
   };
 
-  const getDisplayStatus = (flight: FlightTrackingStatus, step: 'step_2_status' | 'step_3_status' | 'step_4_status') => {
+  const getDisplayStatus = (flight: FlightTrackingStatus, step: StepStatusKey) => {
     return pendingChanges[flight.flight_name]?.[step] ?? flight[step];
   };
 
@@ -189,6 +238,24 @@ export default function ImportPage() {
       console.error('Failed to save flight tracking:', err);
     } finally {
       setSavingFlight(null);
+    }
+  };
+
+  /** Drop one override so the step follows the warehouse data again. */
+  const handleClearOverride = async (flight: FlightTrackingStatus, stepNumber: number) => {
+    const key = `${flight.flight_name}:${stepNumber}`;
+    setClearingStep(key);
+    try {
+      const result = await clearFlightTrackingStep(flight.flight_name, stepNumber);
+      toast.success(result.message);
+      // Refetch rather than patch locally: dropping the override changes what
+      // clients see, and that value is only known to the server.
+      await fetchFlights();
+    } catch (err) {
+      console.error('Failed to clear tracking override:', err);
+      toast.error("Avtomatikaga qaytarib bo'lmadi");
+    } finally {
+      setClearingStep(null);
     }
   };
 
@@ -371,6 +438,12 @@ export default function ImportPage() {
                   {t('import.submit')}
                 </Button>
               </form>
+
+              {importedFlight && (
+                <div className="relative z-10 mt-6">
+                  <CampaignSender defaultFlight={importedFlight} />
+                </div>
+              )}
             </>
           )}
 
@@ -400,9 +473,11 @@ export default function ImportPage() {
                     <thead className="bg-gray-50 text-gray-700 font-semibold">
                       <tr>
                         <th className="px-4 py-3 text-left">Reys nomi</th>
-                        <th className="px-4 py-3 text-center">2-step (Yo'lda)</th>
-                        <th className="px-4 py-3 text-center">3-step (Bojxona)</th>
-                        <th className="px-4 py-3 text-center">4-step (Saralash)</th>
+                        {TRACKING_STEPS.map((step) => (
+                          <th key={step.number} className="px-4 py-3 text-center">
+                            {step.title}
+                          </th>
+                        ))}
                         <th className="px-4 py-3 text-center">Amallar</th>
                       </tr>
                     </thead>
@@ -416,28 +491,57 @@ export default function ImportPage() {
                                 <Plane className="w-4 h-4 text-orange-500" />
                                 {flight.flight_name}
                               </div>
+                              <p className="mt-0.5 text-[11px] font-semibold text-gray-500">
+                                {flight.total_parcels} yuk · {flight.total_clients} mijoz
+                              </p>
                             </td>
-                            {(['step_2_status', 'step_3_status', 'step_4_status'] as const).map((step) => (
-                              <td key={step} className="px-4 py-3 text-center">
-                                <select
-                                  value={getDisplayStatus(flight, step)}
-                                  onChange={(e) => updatePendingChange(flight.flight_name, step, e.target.value)}
-                                  className={`px-2 py-1 rounded-md border text-xs font-medium outline-none focus:ring-2 focus:ring-orange-500/20 ${
-                                    getDisplayStatus(flight, step) === 'available'
-                                      ? 'bg-green-50 border-green-200 text-green-700'
-                                      : getDisplayStatus(flight, step) === 'pending'
-                                      ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
-                                      : 'bg-gray-50 border-gray-200 text-gray-600'
-                                  }`}
-                                >
-                                  {STEP_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                            ))}
+                            {TRACKING_STEPS.map((step) => {
+                              const displayed = getDisplayStatus(flight, step.statusKey);
+                              const isManual = flight[step.manualKey];
+                              const clearKey = `${flight.flight_name}:${step.number}`;
+                              return (
+                                <td key={step.number} className="px-4 py-3 text-center align-top">
+                                  <select
+                                    value={displayed}
+                                    onChange={(e) => updatePendingChange(flight.flight_name, step.statusKey, e.target.value)}
+                                    className={`px-2 py-1 rounded-md border text-xs font-medium outline-none focus:ring-2 focus:ring-orange-500/20 dark:[color-scheme:dark] ${
+                                      displayed === 'available'
+                                        ? 'bg-green-50 border-green-200 text-green-700 dark:bg-emerald-500/15 dark:border-emerald-400/30 dark:text-emerald-200'
+                                        : displayed === 'pending'
+                                        ? 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-amber-400/15 dark:border-amber-300/30 dark:text-amber-200'
+                                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-white/10 dark:border-white/15 dark:text-white/70'
+                                    }`}
+                                  >
+                                    {STEP_OPTIONS.map((opt) => (
+                                      <option key={opt.value} className={NATIVE_OPTION_CLASS} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  {isManual && (
+                                    <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                                      qo'lda
+                                    </span>
+                                  )}
+
+                                  <AutoSignalHint auto={flight[step.autoKey]} isManual={isManual} />
+
+                                  {isManual && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleClearOverride(flight, step.number)}
+                                      disabled={clearingStep === clearKey || savingFlight === flight.flight_name}
+                                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 underline-offset-2 hover:underline disabled:opacity-50"
+                                      title="Qo'lda qo'yilgan qiymatni olib tashlash"
+                                    >
+                                      <RotateCcw className={`w-3 h-3 ${clearingStep === clearKey ? 'animate-spin' : ''}`} />
+                                      Avtomatikaga
+                                    </button>
+                                  )}
+                                </td>
+                              );
+                            })}
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-2">
                               <button

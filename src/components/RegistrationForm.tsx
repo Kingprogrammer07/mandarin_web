@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, isValid, parse } from 'date-fns';
-import { Calendar as CalendarIcon, Hash, IdCard, MapPin, Phone, UserRound } from 'lucide-react';
+import { Calendar as CalendarIcon, Hash, IdCard, Loader2, MapPin, Phone, UserRound } from 'lucide-react';
 import { register as registerApi, getTelegramWebAppData } from '@/api/services/auth';
+import { applicationService, MY_APPLICATION_QUERY_KEY } from '@/api/services/application';
 import StatusAnimation from './StatusAnimation';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -13,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUpload from './ImageUpload';
+import RegistrationPendingScreen from './RegistrationPendingScreen';
 import TranslatedFormMessage from './TranslatedFormMessage';
 import PrivacyPolicyModal, { PRIVACY_POLICY_VERSION } from './legal/PrivacyPolicyModal';
 import { DISTRICTS, formSchema, regions, type RegistrationFormData } from '@/lib/validation';
@@ -31,12 +34,15 @@ const STEP_FIELDS: Record<RegisterStep, Array<keyof RegistrationFormData>> = {
 
 export default function RegistrationForm({ onNavigateToLogin }: RegistrationFormProps) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState<RegisterStep>(1);
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [dateInputValue, setDateInputValue] = useState('');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  // Replaces the old "toast then redirect to login" ending — see the submit handler.
+  const [showPendingScreen, setShowPendingScreen] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   // Explicit, required consent to the Privacy Policy + User Agreement before the
   // account (with passport/KYC data) is created.
@@ -48,6 +54,15 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
       onNavigateToLogin();
     }
   }, [onNavigateToLogin]);
+
+  // Someone who already applied must not be handed a blank form again — that is
+  // how the same person ends up submitting twice. On failure (no Telegram
+  // context, network down) we fall through to the form rather than block them.
+  const { data: existingApplication, isPending: isCheckingApplication } = useQuery({
+    queryKey: MY_APPLICATION_QUERY_KEY,
+    queryFn: () => applicationService.get(),
+    retry: false,
+  });
 
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(formSchema),
@@ -129,11 +144,10 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
       setDateInputValue('');
       setCurrentStep(1);
 
-      setTimeout(() => {
-        if (onNavigateToLogin) {
-          onNavigateToLogin();
-        }
-      }, 1500);
+      // No auto-redirect to login: the account is not usable until an admin
+      // approves it. Sending the user to a login form they cannot pass is what
+      // made people re-submit the same registration.
+      setShowPendingScreen(true);
     } catch (error: unknown) {
       setSubmitStatus('error');
       const message =
@@ -216,6 +230,32 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
   const labelClass = 'ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76';
   const iconBoxClass =
     'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300';
+
+  if (isCheckingApplication) {
+    return (
+      <div className="flex min-h-[40svh] items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (showPendingScreen || existingApplication?.status === 'pending') {
+    return (
+      <RegistrationPendingScreen
+        onContinue={() => {
+          setShowPendingScreen(false);
+          onNavigateToLogin?.();
+        }}
+        onWithdrawn={() => {
+          // Back to a blank form: the withdrawal freed the phone/passport, so a
+          // fresh application can be filled in immediately.
+          setShowPendingScreen(false);
+          setCurrentStep(1);
+          void queryClient.invalidateQueries({ queryKey: MY_APPLICATION_QUERY_KEY });
+        }}
+      />
+    );
+  }
 
   return (
     <>

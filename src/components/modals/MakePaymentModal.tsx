@@ -53,6 +53,7 @@ import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
 import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
+import { OfficeVisitSummary } from '@/components/office/OfficeStatus';
 import { playApplePaySound } from '@/utils/audioUtils';
 import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
 import { useGuideTour } from '@/hooks/useGuideTour';
@@ -605,6 +606,11 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     () => Math.max(effectiveAmount - walletDeduction, 0),
     [effectiveAmount, walletDeduction],
   );
+
+  // NBU's gateway minimum (100000 tiyin). Below it the charge is rejected
+  // server-side, so the online button is disabled with an explanation instead.
+  const NBU_MIN_UZS = 1000;
+  const isBelowNbuMinimum = finalPayable > 0 && finalPayable < NBU_MIN_UZS;
 
   const paymentMode = useMemo((): 'full' | 'partial' | 'full_remaining' => {
     if (isPartial) return 'partial'; // Always "partial" if the custom toggle is activated
@@ -1468,13 +1474,21 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           </motion.button>
         )}
 
-        {/* ---- NBU Online Payment (primary CTA when enabled) ---- */}
+        {/* ---- NBU Online Payment (primary CTA when enabled) ----
+             NBU refuses anything under 1000 so'm. Saying so up front beats
+             letting the user reach the bank page and bounce back with a
+             rejection they cannot act on. */}
+        {nbuEnabled && isBelowNbuMinimum && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-[12px] font-bold text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+            {t('makePayment.belowNbuMinimum')}
+          </p>
+        )}
         {nbuEnabled && (
           <motion.button
             data-tour="pay-methods"
             whileTap={{ scale: 0.97 }}
             onClick={handleNbuPayment}
-            disabled={isNbuInitiating}
+            disabled={isNbuInitiating || isBelowNbuMinimum}
             className="w-full h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-sky-500 to-cyan-500
               hover:from-sky-600 hover:to-cyan-600
@@ -1487,7 +1501,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             ) : (
               <CreditCard className="w-5 h-5" />
             )}
-            {t('nbu.payOnlineNbu')}
+            {/* Three payment buttons sat side by side with no explanation of how
+                they differ — the reported complaint. Each now says what happens. */}
+            <span className="flex flex-col items-start leading-tight">
+              <span>{t('nbu.payOnlineNbu')}</span>
+              <span className="text-[11px] font-semibold opacity-80">
+                {t('nbu.payOnlineNbuHint')}
+              </span>
+            </span>
           </motion.button>
         )}
 
@@ -1527,7 +1548,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             }
           >
             <Banknote className="w-5 h-5" />
-            {t('makePayment.payCash')}
+            <span className="flex flex-col items-start leading-tight">
+              <span>{t('makePayment.payCash')}</span>
+              <span className="text-[11px] font-semibold opacity-70">
+                {t('makePayment.payCashHint')}
+              </span>
+            </span>
           </motion.button>
         </div>
       </div>
@@ -1586,6 +1612,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               {t('makePayment.cashConfirmDesc')}
             </p>
           </div>
+          {/* This screen tells the customer to come to the office — without the
+              address and today's hours they arrive at a closed door. */}
+          <OfficeVisitSummary />
           {walletDeduction > 0 && (
             <div className="w-full max-w-xs mx-auto rounded-xl p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
               <div className="flex justify-between text-sm">

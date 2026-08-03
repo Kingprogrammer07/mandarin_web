@@ -342,7 +342,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 {t('nbu.cards.title', "Saqlangan kartalar")}
                                             </h3>
                                             <p className="text-xs text-gray-500 dark:text-[#fff8ed]/55">
-                                                {t('nbu.cards.sectionHint', "Tezkor to'lov uchun")}
+                                                {t('nbu.cards.sectionHintLong', "Yuk to'lovini shu karta bilan bir bosishda to'laysiz")}
                                             </p>
                                         </div>
 
@@ -442,6 +442,9 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 {/* Bind block: optional nickname (NBU never returns the PAN
                                                     on bind, so the label is the user's pre-charge anchor). */}
                                                 <div className="space-y-2 pt-1">
+                                                    <Label className="text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
+                                                        {t('nbu.cards.nicknameLabel', "Karta nomi (ixtiyoriy)")}
+                                                    </Label>
                                                     <Input
                                                         value={bindNickname}
                                                         onChange={(e) => setBindNickname(e.target.value.slice(0, 40))}
@@ -450,6 +453,12 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                     />
                                                     <p className="px-1 text-[11px] leading-snug text-gray-400 dark:text-[#fff8ed]/45">
                                                         {t('nbu.cards.nicknameHint', "Kartani keyin tanib olishingiz uchun nom bering. Karta raqami birinchi to'lovdan keyin ko'rinadi.")}
+                                                    </p>
+                                                    {/* People reported "I can't add a card": tapping this leaves the
+                                                        Uzbek app for NBU's Russian-only form with no warning. Say what
+                                                        happens and what they will need before they get there. */}
+                                                    <p className="rounded-xl bg-sky-50 px-3 py-2 text-[11px] font-semibold leading-snug text-sky-900 dark:bg-sky-400/10 dark:text-sky-200">
+                                                        {t('nbu.cards.bindNotice')}
                                                     </p>
                                                     <Button
                                                         variant="outline"
@@ -490,8 +499,12 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         <div className="h-14 w-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-3">
                                             <CreditCard className="h-7 w-7 text-gray-400" />
                                         </div>
-                                        <p className="font-medium mb-1 text-sm">{t('wallet.cards.noCards', "Hozircha kartalar yo'q")}</p>
-                                        <p className="text-xs text-gray-400 mb-5 max-w-xs">{t('wallet.cards.addPrompt', "To'lovlarni tezroq amalga oshirish uchun karta qo'shing")}</p>
+                                        {/* Refund-card empty state. Must NOT reuse the payment-card
+                                            copy: a user with a saved payment card above was reading
+                                            "Hozircha kartalar yo'q" and concluded their card binding
+                                            had failed. */}
+                                        <p className="font-medium mb-1 text-sm">{t('wallet.cards.noRefundCards', "Qaytarish kartasi qo'shilmagan")}</p>
+                                        <p className="text-xs text-gray-400 mb-5 max-w-xs">{t('wallet.cards.refundAddPrompt', "Bu karta faqat pul qaytarilganda ishlatiladi. To'lov uchun yuqoridagi “To'lov kartalari” bo'limidan foydalaning.")}</p>
                                         <Button
                                             onClick={() => setIsAdding(true)}
                                             className="rounded-full bg-orange-500 px-6 font-black text-white hover:bg-orange-600"

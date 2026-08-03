@@ -67,21 +67,51 @@ const UZBEK_HTTP_ERRORS: Record<number, string> = {
 };
 
 /**
+ * Statuses where a `detail` from the backend beats the generic text.
+ *
+ * 403 and 404 are the two that carry a real explanation — which account the
+ * test may target, which identifier matched nothing. Replacing that with
+ * "Ruxsat yo'q" hid the only useful part of the answer and made a rule look
+ * like a broken permission.
+ */
+const DETAIL_PREFERRED_STATUSES = new Set([403, 404]);
+
+/**
  * Resolves the user-facing error message for a failed response.
- * - For auth/infra status codes (401, 403, 5xx, …) returns a hardcoded Uzbek string
+ * - For auth/infra status codes (401, 5xx, …) returns a hardcoded Uzbek string
  *   because the backend middleware returns English for those.
- * - For business-logic codes (400, 409, 422) trusts the backend's `detail` field,
- *   which is already written in Uzbek.
+ * - For business-logic codes (400, 409, 422) and for 403/404 trusts the
+ *   backend's `detail` field, which is already written in Uzbek.
  */
 function resolveErrorMessage(status: number, detail: unknown): string {
+  const detailText = typeof detail === 'string' ? detail.trim() : '';
+  if (detailText && DETAIL_PREFERRED_STATUSES.has(status)) return detailText;
   if (UZBEK_HTTP_ERRORS[status]) return UZBEK_HTTP_ERRORS[status];
-  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (detailText) return detailText;
   if (Array.isArray(detail) && detail.length > 0) {
     // FastAPI validation error array — take the first message
     const first = detail[0];
     if (typeof first?.msg === 'string') return first.msg;
   }
   return "Serverda xatolik yuz berdi.";
+}
+
+/**
+ * A 401 that must NOT clear the session or dispatch a logout.
+ *
+ * These endpoints are either read-only reads behind a stricter-than-needed
+ * permission gate, or genuinely pre-login surfaces where 401 means "no
+ * credentials yet" rather than "your session died". Treating those as a logout
+ * bounces the user off the screen that was about to explain the situation.
+ */
+function isSilentUnauthorized(url: string, method: string): boolean {
+  return (
+    url.includes('/admin/auth/refresh') ||
+    url.includes('/payments/nbu/payment-status-public/') ||
+    // A pending applicant has no session by definition.
+    url.includes('/auth/my-application') ||
+    (url.includes('/flight-schedule') && method === 'get')
+  );
 }
 
 // ─── Main API client (JSON) ───────────────────────────────────────────────────
@@ -134,11 +164,7 @@ apiClient.interceptors.response.use(
         const requestMethod: string = error.config?.method ?? '';
         // Public-read endpoints that should never trigger logout on 401 —
         // the backend permission gate is stricter than needed for read access.
-        const isSilent401 =
-          requestUrl.includes('/admin/auth/refresh') ||
-          requestUrl.includes('/payments/nbu/payment-status-public/') ||
-          (requestUrl.includes('/flight-schedule') && requestMethod === 'get');
-        if (!isSilent401) {
+        if (!isSilentUnauthorized(requestUrl, requestMethod)) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('admin_role');
           sessionStorage.removeItem('access_token');
@@ -297,11 +323,7 @@ apiClientFormData.interceptors.response.use(
       if (status === 401) {
         const requestUrl: string = error.config?.url ?? '';
         const requestMethod: string = error.config?.method ?? '';
-        const isSilent401 =
-          requestUrl.includes('/admin/auth/refresh') ||
-          requestUrl.includes('/payments/nbu/payment-status-public/') ||
-          (requestUrl.includes('/flight-schedule') && requestMethod === 'get');
-        if (!isSilent401) {
+        if (!isSilentUnauthorized(requestUrl, requestMethod)) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('admin_role');
           sessionStorage.removeItem('access_token');

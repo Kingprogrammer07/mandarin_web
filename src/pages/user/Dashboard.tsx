@@ -47,6 +47,8 @@ const CalculatorModal = lazy(() => import('@/components/modals/CalculatorModal')
 const DeliveryReviewModal = lazy(() => import('@/components/delivery/DeliveryReviewModal'));
 const ProhibitedItemsModal = lazy(() => import('@/components/modals/ProhibitedItemsModal'));
 const OurAddressModal = lazy(() => import('@/components/modals/OurAddressModal'));
+import { OfficeHomeStrip } from '@/components/office/OfficeStatus';
+import ReviewPromptCard from '@/components/delivery/ReviewPromptCard';
 const NotificationCenter = lazy(loadNotificationCenter);
 
 /**
@@ -103,6 +105,10 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
   // never causes a setState-in-effect cascade; in that mode submit is mocked.
   const [reviewDrId, setReviewDrId] = useState<number | null>(readForcedReviewId);
   const reviewIsMock = readForcedReviewId() !== null;
+  // The prompt used to pop open on every load, which interrupted people who
+  // came to do something else. It is now a card on the home screen; the modal
+  // opens only when they tap it. Dev-forced runs still open it immediately.
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(reviewIsMock);
   useEffect(() => {
     // Dev force already armed the modal — skip the real pending-review fetch.
     if (readForcedReviewId() !== null) return;
@@ -121,9 +127,12 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
   const [isChinaModalOpen, setIsChinaModalOpen] = useState(false);
   // Returning from an NBU payment? Open the modal straight from initial state
   // (lazy init) instead of a setState-in-effect, which avoids a cascading render.
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(
-    () => new URLSearchParams(window.location.search).get('nbuReturn') === 'payment',
-  );
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    // `nbuReturn=payment` is the bank round-trip; `action=pay` is the bot's
+    // "💳 To'lov qilish" button deep-linking straight into the payment flow.
+    return params.get('nbuReturn') === 'payment' || params.get('action') === 'pay';
+  });
   const [paymentFlightName, setPaymentFlightName] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('nbuReturn') === 'payment' ? params.get('nbuFlight') : null;
@@ -395,9 +404,12 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
     }
   };
 
+  // Bottom padding must clear the floating nav (fixed bottom-4 + ~68px pill) AND
+  // the gesture bar — without the safe-area term the last row sits under the nav
+  // on gesture-navigation phones.
   return (
     <div
-      className="min-h-screen bg-gray-50 dark:bg-[#06080d] text-gray-900 dark:text-white transition-colors duration-300 font-sans selection:bg-orange-500/30 pb-24"
+      className="min-h-screen bg-gray-50 dark:bg-[#06080d] text-gray-900 dark:text-white transition-colors duration-300 font-sans selection:bg-orange-500/30 pb-[calc(7.5rem+env(safe-area-inset-bottom))]"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -428,6 +440,13 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
             <DeliveryRequestPage
               onBack={() => handleSetActiveTab('home')}
               onNavigateToHistory={() => handleSetActiveTab('delivery_history')}
+              onGoToPayment={() => {
+                // Delivery needs a paid flight; send the user straight to payment
+                // instead of leaving them on an empty flight list.
+                handleSetActiveTab('home');
+                setPaymentFlightName(null);
+                setIsPaymentModalOpen(true);
+              }}
             />
           </Suspense>
         )}
@@ -494,6 +513,15 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
                 ))}
               </div>
             </section>
+
+            {reviewDrId !== null && !isReviewModalOpen && (
+              <ReviewPromptCard onOpen={() => setIsReviewModalOpen(true)} />
+            )}
+
+            {/* Office strip — the address used to be buried third in "Boshqa
+                xizmatlar", so customers went looking for the office without it
+                and with no idea whether it was even open. */}
+            <OfficeHomeStrip onOpen={() => setIsOurAddressModalOpen(true)} />
 
             <section className="mb-5" data-tour="dash-actions">
               <div className="flex items-center justify-between mb-3 ml-1 mr-1">
@@ -667,18 +695,21 @@ export default function Dashboard({ onNavigateToReports, onNavigateToHistory, on
             isOpen={isOurAddressModalOpen}
             onClose={() => setIsOurAddressModalOpen(false)}
           />
-          {reviewDrId !== null && (
+          {reviewDrId !== null && isReviewModalOpen && (
             <DeliveryReviewModal
               open
               deliveryRequestId={reviewDrId}
               mock={reviewIsMock}
               onDismiss={() => {
-                // Mark seen so it never asks again (skip while dev-testing).
+                // "Keyinroq" = an explicit answer, so retire the prompt
+                // permanently (skip while dev-testing).
                 if (!reviewIsMock) markReviewSeen(reviewDrId);
+                setIsReviewModalOpen(false);
                 setReviewDrId(null);
               }}
               onSubmitted={() => {
                 if (!reviewIsMock) markReviewSeen(reviewDrId);
+                setIsReviewModalOpen(false);
                 setReviewDrId(null);
               }}
             />

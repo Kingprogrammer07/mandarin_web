@@ -1,5 +1,109 @@
 import { apiClient } from '@/api/client';
 
+/**
+ * SMS gateway configuration, editable by a super-admin.
+ *
+ * The password is never part of this type: the API reports only whether one is
+ * stored. Returning the credential so the form could pre-fill it would put it
+ * in every browser cache and proxy log.
+ */
+export interface SmsSettings {
+  provider: 'none' | 'smsgate';
+  /**
+   * Which SMS Gate server `base_url` points at. The paths differ —
+   * cloud/private serve `/3rdparty/v1/messages`, the phone's own server serves
+   * `/message` — so this cannot be inferred from the URL.
+   */
+  mode: 'cloud' | 'local';
+  base_url: string;
+  username: string;
+  password_set: boolean;
+  device_id: string;
+  sim_number: number | null;
+  /** Refuse to queue unless the phone was online this recently. 0 disables. */
+  active_within_hours: number;
+  daily_limit: number;
+  message_ttl_seconds: number;
+  request_timeout_seconds: number;
+  updated_at: string | null;
+  updated_by: string | null;
+  /** Stored password can no longer be decrypted — it must be re-entered. */
+  password_unreadable: boolean;
+}
+
+/** One place the bot can offer a video guide. */
+export interface VideoGuideEntry {
+  key: string;
+  label: string;
+  /** Where in the bot this guide appears. */
+  placement: string;
+  /** Empty when no video has been recorded yet — the bot then shows nothing. */
+  url: string;
+}
+
+export interface VideoGuides {
+  guides: VideoGuideEntry[];
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+/** One home-menu button that can carry a premium custom emoji. */
+export interface ButtonIconEntry {
+  key: string;
+  label: string;
+  /** Numeric Telegram custom emoji id. Empty = plain button. */
+  emoji_id: string;
+  /** '', 'primary', 'success' or 'danger'. */
+  style: string;
+}
+
+export interface ButtonIcons {
+  enabled: boolean;
+  buttons: ButtonIconEntry[];
+  /** Telegram refused the decoration; it is off regardless of `enabled`. */
+  auto_disabled: boolean;
+  auto_disabled_reason: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface ButtonIconsUpdate {
+  enabled?: boolean;
+  icons?: Record<string, { emoji_id?: string; style?: string }>;
+}
+
+/** One phone registered on the gateway account. */
+export interface SmsDevice {
+  id: string;
+  name: string;
+  /** ISO timestamp exactly as the gateway reported it. */
+  last_seen: string;
+}
+
+/** Read-only probe result — no message is sent. */
+export interface SmsCheckResult {
+  ok: boolean;
+  detail: string;
+  devices: SmsDevice[];
+}
+
+export interface SmsSettingsUpdate {
+  provider?: 'none' | 'smsgate';
+  mode?: 'cloud' | 'local';
+  base_url?: string;
+  username?: string;
+  /** Omit to keep the stored password; send a value to replace it. */
+  password?: string;
+  /** Explicit erase — an omitted password means "leave it alone". */
+  clear_password?: boolean;
+  device_id?: string;
+  sim_number?: number | null;
+  active_within_hours?: number;
+  daily_limit?: number;
+  message_ttl_seconds?: number;
+  request_timeout_seconds?: number;
+}
+
 export interface MaintenanceStatusResponse {
   maintenance: boolean;
   is_admin: boolean;
@@ -250,6 +354,51 @@ export const systemService = {
     const { data } = await apiClient.post<NbuReportResendResponse>(
       '/api/v1/system/nbu/report/resend',
       { hours_back: hoursBack },
+    );
+    return data;
+  },
+
+  async getVideoGuides(): Promise<VideoGuides> {
+    const { data } = await apiClient.get<VideoGuides>('/api/v1/system/video-guides');
+    return data;
+  },
+
+  async updateVideoGuides(links: Record<string, string>): Promise<VideoGuides> {
+    const { data } = await apiClient.put<VideoGuides>('/api/v1/system/video-guides', {
+      links,
+    });
+    return data;
+  },
+
+  async getButtonIcons(): Promise<ButtonIcons> {
+    const { data } = await apiClient.get<ButtonIcons>('/api/v1/system/button-icons');
+    return data;
+  },
+
+  async updateButtonIcons(body: ButtonIconsUpdate): Promise<ButtonIcons> {
+    const { data } = await apiClient.put<ButtonIcons>(
+      '/api/v1/system/button-icons',
+      body,
+    );
+    return data;
+  },
+
+  async getSmsSettings(): Promise<SmsSettings> {
+    const { data } = await apiClient.get<SmsSettings>('/api/v1/system/sms-settings');
+    return data;
+  },
+
+  async checkSmsGateway(): Promise<SmsCheckResult> {
+    const { data } = await apiClient.post<SmsCheckResult>(
+      '/api/v1/system/sms-settings/check',
+    );
+    return data;
+  },
+
+  async updateSmsSettings(body: SmsSettingsUpdate): Promise<SmsSettings> {
+    const { data } = await apiClient.put<SmsSettings>(
+      '/api/v1/system/sms-settings',
+      body,
     );
     return data;
   },

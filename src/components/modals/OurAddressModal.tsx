@@ -7,6 +7,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import {
+  Clock,
   ExternalLink,
   Instagram,
   MapPin,
@@ -14,6 +15,13 @@ import {
   Send,
   X,
 } from 'lucide-react';
+import {
+  OfficeContacts,
+  OfficeHoursTable,
+  OfficeOpenBadge,
+} from '@/components/office/OfficeStatus';
+import { useOfficeInfo } from '@/hooks/useOfficeInfo';
+import YandexMap, { type YandexMarker } from '@/components/map/YandexMap';
 
 const MANDARIN_LOCATION = {
   latitude: 41.284025,
@@ -102,6 +110,34 @@ function SocialLink({
 function OurAddressModal({ isOpen, onClose }: OurAddressModalProps) {
   const { t } = useTranslation();
   const pinIcon = useMemo(() => createPinIcon(), []);
+  // Address, hours and phones are admin-editable; fall back to the historical
+  // constants so the modal still works before staff fill the record in.
+  const { data: office, isLoading: officeLoading } = useOfficeInfo();
+
+  const center = useMemo<[number, number]>(
+    () => [
+      office?.latitude ?? MANDARIN_LOCATION.latitude,
+      office?.longitude ?? MANDARIN_LOCATION.longitude,
+    ],
+    [office?.latitude, office?.longitude],
+  );
+  const mapUrl = office?.map_url || YANDEX_MAP_URL;
+  const adminUrl = office?.telegram_username
+    ? `https://t.me/${office.telegram_username.replace(/^@/, '')}`
+    : ADMIN_URL;
+  const officeMarkers = useMemo<YandexMarker[]>(
+    () => [
+      {
+        id: 'office',
+        latitude: center[0],
+        longitude: center[1],
+        // Red reads as "you are looking for this" against Yandex's warm map.
+        color: '#e11d48',
+        selected: true,
+      },
+    ],
+    [center],
+  );
 
   if (typeof document === 'undefined') return null;
 
@@ -150,29 +186,39 @@ function OurAddressModal({ isOpen, onClose }: OurAddressModalProps) {
 
             <div className="max-h-[calc(92vh-73px)] overflow-y-auto p-5">
               <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-100 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
-                <div className="relative h-[230px]">
-                  <MapContainer
-                    center={[MANDARIN_LOCATION.latitude, MANDARIN_LOCATION.longitude]}
-                    zoom={16}
-                    scrollWheelZoom={false}
-                    dragging
-                    touchZoom
-                    doubleClickZoom
-                    zoomControl={false}
+                <div className="relative h-[300px]">
+                  {/* Yandex when a key is configured (local street data is far
+                      better here); OSM/Leaflet stays as the fallback so a missing
+                      key or a blocked CDN can never hide the office location. */}
+                  <YandexMap
+                    center={center}
+                    zoom={17}
+                    followCenter
+                    markers={officeMarkers}
                     className="h-full w-full"
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker
-                      position={[MANDARIN_LOCATION.latitude, MANDARIN_LOCATION.longitude]}
-                      icon={pinIcon}
-                    />
-                  </MapContainer>
+                    fallback={
+                      <MapContainer
+                        key={`${center[0]},${center[1]}`}
+                        center={center}
+                        zoom={16}
+                        scrollWheelZoom={false}
+                        dragging
+                        touchZoom
+                        doubleClickZoom
+                        zoomControl={false}
+                        className="h-full w-full"
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <Marker position={center} icon={pinIcon} />
+                      </MapContainer>
+                    }
+                  />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
                   <a
-                    href={YANDEX_MAP_URL}
+                    href={mapUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="absolute bottom-3 left-3 z-[500] inline-flex items-center gap-2 rounded-2xl bg-white/95 px-3 py-2 text-xs font-black text-gray-900 shadow-lg ring-1 ring-black/5 backdrop-blur-md transition active:scale-95 dark:bg-gray-950/95 dark:text-white dark:ring-white/10"
@@ -187,12 +233,29 @@ function OurAddressModal({ isOpen, onClose }: OurAddressModalProps) {
                 <p className="text-[11px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-300">
                   {t('ourAddress.addressLabel')}
                 </p>
-                <p className="mt-2 text-base font-black text-gray-950 dark:text-[#fff8ed]">
-                  {t('ourAddress.locationName')}
-                </p>
+                <div className="mt-2 flex items-start justify-between gap-2">
+                  <p className="text-base font-black text-gray-950 dark:text-[#fff8ed]">
+                    {t('ourAddress.locationName')}
+                  </p>
+                  {office && <OfficeOpenBadge office={office} />}
+                </div>
+                {/* Admin-managed address; the old hardcoded string had no street
+                    or building number, so customers could not find the office. */}
                 <p className="mt-1 text-sm font-semibold leading-relaxed text-gray-600 dark:text-white/50">
-                  {t('ourAddress.addressValue')}
+                  {officeLoading
+                    ? t('office.loading')
+                    : office?.address_text || t('ourAddress.addressValue')}
                 </p>
+                {office?.landmark && (
+                  <p className="mt-1 text-[13px] font-semibold leading-relaxed text-gray-500 dark:text-white/40">
+                    {office.landmark}
+                  </p>
+                )}
+                {office?.notice && (
+                  <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[13px] font-bold text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                    {office.notice}
+                  </p>
+                )}
                 <a
                   href={YANDEX_MAP_URL}
                   target="_blank"
@@ -204,6 +267,25 @@ function OurAddressModal({ isOpen, onClose }: OurAddressModalProps) {
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
+
+              {office && Object.keys(office.working_hours ?? {}).length > 0 && (
+                <div className="mt-4 rounded-[1.5rem] border border-gray-200/80 bg-white/85 p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.045]">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-gray-950 dark:text-[#fff8ed]">
+                    <Clock className="h-4 w-4 text-orange-500" />
+                    {t('office.hoursTitle')}
+                  </h3>
+                  <OfficeHoursTable office={office} />
+                </div>
+              )}
+
+              {office && (office.phones.length > 0 || office.telegram_username) && (
+                <div className="mt-4">
+                  <h3 className="mb-3 text-sm font-black text-gray-950 dark:text-[#fff8ed]">
+                    {t('office.contactsTitle')}
+                  </h3>
+                  <OfficeContacts office={office} />
+                </div>
+              )}
 
               <div className="mt-4">
                 <h3 className="mb-3 text-sm font-black text-gray-950 dark:text-[#fff8ed]">
@@ -223,7 +305,7 @@ function OurAddressModal({ isOpen, onClose }: OurAddressModalProps) {
                     description={t('ourAddress.instagram.desc')}
                   />
                   <SocialLink
-                    href={ADMIN_URL}
+                    href={adminUrl}
                     icon={<MessageCircle className="h-5 w-5" />}
                     label={t('ourAddress.admin.label')}
                     description={t('ourAddress.admin.desc')}

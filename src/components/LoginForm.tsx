@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { login as loginApi, getTelegramWebAppData, fetchAuthMe } from '@/api/services/auth';
+import { applicationService } from '@/api/services/application';
 import StatusAnimation from './StatusAnimation';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
@@ -28,6 +29,21 @@ const addressSchema = z.object({
   district: z.string().min(1, 'form.validation.districtRequired'),
 });
 type AddressFormData = z.infer<typeof addressSchema>;
+
+/**
+ * A 403 from login means either "still awaiting approval" or "not logged in",
+ * and the two need different screens. Rather than pattern-match a translated
+ * message, ask the application endpoint directly; if it cannot answer we fall
+ * back to showing the server's message.
+ */
+async function hasPendingApplication(): Promise<boolean> {
+  try {
+    const application = await applicationService.get();
+    return application.status === 'pending';
+  } catch {
+    return false;
+  }
+}
 
 interface LoginFormProps {
   onNavigateToRegister?: () => void;
@@ -114,6 +130,13 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
         setSubmitMessage('');
         setCredentials({ clientCode: data.clientCode, phoneNumber: data.phoneNumber });
         setShowAddressDrawer(true);
+      } else if (status === 403 && (await hasPendingApplication())) {
+        // Their application is still waiting, so no code will ever work here.
+        // Send them to the screen that explains it and lets them fix or cancel
+        // it, instead of leaving them to retry a login that cannot succeed.
+        setSubmitStatus('idle');
+        setSubmitMessage('');
+        onNavigateToRegister?.();
       } else {
         setSubmitStatus('error');
         setSubmitMessage(detail || message || t('login.messages.generalError'));

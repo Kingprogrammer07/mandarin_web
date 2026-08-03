@@ -76,6 +76,8 @@ interface DeliveryOption {
 interface Props {
   onBack: () => void;
   onNavigateToHistory?: () => void;
+  /** Opens the payment modal — offered when the user has no paid flight yet. */
+  onGoToPayment?: () => void;
 }
 
 // ============================================
@@ -285,10 +287,12 @@ interface StepFlightProps {
   onToggle: (name: string) => void;
   onContinue: () => void;
   onBack: () => void;
+  /** Opens the payment flow — the only way out when no flight is paid yet. */
+  onGoToPayment?: () => void;
 }
 
 const StepFlightSelection = memo(
-  ({ deliveryType, flights, loading, selected, onToggle, onContinue, onBack }: StepFlightProps) => {
+  ({ deliveryType, flights, loading, selected, onToggle, onContinue, onBack, onGoToPayment }: StepFlightProps) => {
     const { t } = useTranslation();
     return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
@@ -317,14 +321,31 @@ const StepFlightSelection = memo(
       {loading ? (
         <FlightSkeleton />
       ) : flights.length === 0 ? (
+        /* Dead-end guard: delivery needs a PAID flight, so a user whose payment
+           failed lands here with no way forward. Explain the rule and hand them
+           the payment flow instead of an empty plane icon. */
         <div className="text-center py-16">
           <Plane className="w-16 h-16 mx-auto text-gray-300 dark:text-white/15 mb-4" />
           <p className="text-gray-500 dark:text-gray-400 font-semibold text-lg">
             {t('deliveryRequest.steps.flight.empty')}
           </p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1 max-w-xs mx-auto">
             {t('deliveryRequest.steps.flight.emptyDesc')}
           </p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-3 max-w-xs mx-auto">
+            {t('deliveryRequest.steps.flight.emptyHint', "Zayavka qoldirish uchun avval yuk to'lovini amalga oshiring.")}
+          </p>
+          {onGoToPayment && (
+            <button
+              onClick={onGoToPayment}
+              className="mt-5 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl
+                bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold
+                shadow-lg shadow-amber-500/20 active:scale-[0.97] transition-all"
+            >
+              <Wallet className="w-5 h-5" />
+              {t('deliveryRequest.steps.flight.emptyCta', "To'lov qilish")}
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -1496,7 +1517,7 @@ const ProfileIncompleteAlert = memo(
 // MAIN COMPONENT
 // ============================================
 
-export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Props) {
+export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoToPayment }: Props) {
   const { t } = useTranslation();
   const { data: userProfile, isLoading: profileLoading, refetch: refetchProfile } = useProfile();
 
@@ -1949,6 +1970,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory }: Pro
           onToggle={toggleFlight}
           onContinue={handleFlightContinue}
           onBack={goBackStep}
+          onGoToPayment={onGoToPayment}
         />
       )}
 

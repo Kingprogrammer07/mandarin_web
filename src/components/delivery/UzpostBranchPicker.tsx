@@ -21,6 +21,7 @@ import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from 're
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import YandexMap, { type YandexMarker } from '@/components/map/YandexMap';
 import { playSuccessSound } from '@/utils/audioUtils';
 import { requestUserLocation, type UserLocation } from '@/utils/locationRequest';
 import type { UzpostBranch } from '@/types/uzpostBranch';
@@ -524,6 +525,34 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     [onSelect, t]
   );
 
+  // ── Yandex map inputs (mirrors what the Leaflet fallback renders) ──
+  const yandexCenter = useMemo<[number, number]>(() => {
+    if (selectedBranch) return [selectedBranch.latitude, selectedBranch.longitude];
+    if (userLocation) return [userLocation.latitude, userLocation.longitude];
+    return DEFAULT_CENTER;
+  }, [selectedBranch, userLocation]);
+
+  const yandexMarkers = useMemo<YandexMarker[]>(() => {
+    const pins: YandexMarker[] = visibleMapBranches.map((branch) => ({
+      id: branch.id,
+      latitude: branch.latitude,
+      longitude: branch.longitude,
+      color: selectedBranch?.id === branch.id ? theme.selectedMarkerColor : theme.markerColor,
+      selected: selectedBranch?.id === branch.id,
+      label: branch.name,
+      onClick: () => handleBranchSelect(branch),
+    }));
+    if (userLocation) {
+      pins.push({
+        id: '__user__',
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        color: '#2563eb',
+      });
+    }
+    return pins;
+  }, [visibleMapBranches, selectedBranch, userLocation, theme, handleBranchSelect]);
+
   useEffect(() => {
     return () => {
       if (collapseTimeoutRef.current !== null) {
@@ -698,6 +727,15 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
       {/* Map container */}
       {isMapExpanded && (
         <div className={cn(theme.mapClassName, 'h-[420px]', 'relative')}>
+          {/* Yandex has far better UzPost-branch-level street data locally;
+              Leaflet/OSM remains the fallback when no API key is configured. */}
+          <YandexMap
+            center={yandexCenter}
+            zoom={selectedBranch ? 15 : 11}
+            followCenter
+            markers={yandexMarkers}
+            className="h-full w-full"
+            fallback={
           <MapContainer
             key="uzpost-map-expanded"
             center={DEFAULT_CENTER}
@@ -758,6 +796,8 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
               );
             })}
           </MapContainer>
+            }
+          />
           <button
             type="button"
             onClick={() => setIsMapExpanded(false)}
