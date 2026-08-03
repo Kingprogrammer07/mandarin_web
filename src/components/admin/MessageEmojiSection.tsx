@@ -41,6 +41,12 @@ function EmojiForm({ data }: { data: MessageEmoji }) {
     data.entries.map((e) => ({ emoji: e.emoji, emoji_id: e.emoji_id })),
   );
 
+  // What the server had when this form was seeded. Used to tell "the operator
+  // edited the pairs" from "the operator only flipped the switch".
+  const initialMapping = JSON.stringify(
+    Object.fromEntries(data.entries.map((e) => [e.emoji, e.emoji_id])),
+  );
+
   const saveMutation = useMutation({
     mutationFn: () => {
       const mapping: Record<string, string> = {};
@@ -49,7 +55,14 @@ function EmojiForm({ data }: { data: MessageEmoji }) {
         const id = row.emoji_id.trim();
         if (emoji && id) mapping[emoji] = id;
       }
-      const body: MessageEmojiUpdate = { enabled, mapping };
+      const body: MessageEmojiUpdate = { enabled };
+      // Only send the map when it actually changed. Pressing Saqlash to turn
+      // the feature on used to overwrite the stored pairs with whatever the
+      // form held — which wiped a 17-entry map to nothing the first time
+      // somebody opened the screen and saved before it had loaded.
+      if (JSON.stringify(mapping) !== initialMapping) {
+        body.mapping = mapping;
+      }
       return systemService.updateMessageEmoji(body);
     },
     onSuccess: (updated) => {
@@ -146,6 +159,14 @@ function EmojiForm({ data }: { data: MessageEmoji }) {
         Kanallarga ketadigan xabarlar tegilmaydi (Telegram ruxsat bermaydi),
         eski ilovada esa oddiy emoji ko'rinadi.
       </p>
+
+      {rows.length === 0 && data.entries.length > 0 && (
+        <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Barcha juftlar o'chirildi — saqlasangiz {data.entries.length} ta juft
+          yo'qoladi va matnlar oddiy emoji bilan ketadi.
+        </p>
+      )}
 
       <button
         type="button"

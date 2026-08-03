@@ -149,6 +149,9 @@ export interface CampaignPreview {
   /** First 20 only — `unknown_count` is the real total. */
   unknown_codes: string[];
   unknown_count: number;
+  /** Codes belonging to other cargo companies on the same manifest. */
+  foreign_codes: string[];
+  foreign_count: number;
   sample_message: string | null;
   sms_segments: number | null;
   sms_encoding: string | null;

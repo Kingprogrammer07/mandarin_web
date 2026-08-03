@@ -29,6 +29,8 @@ export interface FlightTrackingStatus {
   step_2_auto: StepAutoStatus | null;
   step_3_auto: StepAutoStatus | null;
   step_4_auto: StepAutoStatus | null;
+  /** Report progress. Not overridable, but it is the end-of-flight number. */
+  step_5_auto: StepAutoStatus | null;
   total_parcels: number;
   total_clients: number;
   updated_at: string | null;

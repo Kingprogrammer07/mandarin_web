@@ -41,14 +41,14 @@ const TRACKING_STEPS = [
   },
   {
     number: 3,
-    title: '3-step (Bojxona)',
+    title: '3-step (Bojxonada)',
     statusKey: 'step_3_status',
     autoKey: 'step_3_auto',
     manualKey: 'step_3_is_manual',
   },
   {
     number: 4,
-    title: '4-step (Saralash)',
+    title: '4-step (Toshkent ombori)',
     statusKey: 'step_4_status',
     autoKey: 'step_4_auto',
     manualKey: 'step_4_is_manual',
@@ -76,17 +76,28 @@ const AUTO_STATUS_LABELS: Record<StepAutoStatus['status'], string> = {
 function AutoSignalHint({ auto, isManual }: { auto: StepAutoStatus | null; isManual: boolean }) {
   if (!auto) return null;
 
-  const unit = auto.unit === 'client' ? 'mijoz' : 'yuk';
+  const isClientUnit = auto.unit === 'client';
+  const unit = isClientUnit ? 'mijoz' : 'yuk';
   // The override is actively hiding a finished signal — the case worth flagging.
   const hidesCompletion = isManual && auto.status === 'available';
+  // Steps 2-4 count parcels, step 5 counts clients — one flight therefore shows
+  // two different denominators, which reads like an error until you know the
+  // photo report is produced once per customer rather than once per box.
+  const missing = Math.max(auto.total - auto.matched, 0);
 
   return (
     <div className="mt-1 space-y-0.5 text-[11px] font-semibold leading-tight">
-      <p className="text-gray-500">
+      <p className="text-gray-500 dark:text-white/45">
         avtomatik: {auto.matched}/{auto.total} {unit} · {AUTO_STATUS_LABELS[auto.status]}
       </p>
+      {isClientUnit && auto.total > 0 && (
+        <p className="text-gray-400 dark:text-white/35">
+          hisobot mijoz boshiga sanaladi, yuk boshiga emas
+          {missing > 0 ? ` — ${missing} ta mijozga hali yuborilmagan` : ''}
+        </p>
+      )}
       {hidesCompletion && (
-        <p className="text-amber-600">avtomatika tayyor deydi — qo'lda qiymat ustun turibdi</p>
+        <p className="text-amber-600 dark:text-amber-300">avtomatika tayyor deydi — qo'lda qiymat ustun turibdi</p>
       )}
     </div>
   );
@@ -351,7 +362,7 @@ export default function ImportPage() {
       )}
 
       <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 sm:p-8 lg:p-10 border border-orange-100 relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-2xl border border-orange-100 bg-white/95 p-6 shadow-2xl backdrop-blur-md sm:p-8 lg:p-10 dark:border-white/10 dark:bg-[#0f172a]/95 dark:shadow-black/40">
           {/* Decorative blur effects */}
           <div className="absolute top-0 left-0 w-64 h-64 bg-orange-300/20 rounded-full blur-3xl -z-10 animate-pulse" />
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber-300/20 rounded-full blur-3xl -z-10 animate-pulse animation-delay-2000" />
@@ -375,7 +386,7 @@ export default function ImportPage() {
               className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
                 mainTab === 'import'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg transform scale-[1.02]'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15'
               }`}
             >
               Import
@@ -386,7 +397,7 @@ export default function ImportPage() {
               className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
                 mainTab === 'tracking'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg transform scale-[1.02]'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15'
               }`}
             >
               <Plane className="w-4 h-4" />
@@ -404,7 +415,7 @@ export default function ImportPage() {
                   className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-300 ${
                     activeDbTab === 'uz'
                       ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg transform scale-[1.02]'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15'
                   }`}
                 >
                   {t('import.uzDatabase')}
@@ -415,7 +426,7 @@ export default function ImportPage() {
                   className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-300 ${
                     activeDbTab === 'china'
                       ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg transform scale-[1.02]'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15'
                   }`}
                 >
                   {t('import.chinaDatabase')}
@@ -425,7 +436,7 @@ export default function ImportPage() {
               <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
                 {/* Flight name — stamped on every imported row (sheet names ignored). */}
                 <div className="space-y-2">
-                  <label htmlFor="import-flight-name" className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="import-flight-name" className="block text-sm font-semibold text-gray-700 dark:text-white/80">
                     {t('import.flightNameLabel')}
                     <span className="text-orange-500"> *</span>
                   </label>
@@ -435,7 +446,7 @@ export default function ImportPage() {
                     value={flightName}
                     onChange={(e) => setFlightName(e.target.value)}
                     placeholder={t('import.flightNamePlaceholder')}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 font-medium outline-none transition-all focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 placeholder:text-gray-400"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 font-medium outline-none transition-all focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 placeholder:text-gray-400 dark:border-white/10 dark:bg-[#111827] dark:text-white dark:placeholder:text-white/30"
                     autoComplete="off"
                   />
                 </div>
@@ -446,8 +457,8 @@ export default function ImportPage() {
                   onDragLeave={handleDragLeave}
                   className={`group relative border-2 border-dashed rounded-xl p-8 transition-all duration-300 backdrop-blur-sm ${
                     isDragging
-                      ? 'border-orange-500 bg-orange-50/50 scale-[1.02] shadow-lg'
-                      : 'border-gray-300 hover:border-orange-400 hover:bg-orange-50/30'
+                      ? 'border-orange-500 bg-orange-50/50 scale-[1.02] shadow-lg dark:bg-orange-500/10'
+                      : 'border-gray-300 hover:border-orange-400 hover:bg-orange-50/30 dark:border-white/15 dark:hover:bg-white/[0.04]'
                   }`}
                 >
                   <input
@@ -473,13 +484,13 @@ export default function ImportPage() {
                     </div>
                     {selectedFile ? (
                       <>
-                        <p className="text-lg font-semibold text-gray-800 mb-1">{selectedFile.name}</p>
-                        <p className="text-sm text-gray-500">{(selectedFile.size / 1024).toFixed(2)} KB</p>
+                        <p className="mb-1 text-lg font-semibold text-gray-800 dark:text-white">{selectedFile.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-white/45">{(selectedFile.size / 1024).toFixed(2)} KB</p>
                       </>
                     ) : (
                       <>
-                        <p className="text-lg font-semibold text-gray-800 mb-2">{t('import.dragDropFile')}</p>
-                        <p className="text-sm text-gray-500">{t('import.selectFilePlaceholder')}</p>
+                        <p className="mb-2 text-lg font-semibold text-gray-800 dark:text-white">{t('import.dragDropFile')}</p>
+                        <p className="text-sm text-gray-500 dark:text-white/45">{t('import.selectFilePlaceholder')}</p>
                       </>
                     )}
                   </div>
@@ -496,11 +507,14 @@ export default function ImportPage() {
                 </Button>
               </form>
 
-              {importedFlight && (
-                <div className="relative z-10 mt-6">
-                  <CampaignSender defaultFlight={importedFlight} />
-                </div>
-              )}
+              {/* Always available, not only straight after an import: an
+                  operator routinely uploads a manifest, checks it, and sends
+                  the notification later — or re-sends for an older flight.
+                  Gating this on `importedFlight` meant re-importing a file just
+                  to reach the button. A fresh import still pre-fills the name. */}
+              <div className="relative z-10 mt-6">
+                <CampaignSender defaultFlight={importedFlight ?? ''} key={importedFlight ?? 'manual'} />
+              </div>
             </>
           )}
 
@@ -508,12 +522,12 @@ export default function ImportPage() {
           {mainTab === 'tracking' && (
             <div className="space-y-4 relative z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-800">Oxirgi 20 ta reys</h2>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Oxirgi 20 ta reys</h2>
                 <button
                   type="button"
                   onClick={fetchFlights}
                   disabled={loadingFlights}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors disabled:opacity-50 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
                 >
                   <RefreshCw className={`w-4 h-4 ${loadingFlights ? 'animate-spin' : ''}`} />
                   Yangilash
@@ -521,13 +535,13 @@ export default function ImportPage() {
               </div>
 
               {loadingFlights && flights.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">Yuklanmoqda...</div>
+                <div className="text-center py-12 text-gray-500 dark:text-white/45">Yuklanmoqda...</div>
               ) : flights.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">Reyslar topilmadi</div>
+                <div className="text-center py-12 text-gray-500 dark:text-white/45">Reyslar topilmadi</div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-700 font-semibold">
+                    <thead className="bg-gray-50 text-gray-700 font-semibold dark:bg-white/5 dark:text-white/70">
                       <tr>
                         <th className="px-4 py-3 text-left">Reys nomi</th>
                         {TRACKING_STEPS.map((step) => (
@@ -535,20 +549,24 @@ export default function ImportPage() {
                             {step.title}
                           </th>
                         ))}
+                        {/* Read-only: step 5 follows the report rows and has no
+                            override, but it is what operations chase once a
+                            flight has landed. */}
+                        <th className="px-4 py-3 text-center">5-step (Hisobot)</th>
                         <th className="px-4 py-3 text-center">Amallar</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
                       {flights.map((flight) => {
                         const changed = hasChanges(flight);
                         return (
-                          <tr key={flight.flight_name} className="hover:bg-orange-50/30 transition-colors">
-                            <td className="px-4 py-3 font-medium text-gray-900">
+                          <tr key={flight.flight_name} className="transition-colors hover:bg-orange-50/30 dark:hover:bg-white/[0.04]">
+                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                               <div className="flex items-center gap-2">
                                 <Plane className="w-4 h-4 text-orange-500" />
                                 {flight.flight_name}
                               </div>
-                              <p className="mt-0.5 text-[11px] font-semibold text-gray-500">
+                              <p className="mt-0.5 text-[11px] font-semibold text-gray-500 dark:text-white/45">
                                 {flight.total_parcels} yuk · {flight.total_clients} mijoz
                               </p>
                             </td>
@@ -607,6 +625,15 @@ export default function ImportPage() {
                                 </td>
                               );
                             })}
+                            <td className="px-4 py-3 text-center align-top">
+                              {flight.step_5_auto ? (
+                                <AutoSignalHint auto={flight.step_5_auto} isManual={false} />
+                              ) : (
+                                <span className="text-[11px] font-semibold text-gray-400 dark:text-white/35">
+                                  ma'lumot yo'q
+                                </span>
+                              )}
+                            </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-2">
                               <button
@@ -616,7 +643,7 @@ export default function ImportPage() {
                                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                                   changed
                                     ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-sm'
-                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-white/10 dark:text-white/30'
                                 }`}
                               >
                                 {savingFlight === flight.flight_name ? (

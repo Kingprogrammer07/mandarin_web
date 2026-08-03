@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle2, Eye, Loader2, Send, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye, Loader2, Pencil, Send, Users } from 'lucide-react';
 import {
   campaignService,
   type Campaign,
@@ -32,15 +32,22 @@ export default function CampaignSender({ defaultFlight = '' }: { defaultFlight?:
     flight: string;
     channel: NotificationChannel;
     audience: CampaignAudience;
+    body: string;
     data: CampaignPreview;
   } | null>(null);
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
+  // Empty means "use the stored template". Only a non-empty value is sent,
+  // so the default path is untouched by this feature existing.
+  const [customBody, setCustomBody] = useState('');
+  const [editing, setEditing] = useState(false);
 
+  const body = customBody.trim();
   const preview =
     previewState &&
     previewState.flight === flightName.trim() &&
     previewState.channel === channel &&
-    previewState.audience === audience
+    previewState.audience === audience &&
+    previewState.body === body
       ? previewState.data
       : null;
 
@@ -51,10 +58,11 @@ export default function CampaignSender({ defaultFlight = '' }: { defaultFlight?:
         flight_name: flightName.trim(),
         channel,
         template_key: 'cargo_in_china',
+        custom_body: body || null,
         audience,
       }),
     onSuccess: (data) =>
-      setPreviewState({ flight: flightName.trim(), channel, audience, data }),
+      setPreviewState({ flight: flightName.trim(), channel, audience, body, data }),
     onError: () => toast.error("Ko'rib chiqishda xatolik"),
   });
 
@@ -65,6 +73,7 @@ export default function CampaignSender({ defaultFlight = '' }: { defaultFlight?:
         flight_name: flightName.trim(),
         channel,
         template_key: 'cargo_in_china',
+        custom_body: body || null,
         audience,
       }),
     onSuccess: (campaign) => {
@@ -196,29 +205,81 @@ export default function CampaignSender({ defaultFlight = '' }: { defaultFlight?:
               SMS provayder sozlanmagan (SMS_PROVIDER=none) — yuborib bo'lmaydi.
             </p>
           )}
+          {/* Two very different facts, previously reported as one number: a
+              Mandarin customer with no account is somebody's job, another
+              company's code on a shared manifest is routine. */}
           {preview.unknown_count > 0 && (
             <p className="flex items-start gap-2 text-xs font-semibold text-red-600 dark:text-red-400">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Bazada topilmagan <b>{preview.unknown_count} ta</b> kod — ular
-                xabar olmaydi.
-                {preview.unknown_count > preview.unknown_codes.length && ' Birinchi 20 tasi:'}{' '}
+                <b>{preview.unknown_count} ta</b> Mandarin kodi ro'yxatdan
+                o'tmagan — mijoz kodi bor, lekin bazada akkaunti yo'q. Ular
+                xabar olmaydi.{' '}
+                {preview.unknown_count > preview.unknown_codes.length && 'Birinchi 20 tasi: '}
                 {preview.unknown_codes.join(', ')}
+              </span>
+            </p>
+          )}
+          {preview.foreign_count > 0 && (
+            <p className="flex items-start gap-2 text-xs font-semibold text-gray-500 dark:text-white/45">
+              <Users className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                <b>{preview.foreign_count} ta</b> kod boshqa kargo firmalariga
+                tegishli (UzTez, TPP, izi…) — bitta manifestda kelgan, bizning
+                mijoz emas. Bu normal holat.{' '}
+                {preview.foreign_count > preview.foreign_codes.length && 'Masalan: '}
+                {preview.foreign_codes.slice(0, 8).join(', ')}
               </span>
             </p>
           )}
 
           {preview.sample_message && (
             <div>
-              <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-white/45">
-                Namuna xabar
-                {preview.sms_segments
-                  ? ` · ${preview.sms_segments} SMS (${preview.sms_encoding})`
-                  : ''}
-              </p>
-              <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 text-xs text-gray-800 dark:bg-white/5 dark:text-white/80">
-                {preview.sample_message}
-              </pre>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-white/45">
+                  Namuna xabar
+                  {preview.sms_segments
+                    ? ` · ${preview.sms_segments} SMS (${preview.sms_encoding})`
+                    : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Seeded from the rendered sample so the operator edits real
+                    // text rather than a template full of {placeholders} — the
+                    // placeholders still work, they are just already filled in
+                    // for one client here.
+                    if (!editing) setCustomBody(customBody || preview.sample_message || '');
+                    setEditing((current) => !current);
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-black text-sky-700 hover:underline dark:text-sky-300"
+                >
+                  <Pencil className="h-3 w-3" />
+                  {editing ? 'Namunaga qaytish' : "Matnni o'zgartirish"}
+                </button>
+              </div>
+
+              {editing ? (
+                <>
+                  <textarea
+                    value={customBody}
+                    onChange={(event) => setCustomBody(event.target.value)}
+                    rows={7}
+                    className="w-full resize-y rounded-xl border border-gray-200 px-3 py-2 text-[13px] leading-relaxed dark:border-white/10 dark:bg-[#111827] dark:text-white"
+                  />
+                  <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-white/45">
+                    O'zgartirilgan matn shablon o'rniga ketadi. Joy egalari
+                    ishlayveradi: <code>{'{flight}'}</code> <code>{'{track}'}</code>{' '}
+                    <code>{'{item}'}</code> <code>{'{count}'}</code>{' '}
+                    <code>{'{client_code}'}</code> <code>{'{name}'}</code>. Yuborishdan
+                    oldin yana «Ko'rib chiqish» bosing.
+                  </p>
+                </>
+              ) : (
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 text-xs text-gray-800 dark:bg-white/5 dark:text-white/80">
+                  {preview.sample_message}
+                </pre>
+              )}
             </div>
           )}
 
