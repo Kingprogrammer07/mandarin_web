@@ -249,7 +249,11 @@ export default function CampaignSender({ defaultFlight = '' }: { defaultFlight?:
                     // text rather than a template full of {placeholders} — the
                     // placeholders still work, they are just already filled in
                     // for one client here.
-                    if (!editing) setCustomBody(customBody || preview.sample_message || '');
+                    // Seed from the TEMPLATE, never from `sample_message`:
+                    // the sample is one real client's parcels with the
+                    // placeholders already resolved, so editing it and sending
+                    // mails that client's track codes to the whole flight.
+                    if (!editing) setCustomBody(customBody || preview.template_body || '');
                     setEditing((current) => !current);
                   }}
                   className="inline-flex items-center gap-1 text-[11px] font-black text-sky-700 hover:underline dark:text-sky-300"
@@ -269,11 +273,21 @@ export default function CampaignSender({ defaultFlight = '' }: { defaultFlight?:
                   />
                   <p className="mt-1 text-[11px] font-semibold text-gray-500 dark:text-white/45">
                     O'zgartirilgan matn shablon o'rniga ketadi. Joy egalari
-                    ishlayveradi: <code>{'{flight}'}</code> <code>{'{track}'}</code>{' '}
-                    <code>{'{item}'}</code> <code>{'{count}'}</code>{' '}
-                    <code>{'{client_code}'}</code> <code>{'{name}'}</code>. Yuborishdan
-                    oldin yana «Ko'rib chiqish» bosing.
+                    <b> majburiy</b> — ular har mijozga o'zining ma'lumotini
+                    qo'yadi: <code>{'{track}'}</code> <code>{'{item}'}</code>{' '}
+                    <code>{'{box}'}</code> <code>{'{count}'}</code>{' '}
+                    <code>{'{client_code}'}</code> <code>{'{name}'}</code>{' '}
+                    <code>{'{flight}'}</code>. Yuborishdan oldin yana
+                    «Ko'rib chiqish» bosing.
                   </p>
+                  {!/\{(track|item|box|count|client_code|name)\}/.test(customBody) && (
+                    <p className="mt-1 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Bu matnda mijozga xos joy egasi yo'q — <b>barcha
+                      {' '}{preview.reachable} ta mijozga bir xil trek kod va yuk
+                      nomi ketadi</b>. Serverga ham yubormaydi.
+                    </p>
+                  )}
                 </>
               ) : (
                 <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 text-xs text-gray-800 dark:bg-white/5 dark:text-white/80">

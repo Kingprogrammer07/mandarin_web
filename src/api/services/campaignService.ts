@@ -152,6 +152,10 @@ export interface CampaignPreview {
   /** Codes belonging to other cargo companies on the same manifest. */
   foreign_codes: string[];
   foreign_count: number;
+  /** Template source WITH its {placeholders} — what the editor must seed from. */
+  template_body: string | null;
+  /** True when the body would reach every recipient identically. */
+  identical_for_everyone: boolean;
   sample_message: string | null;
   sms_segments: number | null;
   sms_encoding: string | null;
@@ -193,6 +197,8 @@ export interface CreateCampaignBody extends AudienceSpec {
   title?: string | null;
   kind?: CampaignKind | null;
   attach?: CampaignAttachment | null;
+  /** Deliberately send one identical text to a whole flight. */
+  allow_identical_body?: boolean;
 }
 
 export interface PreviewBody extends AudienceSpec {
