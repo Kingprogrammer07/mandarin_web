@@ -89,7 +89,7 @@ function WarehouseRequestCardBase({ canProcess, activeClientCode }: WarehouseReq
             value={clientCode}
             onChange={(e) => setClientCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder="T123"
+            placeholder="ST123"
             className="w-full px-3 py-2.5 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[13px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all text-gray-900 dark:text-white uppercase"
           />
         </div>

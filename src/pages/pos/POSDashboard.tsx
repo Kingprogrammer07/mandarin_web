@@ -23,6 +23,7 @@ import {
   VolumeX,
   Zap,
   Calculator,
+  Check,
   ChevronDown,
   MessageSquare,
   DollarSign,
@@ -62,6 +63,7 @@ import {
 import type { ClientSearchResult, UnpaidCargoItem } from "@/api/verification";
 import { formatCurrencySum } from "@/lib/format";
 import { normalizeNumber } from "@/utils/numberFormat";
+import { logFrontendError } from "@/api/services/frontendErrors";
 import { cn } from "@/lib/utils";
 import {
   loadPendingNotifs,
@@ -131,13 +133,38 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     return false;
   });
 
-  const toggleDark = useCallback(() => {
-    setIsDark((prev) => {
-      const next = !prev;
-      document.documentElement.classList.toggle("dark", next);
-      localStorage.setItem("pos_theme", next ? "dark" : "light");
-      return next;
-    });
+  /** Put the root element in exactly one theme class.
+   *
+   * `classList.toggle("dark", next)` left any existing `light` in place, so
+   * toggling produced `<html class="light dark">` — both at once, with the
+   * outcome decided by stylesheet order rather than by intent. NavigationBar
+   * already removes both before adding one; this matches it so the two cannot
+   * disagree about the same element.
+   */
+  const applyTheme = (dark: boolean) => {
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(dark ? "dark" : "light");
+  };
+
+  // Pure updater. The DOM write and the localStorage write used to sit inside
+  // it, which React does not guarantee to run once — two quick clicks left the
+  // class and the state disagreeing. Side effects belong in the effect below.
+  const toggleDark = useCallback(() => setIsDark((prev) => !prev), []);
+
+  // Single source of truth for the root class. Also fixes a separate bug: the
+  // saved preference was read into state at mount but never applied, so after a
+  // reload the toggle claimed dark while the page rendered light.
+  useEffect(() => {
+    applyTheme(isDark);
+    localStorage.setItem("pos_theme", isDark ? "dark" : "light");
+  }, [isDark]);
+
+  // Hand the root class back to the app-wide theme on the way out; the admin
+  // screens drive the same element from their own key (NavigationBar.tsx:113)
+  // and would otherwise inherit whatever the cashier last chose.
+  useEffect(() => {
+    return () => applyTheme(localStorage.getItem("theme") === "dark");
   }, []);
 
   // ── Payment notifications (PostgreSQL-backed) ─────────────────────────────
@@ -395,6 +422,18 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   const [useWallet, setUseWallet] = useState(false);
   const [receivedInput, setReceivedInput] = useState("");
   const [flightDropdownOpen, setFlightDropdownOpen] = useState(false);
+
+  // The cargo picker covers the totals and the confirm button while it is open,
+  // and Escape did nothing — the only way out was to find the trigger again.
+  useEffect(() => {
+    if (!flightDropdownOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFlightDropdownOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flightDropdownOpen]);
+
   const [editNote, setEditNote] = useState("");
   // Editable confirmed amount in notification edit mode (paid notifications).
   const [editAmount, setEditAmount] = useState("");
@@ -766,7 +805,15 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     const notifFallback = activeNotifAmounts?.payable ?? 0;
     const effective = net > 0 ? net : notifFallback;
     if (!userEditedRef.current || effective !== prevNetRef.current) {
-      setReceivedInput(effective > 0 ? String(Math.round(effective)) : "");
+      // Exact, not rounded. Math.round turned a 786,400.50 debt into a
+      // pre-filled 786,401 that nobody handed over, and the 0.50 difference is
+      // booked as wallet credit by the backend — the ledger already holds four
+      // such +0.50 rows. 352 of 4,308 debts end in .5 so'm, so this was not
+      // rare. Rounding to a convenient note is the cashier's decision to make,
+      // not a default to inherit.
+      setReceivedInput(
+        effective > 0 ? String(Number(effective.toFixed(2))) : "",
+      );
       prevNetRef.current = effective;
     }
   }, [totalOwed, useWallet, displayBalance, activeNotifAmounts]);
@@ -807,8 +854,32 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
         if (overrideCode) setSearchInput(overrideCode);
         saveRecentSearch(normalized.client_code);
         setRecentCodes(getRecentSearches());
-      } catch {
-        setSearchError(`"${query}" kodli mijoz topilmadi`);
+      } catch (err) {
+        // A bare catch reported every failure as "client not found": a dead
+        // backend, a 500, an expired session and a genuinely unknown code all
+        // produced the same sentence, sending the cashier to re-type a code
+        // that was never the problem. Only 404 means not found.
+        const apiErr = err as { status?: number; message?: string };
+        if (apiErr.status === 404) {
+          setSearchError(`"${query}" kodli mijoz topilmadi`);
+        } else if (apiErr.status === 401 || apiErr.status === 403) {
+          setSearchError("Sessiya tugagan. Qaytadan kiring.");
+        } else if (apiErr.status && apiErr.status >= 500) {
+          setSearchError(`Server xatosi (${apiErr.status}). Biroz kutib, qayta urining.`);
+        } else if (!apiErr.status) {
+          setSearchError("Aloqa yo'q. Internet yoki server bilan bog'lanib bo'lmadi.");
+        } else {
+          setSearchError(`Qidirishda xatolik (${apiErr.status}).`);
+        }
+        // A 404 is an ordinary "no such code" and not worth reporting; anything
+        // else is a real failure the cashier cannot diagnose from the counter.
+        if (apiErr.status !== 404) {
+          logFrontendError(
+            apiErr.status ? "api" : "network",
+            `POS client search failed: ${apiErr.message ?? "unknown"}`,
+            { status: apiErr.status ?? null, endpoint: "/clients/search" },
+          );
+        }
       } finally {
         setIsSearching(false);
       }
@@ -1290,7 +1361,10 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                       setSearchInput(e.target.value.toUpperCase())
                     }
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Mijoz kodini kiriting (masalan: T123)"
+                    // Real codes all begin with S (SXAN38, STMU63, SSTL41…);
+                    // "T123" matched nothing in the database and the rest of
+                    // the app already uses ST123 (AdminAccountsPage, ClientDetailDrawer).
+                    placeholder="Mijoz kodini kiriting (masalan: ST123)"
                     className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.04] border border-gray-200/80 dark:border-white/[0.08] rounded-xl text-[14px] font-mono font-semibold focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 placeholder:font-sans placeholder:font-normal uppercase"
                   />
                 </div>
@@ -1754,6 +1828,65 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                             </button>
                           )}
 
+                          {/* What is being charged for.
+                              The only place this list existed was inside the
+                              "Reys" dropdown, which opens on top of the totals
+                              and the confirm button: to check *what* you were
+                              charging you had to hide *how much*. Its scroll box
+                              was 192px against 258px of content, so on this
+                              client two of seven flights sat below the fold —
+                              including a leftover from 29 June that is selected
+                              by default. Shown inline and toggleable, so the
+                              cashier can see and change the selection without
+                              covering the amount. */}
+                          {activeNotifData?.payment_status !== "paid" && flightGroups.length > 0 && (
+                            <div className="pt-1 border-t border-gray-100 dark:border-white/[0.06]">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                  To'lanayotgan yuklar
+                                </span>
+                                <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+                                  {selectedIds.size} / {cargos.length}
+                                </span>
+                              </div>
+                              <div className="max-h-40 overflow-y-auto space-y-0.5 pr-0.5">
+                                {flightGroups.map(({ flightName, items, totalAmount }) => {
+                                  const allSelected = items.every((c) => selectedIds.has(c.cargo_id));
+                                  return (
+                                    <button
+                                      key={flightName}
+                                      type="button"
+                                      onClick={() => toggleFlight(flightName)}
+                                      className={cn(
+                                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors",
+                                        allSelected
+                                          ? "bg-orange-50 dark:bg-orange-500/[0.08]"
+                                          : "bg-gray-50 dark:bg-white/[0.03] opacity-60",
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          "w-3.5 h-3.5 rounded shrink-0 border flex items-center justify-center",
+                                          allSelected
+                                            ? "bg-orange-500 border-orange-500"
+                                            : "border-gray-300 dark:border-white/20",
+                                        )}
+                                      >
+                                        {allSelected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                                      </span>
+                                      <span className="flex-1 min-w-0 truncate text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                                        {flightName}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 shrink-0 tabular-nums">
+                                        {formatCurrencySum(totalAmount)}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Amount breakdown — hide in edit mode */}
                           {activeNotifData?.payment_status !== "paid" && (
                           <div className="pt-1 border-t border-gray-100 dark:border-white/[0.06] space-y-1">
@@ -1777,11 +1910,27 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                               <span className="font-bold text-gray-700 dark:text-gray-300">To'lash:</span>
                               <span className="font-black text-orange-600 dark:text-orange-400">{formatCurrencySum(netAfterWallet)}</span>
                             </div>
-                            {/* Change due — only for cash when the cashier enters more than owed */}
-                            {paymentType === "cash" && receivedAmount > netAfterWallet && (
+                            {/* Surplus over the debt. Labelled "Qaytim" (change
+                                handed back) until now, which was the opposite of
+                                what happens: the backend books the excess as
+                                payment_balance_difference, i.e. wallet credit.
+                                A cashier reading "change" could hand the cash
+                                back as well, paying the client twice. Shown for
+                                every provider, not just cash — a card or Click
+                                overpayment is credited the same way. */}
+                            {receivedAmount > netAfterWallet && (
                               <div className="flex items-center justify-between text-[13px] pt-1 border-t border-gray-100 dark:border-white/[0.06]">
-                                <span className="font-bold text-blue-600 dark:text-blue-400">Qaytim:</span>
-                                <span className="font-black text-blue-600 dark:text-blue-400">{formatCurrencySum(receivedAmount - netAfterWallet)}</span>
+                                <span className="font-bold text-green-600 dark:text-green-400">Hamyonga tushadi:</span>
+                                <span className="font-black text-green-600 dark:text-green-400">+{formatCurrencySum(receivedAmount - netAfterWallet)}</span>
+                              </div>
+                            )}
+                            {/* The opposite case is a deliberate part-payment;
+                                say so, rather than leaving the cashier to notice
+                                that the confirm button is smaller than the debt. */}
+                            {receivedAmount > 0 && receivedAmount < netAfterWallet && (
+                              <div className="flex items-center justify-between text-[13px] pt-1 border-t border-gray-100 dark:border-white/[0.06]">
+                                <span className="font-bold text-amber-600 dark:text-amber-400">Qarz qoladi:</span>
+                                <span className="font-black text-amber-600 dark:text-amber-400">{formatCurrencySum(netAfterWallet - receivedAmount)}</span>
                               </div>
                             )}
                           </div>
@@ -1871,8 +2020,12 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                 <p className="text-[15px] font-medium text-gray-400 dark:text-gray-500">
                   Mijoz kodini kiriting
                 </p>
+                {/* The second line repeated the first ("search to start a
+                    payment"). Replaced with the one thing a new cashier
+                    actually needs: the code format, and that a receipt QR
+                    works instead of typing. */}
                 <p className="text-[12px] text-gray-300 dark:text-gray-600 mt-1">
-                  To'lovni boshlash uchun qidiring
+                  Masalan ST123 — yoki chekdagi QR kodni skanerlang
                 </p>
               </div>
             )}

@@ -6,6 +6,7 @@ import {
   type PosNotificationItem,
   type NotificationFilters,
 } from "@/api/services/posNotificationService";
+import { buildDatePresets } from "@/lib/datePresets";
 import { isPosPath } from "@/lib/posRoutes";
 import {
   useEventSource,
@@ -60,9 +61,30 @@ function saveReadIds(ids: Set<number>) {
   }
 }
 
+/**
+ * Opens on today's payments.
+ *
+ * Previously there was no date bound at all, so the panel loaded all 1 760
+ * notifications — 88 pages, and every card visible on the first screen already
+ * said "To'langan". The handful that still need a cashier were buried under
+ * months of finished work.
+ *
+ * Both bounds come from the "Bugun" preset rather than being written by hand:
+ * QuickDatePresets highlights a chip only when dateFrom *and* dateTo match one
+ * exactly (QuickDatePresets.tsx:19). Setting only date_from would filter the
+ * list while leaving every chip unlit — a cashier facing an empty panel with no
+ * indication of why. With the preset, "Bugun" is visibly selected and widening
+ * the range is one click.
+ */
+function todayFilterRange(): { date_from: string; date_to: string } {
+  const today = buildDatePresets()[0]; // "Bugun"
+  return { date_from: today.dateFrom, date_to: today.dateTo };
+}
+
 const DEFAULT_FILTERS: NotificationFilters = {
   sort: "created_desc",
   source: "flight",
+  ...todayFilterRange(),
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────

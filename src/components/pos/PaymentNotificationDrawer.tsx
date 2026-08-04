@@ -106,6 +106,11 @@ export function formatDateTime(iso: string): string {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    // Pinned, not inherited from the machine. The till closes on Tashkent
+    // hours and the backend stores Tashkent time; a counter PC with a stale
+    // or wrong system timezone would otherwise shift every timestamp on the
+    // screen while the totals stayed put.
+    timeZone: "Asia/Tashkent",
   });
 }
 
@@ -635,14 +640,19 @@ function SummaryView({
       {/* Footer: actions */}
       <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-white/[0.05]">
         <div className="flex flex-col gap-0.5">
+          {/* Both times were shown bare, five hours apart on the same card
+              (confirmed_at was stored naive into a timestamptz column), leaving
+              the cashier no way to tell which was which. Labelled now, so even
+              on the 1 403 rows written before the backend fix it is obvious
+              which number means what. */}
           <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
             <Calendar className="w-3 h-3" />
-            {formatDateTime(n.created_at)}
+            Kelgan: {formatDateTime(n.created_at)}
           </div>
           {n.confirmed_by && n.confirmed_at && (
             <div className="flex items-center gap-1 text-[9px] text-green-600 dark:text-green-400">
               <CheckCheck className="w-2.5 h-2.5" />
-              {n.confirmed_by} · {formatDateTime(n.confirmed_at)}
+              Tasdiqlagan: {n.confirmed_by} · {formatDateTime(n.confirmed_at)}
             </div>
           )}
         </div>
@@ -891,14 +901,19 @@ function DetailView({
       {/* Footer */}
       <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-white/[0.05]">
         <div className="flex flex-col gap-0.5">
+          {/* Both times were shown bare, five hours apart on the same card
+              (confirmed_at was stored naive into a timestamptz column), leaving
+              the cashier no way to tell which was which. Labelled now, so even
+              on the 1 403 rows written before the backend fix it is obvious
+              which number means what. */}
           <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
             <Calendar className="w-3 h-3" />
-            {formatDateTime(n.created_at)}
+            Kelgan: {formatDateTime(n.created_at)}
           </div>
           {n.confirmed_by && n.confirmed_at && (
             <div className="flex items-center gap-1 text-[9px] text-green-600 dark:text-green-400">
               <CheckCheck className="w-2.5 h-2.5" />
-              {n.confirmed_by} · {formatDateTime(n.confirmed_at)}
+              Tasdiqlagan: {n.confirmed_by} · {formatDateTime(n.confirmed_at)}
             </div>
           )}
         </div>
