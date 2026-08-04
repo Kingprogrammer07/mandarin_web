@@ -22,6 +22,14 @@ export interface ConfirmPayload {
   walletDeduction: number;
   selectedCard: CardWithBalance | null;
   clientCode: string;
+  /**
+   * Idempotency key for this confirmation, minted when the payload is built.
+   *
+   * It lives on the payload rather than being generated at submit time so that
+   * every retry of the same confirmation reuses it — a double-click or a
+   * resent POST must not become a second ledger row.
+   */
+  idempotencyKey: string;
 }
 
 export function ConfirmModal({

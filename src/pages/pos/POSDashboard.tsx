@@ -639,8 +639,17 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
     return `${selectedIds.size} ta yuk`;
   }, [selectedIds, cargos]);
   // ── Bulk payment mutation ─────────────────────────────────────────────────
+  // Holds the idempotency key of the payment currently in flight. A ref, not
+  // state, because it must be readable and writable within a single tick —
+  // state would not update until the next render, which is the very window
+  // rapid clicks slip through.
+  const inFlightPaymentRef = useRef<string | null>(null);
+
   const payMut = useMutation({
     mutationFn: processBulkPayment,
+    onSettled: () => {
+      inFlightPaymentRef.current = null;
+    },
     onSuccess: async (result) => {
       const msg = `${result.processed_count} ta yuk to'lovi qabul qilindi! Jami: ${formatCurrencySum(result.total_paid)}`;
       toast.success(msg);
@@ -977,11 +986,29 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       walletDeduction,
       selectedCard: paymentType === "card" ? selectedCard : null,
       clientCode: clientInfo.client_code,
+      // Minted here, once per confirmation — not at submit time. Every retry of
+      // this one payment (double-click, react-query retry, a POST the browser
+      // resent after a dropped connection) therefore carries the same key and
+      // the server answers the second one from its store instead of writing a
+      // second ledger row. Closing the modal and reopening mints a new key,
+      // which is correct: that is a new payment.
+      idempotencyKey: crypto.randomUUID(),
     });
   };
 
   const handleConfirmPay = () => {
     if (!confirmPayload || !clientInfo) return;
+    // Synchronous re-entry guard. `payMut.isPending` disables the button, but
+    // that only takes effect after React re-renders — four clicks in the same
+    // tick all pass the disabled check and fire four requests. Measured, not
+    // theorised: four clicks produced four POSTs of 786,401 so'm, the exact
+    // shape of the 2026-07-15 ledger corruption.
+    //
+    // The server key already makes the extra requests harmless; this stops
+    // them being sent at all. Keyed by the payload's idempotency key so a
+    // genuinely new payment is never blocked by the previous one.
+    if (inFlightPaymentRef.current === confirmPayload.idempotencyKey) return;
+    inFlightPaymentRef.current = confirmPayload.idempotencyKey;
     payMut.mutate({
       items: confirmPayload.cargos.map((cargo, i) => ({
         cargo_id: cargo.cargo_id,
@@ -998,6 +1025,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       pickup_priority: undefined,
       pickup_note: null,
       pickup_idempotency_key: null,
+      idempotency_key: confirmPayload.idempotencyKey,
     });
   };
 

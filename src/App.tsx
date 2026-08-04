@@ -21,6 +21,7 @@ import { useVersionWatcher } from "./hooks/useVersionWatcher";
 import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
+import { isPosPath } from "@/lib/posRoutes";
 
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
 const LoginForm = lazy(() => import("./components/LoginForm"));
@@ -777,7 +778,7 @@ function AppContent() {
   const isExemptFromMaintenance =
     isOperationalConsole ||
     window.location.pathname.startsWith('/admin') ||
-    window.location.pathname === '/pos' ||
+    isPosPath(window.location.pathname) ||
     window.location.pathname.startsWith('/flights') ||
     window.location.pathname.startsWith('/statistics') ||
     window.location.pathname === '/pickup-tv' ||

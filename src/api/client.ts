@@ -2,6 +2,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/config/config';
 import i18n from '@/i18n/config';
 import { logFrontendError } from '@/api/services/frontendErrors';
+import { isOperationalPath } from '@/lib/posRoutes';
 import { useMaintenanceStore } from '@/store/useMaintenanceStore';
 
 // Status codes that reliably mean the backend is down (gateway / proxy errors).
@@ -14,14 +15,13 @@ const SERVER_DOWN_STATUSES = new Set([502, 503, 504]);
 // mid-task. We suppress the trigger at the source here so the store is never
 // even polluted; the admin-toggled maintenance flag is separately exempted for
 // the same routes in App.tsx (`isOperationalConsole`).
-const MAINTENANCE_EXEMPT_PATH_PREFIXES = ['/pos', '/admin/warehouse', '/admin/expected-cargo'];
-
+//
+// The path set lives in lib/posRoutes so this file and App.tsx cannot drift
+// apart — an exemption honoured in one and not the other is a maintenance
+// screen that appears only sometimes, which is worse than one that always does.
 function isOnMaintenanceExemptPage(): boolean {
   if (typeof window === 'undefined') return false;
-  const path = window.location.pathname;
-  return MAINTENANCE_EXEMPT_PATH_PREFIXES.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-  );
+  return isOperationalPath(window.location.pathname);
 }
 
 function triggerMaintenanceIfServerDown(

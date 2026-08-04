@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, Package, WifiOff, RefreshCw } from 'lucide-react';
 import { getTelegramWebAppData, validateInitData, telegramAutoLogin } from '@/api/services/auth';
 import { TopProgressBar } from '@/components/ui/TopProgressBar';
+import { isPosPath } from '@/lib/posRoutes';
 
 interface TelegramWebAppGuardProps {
   children: React.ReactNode;
@@ -190,7 +191,7 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
 
   const isBrowserRoute =
     window.location.pathname.startsWith('/admin') ||
-    window.location.pathname === '/pos' ||
+    isPosPath(window.location.pathname) ||
     window.location.pathname.startsWith('/flights') ||
     window.location.pathname.startsWith('/statistics') ||
     window.location.pathname === '/pickup-tv' ||

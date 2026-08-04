@@ -61,6 +61,16 @@ export interface BulkPaymentRequest {
   pickup_note?: string | null;
   /** Idempotency key to prevent duplicate queues on retry. */
   pickup_idempotency_key?: string | null;
+  /**
+   * Idempotency key for the **payment itself** — distinct from
+   * `pickup_idempotency_key`, which only guards queue creation.
+   *
+   * Must stay the same across every retry of one logical payment and change
+   * for the next one. Without it the server writes a second ledger row for a
+   * replayed request; that is how 4,101,804 so'm of phantom money entered the
+   * ledger on 2026-07-15 and 2026-07-31.
+   */
+  idempotency_key?: string | null;
 }
 
 /** Processing result for a single item within a bulk payment response. */

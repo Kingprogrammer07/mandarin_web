@@ -6,6 +6,7 @@ import {
   type PosNotificationItem,
   type NotificationFilters,
 } from "@/api/services/posNotificationService";
+import { isPosPath } from "@/lib/posRoutes";
 import {
   useEventSource,
   type BroadcastMessage,
@@ -68,7 +69,10 @@ const DEFAULT_FILTERS: NotificationFilters = {
 
 export function usePaymentNotifications(): UsePaymentNotificationsReturn {
   const queryClient = useQueryClient();
-  const isOnPosRoute = window.location.pathname === "/pos";
+  // Any cashier console, not the literal "/pos". An exact-match check here made
+  // a console at any other path fetch nothing and render an empty list — a
+  // silent failure that looks like "no notifications today".
+  const isOnPosRoute = isPosPath(window.location.pathname);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<NotificationFilters>(DEFAULT_FILTERS);
   const [readIds, setReadIds] = useState<Set<number>>(loadReadIds);
@@ -91,7 +95,7 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
     refetchInterval: () =>
       typeof document !== "undefined" &&
       document.visibilityState === "visible" &&
-      window.location.pathname === "/pos"
+      isPosPath(window.location.pathname)
         ? 90_000
         : false,
     refetchIntervalInBackground: false,
