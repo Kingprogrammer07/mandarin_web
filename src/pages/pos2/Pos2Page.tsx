@@ -82,7 +82,9 @@ export default function Pos2Page({ onNavigate }: Pos2PageProps) {
   const today = buildDatePresets()[0];
   const [dateFrom, setDateFrom] = useState(today.dateFrom);
   const [dateTo, setDateTo] = useState(today.dateTo);
-  const [search, setSearch] = useState("");
+  // Reported by the grid, which owns the per-column filter boxes. The page only
+  // needs the counts, to say whether the footer total covers the whole range.
+  const [visibleCount, setVisibleCount] = useState<number | null>(null);
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["pos2-cashier-log", dateFrom, dateTo],
@@ -90,26 +92,13 @@ export default function Pos2Page({ onNavigate }: Pos2PageProps) {
     staleTime: 20_000,
   });
 
-  // Client-side, and only over the page already loaded. Presented as a filter
-  // on what is on screen rather than a search of the whole ledger, because the
-  // endpoint has no text search — promising more than that would be a lie the
-  // cashier finds out about at the counter.
-  const rows = useMemo<CashierLogItem[]>(() => {
-    const items = data?.items ?? [];
-    const needle = search.trim().toUpperCase();
-    if (!needle) return items;
-    return items.filter(
-      (r) =>
-        (r.client_code ?? "").toUpperCase().includes(needle) ||
-        (r.flight ?? "").toUpperCase().includes(needle) ||
-        (r.cashier_name ?? "").toUpperCase().includes(needle),
-    );
-  }, [data?.items, search]);
+  const rows = useMemo<CashierLogItem[]>(() => data?.items ?? [], [data?.items]);
 
   const capped = data?.capped ?? false;
-  /** True when the visible rows are a subset of the range — the footer then
-   *  describes the subset, not the range, and must say so. */
-  const partialTotal = capped || rows.length !== (data?.items.length ?? 0);
+  const filtered = visibleCount !== null && visibleCount < rows.length;
+  /** True when the footer total describes fewer rows than the chosen range —
+   *  either the range exceeded the load ceiling, or a column filter is on. */
+  const partialTotal = capped || filtered;
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-[#0d0d0d] p-3 gap-3">
@@ -143,12 +132,10 @@ export default function Pos2Page({ onNavigate }: Pos2PageProps) {
           }}
         />
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Mijoz · reys · kassir"
-          className="px-3 py-1.5 w-52 rounded-lg bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] text-[12px] outline-none focus:ring-2 focus:ring-orange-500/20 text-gray-900 dark:text-white"
-        />
+        {/* No global search box: filtering lives in the row under the header,
+            one box per column, which is where a spreadsheet user looks for it.
+            A single box searching three columns at once also cannot express
+            "this client code exactly" — the case that motivated the change. */}
 
         <button
           type="button"
@@ -199,14 +186,14 @@ export default function Pos2Page({ onNavigate }: Pos2PageProps) {
       )}
 
       {/* The footer total is only trustworthy when every row of the range is
-          loaded. Whenever it is not — the range exceeded MAX_ROWS, or the text
-          box is filtering the loaded set — say so beside the grid rather than
-          let a partial sum sit under the word JAMI. */}
+          loaded and unfiltered. Whenever it is not — the range exceeded
+          MAX_ROWS, or a column filter is on — say so beside the grid rather
+          than let a partial sum sit under the word JAMI. */}
       {partialTotal && (
         <p className="shrink-0 px-1 text-[11px] text-amber-600 dark:text-amber-400">
           {capped
             ? `Oraliqda ${data?.total_count} ta yozuv bor, ${rows.length} tasi yuklandi. Pastdagi JAMI shu yuklanganlarniki — sanani toraytiring.`
-            : `Qidiruv yoqilgan: ${rows.length} / ${data?.items.length} qator. Pastdagi JAMI faqat ko'rinayotganlarniki.`}
+            : `Filtr yoqilgan: ${visibleCount} / ${rows.length} qator. Pastdagi JAMI faqat ko'rinayotganlarniki.`}
         </p>
       )}
 
@@ -216,11 +203,8 @@ export default function Pos2Page({ onNavigate }: Pos2PageProps) {
         rowKey={(row) => `${row.entry_kind}:${row.id}`}
         loading={isLoading}
         error={error ? "Ma'lumotni yuklab bo'lmadi. Qayta urinib ko'ring." : null}
-        emptyMessage={
-          search
-            ? "Qidiruvga mos yozuv yo'q"
-            : "Tanlangan sanada yozuv yo'q"
-        }
+        emptyMessage="Tanlangan sanada yozuv yo'q"
+        onFilteredCountChange={(visible) => setVisibleCount(visible)}
         className="flex-1 min-h-0"
       />
 
@@ -228,6 +212,14 @@ export default function Pos2Page({ onNavigate }: Pos2PageProps) {
         <p className="text-[10px] text-gray-400 dark:text-gray-600">
           Strelkalar — yurish · Tab — o'ngga · Enter — pastga · F2 — tahrir ·
           Ctrl+C — nusxa · Home/End — qator boshi/oxiri
+        </p>
+        {/* Spelled out because the whole point of the `=` prefix is that it is
+            discoverable without a dropdown. STCH3 is the example on purpose —
+            it is the case that has no answer without it. */}
+        <p className="text-[10px] text-gray-400 dark:text-gray-600">
+          Filtr: <b>STCH3</b> — ichida (STCH3, STCH30, STCH330) ·{" "}
+          <b>=STCH3</b> — faqat aynan shu · <b>&gt;50000</b> / <b>&lt;50000</b> —
+          summa bo'yicha
         </p>
         {/* Stated, not hidden: an NBU UzPost row's amount is the gateway amount
             plus wallet_used, so the JAMI figure is money booked, not money in

@@ -47,6 +47,14 @@ export interface GridColumn<TRow> {
    * decides this from the field catalogue and the cashier's permissions.
    */
   editable?: boolean;
+  /**
+   * Whether the column gets a filter box. Defaults to true.
+   *
+   * Set false only where filtering is meaningless (a row-number gutter), not
+   * to reduce clutter — an unfilterable column in a spreadsheet reads as a
+   * broken one.
+   */
+  filterable?: boolean;
 }
 
 /** The cell the keyboard is currently on. */

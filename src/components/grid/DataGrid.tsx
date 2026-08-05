@@ -12,18 +12,20 @@
  */
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
+import { Loader2, X } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 
+import { matchesFilter, parseFilter } from "./filter";
 import { copyValue, formatCell, isNumericFormat, sumColumn } from "./format";
 import type { CellAddress, GridColumn } from "./types";
 import { useGridKeyboard } from "./useGridKeyboard";
 
 const ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 34;
+const FILTER_HEIGHT = 28;
 const FOOTER_HEIGHT = 34;
 
 interface DataGridProps<TRow> {
@@ -37,20 +39,62 @@ interface DataGridProps<TRow> {
   emptyMessage?: string;
   /** Called when an editable cell is committed. Absent → the grid is read-only. */
   onCellCommit?: (row: TRow, column: GridColumn<TRow>, raw: string) => void;
+  /**
+   * Reports how many rows survive the column filters, so the page can warn that
+   * the footer total describes a subset. The grid knows the numbers; only the
+   * page knows where to put the sentence.
+   */
+  onFilteredCountChange?: (visible: number, total: number) => void;
   className?: string;
 }
 
 export function DataGrid<TRow>({
   columns,
-  rows,
+  rows: allRows,
   rowKey,
   loading = false,
   error = null,
   emptyMessage = "Ma'lumot yo'q",
   onCellCommit,
+  onFilteredCountChange,
   className,
 }: DataGridProps<TRow>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Raw filter text per column key. Kept as typed, operator prefix and all, so
+  // the box shows exactly what the operator wrote.
+  const [filters, setFilters] = useState<Record<string, string>>({});
+
+  const activeFilters = useMemo(
+    () =>
+      columns
+        .map((column) => ({ column, parsed: parseFilter(filters[column.key] ?? "") }))
+        .filter((entry): entry is { column: GridColumn<TRow>; parsed: NonNullable<ReturnType<typeof parseFilter>> } =>
+          entry.parsed !== null,
+        ),
+    [columns, filters],
+  );
+
+  // Every filter must pass: separate boxes read as "and", the way a spreadsheet
+  // filter row does.
+  const rows = useMemo(() => {
+    if (activeFilters.length === 0) return allRows;
+    return allRows.filter((row) =>
+      activeFilters.every(({ column, parsed }) =>
+        matchesFilter(column.accessor(row), parsed),
+      ),
+    );
+  }, [activeFilters, allRows]);
+
+  const filteredCountRef = useRef<string>("");
+  const countSignature = `${rows.length}/${allRows.length}`;
+  if (filteredCountRef.current !== countSignature) {
+    filteredCountRef.current = countSignature;
+    // Reported during render rather than from an effect so the page's warning
+    // and the grid's contents change in the same frame; a one-frame lag here
+    // means a "total is partial" notice that flashes after the total does.
+    queueMicrotask(() => onFilteredCountChange?.(rows.length, allRows.length));
+  }
 
   // Left offset of every frozen column, so each pins just past the previous one
   // instead of stacking at zero.
@@ -179,6 +223,77 @@ export function DataGrid<TRow>({
                 <span className="truncate">{column.label}</span>
               </div>
             ))}
+          </div>
+
+          {/* Filter row.
+              Sticky under the header at the same z-level, so it stays reachable
+              on a scrolled list — a filter you have to scroll back up to change
+              is one an operator stops using.
+
+              `=` in a box means exact. That single character is the whole answer
+              to STCH3 / STCH30 / STCH330: no amount of extra typing narrows a
+              substring match down to the shortest of a set of prefixes. */}
+          <div
+            className="sticky z-20 flex bg-white dark:bg-[#141414] border-b border-gray-200 dark:border-white/[0.08]"
+            style={{ top: HEADER_HEIGHT, height: FILTER_HEIGHT }}
+            role="row"
+          >
+            {columns.map((column, colIndex) => {
+              const value = filters[column.key] ?? "";
+              const disabled = column.filterable === false;
+              return (
+                <div
+                  key={column.key}
+                  className={cn(
+                    "relative flex items-center border-r border-gray-200 dark:border-white/[0.06]",
+                    column.frozen &&
+                      "sticky z-10 bg-white dark:bg-[#141414] shadow-[1px_0_0_0_rgba(0,0,0,0.06)]",
+                  )}
+                  style={{
+                    width: column.width,
+                    minWidth: column.width,
+                    left: column.frozen ? frozenOffsets[colIndex] : undefined,
+                  }}
+                >
+                  {!disabled && (
+                    <>
+                      <input
+                        value={value}
+                        onChange={(e) =>
+                          setFilters((prev) => ({ ...prev, [column.key]: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          // Escape clears this box instead of bubbling to the
+                          // grid, where it would only cancel a cell edit.
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            setFilters((prev) => ({ ...prev, [column.key]: "" }));
+                          }
+                        }}
+                        placeholder={isNumericFormat(column.format) ? "> yoki =" : "= aniq"}
+                        className={cn(
+                          "w-full h-full bg-transparent px-2 pr-5 text-[11px] outline-none text-gray-800 dark:text-gray-200 placeholder:text-gray-300 dark:placeholder:text-gray-600",
+                          value && "font-bold text-orange-600 dark:text-orange-400",
+                          isNumericFormat(column.format) ? "text-right" : "text-left",
+                        )}
+                      />
+                      {value && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFilters((prev) => ({ ...prev, [column.key]: "" }))
+                          }
+                          className="absolute right-1 p-0.5 rounded text-gray-400 hover:text-orange-500"
+                          title="Tozalash"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Body */}
