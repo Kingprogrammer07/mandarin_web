@@ -34,6 +34,7 @@ const AdminAuditLogsPage = lazy(() => import("./pages/admin/AdminAuditLogsPage")
 const AdminCarouselPage = lazy(() => import("./pages/admin/AdminCarouselPage"));
 const FlightScheduleAdminPage = lazy(() => import("./pages/admin/FlightScheduleAdminPage"));
 const POSDashboard = lazy(() => import("./pages/pos/POSDashboard"));
+const Pos2Page = lazy(() => import("./pages/pos2/Pos2Page"));
 const ImportPage = lazy(() => import("./pages/shared/ImportPage"));
 const ClientForm = lazy(() => import("./pages/shared/ClientForm"));
 const FlightsPage = lazy(() => import("./pages/worker/FlightsPage"));
@@ -82,6 +83,7 @@ type Page =
   | "admin-profile"
   | "admin-carousel"
   | "pos-dashboard"
+  | "pos2-grid"
   | "manager-page"
   | "passkey-page"
   | "warehouse-page"
@@ -117,6 +119,9 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
     default: "pos-dashboard",
     allowed: [
       "pos-dashboard",
+      // The trial spreadsheet console. Reachable but not the default: the
+      // cashier's day still starts on the screen that can take money.
+      "pos2-grid",
       "admin-profile",
       "passkey-page",
       "admin-expenses",
@@ -143,6 +148,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-profile",
       "admin-carousel",
       "pos-dashboard",
+      "pos2-grid",
       "warehouse-page",
       "expected-cargo",
       "passkey-page",
@@ -177,6 +183,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-profile",
       "admin-carousel",
       "pos-dashboard",
+      "pos2-grid",
       "warehouse-page",
       "expected-cargo",
       "manager-page",
@@ -296,6 +303,7 @@ function getPathForPage(
   if (page === "passkey-page") return "/admin/passkey";
   if (page === "warehouse-page") return "/admin/warehouse";
   if (page === "pos-dashboard") return "/pos";
+  if (page === "pos2-grid") return "/pos2";
   if (page === "expected-cargo") return "/admin/expected-cargo";
   if (page === "flight-schedule-admin") return "/admin/flight-schedule";
   if (page === "admin-delivery-request") return "/admin/delivery-request";
@@ -356,6 +364,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/admin/expected-cargo") return { page: "expected-cargo" };
   if (path === "/admin/flight-schedule") return { page: "flight-schedule-admin" };
   if (path === "/pos") return { page: "pos-dashboard" };
+  if (path === "/pos2") return { page: "pos2-grid" };
   if (path === "/admin/expenses") return { page: "admin-expenses" };
   if (path === "/pickup-tv") return { page: "pickup-tv" };
   if (path === "/payment/nbu/success") return { page: "payment_nbu_success" };
@@ -739,7 +748,10 @@ function AppContent() {
     !canAccessAdminPanel &&
     userRole !== null;
 
-  const isPOSPage = currentPage === "pos-dashboard";
+  // Both cashier consoles. They share the standalone layout (no AdminLayout, no
+  // NavigationBar) and the maintenance exemption — a spreadsheet buried under a
+  // "Texnik ishlar" screen is as useless as a till buried under one.
+  const isPOSPage = currentPage === "pos-dashboard" || currentPage === "pos2-grid";
   const isManagerPage = currentPage === "manager-page";
   const isPasskeyPage = currentPage === "passkey-page";
   const isWarehousePage = currentPage === "warehouse-page";
@@ -892,6 +904,8 @@ function AppContent() {
           {currentPage === "admin-expenses" && <ExpensesPage />}
           {currentPage === "system-settings" && <SystemSettingsPage />}
         </AdminLayout>
+      ) : currentPage === "pos2-grid" ? (
+        <Pos2Page onNavigate={(page) => navigateToPage(page as Page)} />
       ) : isPOSPage ? (
         <POSDashboard
           onNavigate={(page) => navigateToPage(page as Page)}

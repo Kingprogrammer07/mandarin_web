@@ -122,13 +122,26 @@ export interface CashierLogResponse {
   page: number;
   size: number;
   total_pages: number;
-  /** Sum of all amounts processed today (UTC calendar day). */
+  /**
+   * Sum of all amounts processed today, **Tashkent** calendar day.
+   *
+   * The comment here used to say UTC; the DAO uses ZoneInfo("Asia/Tashkent").
+   *
+   * Takes only `admin_id` — `date_from`, `date_to`, `payment_provider` and
+   * `payment_source` are ignored. It does NOT describe the filtered list in
+   * `items`, so never present the two side by side as comparable.
+   */
   today_total: number;
-  /** Sum of cash amounts processed today (UTC calendar day). */
+  /** Cash-only part of `today_total`. Same Tashkent day, same filter caveat. */
   today_cash_total: number;
-  /** Sum of all amounts processed yesterday (UTC calendar day). */
+  /**
+   * Yesterday's total — but anchored at **UTC** midnight, unlike `today_total`,
+   * which anchors at Tashkent midnight. The two windows are five hours out of
+   * step, so the difference between them is not a like-for-like comparison.
+   */
   yesterday_total: number;
-  /** Percentage change from yesterday to today. Null when yesterday had no payments. */
+  /** Change from `yesterday_total` to `today_total`. Inherits the 5-hour
+   *  mismatch above — indicative only. Null when yesterday was zero. */
   today_change_percent: number | null;
   summary: CashierLogSummary;
 }
