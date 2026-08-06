@@ -28,7 +28,17 @@ export default function ClientLookupPanel({
   const { data, isLoading } = useGroupedWarehouseSearch(
     {
       code: searchTerm.trim().toUpperCase() || undefined,
-      taken_status: "not_taken",
+      // "all", not "not_taken". The old value filtered server-side BEFORE
+      // grouping, so a client whose cargo had all been collected came back with
+      // no flights at all — the manager saw "nothing here" and only learned the
+      // truth from a rejected submission. The collected flights are now
+      // returned and labelled, which is the state the manager was asking about.
+      //
+      // Note for anyone extending this call: warehouse_router ignores
+      // payment_status whenever taken_status !== "all". Switching to "all"
+      // re-activates that branch, so do not add a payment filter here without
+      // reading those lines first.
+      taken_status: "all",
       page: 1,
       size: 20,
     },

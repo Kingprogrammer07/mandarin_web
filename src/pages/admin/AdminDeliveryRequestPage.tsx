@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Send, CheckCircle, RotateCcw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ClientDeliveryHistory } from "@/components/admin/delivery/ClientDeliveryHistory";
 import ClientLookupPanel from "@/components/admin/delivery/ClientLookupPanel";
 import FlightSelector from "@/components/admin/delivery/FlightSelector";
 import CargoPreviewList from "@/components/admin/delivery/CargoPreviewList";
@@ -323,6 +324,12 @@ export default function AdminDeliveryRequestPage() {
                     {t("adminDeliveryRequest.actions.changeClient", "Boshqa mijoz")}
                   </button>
                 </div>
+
+                {/* Placed above the flight picker on purpose: "has someone
+                    already filed for this client" changes whether you file at
+                    all, so it has to be read before the flights are chosen,
+                    not after. */}
+                <ClientDeliveryHistory clientCode={selectedClient.client_code} />
 
                 <FlightSelector
                   flights={selectedClient.flights}

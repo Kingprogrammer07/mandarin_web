@@ -48,6 +48,15 @@ export default function FlightSelector({
           const hasPartial = flight.transactions.some(tx => tx.payment_status === "partial");
           const allPaid = flight.transactions.every(tx => tx.payment_status === "paid");
 
+          // Collection state. The data was always on the wire; the lookup used
+          // to filter fully-collected flights out server-side, so the manager
+          // saw an empty list rather than a collected one. Rolled up here the
+          // same way the payment badges are, because FlightGroup carries no
+          // flight-level aggregate.
+          const takenCount = flight.transactions.filter(tx => tx.is_taken_away).length;
+          const allTaken = takenCount === cargoCount && cargoCount > 0;
+          const someTaken = takenCount > 0 && !allTaken;
+
           return (
             <motion.button
               key={flight.flight_name}
@@ -106,6 +115,20 @@ export default function FlightSelector({
                     {flight.total_remaining_amount.toLocaleString()} so'm qarz
                   </Badge>
                 )}
+                {/* The fact that used to be invisible: this flight has already
+                    left. Shown as its own badge rather than by hiding the
+                    flight, so a manager filing anyway knows what they are
+                    filing over. Partial collection gets its own count — a
+                    half-collected flight still has something to deliver. */}
+                {allTaken ? (
+                  <Badge variant="secondary" className="rounded-md text-xs bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300">
+                    📦 Olib ketilgan
+                  </Badge>
+                ) : someTaken ? (
+                  <Badge variant="secondary" className="rounded-md text-xs bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-400">
+                    📦 {takenCount}/{cargoCount} olib ketilgan
+                  </Badge>
+                ) : null}
               </div>
             </motion.button>
           );
