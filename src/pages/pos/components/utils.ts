@@ -274,7 +274,15 @@ export function formatCard(raw: string): string {
     .trim();
 }
 
-/** 8600123456789012 → 8600 **** **** 9012 */
+/**
+ * 8600123456789012 → 8600 **** **** 9012
+ *
+ * Not used by the till any more, and deliberately kept. The cards a cashier
+ * picks from are Mandarin Cargo's own receiving cards, which exist to be read
+ * out to customers — masking those made the screen unable to do its job. A
+ * *customer's* card is a different matter, and if one ever has to be rendered
+ * this is what should render it.
+ */
 export function maskCard(raw: string): string {
   const d = raw.replace(/\s/g, "");
   return `${d.slice(0, 4)} **** **** ${d.slice(-4)}`;

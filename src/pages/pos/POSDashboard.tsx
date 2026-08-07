@@ -76,7 +76,7 @@ import {
   toIsoDateBound,
   PAYMENT_TYPES,
   SOUND_KEY,
-  maskCard,
+  formatCard,
 } from "./components/utils";
 import type { PendingNotif } from "./components/utils";
 import { CashierLogPanel } from "./components/CashierLogPanel";
@@ -1756,7 +1756,19 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                         >
                                           <div className="min-w-0">
                                             <p className="text-[13px] font-black text-gray-900 dark:text-white font-mono tracking-wider leading-tight flex items-center gap-1.5">
-                                              {maskCard(card.card_number)}
+                                              {/* Shown in full, not masked.
+                                                  These are Mandarin Cargo's own
+                                                  receiving cards — the cashier
+                                                  reads the number out so the
+                                                  customer can transfer to it.
+                                                  Masking made the screen unable
+                                                  to do the one job it is open
+                                                  for. Grouped in fours because
+                                                  that is how it gets read aloud.
+                                                  (A customer's card, on the
+                                                  scanned receipt, stays masked:
+                                                  ReceiptScannerModal.) */}
+                                              {formatCard(card.card_number)}
                                               {!card.is_active && (
                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-200 dark:bg-white/[0.1] text-gray-500 dark:text-gray-400 uppercase tracking-normal">
                                                   Nofaol
