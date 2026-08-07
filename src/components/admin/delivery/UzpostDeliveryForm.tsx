@@ -1,9 +1,11 @@
 import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Phone, Search, MapPin, Check } from "lucide-react";
+import { Phone, Search, MapPin, Check, PackageCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getClientDeliveryContext } from "@/api/services/adminDeliveryService";
 import { useUzpostBranches } from "@/hooks/useUzpostBranches";
 import type { UzpostBranch } from "@/types/uzpostBranch";
 
@@ -12,6 +14,9 @@ interface UzpostDeliveryFormProps {
   onPhoneChange: (v: string) => void;
   selectedBranch: UzpostBranch | null;
   onBranchChange: (branch: UzpostBranch | null) => void;
+  /** Whose request this is. Used only to look up whether this filer's
+   *  submission will also release the cargo — see the notice below. */
+  clientCode: string | null;
 }
 
 export default function UzpostDeliveryForm({
@@ -19,10 +24,20 @@ export default function UzpostDeliveryForm({
   onPhoneChange,
   selectedBranch,
   onBranchChange,
+  clientCode,
 }: UzpostDeliveryFormProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const { data: branches, isLoading, isError } = useUzpostBranches();
+
+  // Same key as ClientDeliveryHistory, so this reads the cached context rather
+  // than issuing a second request for the same client.
+  const { data: deliveryContext } = useQuery({
+    queryKey: ["admin-delivery-context", clientCode],
+    queryFn: () => getClientDeliveryContext(clientCode as string),
+    enabled: Boolean(clientCode),
+    staleTime: 30_000,
+  });
 
   const filtered = useMemo(() => {
     if (!branches || !query.trim()) return branches ?? [];
@@ -47,6 +62,27 @@ export default function UzpostDeliveryForm({
 
   return (
     <div className="space-y-5">
+      {/* Stated before the button, not after it.
+          For a filer holding delivery_requests:override_state this form does
+          more than file a request: it creates the UzPost order, prints the
+          label, and marks the cargo collected with no proof photo. That is not
+          something to discover from a toast once it has already happened. */}
+      {deliveryContext?.may_override && (
+        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20">
+          <PackageCheck className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+          <div className="text-[12px] leading-relaxed text-blue-900 dark:text-blue-200">
+            <p className="font-semibold">
+              Yuborilgach yuk avtomatik ombordan chiqariladi.
+            </p>
+            <p className="mt-0.5 text-blue-800/80 dark:text-blue-300/80">
+              UzPost buyurtmasi yaratiladi, chek printerdan chiqadi va yuk
+              &ldquo;olib ketilgan&rdquo; deb belgilanadi — rasm so&apos;ralmaydi.
+              Buyurtma yaratilmasa, yuk ombordan chiqarilmaydi.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Phone */}
       <div className="space-y-2">
         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">

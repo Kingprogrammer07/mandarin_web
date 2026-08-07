@@ -15,6 +15,7 @@ import {
   useAdminCreateUzpostDelivery,
 } from "@/api/hooks/useAdminDelivery";
 
+import type { AdminDeliverySuccessResponse } from "@/api/services/adminDeliveryService";
 import type { ClientGroup } from "@/api/services/warehouse";
 import type { UzpostBranch } from "@/types/uzpostBranch";
 
@@ -37,6 +38,11 @@ export default function AdminDeliveryRequestPage() {
   const [selectedFlights, setSelectedFlights] = useState<string[]>([]);
   const [deliveryType, setDeliveryType] = useState<DeliveryType | null>(null);
   const [deliveryRequestId, setDeliveryRequestId] = useState<number | null>(null);
+  // What the UzPost submission actually did beyond filing — kept so the success
+  // screen can say it, rather than leaving the release and the printed label to
+  // a toast the manager may have already dismissed.
+  const [releaseResult, setReleaseResult] =
+    useState<AdminDeliverySuccessResponse | null>(null);
 
   // Standard form state
   const [standardPhone, setStandardPhone] = useState("");
@@ -155,6 +161,7 @@ export default function AdminDeliveryRequestPage() {
       uzpostMutation.mutate(formData, {
         onSuccess: (res) => {
           setDeliveryRequestId(res.delivery_request_id);
+          setReleaseResult(res);
           setStep("success");
         },
       });
@@ -180,6 +187,7 @@ export default function AdminDeliveryRequestPage() {
     setSelectedFlights([]);
     setDeliveryType(null);
     setDeliveryRequestId(null);
+    setReleaseResult(null);
     setStandardPhone("");
     setStandardCaption("");
     setStandardLocation(null);
@@ -423,6 +431,7 @@ export default function AdminDeliveryRequestPage() {
                     onPhoneChange={setUzpostPhone}
                     selectedBranch={uzpostBranch}
                     onBranchChange={setUzpostBranch}
+                    clientCode={selectedClient.client_code}
                   />
                 )}
                 {/* Inline submit — inside the card so it flows with content and never
@@ -475,6 +484,31 @@ export default function AdminDeliveryRequestPage() {
                 <p className="text-xs text-gray-400 font-mono">
                   ID: {deliveryRequestId}
                 </p>
+
+                {/* The release is the consequential half of this submission, so
+                    it gets its own line on the screen that stays put — a toast
+                    is gone in seconds and a warehouse question comes later. */}
+                {releaseResult?.auto_released && (
+                  <div className="mt-4 p-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-left">
+                    <p className="text-[12px] font-semibold text-green-800 dark:text-green-300">
+                      {releaseResult.released_count} ta yuk ombordan chiqarildi
+                    </p>
+                    <p className="text-[11px] text-green-700/80 dark:text-green-400/80 mt-0.5">
+                      Chek printerga yuborildi
+                      {releaseResult.uzpost_order_number
+                        ? ` · ${releaseResult.uzpost_order_number}`
+                        : ""}
+                    </p>
+                  </div>
+                )}
+
+                {releaseResult?.release_warning && (
+                  <div className="mt-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-left">
+                    <p className="text-[12px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                      {releaseResult.release_warning}
+                    </p>
+                  </div>
+                )}
 
                 <Button
                   onClick={handleReset}

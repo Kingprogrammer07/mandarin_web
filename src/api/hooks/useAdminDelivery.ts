@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   adminCreateStandardDelivery,
   adminCreateUzpostDelivery,
+  type AdminDeliverySuccessResponse,
   type AdminStandardDeliveryRequest,
 } from "../services/adminDeliveryService";
 
@@ -26,14 +27,27 @@ function deliveryErrorText(err: unknown, fallback: string): string {
  * read and says what to do next.
  */
 function reportDeliveryResult(
-  res: { message: string; queue_created?: boolean; queue_warning?: string | null },
+  res: AdminDeliverySuccessResponse,
   fallback: string,
 ): void {
+  // A release that did not happen outranks everything else on screen: the
+  // manager believes the parcel has left, and only this line says otherwise.
+  if (res.release_warning) {
+    toast.warning(res.release_warning, { duration: 12_000 });
+    return;
+  }
   if (res.queue_created === false && res.queue_warning) {
     toast.warning(res.queue_warning, { duration: 10_000 });
     return;
   }
-  toast.success(res.message || fallback);
+  toast.success(res.message || fallback, {
+    description: res.auto_released
+      ? `${res.released_count} ta yuk ombordan chiqarildi · chek printerda${
+          res.uzpost_order_number ? ` · ${res.uzpost_order_number}` : ""
+        }`
+      : undefined,
+    duration: res.auto_released ? 8_000 : undefined,
+  });
 }
 
 export const useAdminCreateStandardDelivery = () => {
@@ -65,7 +79,8 @@ export const useAdminCreateUzpostDelivery = () => {
     onSuccess: (res) => {
       // The uzpost path never spawns a queue, so it reports queue_created=false
       // with no warning — reportDeliveryResult only warns when there is a
-      // reason to, which keeps this path's toast green as before.
+      // reason to, which keeps this path's toast green as before. For a filer
+      // with the override it now also carries the release + printer result.
       reportDeliveryResult(
         res,
         t("adminDeliveryRequest.submit.success", "Zayavka muvaffaqiyatli yuborildi!"),

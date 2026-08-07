@@ -24,6 +24,24 @@ export interface AdminDeliverySuccessResponse {
   queue_warning?: string | null;
   /** True when the request was filed over already-collected cargo. */
   state_overridden?: boolean;
+
+  /**
+   * UzPost only, and only for a filer holding `delivery_requests:override_state`:
+   * the request dispatched the parcel itself — UzPost order created, label sent
+   * to the printer, cargo marked collected without warehouse proof photos.
+   */
+  auto_released?: boolean;
+  /** How many transactions actually changed state. */
+  released_count?: number;
+  uzpost_order_number?: string | null;
+  /** Printer queue job id, when the label was accepted for printing. */
+  printer_job_id?: number | null;
+  /**
+   * Why the release did not go as planned, in Uzbek. Present when the UzPost
+   * order failed (cargo deliberately left in the warehouse) or when there was
+   * nothing left to release.
+   */
+  release_warning?: string | null;
 }
 
 /** One flight of a client's, with the two facts that decide whether to file. */
