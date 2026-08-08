@@ -95,6 +95,42 @@ export async function getClientDeliveryContext(
   return response.data;
 }
 
+export interface SuggestedBranch {
+  id: number;
+  name: string | null;
+  index: string | null;
+  address: string | null;
+}
+
+export interface BranchSuggestionResponse {
+  client_code: string;
+  /** District the code was issued for; null for legacy codes that encode none. */
+  district: string | null;
+  /**
+   * "district" — offices in that district. "region" — none there, so the
+   * region's offices instead. "none" — the code says nothing about location.
+   * Shown to the manager, so a region-wide list is not mistaken for a precise one.
+   */
+  match_level: "district" | "region" | "none";
+  branches: SuggestedBranch[];
+}
+
+/**
+ * Branches near the district a client's code was issued for.
+ *
+ * Codes are generated from the registered region and district — STCH3 is
+ * Chilonzor — so the picker can lead with the few offices there instead of
+ * 231 in catalogue order.
+ */
+export async function getBranchSuggestions(
+  clientCode: string,
+): Promise<BranchSuggestionResponse> {
+  const response = await apiClient.get<BranchSuggestionResponse>(
+    `/api/v1/admin/delivery-requests/branch-suggestions/${encodeURIComponent(clientCode)}`,
+  );
+  return response.data;
+}
+
 export async function adminCreateStandardDelivery(
   data: AdminStandardDeliveryRequest,
 ): Promise<AdminDeliverySuccessResponse> {

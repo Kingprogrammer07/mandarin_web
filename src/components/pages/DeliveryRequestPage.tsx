@@ -1718,8 +1718,11 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         selectedFlights,
         phoneToSend,
         standardCaption.trim(),
-        standardMapLocation?.latitude ?? 0,
-        standardMapLocation?.longitude ?? 0,
+        // null, not 0. The map pin is optional here — canSubmit only requires
+        // a caption — and 0,0 is a real point in the Gulf of Guinea that every
+        // reader downstream turned into a route link for the courier.
+        standardMapLocation?.latitude ?? null,
+        standardMapLocation?.longitude ?? null,
         includeAddress
       );
       setCurrentStep(4);

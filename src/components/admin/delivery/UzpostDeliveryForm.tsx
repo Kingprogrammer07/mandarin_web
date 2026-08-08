@@ -2,10 +2,13 @@ import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Phone, Search, MapPin, Check, PackageCheck } from "lucide-react";
+import { Phone, Search, MapPin, Check, PackageCheck, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getClientDeliveryContext } from "@/api/services/adminDeliveryService";
+import {
+  getBranchSuggestions,
+  getClientDeliveryContext,
+} from "@/api/services/adminDeliveryService";
 import { useUzpostBranches } from "@/hooks/useUzpostBranches";
 import type { UzpostBranch } from "@/types/uzpostBranch";
 
@@ -39,6 +42,16 @@ export default function UzpostDeliveryForm({
     staleTime: 30_000,
   });
 
+  // Branches near the district the client's code was issued for. STCH3 is
+  // Chilonzor, so the picker can lead with the few offices there instead of
+  // 231 in catalogue order.
+  const { data: suggestions, isLoading: suggestionsLoading } = useQuery({
+    queryKey: ["admin-branch-suggestions", clientCode],
+    queryFn: () => getBranchSuggestions(clientCode as string),
+    enabled: Boolean(clientCode),
+    staleTime: 5 * 60_000,
+  });
+
   const filtered = useMemo(() => {
     if (!branches || !query.trim()) return branches ?? [];
     const q = query.trim().toLowerCase();
@@ -49,6 +62,22 @@ export default function UzpostDeliveryForm({
         String(b.index).includes(q),
     );
   }, [branches, query]);
+
+  /**
+   * The suggested ids, resolved against the real catalogue.
+   *
+   * Resolved rather than rendered from the API payload directly so a suggested
+   * row is the same object as the one in the list below — selecting it stores
+   * the identical branch, whichever place the manager clicks.
+   *
+   * Hidden while searching: the manager has started typing a specific branch,
+   * and a "recommended" block above their own results only gets in the way.
+   */
+  const suggestedBranches = useMemo(() => {
+    if (!branches || !suggestions?.branches.length || query.trim()) return [];
+    const ids = new Set(suggestions.branches.map((b) => b.id));
+    return branches.filter((b) => ids.has(b.id));
+  }, [branches, suggestions, query]);
 
   // UzPost has hundreds of branches — virtualize so only on-screen rows mount.
   const listRef = useRef<HTMLDivElement>(null);
@@ -125,6 +154,77 @@ export default function UzpostDeliveryForm({
         )}
         {isError && (
           <p className="text-sm text-red-500 py-2">{t("common.error", "Xatolik yuz berdi")}</p>
+        )}
+
+        {/* Suggestions, above the catalogue and never instead of it.
+            The code says where the client registered, not where they will
+            collect — plenty of people take a parcel near their office. So this
+            is a shortcut for the common case, and the full list stays open
+            underneath. */}
+        {suggestionsLoading && clientCode && !query.trim() && (
+          <p className="text-[12px] text-gray-400 py-1.5">
+            Mijoz kodiga mos filiallar qidirilmoqda…
+          </p>
+        )}
+
+        {suggestedBranches.length > 0 && suggestions && (
+          <div className="rounded-xl border border-orange-200 dark:border-orange-500/25 bg-orange-50/60 dark:bg-orange-500/[0.07] p-2 space-y-1">
+            <p className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-orange-700 dark:text-orange-400">
+              <Sparkles className="w-3.5 h-3.5" />
+              {suggestions.match_level === "district"
+                ? `Mijoz kodiga ko'ra — ${suggestions.district}`
+                : suggestions.district
+                  ? `${suggestions.district} da filial yo'q — viloyat bo'yicha`
+                  : "Mijoz kodiga ko'ra — viloyat filiallari"}
+            </p>
+            {suggestions.match_level === "region" && (
+              // Said plainly: a region-wide list is a weaker answer than a
+              // district one and must not read as precise. Most clients land
+              // here — a bare regional code like SS1234 names no district —
+              // so the wording has to be honest without sounding broken.
+              <p className="px-1 text-[10px] text-orange-700/70 dark:text-orange-400/70">
+                Kodda tuman ko'rsatilmagan — tekshirib tanlang.
+              </p>
+            )}
+            {suggestedBranches.map((branch) => {
+              const isSelected = selectedBranch?.id === branch.id;
+              return (
+                <button
+                  key={`suggested-${branch.id}`}
+                  type="button"
+                  onClick={() => onBranchChange(isSelected ? null : branch)}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors border ${
+                    isSelected
+                      ? "bg-orange-100 dark:bg-orange-500/15 border-orange-300 dark:border-orange-500/40"
+                      : "bg-white/70 dark:bg-white/[0.04] border-transparent hover:border-orange-300"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                        {branch.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                        {branch.address}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                        Indeks: {branch.index}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center mt-0.5">
+                        <Check className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+            <p className="px-1 pt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+              Barcha filiallar pastda —{" "}
+              {branches ? branches.length : 0} ta
+            </p>
+          </div>
         )}
 
         <div

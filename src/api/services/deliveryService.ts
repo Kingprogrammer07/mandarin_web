@@ -105,8 +105,13 @@ export async function submitStandardDelivery(
   flightNames: string[],
   phoneNumber: string | null,
   caption: string,
-  latitude: number,
-  longitude: number,
+  /**
+   * Null when the client did not drop a map pin — which the form allows.
+   * These used to be plain `number`, so the caller substituted 0, and 0,0 is a
+   * real place in the Atlantic that the courier's route link pointed at.
+   */
+  latitude: number | null,
+  longitude: number | null,
   includeAddress: boolean = false
 ): Promise<DeliverySuccessResponse> {
   const response = await apiClient.post<DeliverySuccessResponse>(
