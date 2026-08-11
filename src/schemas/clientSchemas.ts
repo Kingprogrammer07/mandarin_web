@@ -46,6 +46,11 @@ export const updateClientPersonalSchema = z.object({
     .max(512, "Manzil uzunligi noto'g'ri")
     .optional()
     .nullable(),
+  // Not a field the operator fills in — the answer to the rename warning.
+  // Renaming a client who already has cargo drops those rows out of their
+  // history, so the server refuses until this comes back true, and records
+  // the answer in the audit log against the operator's name.
+  code_change_acknowledged: z.boolean().optional(),
 });
 
 export type UpdateClientPersonalFormValues = z.infer<typeof updateClientPersonalSchema>;

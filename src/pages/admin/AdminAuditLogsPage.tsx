@@ -111,7 +111,9 @@ const ACTION_TRANSLATIONS: Record<string, string> = {
   'UPDATED_CAROUSEL_ITEM':   'Karousel elementi tahrirlandi',
   'DELETED_CAROUSEL_ITEM':   'Karousel elementi o\'chirildi',
   'bulk_mark_cargo_taken': 'Yuk olib ketildi deb belgilandi (massiv)',
-  
+  'UPDATED_CLIENT_PERSONAL':  "Mijoz ma'lumotlari tahrirlandi",
+  'UPDATED_CLIENT_PASSPORT_IMAGES': 'Mijoz pasport rasmlari tahrirlandi',
+  'CLIENT_CODE_CHANGED':      "Mijoz kodi almashtirildi",
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

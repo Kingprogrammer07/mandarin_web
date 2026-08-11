@@ -10,7 +10,10 @@ import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useManagerStore } from "../../store/useManagerStore";
 import { getAdminJwtClaims } from "../../api/services/adminManagement";
+import { previewClientCode } from "../../api/services/client";
 import { ClientPassportEditor } from "./ClientPassportEditor";
+import { CodeChangeWarningModal } from "./CodeChangeWarningModal";
+import type { CodeChangeWarning } from "./CodeChangeWarningModal";
 import {
   useClientDetail,
   useClientFinances,
@@ -282,6 +285,108 @@ export function ClientDetailDrawer() {
     control,
     name: "region",
   });
+  const selectedDistrict = useWatch({
+    control,
+    name: "district",
+  });
+
+  // ── Next-code preview + "replace with the new code" toggle ────────────────
+  //
+  // Client codes are derived from region + district (`generate_client_code`
+  // → AVIA_CODES), so moving a client to another district makes their code
+  // wrong. The full add/edit form has offered this for a while; this drawer —
+  // the only place a manager can edit a client — did not, so a manager could
+  // change the district and had no way to see or apply the code that goes
+  // with it.
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [autoUpdateCode, setAutoUpdateCode] = useState(false);
+
+  // Holds the form values alongside the server's warning while the operator
+  // decides. The values are kept because the retry has to re-send exactly what
+  // was refused, not whatever the form happens to hold by then.
+  const [pendingCodeChange, setPendingCodeChange] = useState<{
+    values: UpdateClientPersonalFormValues;
+    warning: CodeChangeWarning;
+  } | null>(null);
+
+  // Reset the toggle whenever a different client is opened — leaving it on
+  // would silently rewrite the next client's code the moment a preview landed.
+  //
+  // Adjusted during render rather than in an effect (React's "reset state on
+  // prop change" pattern, as used in WarehouseRequestCard): an unconditional
+  // effect that calls setState trips the cascading-render lint rule, and this
+  // runs before the children see the stale value anyway.
+  const [lastPreviewClientId, setLastPreviewClientId] = useState(selectedClientId);
+  if (selectedClientId !== lastPreviewClientId) {
+    setLastPreviewClientId(selectedClientId);
+    setAutoUpdateCode(false);
+    setPreviewCode(null);
+    setPreviewError(null);
+  }
+
+  // Only when the location actually moved. Opening a client and saving an
+  // unrelated field must not offer to renumber them.
+  //
+  // Derived, not stored: clearing the preview by calling setState from an
+  // effect body is what the cascading-render lint rule forbids, and there is
+  // nothing to store — "no location change" already means "no preview".
+  const locationMoved =
+    !!selectedRegion &&
+    !!selectedDistrict &&
+    (selectedRegion !== (client?.region || "") ||
+      selectedDistrict !== (client?.district || ""));
+
+  const shownPreviewCode = locationMoved ? previewCode : null;
+  const shownPreviewError = locationMoved ? previewError : null;
+  const shownPreviewLoading = locationMoved && isLoadingPreview;
+
+  useEffect(() => {
+    if (!locationMoved) return;
+
+    let cancelled = false;
+    // Debounced: the district select fires on every change, and the server
+    // reserves the next number under a table lock to build the preview.
+    const timeoutId = setTimeout(() => {
+      setIsLoadingPreview(true);
+      previewClientCode(selectedRegion, selectedDistrict)
+        .then((data) => {
+          if (cancelled) return;
+          setPreviewCode(data.preview_code);
+          setPreviewError(null);
+          if (autoUpdateCode) {
+            setValue("client_code", data.preview_code, {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+          }
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          setPreviewCode(null);
+          setPreviewError(
+            error && typeof error === "object" && "message" in error
+              ? String((error as { message: string }).message)
+              : "Kodni hisoblab bo'lmadi",
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoadingPreview(false);
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [
+    locationMoved,
+    selectedRegion,
+    selectedDistrict,
+    setValue,
+    autoUpdateCode,
+  ]);
 
   // Sync form with client data when client loads or changes
   useEffect(() => {
@@ -327,23 +432,96 @@ export function ClientDetailDrawer() {
       activeTab === "profile",
   );
 
+  /**
+   * The shape the backend returns when a rename would touch a client who
+   * already has cargo. It is a 409 like the duplicate-code one, so the
+   * `error_code` is what tells them apart — one can be answered, the other
+   * cannot.
+   *
+   * Read off `response.data.detail`: the axios interceptor re-throws the raw
+   * error, so the body sits under `response`. Reading `err.data` instead
+   * silently yields `undefined` and every server message degrades to axios'
+   * "Request failed with status code 409".
+   */
+  type ApiError = {
+    response?: {
+      data?: {
+        detail?:
+          | string
+          | {
+              error_code?: string;
+              transaction_count?: number;
+              old_code?: string;
+              new_code?: string;
+              message?: string;
+            };
+      };
+    };
+    message?: string;
+  };
+
+  function submitClient(
+    data: UpdateClientPersonalFormValues,
+    acknowledged: boolean,
+  ) {
+    if (!selectedClientId) return;
+    updateClient(
+      {
+        clientId: selectedClientId,
+        data: acknowledged
+          ? { ...data, code_change_acknowledged: true }
+          : data,
+      },
+      {
+        onSuccess: () => {
+          setPendingCodeChange(null);
+          toast.success("Mijoz ma'lumotlari yangilandi");
+        },
+        onError: (err: unknown) => {
+          const e = err as ApiError;
+          const detail = e?.response?.data?.detail;
+
+          // Renaming a client with cargo: warn, name the consequence, and
+          // let them decide. Re-sent with the acknowledgement so the audit
+          // row records that they were told.
+          if (
+            typeof detail === "object" &&
+            detail?.error_code === "CLIENT_CODE_HAS_TRANSACTIONS" &&
+            !acknowledged
+          ) {
+            setPendingCodeChange({
+              values: data,
+              warning: {
+                transaction_count: detail.transaction_count ?? 0,
+                old_code: detail.old_code ?? "—",
+                new_code: detail.new_code ?? "—",
+                message:
+                  detail.message ??
+                  "Kod o'zgarsa mavjud yuklar mijoz tarixidan yo'qolishi " +
+                    "mumkin. Davom etsangiz, javobgarlik sizda qoladi.",
+              },
+            });
+            return;
+          }
+
+          setPendingCodeChange(null);
+          toast.error(
+            (typeof detail === "string" ? detail : detail?.message) ||
+              e?.message ||
+              "Ma'lumotlarni yangilashda xatolik",
+          );
+        },
+      },
+    );
+  }
+
+
   if (!selectedClientId) return null;
 
   const availableDistricts = selectedRegion ? (DISTRICTS[selectedRegion] ?? []) : [];
 
   const onSubmit = (data: UpdateClientPersonalFormValues) => {
-    if (!selectedClientId) return;
-    updateClient(
-      { clientId: selectedClientId, data },
-      {
-        onSuccess: () => toast.success("Mijoz ma'lumotlari yangilandi"),
-        onError: (err: unknown) => {
-          // Prefer the backend's specific reason (e.g. code-in-use / has-transactions).
-          const e = err as { data?: { detail?: string }; message?: string };
-          toast.error(e?.data?.detail || e?.message || "Ma'lumotlarni yangilashda xatolik");
-        },
-      },
-    );
+    submitClient(data, false);
   };
 
   // Guard against losing unsaved profile edits when closing via backdrop / X.
@@ -354,11 +532,20 @@ export function ClientDetailDrawer() {
       );
       if (!ok) return;
     }
+    setPendingCodeChange(null);
     setSelectedClientId(null);
   };
 
   return (
     <>
+      <CodeChangeWarningModal
+        warning={pendingCodeChange?.warning ?? null}
+        isPending={isUpdating}
+        onConfirm={() => {
+          if (pendingCodeChange) submitClient(pendingCodeChange.values, true);
+        }}
+        onCancel={() => setPendingCodeChange(null)}
+      />
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -598,7 +785,73 @@ export function ClientDetailDrawer() {
                         </select>
                       )}
                     />
+
+                    {/* The code that district would issue. Only appears once the
+                        location has actually been changed — see the effect. */}
+                    {shownPreviewLoading && (
+                      <span className="mt-1.5 inline-flex items-center gap-2 text-[12px] text-orange-500 animate-pulse">
+                        <span className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        Hisoblanmoqda...
+                      </span>
+                    )}
+                    {!shownPreviewLoading && shownPreviewCode && (
+                      <span className="mt-1.5 inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[12px] bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400">
+                        Kutilayotgan kod:{" "}
+                        <b className="tracking-wide text-green-800 dark:text-green-300">
+                          {shownPreviewCode}
+                        </b>
+                      </span>
+                    )}
+                    {!shownPreviewLoading && shownPreviewError && (
+                      <span className="mt-1.5 block text-[12px] text-red-500">
+                        {shownPreviewError}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Replace-the-code toggle.
+                      Off by default and never automatic: a client's code is
+                      printed on parcels and quoted by the client, so changing
+                      it is a decision, not a side effect of correcting their
+                      address. Turning it off restores whatever the code was
+                      when the drawer opened. */}
+                  {shownPreviewCode && (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-orange-200 dark:border-white/[0.08] bg-orange-50/60 dark:bg-white/[0.04] px-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                          Yangi kod bilan almashtirilsinmi?
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                          {client?.primary_code || "—"} → {shownPreviewCode}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={autoUpdateCode}
+                        onClick={() => {
+                          const next = !autoUpdateCode;
+                          setAutoUpdateCode(next);
+                          setValue(
+                            "client_code",
+                            next ? shownPreviewCode : client?.primary_code || "",
+                            { shouldValidate: true, shouldDirty: true },
+                          );
+                        }}
+                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${
+                          autoUpdateCode
+                            ? "bg-orange-500"
+                            : "bg-gray-300 dark:bg-white/20"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                            autoUpdateCode ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
 
                   {/* Address */}
                   <div className="space-y-1.5">
