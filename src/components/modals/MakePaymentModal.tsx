@@ -612,6 +612,23 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const NBU_MIN_UZS = 1000;
   const isBelowNbuMinimum = finalPayable > 0 && finalPayable < NBU_MIN_UZS;
 
+  /**
+   * The three figures the notice quotes, formatted once.
+   *
+   * Kept together so the sum shown always adds up: the same `finalPayable`
+   * feeds the debt and the surplus, and the server derives the identical split
+   * from its own recalculation (`_raise_to_nbu_minimum`). Rounding here is
+   * display-only — the charge itself is computed server-side in tiyin.
+   */
+  const nbuMinimumParts = useMemo(() => {
+    const debt = Math.round(finalPayable);
+    return {
+      min: NBU_MIN_UZS.toLocaleString('uz-UZ'),
+      debt: debt.toLocaleString('uz-UZ'),
+      surplus: Math.max(NBU_MIN_UZS - debt, 0).toLocaleString('uz-UZ'),
+    };
+  }, [finalPayable]);
+
   const paymentMode = useMemo((): 'full' | 'partial' | 'full_remaining' => {
     if (isPartial) return 'partial'; // Always "partial" if the custom toggle is activated
     if (details?.has_existing_partial) return 'full_remaining'; // Paying the rest fully
@@ -1085,6 +1102,29 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
     return (
       <div className="space-y-5">
+        {/* Placed above every online option, not beside one of them.
+            A saved card charges in one tap from the block below, so a notice
+            sitting under the main CTA would be read after the money had already
+            moved. Both routes go through the same top-up. */}
+        {nbuEnabled && isBelowNbuMinimum && (
+          <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900 dark:bg-amber-400/10 dark:text-amber-200 space-y-0.5">
+            <p className="font-bold">
+              {t('makePayment.belowNbuMinimum', { min: nbuMinimumParts.min })}
+            </p>
+            <p>
+              {t('makePayment.belowNbuMinimumBody', {
+                debt: nbuMinimumParts.debt,
+                min: nbuMinimumParts.min,
+              })}
+            </p>
+            <p className="font-semibold">
+              {t('makePayment.belowNbuMinimumSurplus', {
+                surplus: nbuMinimumParts.surplus,
+              })}
+            </p>
+          </div>
+        )}
+
         {/* ---- Saved Cards Section ----
             Only renders when the user already has at least one tokenised
             card. Binding a new card is intentionally NOT offered inside the
@@ -1475,20 +1515,20 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         )}
 
         {/* ---- NBU Online Payment (primary CTA when enabled) ----
-             NBU refuses anything under 1000 so'm. Saying so up front beats
-             letting the user reach the bank page and bounce back with a
-             rejection they cannot act on. */}
-        {nbuEnabled && isBelowNbuMinimum && (
-          <p className="rounded-xl bg-amber-50 px-3 py-2 text-[12px] font-bold text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
-            {t('makePayment.belowNbuMinimum')}
-          </p>
-        )}
+             NBU refuses anything under 1000 so'm, which used to disable this
+             button outright — 49 clients owing under that could not pay online
+             at all, most of them owing under 200 so'm. The gateway's floor is
+             charged instead and the difference is credited to the wallet, which
+             the distributor already books as a credit event.
+
+             The arithmetic is spelled out rather than hidden — see the notice
+             rendered above the saved-card block, which covers both routes. */}
         {nbuEnabled && (
           <motion.button
             data-tour="pay-methods"
             whileTap={{ scale: 0.97 }}
             onClick={handleNbuPayment}
-            disabled={isNbuInitiating || isBelowNbuMinimum}
+            disabled={isNbuInitiating}
             className="w-full h-16 rounded-2xl font-black text-[16px]
               bg-gradient-to-r from-sky-500 to-cyan-500
               hover:from-sky-600 hover:to-cyan-600

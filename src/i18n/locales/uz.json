@@ -1705,7 +1705,9 @@
     "noReadyFlights": "Hisoboti tayyor reys yo'q",
     "noReadyFlightsHint": "Hisobot yuborilmagan reyslar arxivda",
     "payCashHint": "Ofisga kelib naqd — admin tasdiqlaydi",
-    "belowNbuMinimum": "Onlayn to‘lov uchun eng kam summa 1 000 so‘m. Bu qarzni ofisda naqd to‘lashingiz mumkin."
+    "belowNbuMinimum": "NBU minimal onlayn to‘lovi — {{min}} so‘m",
+    "belowNbuMinimumBody": "Qarzingiz {{debt}} so‘m, shuning uchun {{min}} so‘m yechiladi.",
+    "belowNbuMinimumSurplus": "Ortiqcha {{surplus}} so‘m hamyoningizga tushadi va keyingi to‘lovda ishlatiladi."
   },
   "adminDeliveryRequest": {
     "title": "Yetkazib berish zayavkasi",
