@@ -7,6 +7,10 @@ export const EXPECTED_CARGO_SOUND_EVENTS = [
   'error',
   'duplicate',
   'merge',
+  // Fires when a scan resolves to a different client than the previous scan.
+  // Added after the original five, so `normalizeProfile` backfills it into
+  // profiles already stored in IndexedDB — no DB version bump needed.
+  'clientChange',
 ] as const;
 
 export type ExpectedCargoSoundEvent = typeof EXPECTED_CARGO_SOUND_EVENTS[number];
@@ -101,6 +105,7 @@ export function createDefaultExpectedCargoSoundProfile(): ExpectedCargoSoundProf
       error: base(),
       duplicate: base(),
       merge: base(),
+      clientChange: base(),
     },
     updatedAt: Date.now(),
   };

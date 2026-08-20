@@ -9,6 +9,7 @@ import {
   Save,
   Settings2,
   Upload,
+  UsersRound,
   Volume2,
   XCircle,
 } from 'lucide-react';
@@ -85,6 +86,12 @@ const EVENT_META: Record<ExpectedCargoSoundEvent, SoundEventMeta> = {
     description: 'Ajralgan mijoz guruhlari birlashtirilganda',
     icon: GitMerge,
     color: 'text-violet-600 dark:text-violet-400',
+  },
+  clientChange: {
+    label: 'Yangi mijoz',
+    description: 'Skanerlangan kod oldingisidan boshqa mijozniki bo‘lganda',
+    icon: UsersRound,
+    color: 'text-sky-600 dark:text-sky-400',
   },
 };
 

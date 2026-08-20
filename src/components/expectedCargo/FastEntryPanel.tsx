@@ -179,7 +179,7 @@ function formatScanTime(value?: string): string {
 function detectClientSwitchWarning(
   queue: FastEntryQueueItem[],
   resolvedClientCode: string,
-): { isContinuation: boolean; priorCount: number } {
+): { isContinuation: boolean; priorCount: number; isClientChanged: boolean } {
   const normalized = resolvedClientCode.trim().toUpperCase();
   const resolvedQueue = [...queue]
     .filter((item) =>
@@ -197,7 +197,7 @@ function detectClientSwitchWarning(
 
   const previousClientCode = resolvedQueue[0]?.clientCode.trim().toUpperCase();
   if (!previousClientCode || previousClientCode === normalized) {
-    return { isContinuation: false, priorCount: 0 };
+    return { isContinuation: false, priorCount: 0, isClientChanged: false };
   }
 
   let previousRunLength = 0;
@@ -209,6 +209,12 @@ function detectClientSwitchWarning(
   return {
     isContinuation: previousRunLength >= 2,
     priorCount: previousRunLength,
+    // The owner changed, however briefly the previous one held the scanner.
+    // `isContinuation` only fires from the second consecutive scan onwards, so
+    // A-then-B used to sound exactly like A-then-A: one code each, same
+    // success chime, nothing to tell the worker the parcel now belongs to
+    // someone else.
+    isClientChanged: true,
   };
 }
 
@@ -986,7 +992,8 @@ export function FastEntryPanel({
     trackCode: string,
   ) => {
     const currentQueue = useExpectedCargoStore.getState().entryQueue;
-    const { isContinuation, priorCount } = detectClientSwitchWarning(currentQueue, resolved.client_code);
+    const { isContinuation, priorCount, isClientChanged } =
+      detectClientSwitchWarning(currentQueue, resolved.client_code);
 
     resolveQueueItemClient(
       trackCode,
@@ -1022,6 +1029,11 @@ export function FastEntryPanel({
         description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${resolved.client_code}" rowi tekshirish nuqtasi sifatida belgilandi. Jami taxminiy: ${totalCount}.`,
         navigateTo: { flightName: flightName ?? '', clientCode: resolved.client_code },
       });
+    } else if (isClientChanged) {
+      // A clean hand-over to the next client: nothing is wrong, so this is not
+      // the warning tone, but it must not be the success tone either or the
+      // switch passes unheard.
+      void playExpectedCargoSound('clientChange');
     } else {
       void playExpectedCargoSound('success');
     }

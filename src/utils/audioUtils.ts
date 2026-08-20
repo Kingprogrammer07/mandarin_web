@@ -144,6 +144,47 @@ export function playApplePaySound() {
   }
 }
 
+/**
+ * Played when a scan resolves to a DIFFERENT client than the previous one.
+ *
+ * Deliberately unlike the other four: triangle timbre (success is sine,
+ * warning sawtooth, error square) and two DISCRETE rising notes rather than
+ * success's single glide, so a warehouse worker hears "new person" without
+ * looking up. Rising rather than falling because nothing went wrong — the
+ * scan succeeded, the owner just changed.
+ */
+export function playClientChangeSound(volumeOverride?: number) {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const volume = clampVolume(volumeOverride ?? getCargoAudioVolume());
+
+    const playTone = (freq: number, startTime: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.85 * volume, startTime + 0.012);
+      gain.gain.linearRampToValueAtTime(0, startTime + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    // Ascending perfect fifth: C5 -> G5.
+    playTone(523.25, ctx.currentTime, 0.09);
+    playTone(783.99, ctx.currentTime + 0.11, 0.11);
+
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+    }
+  } catch (e) {
+    console.error('Audio play failed', e);
+  }
+}
+
 /** Two-tone descending warning chime — distinct from success (ascending) and error (square). */
 export function playWarningSound(volumeOverride?: number) {
   try {

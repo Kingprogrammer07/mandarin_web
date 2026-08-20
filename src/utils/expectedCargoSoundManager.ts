@@ -1,4 +1,5 @@
 import {
+  playClientChangeSound,
   playErrorSound,
   playRusterSuccessSound,
   playSuccessSound,
@@ -72,6 +73,8 @@ function playDefaultSound(event: ExpectedCargoSoundEvent, volume: number): void 
     playSuccessSound(volume);
   } else if (event === 'error') {
     playErrorSound(volume);
+  } else if (event === 'clientChange') {
+    playClientChangeSound(volume);
   } else {
     playWarningSound(volume);
   }
@@ -80,7 +83,9 @@ function playDefaultSound(event: ExpectedCargoSoundEvent, volume: number): void 
 function triggerHaptic(event: ExpectedCargoSoundEvent): void {
   const feedback = window.Telegram?.WebApp?.HapticFeedback;
   if (!feedback) return;
-  const type = event === 'success' || event === 'merge'
+  // A client change is a SUCCESSFUL scan — only the owner differs — so it
+  // keeps the success haptic. The ear carries the distinction, not the wrist.
+  const type = event === 'success' || event === 'merge' || event === 'clientChange'
     ? 'success'
     : event === 'error'
       ? 'error'
