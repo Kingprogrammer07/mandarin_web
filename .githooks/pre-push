@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs the same checks CI runs, before anything reaches the remote.
+# GitHub Actions is currently blocked by an account billing lock, so this is
+# the only gate that actually runs today.
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+# Skip deliberately:       git push --no-verify
+exec "$(dirname "$0")/../scripts/check.sh"
