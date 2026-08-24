@@ -400,6 +400,7 @@ const StepFlightSelection = memo(
       <div className="mt-6 flex gap-3">
         <button
           onClick={onBack}
+          aria-label={t('common.back', 'Ortga')}
           className="
             flex-shrink-0 w-14 h-14 rounded-mc-lg flex items-center justify-center
             bg-mc-surface-2 text-mc-text-2
@@ -1264,6 +1265,7 @@ function StepUzpostPayment({
                   />
                   <button
                     onClick={clearFile}
+                    aria-label={t('deliveryRequest.clearFile', "Faylni o'chirish")}
                     className="absolute top-2 right-2 w-8 h-8 rounded-full bg-mc-danger-fill text-mc-on-danger flex items-center justify-center active:scale-90 transition-transform shadow-lg"
                   >
                     <X className="w-4 h-4" />
@@ -1284,6 +1286,7 @@ function StepUzpostPayment({
                   </div>
                   <button
                     onClick={clearFile}
+                    aria-label={t('deliveryRequest.clearFile', "Faylni o'chirish")}
                     className="w-8 h-8 rounded-full bg-mc-danger-soft text-mc-danger flex items-center justify-center active:scale-90 transition-transform"
                   >
                     <X className="w-4 h-4" />
@@ -1354,6 +1357,7 @@ function StepUzpostPayment({
       <div className="flex gap-3">
         <button
           onClick={onBack}
+          aria-label={t('common.back', 'Ortga')}
           className="
             flex-shrink-0 w-14 h-14 rounded-mc-lg flex items-center justify-center
             bg-mc-surface-2 text-mc-text-2

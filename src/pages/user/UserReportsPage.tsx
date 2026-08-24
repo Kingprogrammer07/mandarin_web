@@ -45,9 +45,12 @@ type ViewState = 'list' | 'detail';
 interface ImagePreviewModalProps {
     src: string | null;
     onClose: () => void;
+    /** Passed in rather than read from a hook: the viewer is a plain
+     *  expression component and the label is the only string it needs. */
+    closeLabel: string;
 }
 
-const ImagePreviewModal = ({ src, onClose }: ImagePreviewModalProps) => (
+const ImagePreviewModal = ({ src, onClose, closeLabel }: ImagePreviewModalProps) => (
     <AnimatePresence>
         {src && (
             <motion.div
@@ -59,7 +62,8 @@ const ImagePreviewModal = ({ src, onClose }: ImagePreviewModalProps) => (
             >
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors z-50"
+                    aria-label={closeLabel}
+                    className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 bg-white/10 text-white rounded-full backdrop-blur-md transition-colors z-50"
                 >
                     <XCircle className="w-8 h-8" />
                 </button>
@@ -601,6 +605,7 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
             <ImagePreviewModal
                 src={previewImage}
                 onClose={() => setPreviewImage(null)}
+                closeLabel={t('common.close', 'Yopish')}
             />
         </div>
     );

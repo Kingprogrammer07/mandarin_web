@@ -381,8 +381,8 @@ const FlightSchedulePage: React.FC<FlightSchedulePageProps> = ({ onBack, onNavig
                                         {monthLabel}
                                     </h2>
                                     <div className="flex gap-1 bg-mc-surface-2 rounded-mc-md p-1">
-                                        <button onClick={prevMonth} className="p-2 rounded-mc-sm text-mc-text-2 shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
-                                        <button onClick={nextMonth} className="p-2 rounded-mc-sm text-mc-text-2 shadow-sm transition-all"><ChevronRight className="w-5 h-5" /></button>
+                                        <button onClick={prevMonth} aria-label={t('flightSchedule.prevMonth', "Oldingi oy")} className="p-2 rounded-mc-sm text-mc-text-2 shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
+                                        <button onClick={nextMonth} aria-label={t('flightSchedule.nextMonth', "Keyingi oy")} className="p-2 rounded-mc-sm text-mc-text-2 shadow-sm transition-all"><ChevronRight className="w-5 h-5" /></button>
                                     </div>
                                 </div>
 

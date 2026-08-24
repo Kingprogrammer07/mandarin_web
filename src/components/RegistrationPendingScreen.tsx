@@ -51,7 +51,7 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
       <span className="shrink-0 text-[12px] font-bold text-mc-text-2 dark:text-white/45">
         {label}
       </span>
-      <span className="text-right text-[13px] font-black text-mc-text">
+      <span className="text-right text-[13px] font-extrabold text-mc-text">
         {value}
       </span>
     </div>
@@ -140,7 +140,7 @@ export default function RegistrationPendingScreen({
     return (
       <div className={shell}>
         <AlertTriangle className="h-9 w-9 text-mc-brand" />
-        <h1 className="mt-3 text-xl font-black text-mc-text">
+        <h1 className="mt-3 text-xl font-extrabold text-mc-text">
           {t('registrationPending.title')}
         </h1>
         <p className="mt-2 text-sm font-medium text-mc-text-2 dark:text-white/55">
@@ -149,7 +149,7 @@ export default function RegistrationPendingScreen({
         <button
           type="button"
           onClick={() => void refetch()}
-          className="mt-5 inline-flex h-11 items-center gap-2 rounded-mc-lg border border-mc-border px-5 text-sm font-black text-mc-text dark:text-white"
+          className="mt-5 inline-flex h-11 items-center gap-2 rounded-mc-lg border border-mc-border px-5 text-sm font-extrabold text-mc-text dark:text-white"
         >
           <RotateCcw className="h-4 w-4" />
           {t('common.retry')}
@@ -157,7 +157,7 @@ export default function RegistrationPendingScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="mt-3 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-black text-white"
+          className="mt-3 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-extrabold text-white"
         >
           {t('registrationPending.continue')}
         </button>
@@ -171,7 +171,7 @@ export default function RegistrationPendingScreen({
         <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-mc-success/12">
           <CheckCircle2 className="h-10 w-10 text-mc-success" />
         </div>
-        <h1 className="text-2xl font-black text-mc-text">
+        <h1 className="text-2xl font-extrabold text-mc-text">
           {t('application.approved.title')}
         </h1>
         <p className="mt-2 text-sm font-medium text-mc-text-2 dark:text-white/55">
@@ -180,7 +180,7 @@ export default function RegistrationPendingScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="mt-6 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-black text-white"
+          className="mt-6 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-extrabold text-white"
         >
           {t('application.approved.login')}
         </button>
@@ -192,7 +192,7 @@ export default function RegistrationPendingScreen({
     return (
       <div className={shell}>
         <AlertTriangle className="h-9 w-9 text-mc-brand" />
-        <h1 className="mt-3 text-xl font-black text-mc-text">
+        <h1 className="mt-3 text-xl font-extrabold text-mc-text">
           {t('application.none.title')}
         </h1>
         <p className="mt-2 text-sm font-medium text-mc-text-2 dark:text-white/55">
@@ -201,7 +201,7 @@ export default function RegistrationPendingScreen({
         <button
           type="button"
           onClick={() => (onWithdrawn ? onWithdrawn() : onContinue())}
-          className="mt-6 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-black text-white"
+          className="mt-6 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-extrabold text-white"
         >
           {t('application.none.register')}
         </button>
@@ -212,7 +212,7 @@ export default function RegistrationPendingScreen({
   if (isEditing) {
     return (
       <div className="mx-auto w-full max-w-md px-5 py-8">
-        <h2 className="mb-1 text-xl font-black text-mc-text">
+        <h2 className="mb-1 text-xl font-extrabold text-mc-text">
           {t('application.edit.title')}
         </h2>
         <p className="mb-5 text-[13px] font-medium text-mc-text-2 dark:text-white/55">
@@ -236,7 +236,7 @@ export default function RegistrationPendingScreen({
         <ShieldCheck className="h-10 w-10 text-mc-success" />
       </div>
 
-      <h1 className="text-2xl font-black text-mc-text">
+      <h1 className="text-2xl font-extrabold text-mc-text">
         {t('registrationPending.title')}
       </h1>
       <p className="mt-2 text-sm font-medium leading-relaxed text-mc-text-2 dark:text-white/55">
@@ -246,7 +246,7 @@ export default function RegistrationPendingScreen({
       <div className="mt-5 flex w-full items-start gap-3 rounded-mc-lg border border-mc-warn/25 bg-mc-warn-soft p-3.5 text-left">
         <Clock className="mt-0.5 h-5 w-5 shrink-0 text-mc-warn" />
         <div>
-          <p className="text-sm font-black text-mc-warn">
+          <p className="text-sm font-extrabold text-mc-warn">
             {t('registrationPending.etaTitle')}
           </p>
           <p className="mt-0.5 text-[13px] font-medium text-mc-warn">
@@ -257,7 +257,7 @@ export default function RegistrationPendingScreen({
 
       {/* What the admin is looking at — so a mistake is visible before approval. */}
       <div className="mt-4 w-full rounded-mc-lg border border-mc-border p-4 text-left dark:border-white/10">
-        <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-mc-text-2 dark:text-white/45">
+        <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-mc-text-2 dark:text-white/45">
           {t('application.submittedData')}
         </p>
         <InfoRow label={t('form.fullName')} value={application.full_name} />
@@ -341,7 +341,7 @@ export default function RegistrationPendingScreen({
       <button
         type="button"
         onClick={onContinue}
-        className="mt-6 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-black text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
+        className="mt-6 h-12 w-full rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong text-sm font-extrabold text-white shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all"
       >
         {t('registrationPending.continue')}
       </button>

@@ -125,12 +125,13 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
         {onBack && (
           <button
             onClick={onBack}
+            aria-label={t('common.back', 'Ortga')}
             className="p-2 -ml-2 rounded-full transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-mc-text-2" />
           </button>
         )}
-        <h1 className="text-xl font-black text-mc-text">
+        <h1 className="text-xl font-extrabold text-mc-text">
           {t('nbu.cards.title')}
         </h1>
       </div>

@@ -60,7 +60,7 @@ function LoadingScreen() {
         </div>
         {/* Brand text */}
         <div className="relative">
-          <p className="text-[15px] font-black tracking-normal text-mc-text">
+          <p className="text-[15px] font-extrabold tracking-normal text-mc-text">
             Mandarin Cargo
           </p>
           <p className="mt-1 min-h-[18px] text-[12px] font-bold leading-snug text-mc-text-2">

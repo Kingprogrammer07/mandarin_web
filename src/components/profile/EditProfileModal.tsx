@@ -130,7 +130,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                 <DialogHeader className="px-5 pb-2 pt-4 text-left sm:px-6">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <DialogTitle className="text-[22px] font-black tracking-normal text-mc-text">
+                            <DialogTitle className="text-[22px] font-extrabold tracking-normal text-mc-text">
                                 {t('profile.edit.title')}
                             </DialogTitle>
                             <DialogDescription className="mt-1 text-[13px] font-semibold leading-snug text-mc-text-2/56">
@@ -152,7 +152,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
                 <form onSubmit={handleSubmit} className="max-h-[calc(88svh-92px)] space-y-4 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-2 sm:px-6">
                     <div className="space-y-2">
-                        <Label htmlFor="full_name" className="text-[12px] font-black text-mc-text/76">{t('profile.edit.fullName')}</Label>
+                        <Label htmlFor="full_name" className="text-[12px] font-extrabold text-mc-text/76">{t('profile.edit.fullName')}</Label>
                         <Input
                             id="full_name"
                             value={formData.full_name}
@@ -163,7 +163,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-[12px] font-black text-mc-text/76">{t('profile.edit.phone')}</Label>
+                        <Label htmlFor="phone" className="text-[12px] font-extrabold text-mc-text/76">{t('profile.edit.phone')}</Label>
                         <Input
                             id="phone"
                             value={formData.phone}
@@ -176,7 +176,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
                     {/* Region Select */}
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-2 text-[12px] font-black text-mc-text/76">
+                        <Label className="flex items-center gap-2 text-[12px] font-extrabold text-mc-text/76">
                             <MapPin className="w-4 h-4 text-mc-brand" />
                             {t('profile.edit.region')}
                         </Label>
@@ -200,7 +200,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
                     {/* District Select */}
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-2 text-[12px] font-black text-mc-text/76">
+                        <Label className="flex items-center gap-2 text-[12px] font-extrabold text-mc-text/76">
                             <MapPin className="w-4 h-4 text-mc-brand opacity-50" />
                             {t('profile.edit.district')}
                         </Label>
@@ -228,7 +228,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="address" className="text-[12px] font-black text-mc-text/76">{t('profile.edit.address')}</Label>
+                        <Label htmlFor="address" className="text-[12px] font-extrabold text-mc-text/76">{t('profile.edit.address')}</Label>
                         <Input
                             id="address"
                             value={formData.address}
@@ -241,7 +241,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                         <Button type="button" variant="outline" onClick={onClose} className="h-12 rounded-mc-md border-mc-border bg-mc-surface-2 text-mc-text">
                             {t('profile.edit.cancel')}
                         </Button>
-                        <Button type="submit" disabled={isPending} className="h-12 rounded-[16px] bg-mc-brand font-black text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]">
+                        <Button type="submit" disabled={isPending} className="h-12 rounded-[16px] bg-mc-brand font-extrabold text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]">
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {t('profile.edit.save')}
                         </Button>

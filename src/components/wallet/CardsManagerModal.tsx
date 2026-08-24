@@ -237,7 +237,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
                         )}
-                            <DialogTitle className="truncate text-[22px] font-black tracking-normal text-mc-text">
+                            <DialogTitle className="truncate text-[22px] font-extrabold tracking-normal text-mc-text">
                                 {isAdding ? t('wallet.cards.newCard', "Yangi karta") : t('wallet.cards.myCards', "Mening Kartalarim")}
                             </DialogTitle>
                         </div>
@@ -312,7 +312,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                     <Button
                                         onClick={handleAddCard}
                                         disabled={addCardMutation.isPending}
-                                            className="h-12 w-full rounded-[16px] bg-mc-brand font-black text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
+                                            className="h-12 w-full rounded-[16px] bg-mc-brand font-extrabold text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
                                     >
                                         {addCardMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                                         {addCardMutation.isPending ? t('wallet.cards.saving', "Saqlanmoqda...") : t('wallet.cards.save', "Saqlash")}
@@ -338,7 +338,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 {nbuEnabled && (
                                     <section className="space-y-3">
                                         <div className="space-y-0.5">
-                                            <h3 className="text-[15px] font-black text-mc-text">
+                                            <h3 className="text-[15px] font-extrabold text-mc-text">
                                                 {t('nbu.cards.title', "Saqlangan kartalar")}
                                             </h3>
                                             <p className="text-xs text-mc-text-2/55">
@@ -442,7 +442,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 {/* Bind block: optional nickname (NBU never returns the PAN
                                                     on bind, so the label is the user's pre-charge anchor). */}
                                                 <div className="space-y-2 pt-1">
-                                                    <Label className="text-[12px] font-black text-mc-text/76">
+                                                    <Label className="text-[12px] font-extrabold text-mc-text/76">
                                                         {t('nbu.cards.nicknameLabel', "Karta nomi (ixtiyoriy)")}
                                                     </Label>
                                                     <Input
@@ -482,7 +482,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 {/* ── Section 2: Refund cards (manual entry, refund payouts) ── */}
                                 <section className="space-y-3">
                                     <div className="space-y-0.5">
-                                        <h3 className="text-[15px] font-black text-mc-text">
+                                        <h3 className="text-[15px] font-extrabold text-mc-text">
                                             {t('wallet.cards.refundTitle', "Qaytarish kartasi")}
                                         </h3>
                                         <p className="text-xs text-mc-text-2/55">
@@ -507,7 +507,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                         <p className="text-xs text-mc-text-3 mb-5 max-w-xs">{t('wallet.cards.refundAddPrompt', "Bu karta faqat pul qaytarilganda ishlatiladi. To'lov uchun yuqoridagi “To'lov kartalari” bo'limidan foydalaning.")}</p>
                                         <Button
                                             onClick={() => setIsAdding(true)}
-                                            className="rounded-full bg-mc-brand px-6 font-black text-mc-on-brand"
+                                            className="rounded-full bg-mc-brand px-6 font-extrabold text-mc-on-brand"
                                         >
                                             <Plus className="h-4 w-4 mr-2" />
                                             {t('wallet.cards.addCard', "Karta qo'shish")}

@@ -891,7 +891,8 @@
     "close": "Закрыть",
     "loading": "Загрузка...",
     "retry": "Повторить",
-    "cancel": "Отмена"
+    "cancel": "Отмена",
+    "back": "Назад"
   },
   "application": {
     "submittedData": "Отправленные данные",
@@ -1250,7 +1251,9 @@
       "title": "Рейс: прибытие {{name}}",
       "details": "Mandarin Cargo: ожидается прибытие рейса {{name}} {{date}}.",
       "tooltip": "Добавить в Google Calendar"
-    }
+    },
+    "prevMonth": "Предыдущий месяц",
+    "nextMonth": "Следующий месяц"
   },
   "deliveryRequest": {
     "headerTitle": "Оставить заявку",
@@ -1438,7 +1441,8 @@
       "chooseOtherLocation": "Другой адрес"
     },
     "confirmSendAddress": "Вы действительно хотите отправить свой адрес проживания?",
-    "back": "Назад"
+    "back": "Назад",
+    "clearFile": "Удалить файл"
   },
   "deliveryHistory": {
     "title": "История заявок",
@@ -1719,7 +1723,7 @@
     "onlineTitle": "Онлайн оплата",
     "transferTo": "Переведите на карту",
     "cardOwner": "Владелец карты",
-    "copyCard": "Скопировать",
+    "copyCard": "Скопировать номер карты",
     "copied": "Скопировано!",
     "uploadReceipt": "Загрузить чек",
     "uploadReceiptDesc": "Загрузите фото чека или PDF файл",

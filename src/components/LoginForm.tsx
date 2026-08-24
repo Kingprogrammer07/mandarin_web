@@ -232,7 +232,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
               <LogIn className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-[24px] font-black leading-tight tracking-normal text-mc-text">
+              <h1 className="text-[24px] font-extrabold leading-tight tracking-normal text-mc-text">
                 {t('login.title')}
               </h1>
               <p className="mt-1 text-[12px] font-bold leading-snug text-mc-text-2 ">
@@ -245,12 +245,12 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
             <form onSubmit={form.handleSubmit(onSubmit)} className="relative z-10 space-y-4">
               <FormField control={form.control} name="clientCode" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="ml-0.5 text-[12px] font-black text-mc-text ">
+                  <FormLabel className="ml-0.5 text-[12px] font-extrabold text-mc-text ">
                     {t('login.clientCode')}
                   </FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-[13px] font-black text-mc-brand ">
+                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-[13px] font-extrabold text-mc-brand ">
                         ID
                       </div>
                       <Input
@@ -258,7 +258,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                         {...field}
                         enterKeyHint="next"
                         onChange={(e) => field.onChange(handleClientCodeInput(e.target.value))}
-                        className={`${inp} pl-14 font-mono text-base font-black uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
+                        className={`${inp} pl-14 font-mono text-base font-extrabold uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
                       />
                     </div>
                   </FormControl>
@@ -268,7 +268,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
 
               <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="ml-0.5 text-[12px] font-black text-mc-text ">
+                  <FormLabel className="ml-0.5 text-[12px] font-extrabold text-mc-text ">
                     {t('login.phoneNumber')}
                   </FormLabel>
                   <FormControl>
@@ -277,7 +277,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                         <Phone className="h-4 w-4" />
                       </div>
                       <div className="pointer-events-none absolute left-[58px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
-                        <span className="text-[13px] font-black text-mc-text-2 ">+998</span>
+                        <span className="text-[13px] font-extrabold text-mc-text-2 ">+998</span>
                         <div className="h-4 w-px bg-mc-surface-2" />
                       </div>
                       <Input
@@ -288,7 +288,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                         placeholder={t('login.phoneNumberPlaceholder')}
                         value={handlePhoneInput(field.value).formatted}
                         onChange={(e) => field.onChange(handlePhoneInput(e.target.value).raw)}
-                        className={`${inp} pl-[6.6rem] font-mono text-base font-black tracking-wider placeholder:font-bold placeholder:tracking-normal`}
+                        className={`${inp} pl-[6.6rem] font-mono text-base font-extrabold tracking-wider placeholder:font-bold placeholder:tracking-normal`}
                       />
                     </div>
                   </FormControl>
@@ -310,7 +310,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                   <button
                     type="button"
                     onClick={onNavigateToRegister}
-                    className="font-black text-mc-brand transition-colors dark:text-mc-brand"
+                    className="font-extrabold text-mc-brand transition-colors dark:text-mc-brand"
                   >
                     {t('login.register')}
                   </button>
@@ -356,7 +356,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
               >
                 <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-mc-border" />
                 <div className="mb-5">
-                  <h2 className="text-[21px] font-black leading-tight text-mc-text">
+                  <h2 className="text-[21px] font-extrabold leading-tight text-mc-text">
                     {t('login.addressDrawer.title')}
                   </h2>
                   <p className="mt-1.5 text-[12px] font-bold leading-snug text-mc-text-2 ">

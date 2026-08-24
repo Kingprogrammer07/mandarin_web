@@ -233,7 +233,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
     'focus:border-mc-brand/70 focus:ring-2 focus:ring-mc-brand/20 focus:ring-offset-0 focus:outline-none',
   ].join(' ');
 
-  const labelClass = 'ml-0.5 text-[12px] font-black text-mc-text ';
+  const labelClass = 'ml-0.5 text-[12px] font-extrabold text-mc-text ';
   const iconBoxClass =
     'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-mc-brand ';
 
@@ -281,7 +281,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                 <IdCard className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-[24px] font-black leading-tight tracking-normal text-mc-text">
+                <h1 className="text-[24px] font-extrabold leading-tight tracking-normal text-mc-text">
                   {t('form.title')}
                 </h1>
                 <p className="mt-1 text-[12px] font-bold leading-snug text-mc-text-2 ">
@@ -311,7 +311,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                   >
                     <span
                       className={[
-                        'mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-black',
+                        'mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-extrabold',
                         isActive || isDone
                           ? 'bg-mc-brand text-mc-on-brand'
                           : 'bg-mc-surface-2 text-mc-text-2',
@@ -319,7 +319,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                     >
                       {step.id}
                     </span>
-                    <span className="block min-h-[24px] text-[10px] font-black leading-[1.15] text-mc-text sm:text-[11px]">
+                    <span className="block min-h-[24px] text-[10px] font-extrabold leading-[1.15] text-mc-text sm:text-[11px]">
                       {step.title}
                     </span>
                   </button>
@@ -363,14 +363,14 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                       <FormLabel className={labelClass}>{t('form.passportSeries')}</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <div className={`${iconBoxClass} text-[13px] font-black`}>ID</div>
+                          <div className={`${iconBoxClass} text-[13px] font-extrabold`}>ID</div>
                           <Input
                             placeholder={t('form.passportSeriesPlaceholder')}
                             {...field}
                             enterKeyHint="next"
                             onChange={(event) => field.onChange(handlePassportInput(event.target.value))}
                             maxLength={9}
-                            className={`${inputClass} pl-14 font-mono text-base font-black uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
+                            className={`${inputClass} pl-14 font-mono text-base font-extrabold uppercase tracking-widest placeholder:font-bold placeholder:tracking-normal`}
                           />
                         </div>
                       </FormControl>
@@ -394,7 +394,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             {...field}
                             onChange={(event) => field.onChange(event.target.value.replace(/\D/g, ''))}
                             maxLength={14}
-                            className={`${inputClass} pl-14 font-mono text-base font-black tracking-wider placeholder:font-bold placeholder:tracking-normal`}
+                            className={`${inputClass} pl-14 font-mono text-base font-extrabold tracking-wider placeholder:font-bold placeholder:tracking-normal`}
                           />
                         </div>
                       </FormControl>
@@ -414,7 +414,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             placeholder="DD/MM/YYYY"
                             value={dateInputValue}
                             onChange={(event) => handleDateInput(event.target.value, field.onChange)}
-                            className={`${inputClass} pr-12 font-mono text-base font-black tracking-widest placeholder:font-bold placeholder:tracking-normal`}
+                            className={`${inputClass} pr-12 font-mono text-base font-extrabold tracking-widest placeholder:font-bold placeholder:tracking-normal`}
                           />
                           <PopoverTrigger asChild>
                             <Button
@@ -543,7 +543,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             <Phone className="h-4 w-4" />
                           </div>
                           <div className="pointer-events-none absolute left-[58px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
-                            <span className="text-[13px] font-black text-mc-text-2 ">+998</span>
+                            <span className="text-[13px] font-extrabold text-mc-text-2 ">+998</span>
                             <div className="h-4 w-px bg-mc-surface-2" />
                           </div>
                           <Input
@@ -554,7 +554,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             placeholder={t('form.phoneNumberPlaceholder')}
                             value={handlePhoneInput(field.value).formatted}
                             onChange={(event) => field.onChange(handlePhoneInput(event.target.value).raw)}
-                            className={`${inputClass} pl-[6.6rem] font-mono text-base font-black tracking-wider placeholder:font-bold placeholder:tracking-normal`}
+                            className={`${inputClass} pl-[6.6rem] font-mono text-base font-extrabold tracking-wider placeholder:font-bold placeholder:tracking-normal`}
                           />
                         </div>
                       </FormControl>
@@ -661,7 +661,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                     type="button"
                     variant="outline"
                     onClick={onNavigateToLogin}
-                    className="h-13 rounded-mc-md border-mc-border bg-mc-surface-2 text-[14px] font-black text-mc-text active:scale-[0.99]"
+                    className="h-13 rounded-mc-md border-mc-border bg-mc-surface-2 text-[14px] font-extrabold text-mc-text active:scale-[0.99]"
                   >
                     {t('form.login')}
                   </Button>
@@ -670,7 +670,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                     type="button"
                     variant="outline"
                     onClick={goBack}
-                    className="h-13 rounded-mc-md border-mc-border bg-mc-surface-2 text-[14px] font-black text-mc-text active:scale-[0.99]"
+                    className="h-13 rounded-mc-md border-mc-border bg-mc-surface-2 text-[14px] font-extrabold text-mc-text active:scale-[0.99]"
                   >
                     {t('form.back')}
                   </Button>
@@ -700,7 +700,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                 <button
                   type="button"
                   onClick={onNavigateToLogin}
-                  className="font-black text-mc-brand transition-colors dark:text-mc-brand"
+                  className="font-extrabold text-mc-brand transition-colors dark:text-mc-brand"
                 >
                   {t('form.login')}
                 </button>

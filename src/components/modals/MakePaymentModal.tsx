@@ -128,7 +128,7 @@ const PaymentLinkButton = ({ link }: { link: PaymentLinkItem }) => {
     >
       {/* Brand badge */}
       <div
-        className="w-10 h-10 rounded-mc-md flex-shrink-0 flex items-center justify-center font-black text-base shadow-sm"
+        className="w-10 h-10 rounded-mc-md flex-shrink-0 flex items-center justify-center font-extrabold text-base shadow-sm"
         style={{ background: brand.bg, color: brand.textColor }}
       >
         {brand.label}
@@ -1195,7 +1195,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           {/* Sized down from 56px: the figure is the point of the screen, but at
               that size a seven-digit sum wrapped on a narrow phone. `break-words`
               is the guard if it ever still does. */}
-          <p className="break-words text-[34px] font-black leading-none tracking-tight text-mc-text tabular-nums sm:text-[40px]">
+          <p className="break-words text-[34px] font-extrabold leading-none tracking-tight text-mc-text tabular-nums sm:text-[40px]">
             {formatMoney(payableAmount)}
             <span className="ml-2 text-[16px] font-bold text-mc-brand">so'm</span>
           </p>
@@ -1506,7 +1506,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => handleChooseMethod('wallet')}
-            className="w-full h-16 rounded-mc-lg font-black text-[16px]
+            className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-success to-mc-success
               text-mc-on-success shadow-lg shadow-emerald-500/20
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
@@ -1531,7 +1531,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             whileTap={{ scale: 0.97 }}
             onClick={handleNbuPayment}
             disabled={isNbuInitiating}
-            className="w-full h-16 rounded-mc-lg font-black text-[16px]
+            className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-mc-on-brand shadow-lg shadow-sky-500/20
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
@@ -1563,7 +1563,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => handleChooseMethod('online')}
-              className="h-16 rounded-mc-lg font-black text-[16px]
+              className="h-16 rounded-mc-lg font-extrabold text-[16px]
                 bg-gradient-to-r from-mc-brand to-mc-brand-strong
                 text-mc-on-brand shadow-lg shadow-blue-500/20
                 active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
@@ -1579,7 +1579,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             disabled={isPartial}
             aria-disabled={isPartial}
             className={
-              `h-16 rounded-mc-lg font-black text-[16px]
+              `h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-mc-surface text-mc-text border border-mc-border shadow-sm
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
               disabled:opacity-60 disabled:cursor-not-allowed`
@@ -1616,7 +1616,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           >
             <CheckCircle2 className="w-10 h-10 text-mc-success" />
           </motion.div>
-          <h3 className="text-2xl font-black text-mc-text">
+          <h3 className="text-2xl font-extrabold text-mc-text">
             {t('makePayment.successTitle')}
           </h3>
           <p className="text-sm text-mc-text-2 max-w-[260px]">
@@ -1624,7 +1624,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           </p>
           <button
             onClick={handleClose}
-            className="mt-4 w-full max-w-[280px] h-16 rounded-mc-lg font-black text-[16px]
+            className="mt-4 w-full max-w-[280px] h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-mc-on-brand shadow-xl shadow-amber-500/25
               active:scale-[0.97] transition-all"
@@ -1665,7 +1665,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               </div>
             </div>
           )}
-          <p className="text-3xl font-black text-mc-text">
+          <p className="text-3xl font-extrabold text-mc-text">
             {formatMoney(finalPayable)}
             <span className="text-base ml-1.5 text-mc-brand font-bold">
               so'm
@@ -1711,14 +1711,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               })}
             </p>
           </div>
-          <p className="text-3xl font-black text-mc-success">
+          <p className="text-3xl font-extrabold text-mc-success">
             {formatMoney(effectiveAmount)}
             <span className="text-base ml-1.5 font-bold">so'm</span>
           </p>
           <button
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="w-full max-w-xs h-16 rounded-mc-lg font-black text-[16px]
+            className="w-full max-w-xs h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-success to-mc-success
               text-mc-on-success shadow-xl shadow-emerald-500/25
               active:scale-[0.97] transition-all
@@ -1763,7 +1763,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
           {/* Amount summary */}
           <div className="text-center">
-            <p className="text-3xl font-black text-mc-text">
+            <p className="text-3xl font-extrabold text-mc-text">
               {formatMoney(finalPayable)}
               <span className="text-sm ml-1.5 text-mc-brand font-bold">
                 so'm
@@ -1784,11 +1784,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 {t('makePayment.transferTo')}
               </p>
               <div className="flex items-center justify-between">
-                <p className="text-2xl font-black tracking-wider text-white">
+                <p className="text-2xl font-extrabold tracking-wider text-white">
                   {details!.card_number}
                 </p>
                 <button
                   onClick={handleCopyCard}
+                  aria-label={t('makePayment.copyCard', 'Karta raqamidan nusxa olish')}
                   className="p-2.5 rounded-mc-md bg-white/10 active:scale-90 transition-all"
                 >
                   {copied ? (
@@ -1898,7 +1899,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <button
             onClick={handleConfirm}
             disabled={!receiptFile || isSubmitting}
-            className="w-full h-16 rounded-mc-lg font-black text-[16px]
+            className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-mc-on-brand shadow-xl shadow-blue-500/25
               active:scale-[0.97] transition-all
@@ -2072,7 +2073,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             {confirmChargeCard && !chargeDone && (
               <div className="space-y-5">
                 <div className="text-center space-y-1">
-                  <h3 className="text-xl font-black text-mc-text">
+                  <h3 className="text-xl font-extrabold text-mc-text">
                     {t('nbu.confirm.title')}
                   </h3>
                   <p className="text-sm text-mc-text-2">
@@ -2085,7 +2086,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <p className="text-xs font-bold uppercase tracking-wider text-mc-brand dark:text-mc-brand mb-1">
                     {t('nbu.confirm.amountLabel')}
                   </p>
-                  <p className="text-4xl font-black text-mc-text tracking-tight">
+                  <p className="text-4xl font-extrabold text-mc-text tracking-tight">
                     {formatMoney(payableAmount)}
                     <span className="text-lg ml-1.5 font-bold text-mc-brand">so'm</span>
                   </p>
@@ -2126,7 +2127,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <button
                     onClick={confirmCharge}
                     disabled={nbuChargeMutation.isPending}
-                    className="w-full h-14 rounded-mc-lg font-black text-[16px]
+                    className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
                       bg-gradient-to-r from-mc-brand to-mc-brand-strong
                       text-mc-on-brand shadow-lg shadow-sky-500/25
                       active:scale-[0.97] transition-all
@@ -2173,21 +2174,21 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <CheckCircle2 className="w-12 h-12 text-mc-success" />
                 </motion.div>
                 <div className="space-y-1.5">
-                  <h3 className="text-2xl font-black text-mc-text">
+                  <h3 className="text-2xl font-extrabold text-mc-text">
                     {t('nbu.chargeSuccessTitle')}
                   </h3>
                   <p className="text-sm text-mc-text-2 max-w-[280px]">
                     {t('nbu.chargeSuccessBody')}
                   </p>
                 </div>
-                <p className="text-3xl font-black text-mc-success">
+                <p className="text-3xl font-extrabold text-mc-success">
                   {formatMoney(payableAmount)}
                   <span className="text-base ml-1.5 font-bold">so'm</span>
                 </p>
 
                 {/* Delivery upsell — strike while the iron is hot */}
                 <div className="w-full max-w-[280px] rounded-mc-lg bg-mc-brand-soft border border-mc-brand/20 p-3 space-y-1">
-                  <p className="text-sm font-black text-mc-brand dark:text-mc-brand">
+                  <p className="text-sm font-extrabold text-mc-brand dark:text-mc-brand">
                     {t('nbu.deliveryCta.title', "1 daqiqada zayavka qoldiring")}
                   </p>
                   <p className="text-[11px] text-mc-text-2">
@@ -2196,7 +2197,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 </div>
                 <button
                   onClick={() => { window.location.href = '/?tab=request'; }}
-                  className="w-full max-w-[280px] h-14 rounded-mc-lg font-black text-[16px]
+                  className="w-full max-w-[280px] h-14 rounded-mc-lg font-extrabold text-[16px]
                     bg-gradient-to-r from-mc-brand to-mc-brand-strong
                     text-mc-on-brand shadow-xl shadow-amber-500/25
                     active:scale-[0.97] transition-all flex items-center justify-center gap-2"

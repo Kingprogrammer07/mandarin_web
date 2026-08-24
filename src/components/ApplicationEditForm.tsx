@@ -144,7 +144,7 @@ export default function ApplicationEditForm({
     'placeholder:text-mc-text-3',
     'focus:border-mc-brand/70 focus:ring-2 focus:ring-mc-brand/20 focus:outline-none',
   ].join(' ');
-  const labelClass = 'ml-0.5 text-[12px] font-black text-mc-text';
+  const labelClass = 'ml-0.5 text-[12px] font-extrabold text-mc-text';
   const iconBoxClass =
     'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand';
 
@@ -169,7 +169,7 @@ export default function ApplicationEditForm({
             <FormLabel className={labelClass}>{t('form.passportSeries')}</FormLabel>
             <FormControl>
               <div className="relative">
-                <div className={`${iconBoxClass} text-[13px] font-black`}>ID</div>
+                <div className={`${iconBoxClass} text-[13px] font-extrabold`}>ID</div>
                 <Input
                   {...field}
                   maxLength={9}
@@ -177,7 +177,7 @@ export default function ApplicationEditForm({
                     const clean = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
                     field.onChange(clean.substring(0, 2) + clean.substring(2, 9));
                   }}
-                  className={`${inputClass} pl-14 font-mono text-base font-black uppercase tracking-widest`}
+                  className={`${inputClass} pl-14 font-mono text-base font-extrabold uppercase tracking-widest`}
                 />
               </div>
             </FormControl>
@@ -197,7 +197,7 @@ export default function ApplicationEditForm({
                   inputMode="numeric"
                   maxLength={14}
                   onChange={(event) => field.onChange(event.target.value.replace(/\D/g, ''))}
-                  className={`${inputClass} pl-14 font-mono text-base font-black tracking-wider`}
+                  className={`${inputClass} pl-14 font-mono text-base font-extrabold tracking-wider`}
                 />
               </div>
             </FormControl>
@@ -216,7 +216,7 @@ export default function ApplicationEditForm({
                   placeholder="DD/MM/YYYY"
                   value={dateInputValue}
                   onChange={(event) => handleDateInput(event.target.value, field.onChange)}
-                  className={`${inputClass} pr-12 font-mono text-base font-black tracking-widest`}
+                  className={`${inputClass} pr-12 font-mono text-base font-extrabold tracking-widest`}
                 />
                 <PopoverTrigger asChild>
                   <Button
@@ -328,7 +328,7 @@ export default function ApplicationEditForm({
             <FormControl>
               <div className="relative">
                 <div className={iconBoxClass}><Phone className="h-4 w-4" /></div>
-                <span className="pointer-events-none absolute left-[58px] top-1/2 z-10 -translate-y-1/2 text-[13px] font-black text-mc-text-2">
+                <span className="pointer-events-none absolute left-[58px] top-1/2 z-10 -translate-y-1/2 text-[13px] font-extrabold text-mc-text-2">
                   +998
                 </span>
                 <Input
@@ -336,7 +336,7 @@ export default function ApplicationEditForm({
                   type="tel"
                   inputMode="numeric"
                   onChange={(event) => field.onChange(event.target.value.replace(/\D/g, '').slice(0, 9))}
-                  className={`${inputClass} pl-[6.6rem] font-mono text-base font-black tracking-wider`}
+                  className={`${inputClass} pl-[6.6rem] font-mono text-base font-extrabold tracking-wider`}
                 />
               </div>
             </FormControl>
@@ -368,14 +368,14 @@ export default function ApplicationEditForm({
             variant="outline"
             onClick={onCancel}
             disabled={isSaving}
-            className="h-12 rounded-mc-lg font-black"
+            className="h-12 rounded-mc-lg font-extrabold"
           >
             {t('common.cancel')}
           </Button>
           <Button
             type="submit"
             disabled={isSaving}
-            className="h-12 rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong font-black text-white"
+            className="h-12 rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong font-extrabold text-white"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : t('application.edit.save')}
           </Button>

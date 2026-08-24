@@ -178,7 +178,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               <Loader2 className="w-10 h-10 text-mc-brand animate-spin" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.pending.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -199,7 +199,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               <CheckCircle2 className="w-10 h-10 text-mc-success" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.success.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -233,7 +233,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
             <div className="rounded-mc-lg bg-mc-brand-soft border border-mc-warn/25 p-4 space-y-2.5">
               <div className="flex items-center justify-center gap-2 text-mc-warn">
                 <Package className="w-5 h-5" />
-                <p className="text-sm font-black">
+                <p className="text-sm font-extrabold">
                   {t('nbu.deliveryCta.title', "1 daqiqada zayavka qoldiring")}
                 </p>
               </div>
@@ -242,7 +242,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               </p>
               <button
                 onClick={handleLeaveDelivery}
-                className="w-full h-12 rounded-mc-md font-black text-sm
+                className="w-full h-12 rounded-mc-md font-extrabold text-sm
                   bg-gradient-to-r from-mc-brand to-mc-brand-strong
                   text-white shadow-lg shadow-amber-500/25
                   active:scale-[0.97] transition-all flex items-center justify-center gap-2"
@@ -265,7 +265,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               <CreditCard className="w-10 h-10 text-mc-brand" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.cardBound.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -286,7 +286,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               <Clock className="w-10 h-10 text-mc-brand" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.timeout.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -307,7 +307,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               <XCircle className="w-10 h-10 text-mc-danger" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.failure.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -327,7 +327,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
           <div className="space-y-3">
             <button
               onClick={handleManualRefresh}
-              className="w-full h-14 rounded-mc-lg font-black text-[16px]
+              className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
                 bg-gradient-to-r from-mc-brand to-mc-brand-strong
                 text-white shadow-xl shadow-sky-500/25
                 active:scale-[0.97] transition-all flex items-center justify-center gap-2"
@@ -351,7 +351,7 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
         {phase !== 'pending' && phase !== 'timeout' && (
           <button
             onClick={handleHome}
-            className="w-full h-14 rounded-mc-lg font-black text-[16px]
+            className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-white shadow-xl shadow-amber-500/25
               active:scale-[0.97] transition-all"

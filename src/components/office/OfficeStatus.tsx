@@ -47,7 +47,7 @@ export function OfficeOpenBadge({
   const nextOpen = formatNextOpen(office.next_open_at, i18n.language);
 
   const shell = compact
-    ? 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black'
+    ? 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold'
     : 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold leading-tight ring-1';
   const dot = compact ? 'h-1.5 w-1.5' : 'h-1.5 w-1.5';
 
@@ -97,7 +97,7 @@ export function OfficeHoursTable({ office }: { office: OfficeInfo }) {
             key={day}
             className={`flex items-center justify-between rounded-mc-sm px-2 py-0.5 text-[12px] ${
               isToday
-                ? 'bg-mc-brand-soft font-black text-mc-text'
+                ? 'bg-mc-brand-soft font-extrabold text-mc-text'
                 : 'font-semibold text-mc-text-2'
             }`}
           >
@@ -198,7 +198,7 @@ export function OfficeHomeStrip({ onOpen }: { onOpen: () => void }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="min-w-0 truncate text-[13px] font-black text-mc-text">
+          <span className="min-w-0 truncate text-[13px] font-extrabold text-mc-text">
             {t('office.homeTitle')}
           </span>
           <OfficeOpenBadge office={office} compact />

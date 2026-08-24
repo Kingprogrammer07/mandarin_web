@@ -76,14 +76,14 @@ const FlightSummaryCard = ({
                 <div className="flex items-center gap-4 sm:gap-6">
                     <div className="hidden sm:flex flex-col items-end">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-mc-text-3">{t('cargoHistory.totalWeight')}</span>
-                        <span className="font-black font-mono text-mc-text text-lg flex items-center gap-1.5">
+                        <span className="font-extrabold font-mono text-mc-text text-lg flex items-center gap-1.5">
                             <Weight className="w-4 h-4 text-mc-brand" />
                             {t('cargoHistory.weightUnit', { weight: summary.total_weight })}
                         </span>
                     </div>
                     <div className="hidden sm:flex flex-col items-end">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-mc-text-3">{t('cargoHistory.totalCount')}</span>
-                        <span className="font-black font-mono text-mc-text text-lg flex items-center gap-1.5">
+                        <span className="font-extrabold font-mono text-mc-text text-lg flex items-center gap-1.5">
                             <Package className="w-4 h-4 text-mc-brand" />
                             {t('cargoHistory.countUnit', { count: summary.total_count })}
                         </span>
@@ -193,14 +193,14 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
             <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-2">
-                        <p className="text-[11px] font-black uppercase tracking-wide text-mc-text-3">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wide text-mc-text-3">
                             {t('tracking.resultLabel')}
                         </p>
-                        <h3 className="truncate font-mono text-2xl font-black tracking-normal text-mc-text">
+                        <h3 className="truncate font-mono text-2xl font-extrabold tracking-normal text-mc-text">
                             {item.track_code_2 || item.track_code}
                         </h3>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass}`}>
+                            <span className={`rounded-full border px-2.5 py-1 text-xs font-extrabold ${statusClass}`}>
                                 {t(`cargoStatus.${status}`)}
                             </span>
                             {item.flight_name && (
@@ -215,7 +215,7 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                 <div className="rounded-mc-lg border border-mc-border bg-mc-surface-2/80 p-3 dark:border-white/10 dark:bg-white/[0.035]">
                     <div className="mb-2.5 flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-mc-text">
+                            <p className="truncate text-sm font-extrabold text-mc-text">
                                 {activeStep?.label}
                             </p>
                             <p className="mt-0.5 text-xs font-semibold text-mc-text-2">
@@ -316,7 +316,7 @@ function DetailChip({ icon: Icon, label, value }: { icon: LucideIcon; label: str
 function InfoBlock({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-mc-sm border border-mc-border bg-mc-surface p-2.5">
-            <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-mc-text-3">{label}</p>
+            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3">{label}</p>
             <p className="text-sm font-bold text-mc-text">{value}</p>
         </div>
     );
@@ -335,11 +335,11 @@ function MetricBlock({
 }) {
     return (
         <div className={`rounded-mc-md border p-3 ${accent ? 'border-mc-success/25 bg-mc-success/12' : 'border-mc-border bg-mc-surface'}`}>
-            <p className={`mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide ${accent ? 'text-mc-success' : 'text-mc-text-3'}`}>
+            <p className={`mb-1 flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide ${accent ? 'text-mc-success' : 'text-mc-text-3'}`}>
                 <Icon className="size-3.5" />
                 {label}
             </p>
-            <p className={`font-mono text-sm font-black ${accent ? 'text-mc-success' : 'text-mc-text'}`}>
+            <p className={`font-mono text-sm font-extrabold ${accent ? 'text-mc-success' : 'text-mc-text'}`}>
                 {value}
             </p>
         </div>

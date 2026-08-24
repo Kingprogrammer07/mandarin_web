@@ -134,7 +134,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               <Loader2 className="w-10 h-10 text-mc-brand animate-spin" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.pending.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -155,7 +155,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               <CheckCircle2 className="w-10 h-10 text-mc-success" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.success.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -198,7 +198,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               <CreditCard className="w-10 h-10 text-mc-brand" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.cardBound.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -219,7 +219,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               <XCircle className="w-10 h-10 text-mc-danger" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-mc-text">
+              <h1 className="text-xl font-extrabold text-mc-text">
                 {t('nbu.failure.title')}
               </h1>
               <p className="text-sm text-mc-text-2">
@@ -239,7 +239,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
           <div className="space-y-3">
             <button
               onClick={handleRetry}
-              className="w-full h-14 rounded-mc-lg font-black text-[16px]
+              className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
                 bg-gradient-to-r from-mc-brand to-mc-brand-strong
                 text-white shadow-xl shadow-blue-500/25
                 active:scale-[0.97] transition-all"
@@ -262,7 +262,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
         {(phase === 'success' || phase === 'card_bound') && (
           <button
             onClick={handleHome}
-            className="w-full h-14 rounded-mc-lg font-black text-[16px]
+            className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-white shadow-xl shadow-amber-500/25
               active:scale-[0.97] transition-all"

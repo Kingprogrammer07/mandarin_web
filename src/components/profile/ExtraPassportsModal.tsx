@@ -593,7 +593,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
-                                                        className="h-8 w-8 text-white/50 rounded-mc-sm opacity-100 md:opacity-0 transition-all"
+                                                        className="h-9 w-9 text-mc-text-2 rounded-mc-sm transition-all"
                                                         onClick={() => handleCopy(selectedPassport.passport_series, t('form.passportSeries'))}
                                                     >
                                                         <Copy className="h-4 w-4" />
@@ -610,7 +610,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
-                                                        className="h-8 w-8 text-white/50 rounded-mc-sm opacity-100 md:opacity-0 transition-all"
+                                                        className="h-9 w-9 text-mc-text-2 rounded-mc-sm transition-all"
                                                         onClick={() => handleCopy(selectedPassport.pinfl, t('form.pinfl'))}
                                                     >
                                                         <Copy className="h-4 w-4" />

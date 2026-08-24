@@ -891,7 +891,8 @@
     "close": "Yopish",
     "loading": "Yuklanmoqda...",
     "retry": "Qayta urinish",
-    "cancel": "Bekor qilish"
+    "cancel": "Bekor qilish",
+    "back": "Ortga"
   },
   "application": {
     "submittedData": "Yuborilgan ma'lumot",
@@ -1250,7 +1251,9 @@
       "title": "Reys: {{name}} kelishi",
       "details": "Mandarin Cargo: {{name}} reysi {{date}} kuni yetib kelishi kutilmoqda.",
       "tooltip": "Google Calendar ga qo'shish"
-    }
+    },
+    "prevMonth": "Oldingi oy",
+    "nextMonth": "Keyingi oy"
   },
   "deliveryRequest": {
     "headerTitle": "Zayavka qoldirish",
@@ -1438,7 +1441,8 @@
       "chooseOtherLocation": "Boshqa manzil"
     },
     "confirmSendAddress": "Rostan ham yashash manzilingizni yubormoqchimisiz?",
-    "back": "Ortga"
+    "back": "Ortga",
+    "clearFile": "Faylni o'chirish"
   },
   "deliveryHistory": {
     "title": "Zayavkalar tarixi",
@@ -1719,7 +1723,7 @@
     "onlineTitle": "Online to'lov",
     "transferTo": "Quyidagi kartaga o'tkazing",
     "cardOwner": "Karta egasi",
-    "copyCard": "Nusxalash",
+    "copyCard": "Karta raqamidan nusxa olish",
     "copied": "Nusxalandi!",
     "uploadReceipt": "Chekni yuklash",
     "uploadReceiptDesc": "To'lov cheki rasmini yoki PDF faylini yuklang",

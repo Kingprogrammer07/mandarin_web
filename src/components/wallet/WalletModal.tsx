@@ -83,7 +83,7 @@ const ReminderCard = memo(({ reminder, idx, onPay }: { reminder: PaymentReminder
                         </Badge>
                         <div className="text-right">
                             <span className="text-[10px] uppercase font-bold text-mc-text-3 block mb-0.5">{t('profile.payments.remaining', "Qoldiq")}</span>
-                            <span className="text-base font-black text-mc-danger dark:text-mc-danger">
+                            <span className="text-base font-extrabold text-mc-danger dark:text-mc-danger">
                                 {reminder.remaining.toLocaleString()} so'm
                             </span>
                         </div>
@@ -150,7 +150,7 @@ const DebtPaymentLinkButton = memo(({ link }: { link: WalletPaymentLink }) => {
                 active:scale-[0.97] transition-all"
         >
             <div
-                className="w-10 h-10 rounded-mc-md flex-shrink-0 flex items-center justify-center font-black text-base text-white shadow-sm"
+                className="w-10 h-10 rounded-mc-md flex-shrink-0 flex items-center justify-center font-extrabold text-base text-white shadow-sm"
                 style={{ background: brand.bg }}
             >
                 {brand.label}
@@ -402,7 +402,7 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                                                         {t('wallet.modal.availableBalance', "Balans")}
                                                     </span>
                                                 </div>
-                                                <p className="text-xl font-black text-mc-success tracking-tight">
+                                                <p className="text-xl font-extrabold text-mc-success tracking-tight">
                                                     {walletBalance.toLocaleString()}
                                                 </p>
                                                 <p className="text-[10px] text-mc-text-3 font-medium">so'm</p>
@@ -425,7 +425,7 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                                                     </span>
                                                 </div>
                                                 <p className={cn(
-                                                    "text-xl font-black tracking-tight",
+                                                    "text-xl font-extrabold tracking-tight",
                                                     hasDebt ? "text-mc-danger" : "text-mc-text-3"
                                                 )}>
                                                     {hasDebt ? Math.abs(debt).toLocaleString() : '0'}

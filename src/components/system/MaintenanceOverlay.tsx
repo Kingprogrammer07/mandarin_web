@@ -27,7 +27,7 @@ export default function MaintenanceOverlay() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-xl font-black text-mc-text">
+          <h1 className="text-xl font-extrabold text-mc-text">
             {t('maintenance.title')}
           </h1>
           <p className="text-sm text-mc-text-2 leading-relaxed">

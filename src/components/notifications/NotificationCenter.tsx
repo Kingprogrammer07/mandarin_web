@@ -224,7 +224,8 @@ const DetailDialog = ({
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="shrink-0 rounded-mc-md p-1.5 text-mc-text-3 transition-colors dark:text-white/42"
+                                    aria-label={closeLabel}
+                                    className="shrink-0 rounded-mc-md p-1.5 text-mc-text-3 transition-colors"
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
