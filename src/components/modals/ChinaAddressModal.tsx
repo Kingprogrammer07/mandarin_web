@@ -119,17 +119,23 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
         };
     }, [isOpen, data, error, t]);
 
-    useEffect(() => {
+    // Closing resets the transient bits. Adjusted during render rather than in
+    // an effect: an effect would repaint the sheet once with the stale state
+    // still showing, and cascading setState in an effect body is what the
+    // react-hooks rule flags.
+    const [wasOpen, setWasOpen] = useState(isOpen);
+    if (isOpen !== wasOpen) {
+        setWasOpen(isOpen);
         if (!isOpen) {
             setCopied(false);
             setPreviewOpen(false);
-            return;
         }
+    }
 
-        if (data?.images.length && activeTab > data.images.length - 1) {
-            setActiveTab(0);
-        }
-    }, [activeTab, data?.images.length, isOpen]);
+    // Clamped rather than corrected through state: if the image list shrinks
+    // between renders, a stored index would point past the end for one frame.
+    const imageCount = data?.images.length ?? 0;
+    const safeTab = imageCount > 0 ? Math.min(activeTab, imageCount - 1) : 0;
 
     const handleRetry = useCallback(() => {
         setError(null);
@@ -341,7 +347,7 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                                                                 onClick={() => setActiveTab(index)}
                                                                 className={cn(
                                                                     'min-w-0 flex-1 rounded-mc-sm px-3 py-1.5 text-[12px] font-extrabold transition-colors',
-                                                                    activeTab === index
+                                                                    safeTab === index
                                                                         ? 'bg-mc-surface text-mc-brand shadow-[var(--mc-shadow-card)]'
                                                                         : 'text-mc-text-2',
                                                                 )}
@@ -355,24 +361,24 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                                                 <button
                                                     type="button"
                                                     className="relative aspect-[4/3] w-full overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface-2"
-                                                    onClick={() => openPreview(activeTab)}
+                                                    onClick={() => openPreview(safeTab)}
                                                 >
-                                                    {!imageLoaded[activeTab] && (
+                                                    {!imageLoaded[safeTab] && (
                                                         <div className="absolute inset-0 grid place-items-center">
                                                             <Loader2 className="h-6 w-6 animate-spin text-mc-brand" />
                                                         </div>
                                                     )}
                                                     <AnimatePresence mode="wait">
                                                         <motion.img
-                                                            key={activeTab}
+                                                            key={safeTab}
                                                             initial={{ opacity: 0 }}
-                                                            animate={{ opacity: imageLoaded[activeTab] ? 1 : 0 }}
+                                                            animate={{ opacity: imageLoaded[safeTab] ? 1 : 0 }}
                                                             exit={{ opacity: 0 }}
                                                             transition={{ duration: 0.25 }}
-                                                            src={data.images[activeTab]}
-                                                            alt={getTabLabel(data.images[activeTab], activeTab)}
+                                                            src={data.images[safeTab]}
+                                                            alt={getTabLabel(data.images[safeTab], safeTab)}
                                                             className="h-full w-full object-contain"
-                                                            onLoad={() => setImageLoaded((prev) => ({ ...prev, [activeTab]: true }))}
+                                                            onLoad={() => setImageLoaded((prev) => ({ ...prev, [safeTab]: true }))}
                                                         />
                                                     </AnimatePresence>
                                                     <span className="pointer-events-none absolute bottom-2.5 right-2.5 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md">

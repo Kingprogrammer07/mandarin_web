@@ -77,15 +77,19 @@ const UserPage = ({
    const { t } = useTranslation();
    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-   const [isCardsModalOpen, setIsCardsModalOpen] = useState(false);
+   // Returning from the NBU card flow reopens the cards sheet. Read straight
+   // into the initial state rather than setting it from an effect, which would
+   // paint one frame with the sheet closed and trip the cascading-render rule.
+   const [isCardsModalOpen, setIsCardsModalOpen] = useState(
+      () => new URLSearchParams(window.location.search).get('nbuReturn') === 'cards',
+   );
    const [isPassportsModalOpen, setIsPassportsModalOpen] = useState(false);
 
    useEffect(() => {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('nbuReturn') !== 'cards') return;
-
-      setIsCardsModalOpen(true);
+      if (!isCardsModalOpen) return;
       clearNbuReturnParams();
+      // Runs once on mount: the param is consumed the moment it is read.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
    const [isSensitiveVisible, setIsSensitiveVisible] = useState(false);
