@@ -68,13 +68,13 @@ const NotificationItem = ({
     const isPaymentNotification = item.type === 'notification' && item.iconType === 'payment';
 
     const getIcon = (type: string, iconType?: string) => {
-        if (type === 'report') return <Plane className="w-4 h-4 text-sky-500" />;
+        if (type === 'report') return <Plane className="w-4 h-4 text-mc-brand" />;
 
         switch (iconType) {
-            case 'payment': return <CreditCard className="w-4 h-4 text-green-500" />;
-            case 'cargo': return <Package className="w-4 h-4 text-orange-500" />;
-            case 'alert': return <AlertCircle className="w-4 h-4 text-red-500" />;
-            default: return <Info className="w-4 h-4 text-blue-500" />;
+            case 'payment': return <CreditCard className="w-4 h-4 text-mc-success" />;
+            case 'cargo': return <Package className="w-4 h-4 text-mc-brand" />;
+            case 'alert': return <AlertCircle className="w-4 h-4 text-mc-danger" />;
+            default: return <Info className="w-4 h-4 text-mc-brand" />;
         }
     };
 
@@ -87,18 +87,18 @@ const NotificationItem = ({
             whileHover={{ scale: 0.995 }}
             onClick={() => onClick(item)}
             className={cn(
-                "relative flex gap-3.5 rounded-[1.15rem] border p-3.5 transition-all cursor-pointer group shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+                "relative flex gap-3.5 rounded-mc-lg border p-3.5 transition-all cursor-pointer group shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
                 item.is_read
-                    ? "border-gray-200/70 bg-white/70 hover:border-orange-200/80 dark:border-white/[0.065] dark:bg-white/[0.035] dark:hover:border-orange-300/15"
-                    : "border-orange-200/70 bg-orange-50/90 shadow-[0_10px_24px_rgba(245,158,11,0.08)] dark:border-orange-300/18 dark:bg-orange-400/[0.075] dark:shadow-[0_12px_28px_rgba(0,0,0,0.20)]"
+                    ? "border-mc-border/70 bg-white/70 dark:bg-white/[0.035]"
+                    : "border-mc-brand/20 bg-mc-brand-soft shadow-[0_10px_24px_rgba(245,158,11,0.08)] dark:border-mc-brand/20 dark:bg-mc-brand-soft"
             )}
         >
             {/* Icon Bubble */}
             <div className={cn(
-                "shrink-0 w-9 h-9 rounded-[14px] flex items-center justify-center border",
+                "shrink-0 w-9 h-9 rounded-mc-md flex items-center justify-center border",
                 item.is_read
-                    ? "bg-gray-100/80 dark:bg-white/[0.045] border-gray-200 dark:border-white/[0.07] text-gray-400"
-                    : "bg-white dark:bg-orange-300/[0.10] border-orange-100 dark:border-orange-300/15 shadow-sm"
+                    ? "bg-mc-surface-2/80 dark:bg-white/[0.045] border-mc-border text-mc-text-3"
+                    : "bg-mc-surface dark:bg-mc-brand-soft border-mc-brand/20 dark:border-mc-brand/20 shadow-sm"
             )}>
                 {getIcon(item.type, item.iconType)}
             </div>
@@ -108,23 +108,23 @@ const NotificationItem = ({
                     <div className="flex items-center gap-1.5 min-w-0">
                         <p className={cn(
                             "text-sm font-semibold truncate",
-                            item.is_read ? "text-gray-600 dark:text-zinc-400" : "text-gray-900 dark:text-zinc-100"
+                            item.is_read ? "text-mc-text-2 dark:text-mc-text-3" : "text-mc-text dark:text-mc-text"
                         )}>
                             {item.title}
                         </p>
                         {item.type === 'notification' && (
-                            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-orange-100/80 dark:bg-orange-300/[0.10] text-orange-700 dark:text-amber-300 border border-orange-200/70 dark:border-orange-300/15">
+                            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-extrabold rounded-full bg-mc-brand-soft text-mc-brand border border-mc-brand/20">
                                 {t('notifications.system')}
                             </span>
                         )}
                     </div>
-                    <span className="text-[10px] text-gray-400 dark:text-zinc-500 shrink-0 mt-0.5">
+                    <span className="text-[10px] text-mc-text-3 dark:text-mc-text-3 shrink-0 mt-0.5">
                         {formatNotificationDate(item.date, i18n.language, t('notifications.yesterday'))}
                     </span>
                 </div>
                 <p className={cn(
                     "text-xs mt-0.5 line-clamp-2 leading-relaxed",
-                    item.is_read ? "text-gray-500 dark:text-white/38" : "text-gray-600 dark:text-white/58"
+                    item.is_read ? "text-mc-text-2 dark:text-white/38" : "text-mc-text-2 dark:text-white/58"
                 )}>
                     {item.body.replace(/<\/?b>/g, ' ')}
                 </p>
@@ -135,7 +135,7 @@ const NotificationItem = ({
                             event.stopPropagation();
                             onPaymentClick();
                         }}
-                        className="mt-2.5 inline-flex h-8 items-center rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-3 text-xs font-black text-[#241406] shadow-[0_8px_18px_rgba(245,158,11,0.22)] transition-transform active:scale-95"
+                        className="mt-2.5 inline-flex h-8 items-center rounded-mc-md bg-gradient-to-r from-mc-brand to-mc-brand-strong px-3 text-xs font-extrabold text-mc-on-brand shadow-[0_8px_18px_rgba(245,158,11,0.22)] transition-transform active:scale-95"
                     >
                         {t('dashboard.actions.payment.action')}
                     </button>
@@ -144,7 +144,7 @@ const NotificationItem = ({
 
             {/* Unread Indicator */}
             {!item.is_read && (
-                <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_12px_rgba(245,158,11,0.8)]" />
+                <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-mc-brand shadow-[0_0_12px_rgba(245,158,11,0.8)]" />
             )}
         </motion.div>
     );
@@ -200,29 +200,31 @@ const DetailDialog = ({
                         className="fixed inset-0 z-[10001] flex items-center justify-center p-4 pointer-events-none"
                     >
                         <div
-                            className="relative w-full max-w-md overflow-hidden rounded-[1.6rem] border border-gray-100 bg-white shadow-2xl pointer-events-auto dark:border-white/[0.075] dark:bg-[#080b11] dark:shadow-[0_28px_70px_rgba(0,0,0,0.56)]"
+                            className="relative w-full max-w-md overflow-hidden rounded-mc-xl border border-mc-border bg-mc-surface shadow-2xl pointer-events-auto"
                             onClick={(e) => e.stopPropagation()}
+                            role="dialog"
+                            aria-modal="true"
                         >
                             {/* Header */}
-                            <div className="flex items-start justify-between border-b border-gray-100 bg-gray-50/70 p-5 pb-4 dark:border-white/[0.075] dark:bg-white/[0.025]">
+                            <div className="flex items-start justify-between border-b border-mc-border bg-mc-surface-2 p-5 pb-4">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     {notification.iconType && (
-                                        <span className="shrink-0 rounded-[14px] border border-orange-200/70 bg-orange-50 p-2 text-orange-600 dark:border-orange-300/15 dark:bg-orange-300/[0.10] dark:text-amber-300">
+                                        <span className="shrink-0 rounded-mc-md border border-mc-brand/20 bg-mc-brand-soft p-2 text-mc-brand dark:border-mc-brand/20 dark:bg-mc-brand-soft dark:text-mc-brand">
                                             <MessageSquare className="h-4 w-4" />
                                         </span>
                                     )}
                                     <div className="min-w-0">
-                                        <h3 className="truncate text-base font-black text-gray-950 dark:text-[#fff8ed]">
+                                        <h3 className="truncate text-base font-extrabold text-mc-text">
                                             {notification.title}
                                         </h3>
-                                        <p className="mt-0.5 text-xs font-semibold text-gray-400 dark:text-white/38">
+                                        <p className="mt-0.5 text-xs font-semibold text-mc-text-3 dark:text-white/38">
                                             {notification.date && formatNotificationDate(notification.date, localeCode, yesterdayLabel)}
                                         </p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="shrink-0 rounded-xl p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-white/42 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                                    className="shrink-0 rounded-mc-md p-1.5 text-mc-text-3 transition-colors dark:text-white/42"
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
@@ -230,18 +232,18 @@ const DetailDialog = ({
 
                             {/* Body */}
                             <div className="p-5">
-                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-white/64">
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-mc-text dark:text-white/64">
                                     {notification.body.replace(/<\/?b>/g, ' ')}
                                 </p>
                             </div>
 
                             {/* Footer */}
-                            <div className="flex justify-end border-t border-gray-100 p-4 pt-3 dark:border-white/[0.075]">
+                            <div className="flex justify-end border-t border-mc-border p-4 pt-3">
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={onClose}
-                                    className="rounded-xl bg-gray-100 font-bold hover:bg-gray-200 dark:bg-white/[0.07] dark:text-white dark:hover:bg-white/[0.10]"
+                                    className="rounded-mc-md bg-mc-surface-2 font-bold dark:bg-white/[0.07] dark:text-white"
                                 >
                                     {closeLabel}
                                 </Button>
@@ -525,25 +527,25 @@ export default function NotificationCenter() {
 
     // --- Notification Panel Content ---
     const renderContent = () => (
-        <div className="flex h-full max-h-[85vh] flex-col overflow-hidden bg-white dark:bg-[#080b11] sm:max-h-[520px]">
+        <div className="flex h-full max-h-[85dvh] flex-col overflow-hidden bg-mc-surface sm:max-h-[520px]">
             {/* Header */}
-            <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white/85 p-4 backdrop-blur-xl dark:border-white/[0.075] dark:bg-[#080b11]/92">
+            <div className="sticky top-0 z-10 shrink-0 border-b border-mc-border bg-white/85 p-4 backdrop-blur-xl">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                            <span className="grid h-9 w-9 place-items-center rounded-[14px] border border-orange-200/70 bg-orange-50 text-orange-600 dark:border-orange-300/15 dark:bg-orange-300/[0.10] dark:text-amber-300">
+                            <span className="grid h-9 w-9 place-items-center rounded-mc-md border border-mc-brand/20 bg-mc-brand-soft text-mc-brand dark:border-mc-brand/20 dark:bg-mc-brand-soft dark:text-mc-brand">
                                 <Bell className="h-[18px] w-[18px]" />
                             </span>
                             <div className="min-w-0">
-                                <h3 className="truncate text-[17px] font-black leading-tight text-gray-950 dark:text-[#fff8ed]">
+                                <h3 className="truncate text-[17px] font-extrabold leading-tight text-mc-text">
                                     {t('notifications.title', 'Bildirishnomalar')}
                                 </h3>
-                                <p className="mt-0.5 text-[11px] font-semibold text-gray-400 dark:text-white/38">
+                                <p className="mt-0.5 text-[11px] font-semibold text-mc-text-3 dark:text-white/38">
                                     {totalUnreadCount > 0 ? `${totalUnreadCount} ta yangi xabar` : t('notifications.empty')}
                                 </p>
                             </div>
                             {(isNotifRefetching || isNotifLoading || isReportsLoading) && (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-500" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-mc-brand" />
                             )}
                         </div>
                     </div>
@@ -554,7 +556,7 @@ export default function NotificationCenter() {
                             size="sm"
                             onClick={handleMarkAllAsRead}
                             disabled={markAllReadMutation.isPending}
-                            className="h-8 gap-1.5 rounded-xl bg-orange-50 px-2.5 text-[11px] font-black text-orange-700 hover:bg-orange-100 hover:text-orange-800 dark:bg-orange-300/[0.10] dark:text-amber-300 dark:hover:bg-orange-300/[0.16]"
+                            className="h-8 gap-1.5 rounded-mc-md bg-mc-brand-soft px-2.5 text-[11px] font-extrabold text-mc-brand dark:bg-mc-brand-soft dark:text-mc-brand"
                         >
                             <CheckCheck className="h-3.5 w-3.5" />
                             {t('notifications.markAll', "O'qilgan qilish")}
@@ -565,7 +567,7 @@ export default function NotificationCenter() {
                             variant="ghost"
                             size="icon"
                             onClick={handleMobileClose}
-                            className="ml-1 h-8 w-8 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-white/42 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                            className="ml-1 h-8 w-8 rounded-mc-md text-mc-text-3 dark:text-white/42"
                         >
                             <X className="h-4 w-4" />
                         </Button>
@@ -578,13 +580,13 @@ export default function NotificationCenter() {
             <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent dark:scrollbar-thumb-white/10">
                 {(isNotifLoading) && !notificationsData ? (
                     <div className="flex flex-col items-center justify-center gap-2 py-10">
-                        <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-                        <span className="text-xs text-gray-400">{t('notifications.loading')}</span>
+                        <Loader2 className="h-6 w-6 animate-spin text-mc-brand" />
+                        <span className="text-xs text-mc-text-3">{t('notifications.loading')}</span>
                     </div>
                 ) : combinedNotifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-gray-500 dark:text-white/42">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-gray-100 dark:bg-white/[0.045]">
-                            <Bell className="h-6 w-6 text-gray-400 dark:text-white/32" />
+                    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-mc-text-2 dark:text-white/42">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-mc-md bg-mc-surface-2 dark:bg-white/[0.045]">
+                            <Bell className="h-6 w-6 text-mc-text-3 dark:text-white/32" />
                         </div>
                         <p className="text-sm">{t('notifications.empty')}</p>
                     </div>
@@ -636,12 +638,12 @@ export default function NotificationCenter() {
                             transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                             className="fixed left-4 right-4 top-[5.3rem] z-[9997] mx-auto max-w-[390px] sm:left-auto sm:right-5 sm:top-[5.6rem]"
                         >
-                            <div className="relative overflow-hidden rounded-[1.25rem] border border-orange-200/70 bg-white/96 p-3.5 shadow-[0_18px_42px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl dark:border-orange-300/16 dark:bg-[#0a0e15]/94 dark:shadow-[0_22px_54px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.07)]">
-                                <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-orange-300/70 to-transparent dark:via-amber-200/45" />
+                            <div className="relative overflow-hidden rounded-mc-lg border border-mc-brand/20 bg-mc-surface p-3.5 shadow-[0_18px_42px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl dark:border-mc-brand/20">
+                                <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-mc-brand/40 to-transparent" />
                                 <div className="flex items-center gap-3">
-                                    <div className="relative grid h-10 w-10 shrink-0 place-items-center rounded-[15px] border border-orange-200 bg-orange-50 text-orange-600 shadow-sm dark:border-orange-300/16 dark:bg-orange-300/[0.10] dark:text-amber-300">
+                                    <div className="relative grid h-10 w-10 shrink-0 place-items-center rounded-mc-md border border-mc-brand/20 bg-mc-brand-soft text-mc-brand shadow-sm dark:border-mc-brand/20 dark:bg-mc-brand-soft dark:text-mc-brand">
                                         <Bell className="h-5 w-5" />
-                                        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-orange-500 px-1 text-[10px] font-black text-[#241406] dark:border-[#0a0e15]">
+                                        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-mc-surface bg-mc-brand px-1 text-[10px] font-extrabold text-mc-on-brand">
                                             {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
                                         </span>
                                     </div>
@@ -650,17 +652,17 @@ export default function NotificationCenter() {
                                         onClick={handleOpenNotificationsFromNudge}
                                         className="min-w-0 flex-1 text-left"
                                     >
-                                        <p className="truncate text-sm font-black text-gray-950 dark:text-[#fff8ed]">
+                                        <p className="truncate text-sm font-extrabold text-mc-text">
                                             {t('notifications.newPopupTitle', 'Sizga yangi xabar bor')}
                                         </p>
-                                        <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-gray-500 dark:text-white/48">
+                                        <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-mc-text-2 dark:text-white/48">
                                             {t('notifications.newPopupDesc', "Bildirishnomalarni ko'rish uchun bosing")}
                                         </p>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setIsNudgeVisible(false)}
-                                        className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-white/38 dark:hover:bg-white/[0.07] dark:hover:text-white/80"
+                                        className="grid h-8 w-8 shrink-0 place-items-center rounded-mc-md text-mc-text-3 transition-colors dark:text-white/38"
                                         aria-label={t('notifications.close')}
                                     >
                                         <X className="h-4 w-4" />
@@ -681,17 +683,17 @@ export default function NotificationCenter() {
                         onClick={() => isMobile && setIsOpen(prev => !prev)}
                     >
                         <div className={cn(
-                            "relative grid h-10 w-10 place-items-center rounded-2xl border transition-all duration-300 shadow-[0_12px_24px_rgba(0,0,0,0.10),inset_0_1px_0_rgba(255,255,255,0.08)]",
+                            "relative grid h-10 w-10 place-items-center rounded-mc-lg border transition-all duration-300 shadow-[0_12px_24px_rgba(0,0,0,0.10),inset_0_1px_0_rgba(255,255,255,0.08)]",
                             isOpen
-                                ? "border-orange-300/40 bg-orange-100/80 text-orange-600 dark:border-orange-300/25 dark:bg-orange-400/[0.14] dark:text-amber-300"
-                                : "border-gray-200/80 bg-white/90 text-gray-500 hover:border-orange-200 hover:bg-orange-50/70 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-white/48 dark:hover:border-orange-300/20 dark:hover:bg-orange-400/[0.09]"
+                                ? "border-mc-brand/40 bg-mc-brand-soft text-mc-brand dark:border-mc-brand/25 dark:bg-mc-brand-soft dark:text-mc-brand"
+                                : "border-mc-border/80 bg-white/90 text-mc-text-2 dark:bg-white/[0.055] dark:text-white/48"
                         )}>
                             <Bell
                                 className={cn(
                                     "h-[21px] w-[21px] transition-colors",
                                     totalUnreadCount > 0
-                                        ? "text-amber-500 dark:text-amber-400"
-                                        : "text-gray-500 dark:text-zinc-400"
+                                        ? "text-mc-brand dark:text-mc-brand"
+                                        : "text-mc-text-2 dark:text-mc-text-3"
                                 )}
                                 style={{
                                     animation: totalUnreadCount > 0 ? 'bell-ring 4s ease-in-out infinite' : 'none',
@@ -705,7 +707,7 @@ export default function NotificationCenter() {
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
                                         exit={{ scale: 0 }}
-                                        className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-orange-500 px-1 text-[10px] font-black text-[#241406] shadow-sm dark:border-[#080b11]"
+                                        className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-mc-surface bg-mc-brand px-1 text-[10px] font-extrabold text-mc-on-brand shadow-sm"
                                     >
                                         {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
                                     </motion.span>
@@ -719,7 +721,7 @@ export default function NotificationCenter() {
                 {!isMobile && (
                     <PopoverContent
                         align="end"
-                        className="w-[370px] overflow-hidden rounded-[1.6rem] border border-gray-100 bg-white/95 p-0 shadow-2xl backdrop-blur-xl dark:border-white/[0.075] dark:bg-[#080b11]/96 dark:shadow-[0_28px_70px_rgba(0,0,0,0.52)]"
+                        className="w-[370px] overflow-hidden rounded-mc-xl border border-mc-border bg-white/95 p-0 shadow-2xl backdrop-blur-xl"
                     >
                         {renderContent()}
                     </PopoverContent>
@@ -749,9 +751,11 @@ export default function NotificationCenter() {
                                 animate={{ y: 0 }}
                                 exit={{ y: '100%' }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                className="fixed bottom-0 left-0 right-0 z-[9999] flex max-h-[85vh] flex-col overflow-hidden rounded-t-[2rem] border-t border-gray-100 bg-white shadow-[0_-16px_44px_rgba(0,0,0,0.16)] dark:border-white/[0.075] dark:bg-[#080b11] dark:shadow-[0_-24px_70px_rgba(0,0,0,0.56)]"
+                                role="dialog"
+                                aria-modal="true"
+                                className="fixed bottom-0 left-0 right-0 z-[9999] flex max-h-[85dvh] flex-col overflow-hidden rounded-t-mc-xl border-t border-mc-border bg-mc-surface shadow-[0_-16px_44px_rgba(0,0,0,0.16)]"
                             >
-                                <div className="mx-auto mt-3 mb-1 h-1.5 w-12 shrink-0 rounded-full bg-gray-200 dark:bg-white/14" />
+                                <div className="mx-auto mt-3 mb-1 h-1.5 w-12 shrink-0 rounded-full bg-mc-border" />
                                 {renderContent()}
                             </motion.div>
                         </>

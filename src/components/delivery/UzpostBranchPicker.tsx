@@ -212,7 +212,7 @@ function SelectedBranchDetails({
   if (!branch) {
     return (
       <div className={cn(theme.selectedPanelClassName, 'text-center')}>
-        <MapPinned className="mx-auto mb-3 h-10 w-10 text-orange-400" />
+        <MapPinned className="mx-auto mb-3 h-10 w-10 text-mc-brand" />
         <p className={cn('text-sm font-bold', theme.primaryTextClassName)}>
           {t('deliveryRequest.branchPicker.emptyTitle')}
         </p>
@@ -256,7 +256,7 @@ function SelectedBranchDetails({
   return (
     <div className={theme.selectedPanelClassName}>
       <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg bg-mc-success/12 text-mc-success dark:bg-mc-success/20 dark:text-mc-success">
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -276,7 +276,7 @@ function SelectedBranchDetails({
         {primaryRows.map((row) => (
           <div
             key={row.label}
-            className="flex items-start justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-white/[0.04]"
+            className="flex items-start justify-between gap-3 rounded-mc-md bg-mc-surface-2 px-3 py-2 dark:bg-white/[0.04]"
           >
             <span className={cn('shrink-0 text-xs font-semibold', theme.mutedTextClassName)}>
               {row.label}
@@ -291,7 +291,7 @@ function SelectedBranchDetails({
       <button
         type="button"
         onClick={() => setIsExpanded((current) => !current)}
-        className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-orange-200 bg-orange-50 px-3 py-2 text-left text-xs font-bold text-orange-700 transition active:scale-[0.99] dark:border-orange-500/25 dark:bg-orange-500/10 dark:text-orange-300"
+        className="mt-3 flex w-full items-center justify-between gap-3 rounded-mc-md border border-dashed border-mc-brand/20 bg-mc-brand-soft px-3 py-2 text-left text-xs font-bold text-mc-brand transition active:scale-[0.99] dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
       >
         <span>{t('deliveryRequest.branchPicker.expandDetails')}</span>
         <ChevronDown
@@ -304,7 +304,7 @@ function SelectedBranchDetails({
           {expandedRows.map((row) => (
             <div
               key={row.label}
-              className="flex items-start justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-white/[0.04]"
+              className="flex items-start justify-between gap-3 rounded-mc-md bg-mc-surface-2 px-3 py-2 dark:bg-white/[0.04]"
             >
               <span className={cn('shrink-0 text-xs font-semibold', theme.mutedTextClassName)}>
                 {row.label}
@@ -341,7 +341,7 @@ function SelectedBranchPreview({
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg bg-mc-success/12 text-mc-success dark:bg-mc-success/20 dark:text-mc-success">
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -354,7 +354,7 @@ function SelectedBranchPreview({
           <p className={cn('mt-1 line-clamp-2 text-sm leading-snug', theme.mutedTextClassName)}>
             {branch.address}
           </p>
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-mc-md bg-mc-brand-soft px-3 py-1.5 text-xs font-bold text-mc-brand dark:bg-mc-brand/10 dark:text-mc-brand">
             <ChevronDown className="-rotate-90 h-3.5 w-3.5" />
             {t('deliveryRequest.branchPicker.changeSelection')}
           </p>
@@ -380,7 +380,7 @@ function SuggestedBranchCard({
   return (
     <div className={theme.selectedPanelClassName}>
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg bg-mc-brand-soft text-mc-brand dark:bg-mc-brand/20 dark:text-mc-brand">
           <MapPinned className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -393,7 +393,7 @@ function SuggestedBranchCard({
           <p className={cn('mt-1 line-clamp-2 text-sm leading-snug', theme.mutedTextClassName)}>
             {branch.address}
           </p>
-          <p className="mt-2 text-xs font-semibold text-orange-600 dark:text-orange-300">
+          <p className="mt-2 text-xs font-semibold text-mc-brand">
             {t('deliveryRequest.branchPicker.savedSuggestionHint')}
           </p>
         </div>
@@ -403,14 +403,14 @@ function SuggestedBranchCard({
         <button
           type="button"
           onClick={onUse}
-          className="h-11 rounded-2xl bg-emerald-500 px-3 text-xs font-extrabold text-white shadow-lg shadow-emerald-500/20 transition active:scale-95"
+          className="h-11 rounded-mc-lg bg-mc-success px-3 text-xs font-extrabold text-white shadow-lg shadow-emerald-500/20 transition active:scale-95"
         >
           {t('deliveryRequest.branchPicker.useSavedBranch')}
         </button>
         <button
           type="button"
           onClick={onChooseOther}
-          className="h-11 rounded-2xl border border-orange-200 bg-orange-50 px-3 text-xs font-extrabold text-orange-700 transition active:scale-95 dark:border-orange-500/25 dark:bg-orange-500/10 dark:text-orange-300"
+          className="h-11 rounded-mc-lg border border-mc-brand/20 bg-mc-brand-soft px-3 text-xs font-extrabold text-mc-brand transition active:scale-95 dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
         >
           {t('deliveryRequest.branchPicker.chooseOtherBranch')}
         </button>
@@ -587,7 +587,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     return (
       <div className={cn(theme.shellClassName, 'flex min-h-[280px] items-center justify-center')}>
         <div className="text-center">
-          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-orange-500" />
+          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-mc-brand" />
           <p className={cn('text-sm font-bold', theme.primaryTextClassName)}>
             {t('deliveryRequest.branchPicker.loading')}
           </p>
@@ -599,14 +599,14 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
   if (isError) {
     return (
       <div className={cn(theme.shellClassName, 'text-center')}>
-        <AlertCircle className="mx-auto mb-3 h-10 w-10 text-red-500" />
+        <AlertCircle className="mx-auto mb-3 h-10 w-10 text-mc-danger" />
         <p className={cn('text-sm font-bold', theme.primaryTextClassName)}>
           {t('deliveryRequest.branchPicker.loadError')}
         </p>
         <button
           type="button"
           onClick={onRetry}
-          className="mx-auto mt-4 flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/20 active:scale-95"
+          className="mx-auto mt-4 flex h-11 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/20 active:scale-95"
         >
           <RefreshCw className="h-4 w-4" />
           {t('deliveryRequest.branchPicker.retry')}
@@ -653,7 +653,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     <div
       className={cn(
         theme.shellClassName,
-        isSelectionSettling && 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-white transition dark:ring-offset-gray-950'
+        isSelectionSettling && 'ring-2 ring-mc-success ring-offset-2 ring-offset-white transition dark:ring-offset-gray-950'
       )}
       data-dashboard-swipe-lock="true"
     >
@@ -669,14 +669,14 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
               })}
             </p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm dark:bg-white/10 dark:text-orange-300">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-mc-surface px-3 py-1.5 text-xs font-bold text-mc-brand shadow-sm dark:bg-white/10 dark:text-mc-brand">
             <MapPin className="h-3.5 w-3.5" />
             {visibleMapBranches.length}/{branches.length}
           </span>
         </div>
 
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-orange-400" />
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-mc-brand" />
           <input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -690,7 +690,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
             type="button"
             onClick={handleLocateUser}
             disabled={isLocating}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
           >
             {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
             {t('deliveryRequest.branchPicker.locateButton')}
@@ -698,7 +698,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           <button
             type="button"
             onClick={() => setIsMapExpanded((current) => !current)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-xs font-bold text-gray-700 shadow-sm transition active:scale-95 dark:bg-white/10 dark:text-gray-200"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-surface px-4 text-xs font-bold text-mc-text shadow-sm transition active:scale-95 dark:bg-white/10 dark:text-mc-text"
           >
             {isMapExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             {isMapExpanded
@@ -708,7 +708,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         </div>
 
         {locationError && (
-          <p className="mt-2 text-xs font-semibold text-red-500">{locationError}</p>
+          <p className="mt-2 text-xs font-semibold text-mc-danger">{locationError}</p>
         )}
       </div>
 
@@ -717,7 +717,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         <button
           type="button"
           onClick={() => setIsMapExpanded(true)}
-          className="w-full h-12 rounded-2xl bg-white dark:bg-white/5 border border-orange-200 dark:border-orange-500/20 text-sm font-bold text-orange-600 dark:text-orange-300 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          className="w-full h-12 rounded-mc-lg bg-mc-surface border border-mc-brand/20 dark:border-mc-brand/20 text-sm font-bold text-mc-brand flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
         >
           <MapPin className="h-4 w-4" />
           {t('deliveryRequest.branchPicker.openMap')}
@@ -786,8 +786,8 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                   <Popup>
                     <div className="min-w-48">
                       <p className="text-sm font-bold">{branch.name}</p>
-                      <p className="mt-1 text-xs text-gray-600">{branch.address}</p>
-                      <p className="mt-2 text-xs font-semibold text-orange-600">
+                      <p className="mt-1 text-xs text-mc-text-2">{branch.address}</p>
+                      <p className="mt-2 text-xs font-semibold text-mc-brand">
                         {t('deliveryRequest.branchPicker.fields.index')}: {branch.index}
                       </p>
                     </div>
@@ -801,9 +801,9 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           <button
             type="button"
             onClick={() => setIsMapExpanded(false)}
-            className="absolute top-2 right-2 z-[1000] inline-flex items-center gap-1.5 rounded-xl bg-white/95 dark:bg-gray-950/95 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md active:scale-95 transition-all"
+            className="absolute top-2 right-2 z-[1000] inline-flex items-center gap-1.5 rounded-mc-md bg-white/95 dark:bg-mc-cardface/95 px-3 py-2 text-xs font-bold text-mc-text shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md active:scale-95 transition-all"
           >
-            <Minimize2 className="h-3.5 w-3.5 text-orange-500" />
+            <Minimize2 className="h-3.5 w-3.5 text-mc-brand" />
             {t('deliveryRequest.branchPicker.closeMap')}
           </button>
         </div>
@@ -821,12 +821,12 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
               className={cn(
                 theme.resultButtonClassName,
                 isSelected && theme.selectedResultButtonClassName,
-                isSelected && isSelectionSettling && 'scale-[0.99] ring-2 ring-emerald-400'
+                isSelected && isSelectionSettling && 'scale-[0.99] ring-2 ring-mc-success'
               )}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-md bg-mc-brand-soft text-mc-brand dark:bg-mc-brand/15 dark:text-mc-brand">
                     <Hash className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
@@ -837,13 +837,13 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                       {branch.address}
                     </p>
                     {branch.workdays && (
-                      <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                      <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-mc-success">
                         <CalendarDays className="h-3.5 w-3.5" />
                         {branch.workdays}
                       </span>
                     )}
                     {distanceLabel && (
-                      <span className="mt-2 ml-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-300">
+                      <span className="mt-2 ml-2 inline-flex items-center gap-1 text-xs font-semibold text-mc-brand">
                         <MapPin className="h-3.5 w-3.5" />
                         {distanceLabel}
                       </span>
@@ -851,7 +851,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                   </div>
                 </div>
                 {isSelected && (
-                  <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center mt-0.5">
+                  <div className="shrink-0 w-5 h-5 rounded-full bg-mc-brand text-white flex items-center justify-center mt-0.5">
                     <Check className="w-3 h-3" />
                   </div>
                 )}

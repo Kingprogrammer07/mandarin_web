@@ -25,7 +25,7 @@ const MediaSlide = memo(({ media }: { media: CarouselMediaItemResponse }) => {
     return (
       <video
         src={media.media_url}
-        className="max-w-full max-h-full object-contain rounded-xl"
+        className="max-w-full max-h-full object-contain rounded-mc-md"
         controls
         playsInline
       />
@@ -35,7 +35,7 @@ const MediaSlide = memo(({ media }: { media: CarouselMediaItemResponse }) => {
     <img
       src={media.media_url}
       alt=""
-      className="max-w-full max-h-full object-contain rounded-xl"
+      className="max-w-full max-h-full object-contain rounded-mc-md"
       draggable={false}
     />
   );
@@ -112,7 +112,7 @@ function CarouselContent({ sorted, itemId, actionUrl }: CarouselContentProps) {
             <button
               onClick={() => scrollToSlide(activeIndex - 1)}
               disabled={activeIndex === 0}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white disabled:opacity-20 transition-all"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 flex items-center justify-center text-white disabled:opacity-20 transition-all"
               aria-label="Oldingi"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -120,7 +120,7 @@ function CarouselContent({ sorted, itemId, actionUrl }: CarouselContentProps) {
             <button
               onClick={() => scrollToSlide(activeIndex + 1)}
               disabled={activeIndex === sorted.length - 1}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white disabled:opacity-20 transition-all"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 flex items-center justify-center text-white disabled:opacity-20 transition-all"
               aria-label="Keyingi"
             >
               <ChevronRight className="w-5 h-5" />
@@ -138,8 +138,8 @@ function CarouselContent({ sorted, itemId, actionUrl }: CarouselContentProps) {
               onClick={() => scrollToSlide(i)}
               className={`rounded-full transition-all duration-300 ${
                 i === activeIndex
-                  ? 'w-5 h-1.5 bg-white'
-                  : 'w-1.5 h-1.5 bg-white/35 hover:bg-white/55'
+                  ? 'w-5 h-1.5 bg-mc-surface'
+                  : 'w-1.5 h-1.5 bg-white/35'
               }`}
               aria-label={`Slayd ${i + 1}`}
             />
@@ -152,7 +152,7 @@ function CarouselContent({ sorted, itemId, actionUrl }: CarouselContentProps) {
         <div className="shrink-0 px-4 pb-6 pt-2">
           <button
             onClick={handleCtaClick}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-white hover:bg-gray-100 active:scale-[0.98] text-gray-900 rounded-2xl font-semibold text-[15px] transition-all"
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-mc-surface active:scale-[0.98] text-mc-text rounded-mc-lg font-semibold text-[15px] transition-all"
           >
             <ExternalLink className="w-4 h-4" />
             Batafsil ko'rish
@@ -198,7 +198,7 @@ export default function CarouselMediaModal({
         <div className="flex items-center justify-end px-4 pt-4 pb-2 shrink-0">
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center transition-colors"
             aria-label="Yopish"
           >
             <X className="w-4 h-4 text-white" />

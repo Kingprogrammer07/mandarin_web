@@ -92,6 +92,12 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
   const mapRef = useRef<L.Map | null>(null);
   const pinIcon = useMemo(() => createPinIcon(), []);
 
+  const handleFlyToUserLocation = useCallback((location: UserLocation) => {
+    if (mapRef.current) {
+      mapRef.current.flyTo([location.latitude, location.longitude], 16, { duration: 0.6 });
+    }
+  }, []);
+
   const handleLocateUser = useCallback(async () => {
     if (!navigator.geolocation && !window.Telegram?.WebApp?.LocationManager) {
       setLocationError(t('deliveryRequest.map.geolocationUnsupported'));
@@ -112,17 +118,12 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
     setSelectedCenter(L.latLng(nextLocation.latitude, nextLocation.longitude));
     setIsLocating(false);
     handleFlyToUserLocation(nextLocation);
-  }, [t]);
+  }, [t, handleFlyToUserLocation]);
 
   const handleMapReady = useCallback((map: L.Map) => {
     mapRef.current = map;
   }, []);
 
-  const handleFlyToUserLocation = useCallback((location: UserLocation) => {
-    if (mapRef.current) {
-      mapRef.current.flyTo([location.latitude, location.longitude], 16, { duration: 0.6 });
-    }
-  }, []);
 
   const handleConfirm = useCallback(() => {
     onConfirm({
@@ -139,7 +140,7 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
           type="button"
           onClick={handleLocateUser}
           disabled={isLocating}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
         >
           {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
           {t('deliveryRequest.map.locateButton')}
@@ -148,7 +149,7 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-gray-100 px-4 text-xs font-bold text-gray-700 transition active:scale-95 dark:bg-white/10 dark:text-gray-200"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-surface-2 px-4 text-xs font-bold text-mc-text transition active:scale-95 dark:bg-white/10 dark:text-mc-text"
           >
             <X className="h-4 w-4" />
             {t('deliveryRequest.map.cancelButton')}
@@ -156,10 +157,10 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
         )}
       </div>
 
-      {locationError && <p className="text-xs font-semibold text-red-500">{locationError}</p>}
+      {locationError && <p className="text-xs font-semibold text-mc-danger">{locationError}</p>}
 
       {/* Map container */}
-      <div className="relative isolate overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10" style={{ height: 320 }}>
+      <div className="relative isolate overflow-hidden rounded-mc-lg border border-mc-border" style={{ height: 320 }}>
         <MapContainer
           center={[selectedCenter.lat, selectedCenter.lng]}
           zoom={15}
@@ -195,7 +196,7 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
         </div>
 
         {/* Bottom-right coordinate pill */}
-        <div className="absolute bottom-3 right-3 z-[400] rounded-xl bg-white/95 px-3 py-1.5 text-[10px] font-bold text-gray-700 shadow-lg ring-1 ring-black/5 backdrop-blur-md dark:bg-gray-950/95 dark:text-gray-200 dark:ring-white/10">
+        <div className="absolute bottom-3 right-3 z-[400] rounded-mc-md bg-white/95 px-3 py-1.5 text-[10px] font-bold text-mc-text shadow-lg ring-1 ring-black/5 backdrop-blur-md dark:bg-mc-cardface/95 dark:text-mc-text dark:ring-white/10">
           {selectedCenter.lat.toFixed(5)}, {selectedCenter.lng.toFixed(5)}
         </div>
       </div>
@@ -204,7 +205,7 @@ export const DeliveryMapPicker = memo(function DeliveryMapPicker({
       <button
         type="button"
         onClick={handleConfirm}
-        className="h-12 rounded-2xl bg-emerald-500 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition active:scale-[0.98]"
+        className="h-12 rounded-mc-lg bg-mc-success px-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition active:scale-[0.98]"
       >
         <span className="flex items-center justify-center gap-2">
           <MapPin className="h-4 w-4" />
