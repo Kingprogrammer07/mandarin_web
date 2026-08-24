@@ -108,7 +108,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
     };
 
     const inp = [
-        'h-12 rounded-[16px]',
+        'h-12 rounded-mc-md',
         'border border-mc-border dark:border-white/[0.085]',
         'bg-mc-surface',
         'text-mc-text',
@@ -241,7 +241,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                         <Button type="button" variant="outline" onClick={onClose} className="h-12 rounded-mc-md border-mc-border bg-mc-surface-2 text-mc-text">
                             {t('profile.edit.cancel')}
                         </Button>
-                        <Button type="submit" disabled={isPending} className="h-12 rounded-[16px] bg-mc-brand font-extrabold text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]">
+                        <Button type="submit" disabled={isPending} className="h-12 rounded-mc-md bg-mc-brand font-extrabold text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]">
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {t('profile.edit.save')}
                         </Button>

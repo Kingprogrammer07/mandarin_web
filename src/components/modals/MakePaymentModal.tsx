@@ -1967,7 +1967,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               ${
                 isMobile
                   ? 'bottom-0 left-0 right-0 rounded-t-[22px] max-h-[92dvh]'
-                  : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-[22px] max-h-[90dvh]'
+                  : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-mc-xl max-h-[90dvh]'
               }
               overflow-hidden shadow-2xl border border-mc-border
               flex flex-col`}

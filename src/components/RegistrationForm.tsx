@@ -421,7 +421,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-mc-brand"
+                              className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-mc-md text-mc-brand"
                             >
                               <CalendarIcon className="h-4 w-4" />
                             </Button>

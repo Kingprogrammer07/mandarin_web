@@ -312,7 +312,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                     <Button
                                         onClick={handleAddCard}
                                         disabled={addCardMutation.isPending}
-                                            className="h-12 w-full rounded-[16px] bg-mc-brand font-extrabold text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
+                                            className="h-12 w-full rounded-mc-md bg-mc-brand font-extrabold text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
                                     >
                                         {addCardMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                                         {addCardMutation.isPending ? t('wallet.cards.saving', "Saqlanmoqda...") : t('wallet.cards.save', "Saqlash")}
@@ -366,7 +366,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                     return (
                                                         <div
                                                             key={card.id}
-                                                            className="flex items-center gap-3 rounded-[18px] border border-mc-brand/20 bg-gradient-to-br from-mc-brand-soft to-mc-brand-soft p-3.5 dark:border-mc-brand/20 dark:from-mc-brand-soft dark:to-mc-brand-soft"
+                                                            className="flex items-center gap-3 rounded-mc-lg border border-mc-brand/20 bg-gradient-to-br from-mc-brand-soft to-mc-brand-soft p-3.5 dark:border-mc-brand/20 dark:from-mc-brand-soft dark:to-mc-brand-soft"
                                                         >
                                                             <div className="h-10 w-10 flex-shrink-0 rounded-mc-md bg-white/80 dark:bg-white/10 flex items-center justify-center">
                                                                 <CreditCard className="h-5 w-5 text-mc-brand dark:text-mc-brand" />
@@ -464,7 +464,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                         variant="outline"
                                                         disabled={nbuBindMutation.isPending}
                                                         onClick={handleNbuBind}
-                                                        className="w-full rounded-[18px] border-2 border-dashed border-mc-brand/30 py-5 text-mc-brand dark:border-mc-brand/30 dark:text-mc-brand"
+                                                        className="w-full rounded-mc-lg border-2 border-dashed border-mc-brand/30 py-5 text-mc-brand dark:border-mc-brand/30 dark:text-mc-brand"
                                                     >
                                                         {nbuBindMutation.isPending ? (
                                                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -550,7 +550,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
 
                                         <Button
                                             variant="outline"
-                                            className="mt-4 w-full rounded-[18px] border-2 border-dashed py-6 text-mc-text-2 transition-colors dark:border-white/10/58"
+                                            className="mt-4 w-full rounded-mc-lg border-2 border-dashed py-6 text-mc-text-2 transition-colors dark:border-white/10/58"
                                             onClick={() => setIsAdding(true)}
                                         >
                                             <Plus className="h-4 w-4 mr-2" />

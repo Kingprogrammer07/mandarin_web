@@ -74,7 +74,7 @@ const ImagePreviewModal = ({ src, onClose, closeLabel }: ImagePreviewModalProps)
                     transition={{ type: "spring", damping: 25, stiffness: 300 }}
                     src={src}
                     alt="Preview"
-                    className="max-w-full max-h-[90dvh] object-contain rounded-xl shadow-2xl cursor-default"
+                    className="max-w-full max-h-[90dvh] object-contain rounded-mc-md shadow-2xl cursor-default"
                     onClick={(e) => e.stopPropagation()}
                 />
             </motion.div>
@@ -279,9 +279,9 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
     if (isUserLoading) {
         return (
             <div className="container max-w-md mx-auto p-4 space-y-4 pt-24">
-                <Skeleton className="h-10 w-1/2 rounded-xl" />
-                <Skeleton className="h-32 w-full rounded-3xl" />
-                <Skeleton className="h-32 w-full rounded-3xl" />
+                <Skeleton className="h-10 w-1/2 rounded-mc-md" />
+                <Skeleton className="h-32 w-full rounded-mc-xl" />
+                <Skeleton className="h-32 w-full rounded-mc-xl" />
             </div>
         );
     }
@@ -588,8 +588,8 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
 
                 {isTrackLoading ? (
                     <div className="space-y-4">
-                        <Skeleton className="h-24 w-full rounded-2xl" />
-                        <Skeleton className="h-48 w-full rounded-2xl" />
+                        <Skeleton className="h-24 w-full rounded-mc-lg" />
+                        <Skeleton className="h-48 w-full rounded-mc-lg" />
                     </div>
                 ) : trackData ? (
                     <TrackResultCard data={trackData} />

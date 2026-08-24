@@ -137,7 +137,7 @@ export default function ApplicationEditForm({
   };
 
   const inputClass = [
-    'h-[54px] rounded-[18px]',
+    'h-[54px] rounded-mc-lg',
     'border border-mc-border',
     'bg-mc-surface',
     'text-mc-text',
@@ -146,7 +146,7 @@ export default function ApplicationEditForm({
   ].join(' ');
   const labelClass = 'ml-0.5 text-[12px] font-extrabold text-mc-text';
   const iconBoxClass =
-    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand';
+    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand';
 
   return (
     <Form {...form}>
@@ -223,7 +223,7 @@ export default function ApplicationEditForm({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-mc-brand"
+                    className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-mc-md text-mc-brand"
                   >
                     <CalendarIcon className="h-4 w-4" />
                   </Button>
@@ -308,7 +308,7 @@ export default function ApplicationEditForm({
             <FormLabel className={labelClass}>{t('form.address')}</FormLabel>
             <FormControl>
               <div className="relative">
-                <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand">
+                <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-mc-sm bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand">
                   <MapPin className="h-4 w-4" />
                 </div>
                 <textarea

@@ -102,7 +102,7 @@ const SkeletonLoader = memo(() => (
     <div className="h-44 rounded-mc-lg bg-mc-surface-2" />
     {/* Header skeleton */}
     <div className="space-y-2 p-4 rounded-mc-lg bg-mc-surface-2">
-      <div className="h-5 w-3/4 rounded-lg bg-mc-surface-2" />
+      <div className="h-5 w-3/4 rounded-mc-sm bg-mc-surface-2" />
       <div className="h-3 w-full rounded bg-mc-surface-2" />
       <div className="h-3 w-5/6 rounded bg-mc-surface-2" />
     </div>

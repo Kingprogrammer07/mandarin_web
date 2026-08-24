@@ -232,11 +232,11 @@ const FlightCard = memo(({ flight, simple = false }: { flight: Flight, simple?: 
                     {flight.flightName}
                 </h5>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <div className="flex items-center gap-1.5 text-mc-text-2 bg-mc-surface-2 px-2 py-0.5 rounded-md">
+                    <div className="flex items-center gap-1.5 text-mc-text-2 bg-mc-surface-2 px-2 py-0.5 rounded-mc-sm">
                         <CalendarIcon className="w-3.5 h-3.5" />
                         <span className="text-xs font-medium">{formatDateUzWithMonths(flight.date, 'dayMonth', months)}</span>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${statusBg} ${statusTextCol}`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-mc-sm uppercase tracking-wider ${statusBg} ${statusTextCol}`}>
                         {statusText}
                     </span>
                 </div>
@@ -457,7 +457,7 @@ const FlightSchedulePage: React.FC<FlightSchedulePageProps> = ({ onBack, onNavig
                             <div>
                                 <h3 className="text-xs font-bold text-mc-text-2 mb-3 uppercase tracking-wider flex items-center justify-between px-1">
                                     <span>{formatDateUzWithMonths(selectedDate, 'dayMonth', months)}</span>
-                                    {isToday(selectedDate) && <span className="text-mc-brand bg-mc-brand-soft dark:bg-mc-brand/10 px-2 py-0.5 rounded-md">{t('flightSchedule.today')}</span>}
+                                    {isToday(selectedDate) && <span className="text-mc-brand bg-mc-brand-soft dark:bg-mc-brand/10 px-2 py-0.5 rounded-mc-sm">{t('flightSchedule.today')}</span>}
                                 </h3>
 
                                 {selectedFlights.length > 0 ? (

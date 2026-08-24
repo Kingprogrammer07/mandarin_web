@@ -477,7 +477,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                             >
                                                                 <div className="flex gap-4 items-center">
                                                                     {/* Image Thumbnail */}
-                                                                    <div className="h-16 w-16 rounded-md bg-mc-surface-2 dark:bg-mc-surface-2 overflow-hidden flex-shrink-0 border border-mc-border dark:border-mc-border">
+                                                                    <div className="h-16 w-16 rounded-mc-sm bg-mc-surface-2 dark:bg-mc-surface-2 overflow-hidden flex-shrink-0 border border-mc-border dark:border-mc-border">
                                                                         {passport.image_urls && passport.image_urls[0] ? (
                                                                             <img
                                                                                 src={passport.image_urls[0]}
