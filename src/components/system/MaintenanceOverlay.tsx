@@ -20,25 +20,25 @@ export default function MaintenanceOverlay() {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="w-full max-w-sm bg-white dark:bg-[#151515] rounded-3xl border border-gray-200 dark:border-white/10 shadow-2xl p-8 text-center space-y-6"
+        className="w-full max-w-sm bg-mc-surface rounded-mc-xl border border-mc-border shadow-2xl p-6 text-center space-y-5"
       >
-        <div className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center mx-auto">
-          <Wrench className="w-10 h-10 text-amber-500" />
+        <div className="w-20 h-20 rounded-full bg-mc-warn-soft flex items-center justify-center mx-auto">
+          <Wrench className="w-10 h-10 text-mc-brand" />
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-xl font-black text-gray-900 dark:text-white">
+          <h1 className="text-xl font-black text-mc-text">
             {t('maintenance.title')}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+          <p className="text-sm text-mc-text-2 leading-relaxed">
             {t('maintenance.body')}
           </p>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+        <div className="flex items-center justify-center gap-2 text-xs text-mc-text-3">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mc-warn opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-mc-brand" />
           </span>
           {t('maintenance.autoRecheck')}
         </div>

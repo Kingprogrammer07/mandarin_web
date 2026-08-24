@@ -92,6 +92,9 @@ export interface TransactionHistoryItem {
   nbu_card_masked?: string | null;
   /** order_id of the latest SUCCESS NBU payment — used to fetch a viewable receipt. */
   nbu_order_id?: string | null;
+  /** Signed balance change. Only meaningful for BONUS/PENALTY rows, whose
+   *  total/paid/remaining are all zero. */
+  balance_difference?: number | null;
 }
 
 export interface TransactionHistoryResponse {

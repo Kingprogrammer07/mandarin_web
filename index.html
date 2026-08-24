@@ -8,7 +8,7 @@
 
     <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#f59e0b" />
+    <meta name="theme-color" content="#f7f7f8" />
 
     <!-- iOS "Add to Home Screen" support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -21,8 +21,63 @@
     <link rel="dns-prefetch" href="https://bot.webmandarin.uz" />
     <link rel="preconnect" href="https://telegram.org" />
 
+    <!-- Manrope: the app ships Uzbek and Russian, so the typeface has to carry
+         Cyrillic — several otherwise-good candidates (Plus Jakarta Sans) only
+         cover it partially. `display=swap` so text is never invisible while the
+         font loads; the system stack below it is the fallback, not a second
+         design. Only the weights actually used are requested. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+    />
+
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!--
+      Theme, resolved before the first paint.
+
+      next-themes applies the class from an effect, i.e. after React mounts, so
+      on its own every cold open flashes light before turning dark. This runs
+      synchronously in <head> — after the Telegram SDK above, so
+      `Telegram.WebApp.colorScheme` is already readable.
+
+      It also writes `localStorage.theme`, the key next-themes reads on mount,
+      so the provider agrees with what is already on screen and never flips it.
+      Keep the logic in step with src/lib/theme.ts; the colours mirror --mc-bg.
+    -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var resolved = 'light';
+        try {
+          var pref = localStorage.getItem('mc:theme-pref');
+          if (pref === 'light' || pref === 'dark') {
+            resolved = pref;
+          } else {
+            var tg = window.Telegram && window.Telegram.WebApp;
+            var scheme = tg && tg.colorScheme;
+            resolved =
+              scheme === 'dark' || scheme === 'light'
+                ? scheme
+                : window.matchMedia &&
+                    window.matchMedia('(prefers-color-scheme: dark)').matches
+                  ? 'dark'
+                  : 'light';
+          }
+          localStorage.setItem('theme', resolved);
+        } catch (error) {
+          // Storage blocked (private mode). Light is the safe default.
+        }
+        root.classList.remove('light', 'dark');
+        root.classList.add(resolved);
+        root.style.colorScheme = resolved;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0f0f11' : '#f7f7f8');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

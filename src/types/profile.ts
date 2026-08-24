@@ -13,6 +13,11 @@ export interface ProfileResponse {
     referral_count: number;
     passport_images: string[];
     telegram_id: number;
+    /** Legal-document version accepted at registration; null for clients
+     *  registered before the consent gate existed. */
+    privacy_policy_version?: string | null;
+    /** dd.mm.yyyy */
+    privacy_policy_accepted_at?: string | null;
     // frontend helper
     avatar_url?: string;
 }

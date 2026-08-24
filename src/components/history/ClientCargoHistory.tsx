@@ -45,26 +45,26 @@ const FlightSummaryCard = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={onToggle}
-            className={`bg-white dark:bg-[#0b1018] rounded-2xl p-4 sm:p-5 shadow-sm border cursor-pointer transition-all duration-200 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${
+            className={`bg-mc-surface rounded-mc-lg p-3.5 shadow-[var(--mc-shadow-card)] border cursor-pointer transition-colors duration-200 ${
                 isExpanded
-                    ? 'border-amber-500/50 dark:border-amber-500/50 ring-2 ring-amber-500/20'
-                    : 'border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10'
+                    ? 'border-mc-brand/35 ring-2 ring-mc-brand/15'
+                    : 'border-mc-border'
             }`}
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 sm:gap-4">
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-colors ${
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-mc-md flex items-center justify-center transition-colors ${
                         isExpanded
-                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400'
-                            : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'
+                            ? 'bg-mc-brand-soft text-mc-brand'
+                            : 'bg-mc-surface-2 text-mc-text-2'
                     }`}>
                         <Plane className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white text-base sm:text-lg">
+                        <h3 className="font-bold text-mc-text text-base sm:text-lg">
                             {summary.flight_name}
                         </h3>
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-mc-text-2 mt-0.5">
                             <Calendar className="w-3.5 h-3.5" />
                             <span>
                                 {summary.last_update ? format(new Date(summary.last_update), 'dd.MM.yyyy HH:mm') : t('cargoHistory.noDate')}
@@ -75,35 +75,35 @@ const FlightSummaryCard = ({
 
                 <div className="flex items-center gap-4 sm:gap-6">
                     <div className="hidden sm:flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{t('cargoHistory.totalWeight')}</span>
-                        <span className="font-black font-mono text-gray-900 dark:text-white text-lg flex items-center gap-1.5">
-                            <Weight className="w-4 h-4 text-amber-500" />
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-mc-text-3">{t('cargoHistory.totalWeight')}</span>
+                        <span className="font-black font-mono text-mc-text text-lg flex items-center gap-1.5">
+                            <Weight className="w-4 h-4 text-mc-brand" />
                             {t('cargoHistory.weightUnit', { weight: summary.total_weight })}
                         </span>
                     </div>
                     <div className="hidden sm:flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{t('cargoHistory.totalCount')}</span>
-                        <span className="font-black font-mono text-gray-900 dark:text-white text-lg flex items-center gap-1.5">
-                            <Package className="w-4 h-4 text-sky-500" />
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-mc-text-3">{t('cargoHistory.totalCount')}</span>
+                        <span className="font-black font-mono text-mc-text text-lg flex items-center gap-1.5">
+                            <Package className="w-4 h-4 text-mc-brand" />
                             {t('cargoHistory.countUnit', { count: summary.total_count })}
                         </span>
                     </div>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-gray-50 dark:bg-white/5 transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-amber-50 dark:bg-amber-500/10' : ''}`}>
-                        <ChevronDown className={`w-5 h-5 ${isExpanded ? 'text-amber-500' : 'text-gray-400'}`} />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-mc-surface-2 transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-mc-warn-soft' : ''}`}>
+                        <ChevronDown className={`w-5 h-5 ${isExpanded ? 'text-mc-brand' : 'text-mc-text-3'}`} />
                     </div>
                 </div>
             </div>
 
             {/* Mobile Extra Stats Row */}
-            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between sm:hidden">
+            <div className="mt-4 pt-3 border-t border-mc-border flex items-center justify-between sm:hidden">
                 <div className="flex gap-4">
                     <div className="flex items-center gap-1.5">
-                        <Weight className="w-4 h-4 text-amber-500" />
-                        <span className="text-sm font-bold font-mono text-gray-900 dark:text-gray-100">{t('cargoHistory.weightUnit', { weight: summary.total_weight })}</span>
+                        <Weight className="w-4 h-4 text-mc-brand" />
+                        <span className="text-sm font-bold font-mono text-mc-text">{t('cargoHistory.weightUnit', { weight: summary.total_weight })}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 border-l border-gray-200 dark:border-gray-700 pl-4">
-                        <Package className="w-4 h-4 text-sky-500" />
-                        <span className="text-sm font-bold font-mono text-gray-900 dark:text-gray-100">{t('cargoHistory.countUnit', { count: summary.total_count })}</span>
+                    <div className="flex items-center gap-1.5 border-l border-mc-border pl-4">
+                        <Package className="w-4 h-4 text-mc-brand" />
+                        <span className="text-sm font-bold font-mono text-mc-text">{t('cargoHistory.countUnit', { count: summary.total_count })}</span>
                     </div>
                 </div>
             </div>
@@ -164,15 +164,15 @@ const getCargoStatus = (item: CargoItemResponse) => {
 
 const getStatusClass = (status: string) => {
     if (status === 'taken') {
-        return 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/12 dark:bg-white/10 dark:text-slate-200';
+        return 'border-mc-border bg-mc-surface-2 text-mc-text-2';
     }
     if (status === 'reportReady' || status === 'inUzb') {
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300';
+        return 'border-mc-success/25 bg-mc-success/12 text-mc-success';
     }
     if (status === 'inChina') {
-        return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300';
+        return 'border-mc-brand/25 bg-mc-brand-soft text-mc-brand';
     }
-    return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.07] dark:text-slate-300';
+    return 'border-mc-border bg-mc-surface-2 text-mc-text-2';
 };
 
 function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
@@ -189,14 +189,14 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
     const itemName = item.item_name_ru || item.item_name_cn || t('cargoHistory.names.notEntered');
 
     return (
-        <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-white/[0.12] dark:bg-[#0b1018] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_34px_rgba(0,0,0,0.22)]">
+        <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
             <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-2">
-                        <p className="text-[11px] font-black uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-mc-text-3">
                             {t('tracking.resultLabel')}
                         </p>
-                        <h3 className="truncate font-mono text-2xl font-black tracking-normal text-gray-950 dark:text-white">
+                        <h3 className="truncate font-mono text-2xl font-black tracking-normal text-mc-text">
                             {item.track_code_2 || item.track_code}
                         </h3>
                         <div className="flex flex-wrap items-center gap-2">
@@ -204,7 +204,7 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                                 {t(`cargoStatus.${status}`)}
                             </span>
                             {item.flight_name && (
-                                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-300">
+                                <span className="rounded-full border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-xs font-bold text-mc-text-2 dark:border-white/10 dark:bg-white/[0.06] dark:text-mc-text-3">
                                     {t('cargoHistory.flight', { name: item.flight_name })}
                                 </span>
                             )}
@@ -212,25 +212,25 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3 dark:border-white/10 dark:bg-white/[0.035]">
+                <div className="rounded-mc-lg border border-mc-border bg-mc-surface-2/80 p-3 dark:border-white/10 dark:bg-white/[0.035]">
                     <div className="mb-2.5 flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-gray-900 dark:text-white">
+                            <p className="truncate text-sm font-black text-mc-text">
                                 {activeStep?.label}
                             </p>
-                            <p className="mt-0.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                            <p className="mt-0.5 text-xs font-semibold text-mc-text-2">
                                 {activeStep?.status === 'completed' ? t('tracking.stepStatus.completed') : activeStep?.status === 'active' ? t('tracking.stepStatus.active') : t('tracking.stepStatus.upcoming')}
                             </p>
                         </div>
-                        <span className="font-mono text-sm font-black text-orange-600 dark:text-orange-300">
+                        <span className="font-mono text-[13px] font-extrabold tabular-nums text-mc-brand">
                             {currentProgress}%
                         </span>
                     </div>
 
                     <div className="relative grid grid-cols-6 gap-1">
-                        <div className="absolute left-[8%] right-[8%] top-3.5 h-1 rounded-full bg-gray-200 dark:bg-white/10" />
+                        <div className="absolute left-[8%] right-[8%] top-3.5 h-1 rounded-full bg-mc-surface-2" />
                         <div
-                            className="absolute left-[8%] top-3.5 h-1 max-w-[84%] rounded-full bg-gradient-to-r from-orange-500 to-amber-400"
+                            className="absolute left-[8%] top-3.5 h-1 max-w-[84%] rounded-full bg-gradient-to-r from-mc-brand to-mc-brand-strong"
                             style={{ width: `${Math.min(currentProgress * 0.84, 84)}%` }}
                         />
                         {steps.map((step) => {
@@ -242,12 +242,12 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                                 <div key={step.id} className="relative z-10 flex justify-center">
                                     <span
                                         className={[
-                                            'flex size-9 items-center justify-center rounded-xl border text-xs font-black transition',
+                                            'flex h-8 w-8 items-center justify-center rounded-mc-sm border transition-colors',
                                             isCompleted
-                                                ? 'border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                                                ? 'border-mc-success bg-mc-success text-mc-on-success'
                                                 : isActive
-                                                    ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-500/20 ring-4 ring-amber-500/15'
-                                                    : 'border-gray-200 bg-white text-gray-300 dark:border-white/10 dark:bg-[#0b1018] dark:text-gray-600',
+                                                    ? 'border-mc-brand bg-mc-brand text-mc-on-brand ring-4 ring-mc-brand/15'
+                                                    : 'border-mc-border bg-mc-surface text-mc-text-3',
                                         ].join(' ')}
                                     >
                                         {isCompleted ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
@@ -258,8 +258,8 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                     </div>
                 </div>
 
-                <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-                    <div className={`absolute inset-y-0 left-0 w-1 ${item.is_taken_away ? 'bg-slate-500' : item.is_sent_web ? 'bg-emerald-500' : 'bg-sky-500'}`} />
+                <div className="relative overflow-hidden rounded-mc-md border border-mc-border bg-mc-surface-2 p-3.5">
+                    <div className={`absolute inset-y-0 left-0 w-1 ${item.is_taken_away ? 'bg-mc-text-3' : item.is_sent_web ? 'bg-mc-success' : 'bg-mc-brand'}`} />
                     <div className="space-y-4 pl-1">
                         <div className="flex flex-wrap gap-2">
                             {item.flight_name && <DetailChip icon={Plane} label={t('reports.flight')} value={item.flight_name} />}
@@ -289,7 +289,7 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
                         </div>
 
                         {(checkinDate || arrivalDate || takenDate || item.exchange_rate) && (
-                            <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-3 text-[11px] font-bold text-gray-500 dark:border-white/10 dark:text-gray-400">
+                            <div className="flex flex-wrap gap-2 border-t border-mc-border pt-3 text-[11px] font-bold text-mc-text-2 dark:border-white/10 dark:text-mc-text-3">
                                 {checkinDate && <span>CN: {checkinDate}</span>}
                                 {arrivalDate && <span>UZ: {arrivalDate}</span>}
                                 {takenDate && <span>{t('cargoStatus.taken')}: {takenDate}</span>}
@@ -305,9 +305,9 @@ function HistoryCargoCard({ item }: { item: CargoItemResponse }) {
 
 function DetailChip({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
     return (
-        <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-gray-300">
-            <Icon className="size-3.5 shrink-0 text-orange-500" />
-            <span className="shrink-0 text-gray-400">{label}:</span>
+        <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-mc-border bg-white px-3 py-1.5 text-xs font-bold text-mc-text-2 dark:border-white/10 dark:bg-white/[0.05] dark:text-mc-text-3">
+            <Icon className="size-3.5 shrink-0 text-mc-brand" />
+            <span className="shrink-0 text-mc-text-3">{label}:</span>
             <span className="min-w-0 truncate">{value}</span>
         </span>
     );
@@ -315,9 +315,9 @@ function DetailChip({ icon: Icon, label, value }: { icon: LucideIcon; label: str
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#0b1018]">
-            <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-gray-400">{label}</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-white">{value}</p>
+        <div className="rounded-mc-sm border border-mc-border bg-mc-surface p-2.5">
+            <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-mc-text-3">{label}</p>
+            <p className="text-sm font-bold text-mc-text">{value}</p>
         </div>
     );
 }
@@ -334,12 +334,12 @@ function MetricBlock({
     accent?: boolean;
 }) {
     return (
-        <div className={`rounded-xl border p-3 ${accent ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-400/8' : 'border-gray-200 bg-white dark:border-white/10 dark:bg-[#0b1018]'}`}>
-            <p className={`mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide ${accent ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-400'}`}>
+        <div className={`rounded-mc-md border p-3 ${accent ? 'border-mc-success/25 bg-mc-success/12' : 'border-mc-border bg-mc-surface'}`}>
+            <p className={`mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide ${accent ? 'text-mc-success' : 'text-mc-text-3'}`}>
                 <Icon className="size-3.5" />
                 {label}
             </p>
-            <p className={`font-mono text-sm font-black ${accent ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'}`}>
+            <p className={`font-mono text-sm font-black ${accent ? 'text-mc-success' : 'text-mc-text'}`}>
                 {value}
             </p>
         </div>
@@ -362,12 +362,12 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-3">
             {isLoading ? (
                 <div className="flex flex-col gap-3">
-                    {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-200 dark:bg-white/5 rounded-xl animate-pulse" />)}
+                    {[1, 2, 3].map(i => <div key={i} className="h-24 bg-mc-surface-2 dark:bg-white/5 rounded-mc-md animate-pulse" />)}
                 </div>
             ) : isError ? (
-                <div className="text-center py-6 text-red-500">{t('cargoHistory.error')}</div>
+                <div className="text-center py-6 text-mc-danger">{t('cargoHistory.error')}</div>
             ) : (data?.items?.length ?? 0) === 0 ? (
-                <div className="text-center py-6 text-gray-500 dark:text-gray-400">{t('cargoHistory.emptyFlight')}</div>
+                <div className="text-center py-6 text-mc-text-2">{t('cargoHistory.emptyFlight')}</div>
             ) : (
                 <div className="flex flex-col gap-3">
                     {data?.items.map((item: CargoItemResponse) => (
@@ -375,7 +375,7 @@ const FlightDetailsSection = ({ clientCode, flightName, isExpanded }: { clientCo
                     ))}
                     {data && data.total > data.size && (
                         <div className="flex justify-center pt-2">
-                            <button className="text-sm font-bold text-orange-600 dark:text-orange-300 bg-orange-50 active:scale-[0.98] dark:bg-orange-400/10 px-6 py-2.5 rounded-xl transition-colors" onClick={() => setPage(p => p + 1)}>
+                            <button className="rounded-mc-md bg-mc-brand-soft px-6 py-2.5 text-[13px] font-extrabold text-mc-brand transition-transform active:scale-[0.98]" onClick={() => setPage(p => p + 1)}>
                                 {t('cargoHistory.loadMore')}
                             </button>
                         </div>
@@ -401,15 +401,15 @@ export default function ClientCargoHistory() {
     });
 
     if (isProfileLoading || (isHistoryLoading && !history)) {
-        return <div className="flex flex-col gap-4 p-4">{[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-gray-100 dark:bg-white/5 rounded-2xl animate-pulse" />)}</div>;
+        return <div className="flex flex-col gap-4 p-4">{[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-mc-surface-2 rounded-mc-lg animate-pulse" />)}</div>;
     }
 
     if (!history || history.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4"><FileText className="w-8 h-8 text-gray-400" /></div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('cargoHistory.emptyState.title')}</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-xs mx-auto">{t('cargoHistory.emptyState.desc')}</p>
+                <div className="w-16 h-16 bg-mc-surface-2 rounded-full flex items-center justify-center mb-4"><FileText className="w-8 h-8 text-mc-text-3" /></div>
+                <h3 className="text-lg font-bold text-mc-text">{t('cargoHistory.emptyState.title')}</h3>
+                <p className="text-mc-text-2 mt-2 max-w-xs mx-auto">{t('cargoHistory.emptyState.desc')}</p>
             </div>
         );
     }

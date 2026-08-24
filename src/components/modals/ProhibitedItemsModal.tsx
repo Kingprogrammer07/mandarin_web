@@ -99,20 +99,20 @@ const fetchProhibitedItems = async (): Promise<ProhibitedDataResponse> => {
 const SkeletonLoader = memo(() => (
   <div className="animate-pulse space-y-5 p-5">
     {/* Image skeleton */}
-    <div className="h-44 rounded-2xl bg-gray-200 dark:bg-white/10" />
+    <div className="h-44 rounded-mc-lg bg-mc-surface-2" />
     {/* Header skeleton */}
-    <div className="space-y-2 p-4 rounded-2xl bg-gray-100 dark:bg-white/5">
-      <div className="h-5 w-3/4 rounded-lg bg-gray-200 dark:bg-white/10" />
-      <div className="h-3 w-full rounded bg-gray-200 dark:bg-white/10" />
-      <div className="h-3 w-5/6 rounded bg-gray-200 dark:bg-white/10" />
+    <div className="space-y-2 p-4 rounded-mc-lg bg-mc-surface-2">
+      <div className="h-5 w-3/4 rounded-lg bg-mc-surface-2" />
+      <div className="h-3 w-full rounded bg-mc-surface-2" />
+      <div className="h-3 w-5/6 rounded bg-mc-surface-2" />
     </div>
     {/* List skeletons */}
     {Array.from({ length: 5 }).map((_, i) => (
       <div key={i} className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gray-200 dark:bg-white/10 shrink-0" />
+        <div className="w-9 h-9 rounded-mc-sm bg-mc-surface-2 shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-2/3 rounded bg-gray-200 dark:bg-white/10" />
-          <div className="h-3 w-4/5 rounded bg-gray-200 dark:bg-white/10" />
+          <div className="h-4 w-2/3 rounded bg-mc-surface-2" />
+          <div className="h-3 w-4/5 rounded bg-mc-surface-2" />
         </div>
       </div>
     ))}
@@ -136,7 +136,7 @@ const ImageCarousel = memo(({ images }: { images: string[] }) => {
         {images.map((url, i) => (
           <div
             key={i}
-            className="flex-shrink-0 w-[90%] sm:w-full snap-center rounded-2xl overflow-hidden"
+            className="flex-shrink-0 w-[90%] sm:w-full snap-center rounded-mc-lg overflow-hidden"
           >
             <img
               src={url}
@@ -154,7 +154,7 @@ const ImageCarousel = memo(({ images }: { images: string[] }) => {
             onClick={() =>
               scrollRef.current?.scrollBy({ left: -300, behavior: "smooth" })
             }
-            className="hidden sm:flex w-7 h-7 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 transition"
+            className="hidden sm:flex w-7 h-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform active:scale-95"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -162,7 +162,7 @@ const ImageCarousel = memo(({ images }: { images: string[] }) => {
             onClick={() =>
               scrollRef.current?.scrollBy({ left: 300, behavior: "smooth" })
             }
-            className="hidden sm:flex w-7 h-7 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60 transition"
+            className="hidden sm:flex w-7 h-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform active:scale-95"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -219,7 +219,7 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={onClose}
         >
           {/* Modal Panel */}
@@ -230,37 +230,41 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
             exit={{ opacity: 0, y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 350 }}
             className="
-              w-full max-h-[90vh] flex flex-col
-              bg-white dark:bg-[#151010]
-              rounded-t-[32px]
-              sm:w-[450px] sm:max-w-[90vw] sm:max-h-[85vh]
-              sm:rounded-3xl
-              shadow-2xl border border-gray-200/50 dark:border-white/10
+              w-full max-h-[90dvh] flex flex-col
+              bg-mc-surface
+              rounded-t-mc-xl
+              sm:w-[450px] sm:max-w-[90vw] sm:max-h-[85dvh]
+              sm:rounded-mc-xl
+              shadow-2xl border border-mc-border
               overflow-hidden
             "
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="prohibited-title"
           >
             {/* Sticky Header */}
-            <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#151010]/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/10">
+            <div className="shrink-0 bg-mc-surface border-b border-mc-border">
               {/* Drag handle (mobile) */}
               <div className="flex justify-center pt-3 sm:hidden">
-                <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-white/20" />
+                <div className="w-10 h-1 rounded-full bg-mc-border" />
               </div>
 
-              <div className="flex items-center justify-between px-5 py-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center">
-                    <Ban className="w-5 h-5 text-red-500" />
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="w-9 h-9 shrink-0 rounded-mc-sm bg-mc-danger-soft flex items-center justify-center">
+                    <Ban className="w-[18px] h-[18px] text-mc-danger" strokeWidth={2} />
                   </div>
-                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  <h2 id="prohibited-title" className="truncate text-[16px] font-extrabold text-mc-text">
                     {t('prohibitedItems.title')}
                   </h2>
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors active:scale-95"
+                  className="w-9 h-9 shrink-0 rounded-mc-md flex items-center justify-center bg-mc-surface-2 text-mc-text-2 transition-transform active:scale-95"
+                  aria-label={t('prohibitedItems.close', 'Yopish')}
                 >
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                  <X className="w-[18px] h-[18px]" strokeWidth={2} />
                 </button>
               </div>
             </div>
@@ -271,15 +275,15 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
 
               {isError && (
                 <div className="flex flex-col items-center justify-center p-10 gap-4 text-center">
-                  <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <AlertTriangle className="w-7 h-7 text-red-500" />
+                  <div className="w-14 h-14 rounded-full bg-mc-danger-soft flex items-center justify-center">
+                    <AlertTriangle className="w-6 h-6 text-mc-danger" strokeWidth={2} />
                   </div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <p className="text-[12px] font-medium text-mc-text-2">
                     {t('prohibitedItems.error')}
                   </p>
                   <button
                     onClick={() => refetch()}
-                    className="px-5 py-2 rounded-xl text-sm font-semibold bg-red-500 text-white hover:bg-red-600 active:scale-95 transition-all"
+                    className="px-5 h-10 rounded-mc-md text-[13px] font-extrabold bg-mc-danger-fill text-mc-on-danger active:scale-95 transition-transform"
                   >
                     {t('prohibitedItems.retry')}
                   </button>
@@ -296,11 +300,11 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
                   )}
 
                   {/* Warning Header */}
-                  <div className="mx-4 p-4 rounded-2xl bg-gradient-to-br from-red-50 to-amber-50 dark:from-red-500/10 dark:to-amber-500/10 border border-red-200/60 dark:border-red-500/20">
-                    <h3 className="text-sm font-extrabold text-red-700 dark:text-red-400 leading-snug mb-1.5">
+                  <div className="mx-4 p-3.5 rounded-mc-lg bg-mc-danger-soft border border-mc-danger/25">
+                    <h3 className="text-[13px] font-extrabold text-mc-danger leading-snug mb-1">
                       {items.header_title}
                     </h3>
-                    <p className="text-xs leading-relaxed text-red-600/80 dark:text-red-300/70">
+                    <p className="text-[12px] leading-snug text-mc-danger">
                       {items.header_subtitle}
                     </p>
                   </div>
@@ -313,17 +317,17 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.04, duration: 0.25 }}
-                        className="flex items-start gap-3 p-3 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5"
+                        className="flex items-start gap-2.5 p-2.5 rounded-mc-md bg-mc-surface-2 border border-mc-border"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-red-500/10 dark:bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                          <Ban className="w-4 h-4 text-red-500 dark:text-red-400" />
+                        <div className="w-8 h-8 rounded-mc-sm bg-mc-danger-soft flex items-center justify-center shrink-0">
+                          <Ban className="w-4 h-4 text-mc-danger" strokeWidth={2} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white leading-snug">
+                          <p className="text-[13px] font-extrabold text-mc-text leading-snug">
                             {item.title}
                           </p>
                           {item.examples && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                            <p className="text-[11px] font-medium text-mc-text-2 mt-0.5 leading-snug">
                               {item.examples}
                             </p>
                           )}
@@ -333,8 +337,8 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
                   </div>
 
                   {/* Footer Note */}
-                  <div className="mx-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-300 leading-relaxed">
+                  <div className="mx-4 p-3.5 rounded-mc-lg bg-mc-warn-soft border border-mc-warn/25">
+                    <p className="text-[12px] font-medium text-mc-warn leading-snug">
                       {items.footer_note}
                     </p>
                   </div>
@@ -343,14 +347,13 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
             </div>
 
             {/* Sticky Footer Button */}
-            <div className="sticky bottom-0 z-20 p-4 bg-white/90 dark:bg-[#151010]/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/10">
+            <div className="shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-mc-surface border-t border-mc-border">
               <button
                 onClick={onClose}
                 className="
-                  w-full py-3.5 rounded-2xl text-sm font-bold
-                  bg-gradient-to-r from-red-500 to-red-600 text-white
-                  hover:from-red-600 hover:to-red-700
-                  active:scale-[0.98] transition-all duration-200
+                  w-full h-12 rounded-mc-md text-[14px] font-extrabold
+                  bg-mc-danger-fill text-mc-on-danger
+                  active:scale-[0.98] transition-transform duration-200
                   shadow-lg shadow-red-500/20
                 "
               >

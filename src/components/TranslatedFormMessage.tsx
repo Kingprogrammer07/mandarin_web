@@ -12,7 +12,7 @@ export default function TranslatedFormMessage() {
   return (
     <p
       id={formMessageId}
-      className="text-red-600 text-sm mt-1"
+      className="text-mc-danger text-sm mt-1"
     >
       {t(error.message)}
     </p>

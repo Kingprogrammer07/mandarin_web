@@ -91,9 +91,13 @@
     "supportedFormats": "PNG · JPG · WEBP · HEIC",
     "consent": {
       "prefix": "Men ",
-      "link": "Maxfiylik siyosati va Foydalanuvchi kelishuvi",
+      "and": " va ",
       "suffix": "ga roziman",
-      "required": "Davom etish uchun shartlarga rozilik bering."
+      "docs": {
+        "offer": "Ommaviy oferta",
+        "privacy": "Maxfiylik siyosati",
+        "terms": "Foydalanish shartlari"
+      }
     }
   },
   "regions": {
@@ -146,7 +150,7 @@
     },
     "consent": {
       "prefix": "Kirish orqali siz ",
-      "link": "Maxfiylik siyosati",
+      "link": "huquqiy hujjatlar",
       "suffix": "ga rozilik bildirasiz"
     }
   },
@@ -639,6 +643,26 @@
       "description": "Haqiqatan ham hisobingizdan chiqmoqchimisiz?",
       "cancel": "Bekor qilish",
       "confirm": "Chiqish"
+    },
+    "registeredOn": "Ro'yxatdan o'tgan sana: {{date}}",
+    "debt": "Qarz",
+    "available": "Mavjud",
+    "back": "Ortga",
+    "menu": {
+      "wallet": "Hamyonim",
+      "cards": "Mening kartalarim",
+      "personal": "Shaxsiy ma'lumotlar",
+      "activity": "Faollik tarixi",
+      "support": "Yordam markazi",
+      "phone": "Telefon raqam",
+      "install": "Ekranga qo'shish"
+    },
+    "consent": {
+      "title": "Siz rozilik bergan hujjatlar",
+      "titleNeutral": "Huquqiy hujjatlar",
+      "acceptedOn": "{{date}} da tasdiqlangan",
+      "subtitle": "Xizmatdan foydalanish shartlari",
+      "updated": "Hujjatlar siz rozilik berganingizdan keyin yangilangan. Yangi tahrir bilan tanishing."
     }
   },
   "districts": {
@@ -1023,7 +1047,18 @@
     "noFlightSelected": "Reys tanlanmagan",
     "trackCodeNotFound": "Trek-kod ma'lumotlari topilmadi",
     "loadMore": "Ko'proq yuklash",
-    "loading": "Yuklanmoqda..."
+    "loading": "Yuklanmoqda...",
+    "tabActive": "Faol",
+    "tabArchive": "Arxiv",
+    "kg": "kg",
+    "infoTitle": "Yuklaringiz haqida",
+    "infoActive": "Yangi jo‘natmalar “Faol” bo‘limida ko‘rinadi.",
+    "infoArchive": "Olib ketilgan jo‘natmalar “Arxiv” bo‘limiga o‘tkaziladi. To‘lanmagan summa kartada ko‘rinib turadi.",
+    "detailsTitle": "{{flight}} tafsilotlari",
+    "detailsSubtitle": "Yukingiz haqida batafsil ma‘lumot",
+    "noTrackCode": "Trek-kod hali biriktirilmagan",
+    "paymentInfo": "To‘lov ma‘lumotlari",
+    "paidAmountShort": "To‘langan"
   },
   "dashboard": {
     "tabs": {
@@ -1121,6 +1156,10 @@
     },
     "toast": {
       "comingSoon": "{{id}} tanlandi (Tez orada...)"
+    },
+    "installApp": {
+      "title": "Ekranga qo'shish",
+      "desc": "Tez kirish uchun bosh ekranga qo'shing"
     }
   },
   "ourAddress": {
@@ -1398,7 +1437,8 @@
       "useSavedLocation": "Shu manzilni tanlash",
       "chooseOtherLocation": "Boshqa manzil"
     },
-    "confirmSendAddress": "Rostan ham yashash manzilingizni yubormoqchimisiz?"
+    "confirmSendAddress": "Rostan ham yashash manzilingizni yubormoqchimisiz?",
+    "back": "Ortga"
   },
   "deliveryHistory": {
     "title": "Zayavkalar tarixi",
@@ -1444,7 +1484,8 @@
     "error": {
       "loadFailed": "Ma'lumotlarni yuklashda xatolik yuz berdi",
       "retry": "Qayta urinish"
-    }
+    },
+    "back": "Ortga"
   },
   "calculator": {
     "title": "Kalkulyator",
@@ -1508,7 +1549,8 @@
       "breakdown": "To'lov taqsimoti",
       "viewReceipt": "Chekni ko'rish",
       "receiptAlt": "To'lov cheki",
-      "currencyUzs": "so'm"
+      "currencyUzs": "so'm",
+      "adjustment": "Balans tuzatish"
     },
     "breakdownTypes": {
       "click": "Click",
@@ -1538,7 +1580,17 @@
       "desc": "Sizda hozircha to'lovlar tarixi mavjud emas."
     },
     "loadMore": "Yana ko'rish ({{current}}/{{total}})",
-    "loading": "Yuklanmoqda..."
+    "loading": "Yuklanmoqda...",
+    "adjustment": {
+      "bonus": "Bonus",
+      "penalty": "Jarima",
+      "effect": "Balansga ta'siri"
+    },
+    "filter": {
+      "all": "Hammasi",
+      "flight": "Reyslar",
+      "empty": "Yuklangan yozuvlar orasida bunday turdagi yozuv yo'q. Ko'proq yuklang."
+    }
   },
   "cargoHistory": {
     "flight": "REYS: {{name}}",
@@ -2015,7 +2067,12 @@
     "dashboardDesc": "Havolangizni ulashing va statistikani koʻring",
     "prev": "Oldingi",
     "next": "Keyingi",
-    "pageOf": "{{page}} / {{total}}"
+    "pageOf": "{{page}} / {{total}}",
+    "rewards": {
+      "title": "Taklif uchun sovg'alar",
+      "desc": "Do'st taklif qilganlar uchun maxsus sovg'alarimiz bor. Shartlarini bilish uchun admin bilan bog'laning.",
+      "cta": "Admin bilan bog'lanish"
+    }
   },
   "review": {
     "title": "Bot xizmatini baholang",
@@ -2080,5 +2137,20 @@
     "contactHint": "Ma'lumotlarda xatolik bo'lsa yoki uzoq javob kelmasa — biz bilan bog'laning:",
     "contactAdmin": "Admin bilan bog'lanish",
     "continue": "Tushunarli"
+  },
+  "bottomNav": {
+    "ariaLabel": "Asosiy navigatsiya",
+    "home": "Bosh sahifa",
+    "cargo": "Yuklarim",
+    "payments": "To'lovlar",
+    "profile": "Profil"
+  },
+  "home": {
+    "search": {
+      "submit": "Qidirish",
+      "openTracking": "Yuk kuzatish oynasini ochish",
+      "label": "Yuk kodi yoki tracking raqami",
+      "placeholder": "Yuk kodi yoki tracking raqami"
+    }
   }
 }

@@ -37,6 +37,14 @@ export interface ReportFlightSummary {
     remaining_amount: number;
     is_taken_away: boolean;
     last_sent_web_date?: string | null;
+    /** Summed from the flight's cargo rows. 0 when the backend predates it. */
+    total_weight: number;
+}
+
+/** Active vs archived flight counts, for the list's segmented tabs. */
+export interface ReportFlightCounts {
+    active: number;
+    archived: number;
 }
 
 const validFlightStatuses: ReportFlightPaymentStatus[] = ['new', 'partial', 'paid', 'taken_away'];
@@ -60,6 +68,7 @@ const normalizeWebFlight = (item: unknown): ReportFlightSummary | null => {
             remaining_amount: 0,
             is_taken_away: false,
             last_sent_web_date: null,
+            total_weight: 0,
         };
     }
 
@@ -82,6 +91,7 @@ const normalizeWebFlight = (item: unknown): ReportFlightSummary | null => {
         remaining_amount: toNumber(raw.remaining_amount),
         is_taken_away: raw.is_taken_away === true,
         last_sent_web_date: typeof raw.last_sent_web_date === 'string' ? raw.last_sent_web_date : null,
+        total_weight: toNumber(raw.total_weight),
     };
 };
 
@@ -96,6 +106,22 @@ export const reportService = {
         return response.data
             .map(normalizeWebFlight)
             .filter((flight): flight is ReportFlightSummary => flight !== null);
+    },
+
+    /**
+     * Get the client's active/archived flight counts.
+     *
+     * Its own endpoint rather than a field on the list: the list stays a plain
+     * array, so a deployed frontend that predates this keeps parsing it.
+     */
+    getFlightCounts: async (clientCode: string): Promise<ReportFlightCounts> => {
+        const response = await apiClient.get<Partial<ReportFlightCounts>>(
+            `/api/v1/reports/flights/${clientCode}/counts`,
+        );
+        return {
+            active: toNumber(response.data?.active),
+            archived: toNumber(response.data?.archived),
+        };
     },
 
     /**

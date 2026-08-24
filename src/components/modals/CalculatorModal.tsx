@@ -5,6 +5,7 @@ import { X, Scale, Box, Calculator, DollarSign, Info, Gift, MessageCircle } from
 import { apiClient } from "@/api/client";
 import { API_BASE_URL } from "@/config/config";
 import { normalizeNumber } from "@/utils/numberFormat";
+import { SUPPORT_TELEGRAM_URL } from "@/config/contacts";
 
 interface CalculatorModalProps {
     isOpen: boolean;
@@ -61,6 +62,17 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
             document.body.style.overflow = original;
         };
     }, [isOpen]);
+
+    // Escape: the modal had a scroll lock but no key handler, so on desktop the
+    // only way out was the X in the corner.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [isOpen, onClose]);
 
     // Modal yopilganda state'larni tozalash
     useEffect(() => {
@@ -167,64 +179,71 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
             />
 
             {/* Modal Container — bottom sheet on mobile, centered on sm+ */}
-            <div className="
-                relative w-full sm:max-w-md md:max-w-lg bg-white dark:bg-[#120e09]
-                rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="calculator-title"
+                className="
+                relative w-full sm:max-w-md md:max-w-lg bg-mc-surface
+                rounded-t-mc-xl sm:rounded-mc-xl shadow-2xl overflow-hidden
                 animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300
-                border border-white/20 dark:border-amber-900/30
-                max-h-[90vh] flex flex-col
+                border border-mc-border
+                max-h-[90dvh] flex flex-col
             ">
                 {/* Header */}
-                <div className="px-6 py-5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                            <Calculator className="w-5 h-5" />
+                <div className="px-4 py-3 border-b border-mc-border flex items-center justify-between gap-3 bg-mc-surface">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="w-9 h-9 shrink-0 rounded-mc-sm bg-mc-brand-soft flex items-center justify-center text-mc-brand">
+                            <Calculator className="w-[18px] h-[18px]" strokeWidth={2} />
                         </div>
-                        <div>
-                            <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">{t('calculator.title')}</h2>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('calculator.subtitle')}</p>
+                        <div className="min-w-0">
+                            <h2 id="calculator-title" className="truncate text-[16px] font-extrabold text-mc-text">{t('calculator.title')}</h2>
+                            <p className="truncate text-[11px] font-medium text-mc-text-2">{t('calculator.subtitle')}</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 rounded-full bg-gray-200/60 dark:bg-white/10 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:scale-110 active:scale-95 transition-transform"
+                        className="w-9 h-9 shrink-0 rounded-mc-md bg-mc-surface-2 flex items-center justify-center text-mc-text-2 active:scale-95 transition-transform"
+                        aria-label={t('calculator.close', 'Yopish')}
                     >
-                        <X className="w-4 h-4" />
+                        <X className="w-[18px] h-[18px]" strokeWidth={2} />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom,24px)]">
+                <div className="p-4 space-y-4 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom,24px)]">
                     {/* Segmented Control (Tabs) */}
-                    <div className="flex bg-gray-100 dark:bg-[#1f1810] p-1.5 rounded-2xl relative">
+                    <div className="flex bg-mc-surface-2 border border-mc-border p-1 rounded-mc-md relative">
                         <button
                             onClick={() => setIsGabarit(false)}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${
-                                !isGabarit ? "text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-mc-sm text-[13px] font-extrabold transition-colors duration-200 z-10 ${
+                                !isGabarit ? "text-mc-text" : "text-mc-text-2"
                             }`}
+                            aria-pressed={!isGabarit}
                         >
-                            <Scale className="w-4 h-4" /> {t('calculator.tabs.normal')}
+                            <Scale className="w-4 h-4" strokeWidth={2} /> {t('calculator.tabs.normal')}
                         </button>
                         <button
                             onClick={() => setIsGabarit(true)}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${
-                                isGabarit ? "text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400"
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-mc-sm text-[13px] font-extrabold transition-colors duration-200 z-10 ${
+                                isGabarit ? "text-mc-text" : "text-mc-text-2"
                             }`}
+                            aria-pressed={isGabarit}
                         >
-                            <Box className="w-4 h-4" /> {t('calculator.tabs.dimensional')}
+                            <Box className="w-4 h-4" strokeWidth={2} /> {t('calculator.tabs.dimensional')}
                         </button>
 
                         {/* Animated sliding background */}
                         <div
-                            className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-white dark:bg-[#322516] rounded-xl shadow transition-transform duration-300 ease-out"
+                            className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-mc-surface rounded-mc-sm shadow-[var(--mc-shadow-card)] transition-transform duration-300 ease-out"
                             style={{ transform: isGabarit ? "translateX(100%)" : "translateX(0)" }}
                         />
                     </div>
 
                     {/* Inputs */}
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {/* Asosiy vazn */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-[12px] font-bold text-mc-text-2 mb-1.5">
                                 {t('calculator.inputs.weightLabel')}
                             </label>
                             <div className="relative">
@@ -237,16 +256,16 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                         if (normalized !== null) setWeight(normalized);
                                     }}
                                     placeholder="0.00"
-                                    className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+                                    className="w-full bg-mc-surface-2 border border-mc-border rounded-mc-md px-4 py-3.5 text-[20px] font-extrabold text-mc-text placeholder:text-mc-text-3 focus:outline-none focus:ring-2 focus:ring-mc-brand/45 transition-all"
                                 />
-                                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">{t('calculator.inputs.kg')}</span>
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-bold text-mc-text-3">{t('calculator.inputs.kg')}</span>
                             </div>
                         </div>
 
                         {/* Gabarit o'lchamlari */}
                         {isGabarit && (
                             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                <label className="block text-[12px] font-bold text-mc-text-2 mb-1.5">
                                     {t('calculator.inputs.dimensionsLabel')}
                                 </label>
                                 <div className="grid grid-cols-3 gap-3">
@@ -256,9 +275,9 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                                 const normalized = normalizeNumber(e.target.value);
                                                 if (normalized !== null) setLength(normalized);
                                             }} placeholder={t('calculator.inputs.length')}
-                                            className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-3 py-3 text-center text-lg font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                                            className="w-full bg-mc-surface-2 border border-mc-border rounded-mc-md px-3 py-2.5 text-center text-[16px] font-extrabold text-mc-text placeholder:text-mc-text-3 focus:outline-none focus:ring-2 focus:ring-mc-brand/45"
                                         />
-                                        <span className="block text-center text-[10px] text-gray-500 mt-1">{t('calculator.inputs.lengthUnit')}</span>
+                                        <span className="block text-center text-[10px] font-medium text-mc-text-2 mt-1">{t('calculator.inputs.lengthUnit')}</span>
                                     </div>
                                     <div className="relative">
                                         <input
@@ -266,9 +285,9 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                                 const normalized = normalizeNumber(e.target.value);
                                                 if (normalized !== null) setWidth(normalized);
                                             }} placeholder={t('calculator.inputs.width')}
-                                            className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-3 py-3 text-center text-lg font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                                            className="w-full bg-mc-surface-2 border border-mc-border rounded-mc-md px-3 py-2.5 text-center text-[16px] font-extrabold text-mc-text placeholder:text-mc-text-3 focus:outline-none focus:ring-2 focus:ring-mc-brand/45"
                                         />
-                                        <span className="block text-center text-[10px] text-gray-500 mt-1">{t('calculator.inputs.widthUnit')}</span>
+                                        <span className="block text-center text-[10px] font-medium text-mc-text-2 mt-1">{t('calculator.inputs.widthUnit')}</span>
                                     </div>
                                     <div className="relative">
                                         <input
@@ -276,71 +295,66 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
                                                 const normalized = normalizeNumber(e.target.value);
                                                 if (normalized !== null) setHeight(normalized);
                                             }} placeholder={t('calculator.inputs.height')}
-                                            className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-2xl px-3 py-3 text-center text-lg font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                                            className="w-full bg-mc-surface-2 border border-mc-border rounded-mc-md px-3 py-2.5 text-center text-[16px] font-extrabold text-mc-text placeholder:text-mc-text-3 focus:outline-none focus:ring-2 focus:ring-mc-brand/45"
                                         />
-                                        <span className="block text-center text-[10px] text-gray-500 mt-1">{t('calculator.inputs.heightUnit')}</span>
+                                        <span className="block text-center text-[10px] font-medium text-mc-text-2 mt-1">{t('calculator.inputs.heightUnit')}</span>
                                     </div>
                                 </div>
                             </div>
                         )}
-                        {/* <div className="p-2 bg-red-50/80 dark:bg-red-900/20 rounded-xl border-l-4 border-red-500">
-                            <p className="text-center text-[10px] text-white-400 dark:text-white-500 leading-tight">
-                                * Gabarit yuklarda, haqiqiy vazndan tashqari, o'lchamlarga ham e'tibor beriladi. Agar yukning o'lchamlari belgilangan limitlardan oshsa, hisoblashda gabarit vazni asosiy hisoblanadi va natija shunga mos ravishda ko'rsatiladi.
-                            </p>
-                        </div> */}
                     </div>
 
                     {/* Live Natija Qismi (Optimized UI) */}
-                    <div className="mt-4 space-y-3">
+                    <div className="space-y-2.5">
                         {isLoading ? (
-                            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl h-24 flex flex-col items-center justify-center gap-3 animate-pulse border border-gray-100 dark:border-white/10">
-                                <div className="w-6 h-6 border-3 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
-                                <p className="text-sm font-medium text-gray-500">{t('calculator.results.calculating')}</p>
+                            <div className="bg-mc-surface-2 rounded-mc-lg h-24 flex flex-col items-center justify-center gap-2.5 border border-mc-border">
+                                <div className="w-6 h-6 border-2 border-mc-brand/30 border-t-mc-brand rounded-full animate-spin" />
+                                <p className="text-[12px] font-medium text-mc-text-2">{t('calculator.results.calculating')}</p>
                             </div>
                         ) : result ? (
                             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-3">
                                 
                                 {/* 1. Hisoblangan Vazn (Main Focus) */}
-                                <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white flex justify-between items-center shadow-md shadow-orange-500/20">
-                                    <div>
-                                        <p className="text-amber-100 font-medium text-sm">{t('calculator.results.chargeableWeight')}</p>
-                                        <p className="text-3xl font-black mt-0.5">{result.chargeable_weight} <span className="text-lg font-medium opacity-90">kg</span></p>
+                                <div className="bg-gradient-to-br from-mc-brand to-mc-brand-strong rounded-mc-lg p-4 text-mc-on-brand flex justify-between items-center gap-3 shadow-[var(--mc-shadow-cta)]">
+                                    <div className="min-w-0">
+                                        <p className="text-mc-on-brand/75 font-bold text-[12px]">{t('calculator.results.chargeableWeight')}</p>
+                                        <p className="text-[26px] font-extrabold leading-tight mt-0.5 tabular-nums">{result.chargeable_weight} <span className="text-[15px] font-bold opacity-80">kg</span></p>
                                     </div>
-                                    <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
-                                        <Scale className="w-6 h-6 text-white" />
+                                    <div className="w-11 h-11 shrink-0 bg-mc-on-brand/12 rounded-full flex items-center justify-center">
+                                        <Scale className="w-5 h-5" strokeWidth={2} />
                                     </div>
                                 </div>
 
                                 {/* 2. Joriy Tarif (Flat & Minimal) */}
-                                <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4 flex justify-between items-center">
-                                    <p className="text-gray-600 dark:text-gray-400 font-medium text-sm flex items-center gap-2">
-                                        <Info className="w-4 h-4 text-gray-400" /> 
+                                <div className="bg-mc-surface-2 border border-mc-border rounded-mc-lg p-3.5 flex justify-between items-center gap-3">
+                                    <p className="text-mc-text-2 font-medium text-[12px] flex items-center gap-1.5">
+                                        <Info className="w-4 h-4 text-mc-text-3" strokeWidth={2} />
                                         {t('calculator.results.pricePerKg')}
                                     </p>
                                     <div className="text-right">
-                                        <p className="text-base font-bold text-gray-900 dark:text-white">
+                                        <p className="text-[14px] font-extrabold text-mc-text tabular-nums">
                                             ${result.price_per_kg_usd.toLocaleString("uz-UZ", { minimumFractionDigits: 2 })}
                                         </p>
-                                        <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                                        <p className="text-[11px] font-medium text-mc-text-2 mt-0.5 tabular-nums">
                                             ~{result.price_per_kg_uzs.toLocaleString("uz-UZ")} {t('calculator.results.currencyUzs')}
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* 3. Taxminiy To'lov (Distinct Color for Interaction) */}
-                                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-2xl p-4 flex justify-between items-center relative overflow-hidden">
+                                <div className="bg-mc-success/12 border border-mc-success/25 rounded-mc-lg p-3.5 flex justify-between items-center gap-3 relative overflow-hidden">
                                     {/* Subtle highlight effect for low-end devices without using blur */}
-                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-emerald-200/50 to-transparent dark:from-emerald-500/20 rounded-bl-full pointer-events-none" />
-                                    
-                                    <p className="text-emerald-800 dark:text-emerald-400 font-semibold text-sm flex items-center gap-2 relative z-10">
-                                        <DollarSign className="w-4 h-4" /> 
+                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-mc-success/20 to-transparent rounded-bl-full pointer-events-none" />
+
+                                    <p className="text-mc-success font-bold text-[12px] flex items-center gap-1.5 relative z-10">
+                                        <DollarSign className="w-4 h-4" strokeWidth={2} />
                                         {t('calculator.results.estimatedPayment')}
                                     </p>
                                     <div className="text-right relative z-10">
-                                        <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                                            {result.estimated_price_uzs.toLocaleString("uz-UZ")} <span className="text-sm">{t('calculator.results.currencyUzs')}</span>
+                                        <p className="text-[18px] font-extrabold text-mc-success tabular-nums">
+                                            {result.estimated_price_uzs.toLocaleString("uz-UZ")} <span className="text-[12px]">{t('calculator.results.currencyUzs')}</span>
                                         </p>
-                                        <p className="text-[11px] font-bold text-emerald-700/60 dark:text-emerald-400/60 mt-0.5">
+                                        <p className="text-[11px] font-bold text-mc-success mt-0.5 tabular-nums">
                                             ${result.estimated_price_usd.toLocaleString("uz-UZ", { minimumFractionDigits: 2 })}
                                         </p>
                                     </div>
@@ -348,9 +362,9 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
 
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-28 text-center bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
-                                <Calculator className="w-6 h-6 mb-2 text-gray-400" />
-                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 max-w-[200px]">
+                            <div className="flex flex-col items-center justify-center h-28 text-center bg-mc-surface-2 border border-dashed border-mc-border rounded-mc-lg">
+                                <Calculator className="w-6 h-6 mb-2 text-mc-text-3" strokeWidth={1.8} />
+                                <p className="text-[12px] font-medium text-mc-text-2 max-w-[200px]">
                                     {t('calculator.results.emptyState')}
                                 </p>
                             </div>
@@ -359,29 +373,27 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
 
                     {/* Gabarit info & CTA — faqat gabarit natijasi bo'lganda va user rejimida */}
                     {isGabarit && result && !isAdminMode && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-300">
                             {/* Explanation container */}
-                            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-2xl p-5">
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-0.5 w-9 h-9 shrink-0 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                                        <Info className="w-5 h-5" />
+                            <div className="bg-mc-surface-2 border border-mc-border rounded-mc-lg p-3.5">
+                                <div className="flex items-start gap-2.5">
+                                    <div className="mt-0.5 w-9 h-9 shrink-0 rounded-mc-sm bg-mc-brand-soft flex items-center justify-center text-mc-brand">
+                                        <Info className="w-[18px] h-[18px]" strokeWidth={2} />
                                     </div>
-                                    <div>
-                                        <h4 className="text-sm font-extrabold text-blue-900 dark:text-blue-100 mb-1.5">
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13px] font-extrabold text-mc-text mb-1">
                                             {t('calculator.dimensionalInfo.title')}
                                         </h4>
-                                        <p className="text-[13px] leading-relaxed text-blue-800 dark:text-blue-200/80">
+                                        <p className="text-[12px] leading-snug text-mc-text-2">
                                             {t('calculator.dimensionalInfo.desc')}
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* Discount highlight */}
-                                <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4 flex items-start gap-3">
-                                    <div className="mt-0.5 w-8 h-8 shrink-0 rounded-lg bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                                        <Gift className="w-4 h-4" />
-                                    </div>
-                                    <p className="text-[13px] leading-relaxed font-semibold text-amber-900 dark:text-amber-100">
+                                <div className="mt-3 bg-mc-warn-soft border border-mc-warn/25 rounded-mc-sm p-3 flex items-start gap-2.5">
+                                    <Gift className="mt-px w-4 h-4 shrink-0 text-mc-warn" strokeWidth={2} />
+                                    <p className="text-[12px] leading-snug font-bold text-mc-warn">
                                         {t('calculator.dimensionalInfo.discount')}
                                     </p>
                                 </div>
@@ -389,17 +401,17 @@ export default function CalculatorModal({ isOpen, onClose, isAdminMode = false }
 
                             {/* CTA Button */}
                             <button
-                                onClick={() => window.open("https://t.me/mandarin_admin", "_blank", "noopener,noreferrer")}
-                                className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-sm py-4 rounded-2xl shadow-lg shadow-blue-500/25 transition-all duration-200"
+                                onClick={() => window.open(SUPPORT_TELEGRAM_URL, "_blank", "noopener,noreferrer")}
+                                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-mc-brand to-mc-brand-strong active:scale-[0.98] text-mc-on-brand font-extrabold text-[13px] py-3.5 rounded-mc-md shadow-[var(--mc-shadow-cta)] transition-transform duration-200"
                             >
-                                <MessageCircle className="w-5 h-5" />
+                                <MessageCircle className="w-[18px] h-[18px]" strokeWidth={2} />
                                 {t('calculator.dimensionalInfo.contactAdmin')}
                             </button>
                         </div>
                     )}
 
                     {!isAdminMode && (
-                        <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 leading-tight pb-6">
+                        <p className="text-center text-[10px] font-medium text-mc-text-3 leading-snug pb-6">
                             {t('calculator.footerNote')}
                         </p>
                     )}

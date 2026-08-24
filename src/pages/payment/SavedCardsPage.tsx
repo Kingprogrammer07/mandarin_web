@@ -119,18 +119,18 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
   useGuideTour('card-binding', buildCardTour, !isLoading && !isError);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#06080d] px-4 pt-6 pb-24">
+    <div className="min-h-dvh bg-mc-bg px-4 pt-3 pb-5">
       {/* Header */}
-      <div className="max-w-lg mx-auto flex items-center gap-3 mb-6">
+      <div className="max-w-lg mx-auto flex items-center gap-2.5 mb-3">
         {onBack && (
           <button
             onClick={onBack}
-            className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            className="p-2 -ml-2 rounded-full transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            <ArrowLeft className="w-5 h-5 text-mc-text-2" />
           </button>
         )}
-        <h1 className="text-xl font-black text-gray-900 dark:text-white">
+        <h1 className="text-xl font-black text-mc-text">
           {t('nbu.cards.title')}
         </h1>
       </div>
@@ -142,12 +142,10 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
           whileTap={{ scale: 0.97 }}
           onClick={handleBind}
           disabled={bindMutation.isPending}
-          className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl font-bold text-base
-            bg-white dark:bg-white/[0.04]
-            border border-dashed border-gray-300 dark:border-white/15
-            text-gray-700 dark:text-gray-300
-            hover:border-amber-400 dark:hover:border-amber-500/40
-            hover:bg-amber-50 dark:hover:bg-amber-500/5
+          className="w-full flex items-center justify-center gap-2 h-14 rounded-mc-lg font-bold text-base
+            bg-mc-surface
+            border border-dashed border-mc-border dark:border-white/15
+            text-mc-text
             active:scale-[0.97] transition-all
             disabled:opacity-60 disabled:cursor-not-allowed"
         >
@@ -162,19 +160,19 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
         {/* Loading */}
         {isLoading && (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-mc-brand animate-spin" />
           </div>
         )}
 
         {/* Error */}
         {isError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-mc-text-2">
               {t('makePayment.errorOccurred')}
             </p>
             <button
               onClick={() => refetch()}
-              className="px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold text-base active:scale-95 transition-transform"
+              className="px-6 py-3 rounded-mc-md bg-mc-brand text-white font-semibold text-base active:scale-95 transition-transform"
             >
               {t('makePayment.retry')}
             </button>
@@ -184,10 +182,10 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
         {/* Empty state */}
         {!isLoading && !isError && cards.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-              <CreditCard className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+            <div className="w-16 h-16 rounded-full bg-mc-surface-2 flex items-center justify-center">
+              <CreditCard className="w-8 h-8 text-mc-text-3" />
             </div>
-            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+            <p className="text-lg font-semibold text-mc-text">
               {t('nbu.cards.empty')}
             </p>
           </div>
@@ -203,29 +201,29 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="flex items-center gap-4 p-4 rounded-2xl
-                bg-white dark:bg-white/[0.04]
-                border border-gray-200 dark:border-white/10
+              className="flex items-center gap-4 p-4 rounded-mc-lg
+                bg-mc-surface
+                border border-mc-border
                 shadow-sm"
             >
-              <div className="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-500/10 flex items-center justify-center flex-shrink-0">
-                <CreditCard className="w-6 h-6 text-sky-600 dark:text-sky-400" />
+              <div className="w-11 h-11 rounded-mc-md bg-mc-brand-soft flex items-center justify-center flex-shrink-0">
+                <CreditCard className="w-5 h-5 text-mc-brand" strokeWidth={2} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-base text-gray-900 dark:text-white truncate">
+                <p className="font-bold text-base text-mc-text truncate">
                   {card.nickname || card.card_masked || t('nbu.cards.namedCardFallback')}
                 </p>
                 {card.nickname && card.card_masked ? (
-                  <p className="font-mono text-xs text-gray-500 dark:text-gray-400 truncate">
+                  <p className="font-mono text-xs text-mc-text-2 truncate">
                     {card.card_masked}
                   </p>
                 ) : !card.card_masked ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                  <p className="text-xs text-mc-text-3 truncate">
                     {t('nbu.cards.pendingMasked')}
                   </p>
                 ) : null}
                 {card.last_used_at && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-mc-text-2">
                     {t('nbu.cards.lastUsed', {
                       when: formatRelativeTime(card.last_used_at, t),
                     })}
@@ -235,9 +233,8 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
               <button
                 onClick={() => handleDelete(card.id)}
                 disabled={deleteMutation.isPending}
-                className="p-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10
-                  text-gray-400 dark:text-gray-500
-                  hover:text-red-500 dark:hover:text-red-400
+                className="p-2.5 rounded-mc-md
+                  text-mc-text-3
                   active:scale-90 transition-all
                   disabled:opacity-60"
                 aria-label={t('nbu.cards.deleteConfirm')}

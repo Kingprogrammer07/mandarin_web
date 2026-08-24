@@ -3,6 +3,7 @@ import {
   getLocaleFromLanguage,
   formatNumberLocalized,
   formatCurrencySum,
+  formatUzs,
   formatCurrencyUz,
 } from "./format"
 
@@ -113,3 +114,30 @@ describe("money formatting invariants", () => {
     expect(formatCurrencySum(2_300_000)).not.toContain(enUs)
   })
 })
+
+describe('formatUzs', () => {
+  it('groups thousands the Uzbek way, not the American way', () => {
+    // UserReportsPage.tsx:334 rendered so'm through en-US, producing
+    // "2,300,000.00 so'm" one tab away from "2 300 000 so'm".
+    expect(formatUzs(2300000)).not.toContain(',');
+    expect(formatUzs(2300000)).toContain("so'm");
+  });
+
+  it('never shows tiyin', () => {
+    expect(formatUzs(114950.5)).not.toContain('.');
+    expect(formatUzs(114950.5)).not.toContain(',5');
+  });
+
+  it('rounds rather than truncating', () => {
+    expect(formatUzs(999.6)).toBe(formatUzs(1000));
+  });
+
+  it('renders zero rather than an empty string', () => {
+    expect(formatUzs(0)).toContain('0');
+  });
+
+  it('survives NaN and Infinity instead of printing them at the user', () => {
+    expect(formatUzs(Number.NaN)).toContain('0');
+    expect(formatUzs(Number.POSITIVE_INFINITY)).toContain('0');
+  });
+});

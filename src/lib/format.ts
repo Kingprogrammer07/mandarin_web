@@ -31,6 +31,58 @@ export const formatCurrencyUz = (value: number) => {
   return `${formatted} so'm`;
 };
 
+/**
+ * The one money formatter for client-facing screens.
+ *
+ * The user side currently renders sums through 22 raw `toLocaleString` calls
+ * across three different locales — `UserReportsPage.tsx:334` prints so'm in
+ * `en-US`, so the same amount reads "2,300,000.00 so'm" on one tab and
+ * "2 300 000 so'm" on the next. Currency is the number a cargo client checks
+ * twice; two spellings of it read as a bug in the totals.
+ *
+ * Always uz-UZ and always whole so'm: tiyin are not used in this business, and
+ * a trailing ".00" only widens the number. Pair with `tabular-nums` so digits
+ * stay in their columns as amounts change.
+ */
+/**
+ * Cargo weight in kilograms.
+ *
+ * Parcels are weighed down to grams, so a fixed single decimal turned 0.001 kg
+ * into "0.0" — which reads as "not weighed" rather than "very light", and hid
+ * exactly the rows a client would query. Three decimals covers a gram, and
+ * trailing zeros are trimmed so a whole number still reads "1" and not
+ * "1.000". The same precision the detail view prints, so the list and the
+ * drawer never disagree about the same parcel.
+ */
+export const formatWeightKg = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) return '—';
+
+  let text = value.toFixed(3);
+  if (text.includes('.')) {
+    // Only after a decimal point: trimming blindly would turn 100 into 1.
+    text = text.replace(/0+$/, '').replace(/\.$/, '');
+  }
+  // Below a gram there is nothing left to round to, but the row still has a
+  // weight — saying so beats printing a zero.
+  return text === '0' ? '<0.001' : text;
+};
+
+export const formatUzsAmount = (value: number): string => {
+  const safe = Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat('uz-UZ', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(safe));
+};
+
+/**
+ * The amount with its unit. Split from `formatUzsAmount` because the summary
+ * tiles set the unit in a smaller weight than the number — rendering one
+ * string there would force the whole thing to the same size, and "so'm" is the
+ * part a reader can afford to have quieter.
+ */
+export const formatUzs = (value: number): string => `${formatUzsAmount(value)} so'm`;
+
 export const formatTashkentDate = (
   dateInput: string | Date,
   language?: string,

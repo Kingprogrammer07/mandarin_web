@@ -75,6 +75,59 @@ IndexedDB via `idb` library (`src/utils/`) caches cargo data for offline use.
 - **Framer Motion** for animations, **Sonner** for toasts, **Recharts** for stats charts
 - **Eruda** for in-browser dev console on mobile
 
+### Design tokens (`--mc-*`)
+
+The client (user) side runs on one token set defined in `src/index.css` — `:root`
+for light, `.dark` for dark — exposed to Tailwind through `@theme inline`.
+
+- Colour: `bg-mc-surface`, `bg-mc-surface-2`, `bg-mc-bg`, `border-mc-border`,
+  `text-mc-text` / `-text-2` / `-text-3`, `mc-brand` / `-strong` / `-soft`,
+  `mc-danger` / `mc-warn` / `mc-success` (+ `-soft`), `mc-cardface` (a bank-card
+  graphic: fixed dark in both themes).
+- Radius: `rounded-mc-sm|md|lg|xl` (10 / 14 / 18 / 22px). **Nothing else** — an
+  arbitrary `rounded-[22px]` is a mistake, the scale already has it.
+- Elevation: `shadow-[var(--mc-shadow-card)]`, `shadow-[var(--mc-shadow-cta)]`.
+- Type scale in use: 16–17px `font-extrabold` titles, 15px card titles, 13px
+  rows, 12px body, 11px meta, 10px uppercase labels. `font-black` is not part
+  of it.
+
+**Two tones per semantic hue.** `--mc-brand` fills buttons and dots; `.text-mc-brand`
+is rebound (unlayered, bottom of `index.css`) to `--mc-brand-text`, which is dark
+enough to clear 4.5:1 on a light card. Same for danger / warn / success. A filled
+button pairs its fill with `text-mc-on-<hue>` — never a bare `text-white`, which
+sits at 2.3–2.6:1 on brand orange and success green.
+
+Never write a raw palette class (`bg-gray-50`, `text-orange-600`) on a client
+screen, and never a `dark:` variant of a token — the token already swaps.
+
+### iOS-first (mandatory for every UI change)
+
+The client is a Telegram Mini App; the majority of it is opened inside
+**WKWebView on iPhone**. Treat iOS Safari as the target, not as an edge case.
+
+1. **Inputs never below 16px.** `font-size < 16px` makes Safari zoom the page on
+   focus and it does not zoom back on blur — the whole layout stays magnified.
+   Applies to `<input>`, `<textarea>`, `<select>`.
+2. **`dvh`, never `vh`.** `100vh` is the height with the browser chrome hidden,
+   so a `min-h-screen` page is always taller than the visible area. Use
+   `min-h-dvh` / `max-h-[92dvh]`.
+3. **Safe areas.** Anything fixed to the bottom pads with
+   `env(safe-area-inset-bottom)`; content above it clears
+   `calc(var(--mc-nav-h) + env(safe-area-inset-bottom))`.
+4. **No `hover:` as the only affordance.** iOS fires hover once on tap and then
+   leaves it stuck. A control revealed by `group-hover` is invisible on a phone.
+   Use `active:scale-*` for press feedback.
+5. **Touch targets ≥ 44×44pt** (Apple HIG), ≥ 8px apart.
+6. **Scrolling.** The scroll container is an inner element with
+   `overflow-y-auto overscroll-contain`, never `body`. Bottom sheets are
+   `flex flex-col` with a `shrink-0` header and a `min-h-0 flex-1` body — never a
+   `calc(90vh - 73px)` guess at the header height.
+7. **Modals** lock body scroll, close on `Escape`, and carry `role="dialog"`,
+   `aria-modal` and `aria-labelledby`.
+8. Platform resets (`-webkit-text-size-adjust`, `-webkit-tap-highlight-color`,
+   `touch-action: manipulation`, `appearance: none`) live in `@layer base` of
+   `src/index.css` — do not repeat them per component.
+
 ### Path Alias
 
 `@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.app.json`).

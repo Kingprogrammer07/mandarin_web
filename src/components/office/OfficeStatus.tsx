@@ -48,15 +48,15 @@ export function OfficeOpenBadge({
 
   const shell = compact
     ? 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black'
-    : 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black ring-1';
-  const dot = compact ? 'h-1.5 w-1.5' : 'h-2 w-2';
+    : 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold leading-tight ring-1';
+  const dot = compact ? 'h-1.5 w-1.5' : 'h-1.5 w-1.5';
 
   if (office.is_open_now) {
     return (
       <span
-        className={`${shell} bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20`}
+        className={`${shell} bg-mc-success/12 text-mc-success ring-mc-success/25`}
       >
-        <span className={`${dot} rounded-full bg-emerald-500`} />
+        <span className={`${dot} rounded-full bg-mc-success`} />
         {compact
           ? t('office.open')
           : office.today_hours
@@ -68,9 +68,9 @@ export function OfficeOpenBadge({
 
   return (
     <span
-      className={`${shell} bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20`}
+      className={`${shell} bg-mc-danger-soft text-mc-danger ring-mc-danger/25`}
     >
-      <span className={`${dot} rounded-full bg-red-500`} />
+      <span className={`${dot} rounded-full bg-mc-danger`} />
       {compact
         ? t('office.closedShort')
         : `${
@@ -95,14 +95,14 @@ export function OfficeHoursTable({ office }: { office: OfficeInfo }) {
         return (
           <div
             key={day}
-            className={`flex items-center justify-between rounded-lg px-2 py-1 text-[13px] ${
+            className={`flex items-center justify-between rounded-mc-sm px-2 py-0.5 text-[12px] ${
               isToday
-                ? 'bg-orange-50 font-black text-gray-950 dark:bg-orange-400/10 dark:text-[#fff8ed]'
-                : 'font-semibold text-gray-600 dark:text-white/55'
+                ? 'bg-mc-brand-soft font-black text-mc-text'
+                : 'font-semibold text-mc-text-2'
             }`}
           >
             <span>{t(`office.weekday.${day}`)}</span>
-            <span className={cfg?.closed || !cfg ? 'text-red-500 dark:text-red-400' : ''}>
+            <span className={cfg?.closed || !cfg ? 'text-mc-danger' : ''}>
               {cfg && !cfg.closed ? `${cfg.open} – ${cfg.close}` : t('office.dayOff')}
             </span>
           </div>
@@ -124,16 +124,16 @@ export function OfficeContacts({ office }: { office: OfficeInfo }) {
         <a
           key={phone}
           href={`tel:${phone.replace(/[^+\d]/g, '')}`}
-          className="flex items-center gap-3 rounded-2xl border border-gray-200/80 bg-white/85 p-3 transition active:scale-[0.98] dark:border-white/[0.08] dark:bg-white/[0.045]"
+          className="flex items-center gap-2.5 rounded-mc-md border border-mc-border bg-mc-surface-2 p-2.5 transition active:scale-[0.98]"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-emerald-50 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-300">
-            <Phone className="h-5 w-5" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-mc-sm bg-mc-success/12 text-mc-success">
+            <Phone className="h-[18px] w-[18px]" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-black text-gray-950 dark:text-[#fff8ed]">
+            <span className="block text-[13px] font-extrabold text-mc-text">
               {phone}
             </span>
-            <span className="text-[11px] font-semibold text-gray-500 dark:text-white/45">
+            <span className="text-[11px] font-medium text-mc-text-2">
               {t('office.callHint')}
             </span>
           </span>
@@ -144,16 +144,16 @@ export function OfficeContacts({ office }: { office: OfficeInfo }) {
           href={`https://t.me/${office.telegram_username.replace(/^@/, '')}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3 rounded-2xl border border-gray-200/80 bg-white/85 p-3 transition active:scale-[0.98] dark:border-white/[0.08] dark:bg-white/[0.045]"
+          className="flex items-center gap-2.5 rounded-mc-md border border-mc-border bg-mc-surface-2 p-2.5 transition active:scale-[0.98]"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-sky-50 text-sky-600 dark:bg-sky-400/10 dark:text-sky-300">
-            <Send className="h-5 w-5" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-mc-sm bg-mc-brand-soft text-mc-brand">
+            <Send className="h-[18px] w-[18px]" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-black text-gray-950 dark:text-[#fff8ed]">
+            <span className="block text-[13px] font-extrabold text-mc-text">
               {t('office.adminChat')}
             </span>
-            <span className="text-[11px] font-semibold text-gray-500 dark:text-white/45">
+            <span className="text-[11px] font-medium text-mc-text-2">
               @{office.telegram_username.replace(/^@/, '')}
             </span>
           </span>
@@ -191,23 +191,23 @@ export function OfficeHomeStrip({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="mb-5 flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-left transition active:scale-[0.99] dark:border-white/[0.08] dark:bg-white/[0.04]"
+      className="mb-5 flex w-full items-center gap-3 rounded-mc-lg border border-mc-border bg-mc-surface px-3 py-2.5 text-left transition active:scale-[0.99]"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-400/10 dark:text-orange-300">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-mc-md bg-mc-brand-soft text-mc-brand">
         <MapPin className="h-[18px] w-[18px]" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="min-w-0 truncate text-[13px] font-black text-gray-950 dark:text-[#fff8ed]">
+          <span className="min-w-0 truncate text-[13px] font-black text-mc-text">
             {t('office.homeTitle')}
           </span>
           <OfficeOpenBadge office={office} compact />
         </span>
-        <span className="block truncate text-[11px] font-semibold text-gray-500 dark:text-white/45">
+        <span className="block truncate text-[11px] font-semibold text-mc-text-2">
           {subtitle}
         </span>
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-gray-400 dark:text-white/30" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-mc-text-3" />
     </button>
   );
 }
@@ -230,29 +230,29 @@ export function OfficeVisitSummary({ className = '' }: { className?: string }) {
 
   return (
     <div
-      className={`w-full max-w-xs mx-auto rounded-2xl border p-3 text-left ${
+      className={`w-full max-w-xs mx-auto rounded-mc-lg border p-3 text-left ${
         office.is_open_now
-          ? 'border-gray-200 bg-gray-50 dark:border-white/[0.08] dark:bg-white/[0.04]'
-          : 'border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10'
+          ? 'border-mc-border bg-mc-surface-2'
+          : 'border-mc-danger/25 bg-mc-danger-soft'
       } ${className}`}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-white/45">
-          <MapPin className="h-3.5 w-3.5" />
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.09em] text-mc-text-2">
+          <MapPin className="h-3 w-3" strokeWidth={2} />
           {t('office.visitTitle')}
         </span>
-        <OfficeOpenBadge office={office} />
+        <OfficeOpenBadge office={office} compact />
       </div>
-      <p className="text-[13px] font-bold leading-snug text-gray-900 dark:text-[#fff8ed]">
+      <p className="text-[12px] font-bold leading-snug text-mc-text">
         {office.address_text}
       </p>
       {office.landmark && (
-        <p className="mt-0.5 text-[11px] font-semibold text-gray-500 dark:text-white/45">
+        <p className="mt-0.5 text-[11px] font-medium text-mc-text-2">
           {office.landmark}
         </p>
       )}
       {!office.is_open_now && (
-        <p className="mt-2 flex items-start gap-1.5 text-[12px] font-bold text-red-700 dark:text-red-300">
+        <p className="mt-2 flex items-start gap-1.5 text-[11px] font-bold text-mc-danger">
           <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {t('office.closedWarning')}
         </p>
@@ -262,9 +262,9 @@ export function OfficeVisitSummary({ className = '' }: { className?: string }) {
           href={routeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 flex h-10 items-center justify-center gap-1.5 rounded-xl bg-gray-900 text-[13px] font-black text-white dark:bg-white dark:text-gray-900"
+          className="mt-2.5 flex h-9 items-center justify-center gap-1.5 rounded-mc-sm border border-mc-border bg-mc-surface text-[12px] font-extrabold text-mc-text transition active:scale-[0.98]"
         >
-          <MapPin className="h-4 w-4" />
+          <MapPin className="h-3.5 w-3.5" strokeWidth={2} />
           {t('office.route')}
         </a>
       )}

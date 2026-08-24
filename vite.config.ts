@@ -55,5 +55,18 @@ export default defineConfig({
     allowedHosts: [
       "huff-nape-expiring.ngrok-free.dev"
     ],
+    // Served through an HTTPS tunnel the page sits on 443, but the HMR client
+    // still dials the dev-server port on the tunnel host — nothing forwards
+    // that, the socket fails silently, and edits stop hot-applying. Pointing it
+    // at wss://<tunnel>:443 fixes it. Guarded by an env var so a plain
+    // `npm run dev` on localhost keeps Vite's own defaults:
+    //   VITE_TUNNEL_HOST=huff-nape-expiring.ngrok-free.dev npm run dev
+    hmr: process.env.VITE_TUNNEL_HOST
+      ? {
+          protocol: "wss",
+          host: process.env.VITE_TUNNEL_HOST,
+          clientPort: 443,
+        }
+      : undefined,
   },
 })

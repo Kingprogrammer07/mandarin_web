@@ -90,32 +90,32 @@ const DELIVERY_OPTIONS: DeliveryOption[] = [
     label: 'UzPost',
     descKey: 'deliveryRequest.options.uzpost',
     icon: <Mail className="w-8 h-8" />,
-    gradient: 'from-orange-500 to-amber-500',
-    iconBg: 'bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400',
+    gradient: 'from-mc-brand to-mc-brand-strong',
+    iconBg: 'bg-mc-brand-soft text-mc-brand',
   },
   {
     id: 'yandex',
     label: 'Yandex',
     descKey: 'deliveryRequest.options.yandex',
     icon: <Zap className="w-8 h-8" />,
-    gradient: 'from-red-500 to-rose-500',
-    iconBg: 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400',
+    gradient: 'from-mc-danger to-mc-danger',
+    iconBg: 'bg-mc-danger-soft text-mc-danger',
   },
   {
     id: 'mandarin',
     label: 'Mandarin Dostavka',
     descKey: 'deliveryRequest.options.mandarin',
     icon: <Package className="w-8 h-8" />,
-    gradient: 'from-emerald-500 to-green-500',
-    iconBg: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+    gradient: 'from-mc-success to-mc-success',
+    iconBg: 'bg-mc-success/12 text-mc-success',
   },
   {
     id: 'bts',
     label: 'BTS',
     descKey: 'deliveryRequest.options.bts',
     icon: <Truck className="w-8 h-8" />,
-    gradient: 'from-blue-500 to-sky-500',
-    iconBg: 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400',
+    gradient: 'from-mc-brand to-mc-brand-strong',
+    iconBg: 'bg-mc-brand-soft text-mc-brand',
   },
 ];
 
@@ -128,7 +128,7 @@ const FlightSkeleton = () => (
     {[1, 2, 3].map((i) => (
       <div
         key={i}
-        className="h-20 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse"
+        className="h-20 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse"
       />
     ))}
   </div>
@@ -136,10 +136,10 @@ const FlightSkeleton = () => (
 
 const CalcSkeleton = () => (
   <div className="space-y-4">
-    <div className="h-10 rounded-xl bg-gray-200 dark:bg-white/5 animate-pulse w-3/4" />
-    <div className="h-24 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
-    <div className="h-24 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
-    <div className="h-14 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
+    <div className="h-10 rounded-mc-md bg-mc-surface-2 dark:bg-white/5 animate-pulse w-3/4" />
+    <div className="h-24 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
+    <div className="h-24 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
+    <div className="h-14 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
   </div>
 );
 
@@ -200,6 +200,9 @@ async function compressReceiptImage(file: File): Promise<File> {
 // STEP INDICATOR
 // ============================================
 
+// Amber is a different hue from the brand orange every other client screen
+// uses; the tokens keep this wizard in the same palette as the card it was
+// opened from.
 const StepIndicator = memo(({ current, total }: { current: number; total: number }) => (
   <div className="flex items-center justify-center gap-2 mb-6">
     {Array.from({ length: total }, (_, i) => (
@@ -207,10 +210,10 @@ const StepIndicator = memo(({ current, total }: { current: number; total: number
         key={i}
         className={`h-1.5 rounded-full transition-all duration-500 ${
           i + 1 === current
-            ? 'w-8 bg-amber-500'
+            ? 'w-8 bg-mc-brand'
             : i + 1 < current
-            ? 'w-4 bg-amber-500/40'
-            : 'w-4 bg-gray-300 dark:bg-white/10'
+            ? 'w-4 bg-mc-brand/40'
+            : 'w-4 bg-mc-surface-2 dark:bg-white/10'
         }`}
       />
     ))}
@@ -227,7 +230,7 @@ const StepTypeSelection = memo(
     return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
       <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.type.title')}</h2>
-      <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+      <p className="text-mc-text-2 text-sm mb-6">
         {t('deliveryRequest.steps.type.subtitle')}
       </p>
 
@@ -237,18 +240,17 @@ const StepTypeSelection = memo(
             key={opt.id}
             onClick={() => onSelect(opt.id)}
             className="
-              relative overflow-hidden rounded-3xl p-5 text-left
-              bg-white dark:bg-white/5 border-2 border-transparent
-              hover:border-amber-400/60 dark:hover:border-amber-500/40
+              relative overflow-hidden rounded-mc-lg p-5 text-left
+              bg-mc-surface border-2 border-transparent
               active:scale-[0.96] transition-all duration-200
-              shadow-sm hover:shadow-lg group
+              shadow-sm group
               backdrop-blur-md
             "
           >
             {/* Gradient glow on hover */}
             <div
               className={`
-                absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300
+                absolute inset-0 opacity-0 transition-opacity duration-300
                 bg-gradient-to-br ${opt.gradient}
               `}
             />
@@ -256,17 +258,17 @@ const StepTypeSelection = memo(
             <div className="relative z-10">
               <div
                 className={`
-                  w-14 h-14 rounded-2xl flex items-center justify-center mb-4
+                  w-14 h-14 rounded-mc-lg flex items-center justify-center mb-4
                   ${opt.iconBg}
                 `}
               >
                 {opt.icon}
               </div>
               <h3 className="font-bold text-lg leading-tight mb-0.5">{opt.label}</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{t(opt.descKey)}</p>
+              <p className="text-xs text-mc-text-2">{t(opt.descKey)}</p>
             </div>
 
-            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 dark:text-white/15 group-hover:text-amber-500 transition-colors" />
+            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-mc-text-3 dark:text-white/15 transition-colors" />
           </button>
         ))}
       </div>
@@ -297,24 +299,24 @@ const StepFlightSelection = memo(
     return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
       <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.flight.title')}</h2>
-      <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+      <p className="text-mc-text-2 text-sm mb-6">
         {t('deliveryRequest.steps.flight.subtitle')}
       </p>
       {deliveryType === 'mandarin' && (
-        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mb-4 font-medium">
-          <Wallet className="w-4 h-4 text-emerald-500 dark:text-emerald-400 inline-block mr-1" />
+        <span className="inline-flex items-center gap-1 text-xs text-mc-success mb-4 font-medium">
+          <Wallet className="w-4 h-4 text-mc-success dark:text-mc-success inline-block mr-1" />
           {t('deliveryRequest.steps.flight.mandarinNote')}
         </span>
       )}
       {deliveryType === 'yandex' && (
-        <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mb-4 font-medium">
-          <Clock className="w-4 h-4 text-blue-500 dark:text-blue-400 inline-block mr-1" />
+        <span className="inline-flex items-center gap-1 text-xs text-mc-brand mb-4 font-medium">
+          <Clock className="w-4 h-4 text-mc-brand dark:text-mc-brand inline-block mr-1" />
           {t('deliveryRequest.steps.flight.yandexNote')}
         </span>
       )}
       {deliveryType === 'bts' && (
-        <span className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 mb-4 font-medium">
-          <Clock className="w-4 h-4 text-sky-500 dark:text-sky-400 inline-block mr-1" />
+        <span className="inline-flex items-center gap-1 text-xs text-mc-brand mb-4 font-medium">
+          <Clock className="w-4 h-4 text-mc-brand dark:text-mc-brand inline-block mr-1" />
           {t('deliveryRequest.steps.flight.btsNote')}
         </span>
       )}
@@ -325,21 +327,21 @@ const StepFlightSelection = memo(
            failed lands here with no way forward. Explain the rule and hand them
            the payment flow instead of an empty plane icon. */
         <div className="text-center py-16">
-          <Plane className="w-16 h-16 mx-auto text-gray-300 dark:text-white/15 mb-4" />
-          <p className="text-gray-500 dark:text-gray-400 font-semibold text-lg">
+          <Plane className="w-16 h-16 mx-auto text-mc-text-3 dark:text-white/15 mb-4" />
+          <p className="text-mc-text-2 font-semibold text-lg">
             {t('deliveryRequest.steps.flight.empty')}
           </p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1 max-w-xs mx-auto">
+          <p className="text-mc-text-3 text-sm mt-1 max-w-xs mx-auto">
             {t('deliveryRequest.steps.flight.emptyDesc')}
           </p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-3 max-w-xs mx-auto">
+          <p className="text-mc-text-3 text-sm mt-3 max-w-xs mx-auto">
             {t('deliveryRequest.steps.flight.emptyHint', "Zayavka qoldirish uchun avval yuk to'lovini amalga oshiring.")}
           </p>
           {onGoToPayment && (
             <button
               onClick={onGoToPayment}
-              className="mt-5 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl
-                bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold
+              className="mt-5 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-mc-lg
+                bg-gradient-to-r from-mc-brand to-mc-brand-strong text-mc-on-brand font-bold
                 shadow-lg shadow-amber-500/20 active:scale-[0.97] transition-all"
             >
               <Wallet className="w-5 h-5" />
@@ -356,25 +358,25 @@ const StepFlightSelection = memo(
                 key={f.flight_name}
                 onClick={() => onToggle(f.flight_name)}
                 className={`
-                  w-full flex items-center gap-4 p-4 rounded-2xl text-left
+                  w-full flex items-center gap-4 p-4 rounded-mc-lg text-left
                   transition-all duration-200 active:scale-[0.98]
                   border-2
                   ${
                     isChecked
-                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10 shadow-md shadow-amber-500/10'
-                      : 'border-transparent bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/8'
+                      ? 'border-mc-brand bg-mc-warn-soft shadow-md shadow-amber-500/10'
+                      : 'border-transparent bg-mc-surface'
                   }
                 `}
               >
                 {/* Checkbox */}
                 <div
                   className={`
-                    w-7 h-7 rounded-lg flex items-center justify-center shrink-0
+                    w-7 h-7 rounded-mc-sm flex items-center justify-center shrink-0
                     transition-all duration-200 border-2
                     ${
                       isChecked
-                        ? 'bg-amber-500 border-amber-500'
-                        : 'border-gray-300 dark:border-white/20 bg-transparent'
+                        ? 'bg-mc-brand border-mc-brand'
+                        : 'border-mc-border bg-transparent'
                     }
                   `}
                 >
@@ -384,10 +386,10 @@ const StepFlightSelection = memo(
                 {/* Flight Info */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-base">{f.flight_name}</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.flight.flightLabel')}</p>
+                  <p className="text-xs text-mc-text-2">{t('deliveryRequest.steps.flight.flightLabel')}</p>
                 </div>
 
-                <Plane className="w-5 h-5 text-gray-300 dark:text-white/15 shrink-0" />
+                <Plane className="w-5 h-5 text-mc-text-3 dark:text-white/15 shrink-0" />
               </button>
             );
           })}
@@ -399,8 +401,8 @@ const StepFlightSelection = memo(
         <button
           onClick={onBack}
           className="
-            flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center
-            bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300
+            flex-shrink-0 w-14 h-14 rounded-mc-lg flex items-center justify-center
+            bg-mc-surface-2 text-mc-text-2
             active:scale-95 transition-transform
           "
         >
@@ -410,13 +412,13 @@ const StepFlightSelection = memo(
           onClick={onContinue}
           disabled={selected.length === 0}
           className={`
-            flex-1 h-14 rounded-2xl font-bold text-base
+            flex-1 h-14 rounded-mc-lg font-bold text-base
             flex items-center justify-center gap-2
             transition-all duration-200 active:scale-[0.98]
             ${
               selected.length > 0
-                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25 hover:bg-amber-600'
-                : 'bg-gray-200 dark:bg-white/10 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                ? 'bg-mc-brand text-mc-on-brand shadow-lg shadow-amber-500/25'
+                : 'bg-mc-surface-2 text-mc-text-3 cursor-not-allowed'
             }
           `}
         >
@@ -490,13 +492,13 @@ const StepStandardConfirm = memo(
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
         <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.confirm.title')}</h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+        <p className="text-mc-text-2 text-sm mb-6">
           {t('deliveryRequest.steps.confirm.subtitle')}
         </p>
 
         {/* Phone Number */}
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
-          <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
+          <label className="flex items-center gap-2 text-xs font-bold text-mc-text-2 mb-2">
             <Phone className="w-3.5 h-3.5" />
             {t('deliveryRequest.steps.confirm.phoneLabel')}
           </label>
@@ -505,9 +507,9 @@ const StepStandardConfirm = memo(
             value={phoneNumber}
             onChange={(e) => onPhoneChange(e.target.value)}
             placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
-            className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+            className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
           />
-          <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+          <p className="mt-1.5 text-[11px] text-mc-text-3">
             {t('deliveryRequest.steps.confirm.phoneHint')}
           </p>
         </div>
@@ -517,22 +519,22 @@ const StepStandardConfirm = memo(
         <button
           type="button"
           onClick={() => onIncludeAddressChange(!includeAddress)}
-          className="w-full flex items-center justify-between gap-3 rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md text-left"
+          className="w-full flex items-center justify-between gap-3 rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md text-left"
         >
           <span className="flex items-center gap-2 min-w-0">
-            <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+            <MapPin className="w-4 h-4 text-mc-brand shrink-0" />
             <span className="min-w-0">
-              <span className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+              <span className="block text-sm font-bold text-mc-text dark:text-mc-text">
                 {t('deliveryRequest.steps.confirm.includeAddressLabel')}
               </span>
-              <span className="block text-[11px] text-gray-400 dark:text-gray-500">
+              <span className="block text-[11px] text-mc-text-3">
                 {t('deliveryRequest.steps.confirm.includeAddressHint')}
               </span>
             </span>
           </span>
           <span
             className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
-              includeAddress ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/20'
+              includeAddress ? 'bg-mc-brand' : 'bg-mc-surface-2 dark:bg-white/20'
             }`}
           >
             <span
@@ -544,8 +546,8 @@ const StepStandardConfirm = memo(
         </button>
 
         {/* Caption / Courier Note */}
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
-          <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
+          <label className="flex items-center gap-2 text-xs font-bold text-mc-text-2 mb-2">
             <MapPin className="w-3.5 h-3.5" />
             {t('deliveryRequest.steps.confirm.captionLabel')}
           </label>
@@ -554,16 +556,16 @@ const StepStandardConfirm = memo(
             onChange={(e) => onCaptionChange(e.target.value)}
             placeholder={t('deliveryRequest.steps.confirm.captionPlaceholder')}
             rows={4}
-            className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition resize-none"
+            className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition resize-none"
           />
-          <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+          <p className="mt-1.5 text-[11px] text-mc-text-3">
             {t('deliveryRequest.steps.confirm.captionHint')}
           </p>
         </div>
 
         {/* Map Picker — lazy loaded */}
         <div className="mb-4">
-          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+          <p className="text-xs font-bold text-mc-text-2 mb-2">
             {t('deliveryRequest.steps.confirm.mapLabel')}
           </p>
           <DeliveryMapPickerLazy
@@ -575,26 +577,26 @@ const StepStandardConfirm = memo(
         </div>
 
         {/* Summary Card */}
-        <div className="rounded-3xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-5 mb-4 backdrop-blur-md">
+        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-5 mb-4 backdrop-blur-md">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+            <div className="w-12 h-12 rounded-mc-lg bg-mc-warn-soft flex items-center justify-center text-mc-warn">
               <Truck className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.confirm.deliveryType')}</p>
+              <p className="text-xs text-mc-text-2">{t('deliveryRequest.steps.confirm.deliveryType')}</p>
               <h3 className="font-bold text-lg">{typeLabel}</h3>
             </div>
           </div>
 
-          <div className="border-t border-gray-100 dark:border-white/5 pt-4">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+          <div className="border-t border-mc-border pt-4">
+            <p className="text-xs text-mc-text-2 mb-2 font-medium">
               {t('deliveryRequest.steps.confirm.selectedFlights')}
             </p>
             <div className="flex flex-wrap gap-2">
               {selectedFlights.map((f) => (
                 <span
                   key={f}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 text-sm font-semibold"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-mc-md bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand text-sm font-semibold"
                 >
                   <Plane className="w-3.5 h-3.5" />
                   {f}
@@ -605,8 +607,8 @@ const StepStandardConfirm = memo(
         </div>
 
         {/* Info box */}
-        <div className="rounded-2xl bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 p-4 mb-6">
-          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+        <div className="rounded-mc-lg bg-mc-warn-soft dark:bg-mc-brand/5 border border-mc-warn/25 p-4 mb-6">
+          <p className="text-sm text-mc-warn font-medium">
             <Trans
               i18nKey="deliveryRequest.steps.confirm.infoMessage"
               values={{ type: typeLabel, flights: selectedFlights.join(', ') }}
@@ -620,8 +622,8 @@ const StepStandardConfirm = memo(
           <button
             onClick={onBack}
             className="
-              flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center
-              bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300
+              flex-shrink-0 w-14 h-14 rounded-mc-lg flex items-center justify-center
+              bg-mc-surface-2 text-mc-text-2
               active:scale-95 transition-transform
             "
           >
@@ -631,13 +633,13 @@ const StepStandardConfirm = memo(
             onClick={onSubmit}
             disabled={!canSubmit}
             className={`
-              flex-1 h-14 rounded-2xl font-bold text-base text-white
+              flex-1 h-14 rounded-mc-lg font-bold text-base
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
                 canSubmit
-                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
-                  : 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
+                  ? 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
+                  : 'bg-mc-surface-2 dark:bg-white/10 text-mc-text-2 cursor-not-allowed'
               }
             `}
           >
@@ -923,7 +925,7 @@ function StepUzpostPayment({
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
         <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.calcTitle')}</h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">{t('deliveryRequest.steps.uzpost.calcDesc')}</p>
+        <p className="text-mc-text-2 text-sm mb-6">{t('deliveryRequest.steps.uzpost.calcDesc')}</p>
         <CalcSkeleton />
       </div>
     );
@@ -935,20 +937,20 @@ function StepUzpostPayment({
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
         <h2 className="text-2xl font-extrabold mb-4">{t('deliveryRequest.steps.uzpost.warningTitle')}</h2>
 
-        <div className="rounded-3xl bg-red-50 dark:bg-red-500/10 border-2 border-red-200 dark:border-red-500/30 p-6 text-center mb-6">
-          <AlertTriangle className="w-16 h-16 mx-auto text-red-500 mb-4" />
-          <p className="text-red-700 dark:text-red-300 font-bold text-lg mb-2">
+        <div className="rounded-mc-lg bg-mc-danger-soft border-2 border-mc-danger/25 dark:border-mc-danger/30 p-6 text-center mb-6">
+          <AlertTriangle className="w-16 h-16 mx-auto text-mc-danger mb-4" />
+          <p className="text-mc-danger font-bold text-lg mb-2">
             {t('deliveryRequest.steps.uzpost.weightExceeded')}
           </p>
-          <p className="text-red-600 dark:text-red-400 text-sm">{calcData.warning}</p>
+          <p className="text-mc-danger text-sm">{calcData.warning}</p>
         </div>
 
         <button
           onClick={onBack}
           className="
-            w-full h-14 rounded-2xl font-bold text-base
+            w-full h-14 rounded-mc-lg font-bold text-base
             flex items-center justify-center gap-2
-            bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-200
+            bg-mc-surface-2 text-mc-text
             active:scale-[0.98] transition-all
           "
         >
@@ -992,7 +994,7 @@ function StepUzpostPayment({
                 type="button"
                 onClick={closeReceiptCamera}
                 disabled={isCapturingReceipt}
-                className="h-12 rounded-2xl border border-white/30 bg-white/10 px-5 font-bold text-white backdrop-blur-sm active:scale-95 disabled:opacity-60"
+                className="h-12 rounded-mc-lg border border-white/30 bg-white/10 px-5 font-bold text-white backdrop-blur-sm active:scale-95 disabled:opacity-60"
               >
                 {t('camera.cancel')}
               </button>
@@ -1000,7 +1002,7 @@ function StepUzpostPayment({
                 type="button"
                 onClick={captureReceiptPhoto}
                 disabled={isCapturingReceipt || !isCameraReady}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 font-bold text-white shadow-lg shadow-amber-500/30 active:scale-95 disabled:opacity-60"
+                className="flex h-12 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-6 font-bold text-mc-on-brand shadow-lg shadow-amber-500/30 active:scale-95 disabled:opacity-60"
               >
                 {isCapturingReceipt ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -1022,13 +1024,13 @@ function StepUzpostPayment({
       {cameraOverlay}
 
       <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.paymentTitle')}</h2>
-      <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+      <p className="text-mc-text-2 text-sm mb-4">
         {t('deliveryRequest.steps.uzpost.flightsFor', { flights: selectedFlights.join(', ') })}
       </p>
 
       {/* Optional phone number */}
-      <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
-        <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">
+      <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
+        <label className="flex items-center gap-2 text-xs font-bold text-mc-text-2 mb-2">
           <Phone className="w-3.5 h-3.5" />
           {t('deliveryRequest.steps.confirm.phoneLabel')}
         </label>
@@ -1037,9 +1039,9 @@ function StepUzpostPayment({
           value={phoneNumber}
           onChange={(e) => onPhoneChange(e.target.value)}
           placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
-          className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+          className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
         />
-        <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+        <p className="mt-1.5 text-[11px] text-mc-text-3">
           {t('deliveryRequest.steps.uzpost.phoneHint')}
         </p>
       </div>
@@ -1048,8 +1050,8 @@ function StepUzpostPayment({
         <Suspense
           fallback={
             <div className="space-y-3">
-              <div className="h-12 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
-              <div className="h-64 rounded-2xl bg-gray-200 dark:bg-white/5 animate-pulse" />
+              <div className="h-12 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
+              <div className="h-64 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
             </div>
           }
         >
@@ -1068,13 +1070,13 @@ function StepUzpostPayment({
       {/* Summary Grid — shown only after branch selected and calc completed */}
       {calcData && (
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
+          <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 backdrop-blur-md">
+            <p className="text-xs text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
             <p className="text-xl font-extrabold">{calcData.total_weight} kg</p>
           </div>
-          <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 backdrop-blur-md">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
-            <p className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
+          <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 backdrop-blur-md">
+            <p className="text-xs text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
+            <p className="text-xl font-extrabold text-mc-warn">
               {calcData.total_amount.toLocaleString()} so'm
             </p>
           </div>
@@ -1083,9 +1085,9 @@ function StepUzpostPayment({
 
       {/* Offline estimate notice — UzPost pricing API was unreachable. */}
       {calcData?.fallback && (
-        <div className="flex items-start gap-2 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-3 mb-4">
-          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-amber-700 dark:text-amber-300 text-xs">
+        <div className="flex items-start gap-2 rounded-mc-lg bg-mc-warn-soft border border-mc-warn/25 dark:border-mc-brand/30 p-3 mb-4">
+          <AlertTriangle className="w-4 h-4 text-mc-brand shrink-0 mt-0.5" />
+          <p className="text-mc-warn text-xs">
             {t('deliveryRequest.steps.uzpost.estimateNote')}
           </p>
         </div>
@@ -1093,15 +1095,15 @@ function StepUzpostPayment({
 
       {/* Wallet Toggle — shown only after calc completed */}
       {calcData && (
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
+        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400">
+              <div className="w-10 h-10 rounded-mc-md bg-mc-brand-soft flex items-center justify-center text-mc-brand">
                 <Wallet className="w-5 h-5" />
               </div>
               <div>
                 <p className="font-bold text-sm">{t('deliveryRequest.steps.uzpost.walletPay')}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-mc-text-2">
                   {t('deliveryRequest.steps.uzpost.walletBalance', { balance: calcData.wallet_balance.toLocaleString() })}
                 </p>
               </div>
@@ -1112,7 +1114,7 @@ function StepUzpostPayment({
               onClick={() => setUseWallet(!useWallet)}
               className={`
                 relative w-14 h-8 rounded-full transition-colors duration-300
-                ${useWallet ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/15'}
+                ${useWallet ? 'bg-mc-brand' : 'bg-mc-surface-2 dark:bg-white/15'}
               `}
             >
               <div
@@ -1126,15 +1128,15 @@ function StepUzpostPayment({
           </div>
 
           {useWallet && (
-            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 space-y-1">
+            <div className="mt-3 pt-3 border-t border-mc-border space-y-1">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
+                <span className="font-bold text-mc-success">
                   -{formatUzs(walletApplied)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
+                <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
                 <span className="font-extrabold text-lg">
                   {formatUzs(remaining)}
                 </span>
@@ -1150,10 +1152,10 @@ function StepUzpostPayment({
           <button
             type="button"
             onClick={() => setPayMethod('online')}
-            className={`h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+            className={`h-12 rounded-mc-lg text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
               payMethod === 'online'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300'
+                ? 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
+                : 'bg-mc-surface-2 text-mc-text-2'
             }`}
           >
             <CreditCard className="w-4 h-4" />
@@ -1162,10 +1164,10 @@ function StepUzpostPayment({
           <button
             type="button"
             onClick={() => setPayMethod('manual')}
-            className={`h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+            className={`h-12 rounded-mc-lg text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
               payMethod === 'manual'
-                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
-                : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300'
+                ? 'bg-mc-brand text-mc-on-brand shadow-lg shadow-amber-500/25'
+                : 'bg-mc-surface-2 text-mc-text-2'
             }`}
           >
             <Upload className="w-4 h-4" />
@@ -1176,9 +1178,9 @@ function StepUzpostPayment({
 
       {/* Online (NBU) payment panel */}
       {onlineMode && (
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4">
+        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-mc-text-2">
               {t('deliveryRequest.steps.uzpost.remainingPayment')}
             </span>
             <span className="font-extrabold text-lg">{formatUzs(remaining)}</span>
@@ -1186,7 +1188,7 @@ function StepUzpostPayment({
 
           {savedCards.length > 0 && (
             <div className="space-y-2 mb-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+              <p className="text-xs text-mc-text-2 font-medium">
                 {t('deliveryRequest.steps.uzpost.savedCards')}
               </p>
               {savedCards.map((card) => (
@@ -1195,13 +1197,13 @@ function StepUzpostPayment({
                   type="button"
                   disabled={submitting}
                   onClick={() => onChargeCard(card.id, walletApplied, phoneNumber)}
-                  className="w-full h-12 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-between px-4 text-sm font-semibold active:scale-[0.98] transition disabled:opacity-50"
+                  className="w-full h-12 rounded-mc-lg bg-mc-surface-2 border border-mc-border flex items-center justify-between px-4 text-sm font-semibold active:scale-[0.98] transition disabled:opacity-50"
                 >
                   <span className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-emerald-500" />
+                    <CreditCard className="w-4 h-4 text-mc-success" />
                     {card.card_masked || card.nickname || t('deliveryRequest.steps.uzpost.cardFallback')}
                   </span>
-                  <span className="text-emerald-600 dark:text-emerald-400">
+                  <span className="text-mc-success">
                     {t('deliveryRequest.steps.uzpost.payButton')}
                   </span>
                 </button>
@@ -1209,7 +1211,7 @@ function StepUzpostPayment({
             </div>
           )}
 
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+          <p className="text-xs text-mc-text-3">
             {t('deliveryRequest.steps.uzpost.nbuPaymentDescription')}
           </p>
         </div>
@@ -1217,8 +1219,8 @@ function StepUzpostPayment({
 
       {/* Card Info (manual transfer only) */}
       {!onlineMode && calcData && !fullyCoveredByWallet && calcData.card && (
-        <div className="rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-4 mb-4 backdrop-blur-md">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
+          <p className="text-xs text-mc-text-2 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.paymentCard')}
           </p>
           <div className="flex items-center justify-between">
@@ -1226,15 +1228,15 @@ function StepUzpostPayment({
               <p className="font-mono font-bold text-lg tracking-wider">
                 {calcData.card.card_number}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-mc-text-2">
                 {calcData.card.card_owner}
               </p>
             </div>
             <button
               onClick={() => handleCopy(calcData.card!.card_number)}
               className="
-                w-11 h-11 rounded-xl flex items-center justify-center
-                bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400
+                w-11 h-11 rounded-mc-md flex items-center justify-center
+                bg-mc-warn-soft text-mc-warn
                 active:scale-90 transition-transform
               "
             >
@@ -1247,22 +1249,22 @@ function StepUzpostPayment({
       {/* File Upload (manual transfer only, when payment remains) */}
       {!onlineMode && !fullyCoveredByWallet && (
         <div className="mb-6">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">
+          <p className="text-xs text-mc-text-2 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.uploadReceipt')}
           </p>
 
           {receiptFile ? (
-            <div className="rounded-2xl bg-white dark:bg-white/5 border-2 border-dashed border-emerald-400 dark:border-emerald-500/40 p-4">
+            <div className="rounded-mc-lg bg-mc-surface border-2 border-dashed border-mc-success dark:border-mc-success/40 p-4">
               {preview ? (
                 <div className="relative mb-3">
                   <img
                     src={preview}
                     alt="Receipt preview"
-                    className="w-full max-h-48 object-contain rounded-xl"
+                    className="w-full max-h-48 object-contain rounded-mc-md"
                   />
                   <button
                     onClick={clearFile}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center active:scale-90 transition-transform shadow-lg"
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-mc-danger-fill text-mc-on-danger flex items-center justify-center active:scale-90 transition-transform shadow-lg"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1270,19 +1272,19 @@ function StepUzpostPayment({
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-emerald-500" />
+                    <FileText className="w-8 h-8 text-mc-success" />
                     <div>
                       <p className="font-semibold text-sm truncate max-w-[200px]">
                         {receiptFile.name}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-mc-text-3">
                         {(receiptFile.size / 1024).toFixed(0)} KB
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={clearFile}
-                    className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-500/20 text-red-500 flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-8 h-8 rounded-full bg-mc-danger-soft text-mc-danger flex items-center justify-center active:scale-90 transition-transform"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1290,29 +1292,29 @@ function StepUzpostPayment({
               )}
             </div>
           ) : receiptProcessing ? (
-            <div className="w-full rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/[0.06] p-8 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-              <p className="font-bold text-sm text-amber-700 dark:text-amber-300">
+            <div className="w-full rounded-mc-lg border-2 border-dashed border-mc-warn/30 bg-mc-warn-soft dark:bg-mc-brand/[0.06] p-8 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-mc-brand" />
+              <p className="font-bold text-sm text-mc-warn">
                 {t('deliveryRequest.steps.uzpost.compressingReceipt')}
               </p>
             </div>
           ) : (
             <div
               className="
-                w-full rounded-2xl border-2 border-dashed
-                border-gray-300 dark:border-white/15
-                bg-gray-50 dark:bg-white/[0.02]
+                w-full rounded-mc-lg border-2 border-dashed
+                border-mc-border dark:border-white/15
+                bg-mc-surface-2
                 p-5 flex flex-col gap-3
               "
             >
               <div className="text-center">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center text-amber-500 mb-3">
+                <div className="w-14 h-14 mx-auto rounded-mc-lg bg-mc-warn-soft flex items-center justify-center text-mc-brand mb-3">
                   <Upload className="w-7 h-7" />
                 </div>
-                <p className="font-bold text-sm text-gray-700 dark:text-gray-200">
+                <p className="font-bold text-sm text-mc-text">
                   {t('deliveryRequest.steps.uzpost.uploadButton')}
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                <p className="text-xs text-mc-text-3 mt-0.5">
                   {t('deliveryRequest.steps.uzpost.uploadHint')}
                 </p>
               </div>
@@ -1321,15 +1323,15 @@ function StepUzpostPayment({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-12 rounded-2xl bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                  className="h-12 rounded-mc-lg bg-white dark:bg-white/10 border border-mc-border text-sm font-bold text-mc-text flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
-                  <Upload className="w-4 h-4 text-amber-500" />
+                  <Upload className="w-4 h-4 text-mc-brand" />
                   {t('deliveryRequest.steps.uzpost.uploadGalleryButton')}
                 </button>
                 <button
                   type="button"
                   onClick={openReceiptCamera}
-                  className="h-12 rounded-2xl bg-amber-500 text-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-500/20"
+                  className="h-12 rounded-mc-lg bg-mc-brand text-mc-on-brand text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-500/20"
                 >
                   <Camera className="w-4 h-4" />
                   {t('deliveryRequest.steps.uzpost.uploadCameraButton')}
@@ -1353,8 +1355,8 @@ function StepUzpostPayment({
         <button
           onClick={onBack}
           className="
-            flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center
-            bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300
+            flex-shrink-0 w-14 h-14 rounded-mc-lg flex items-center justify-center
+            bg-mc-surface-2 text-mc-text-2
             active:scale-95 transition-transform
           "
         >
@@ -1365,13 +1367,13 @@ function StepUzpostPayment({
             onClick={() => onPayOnline(walletApplied, phoneNumber)}
             disabled={submitting || !selectedBranch || !calcData}
             className={`
-              flex-1 h-14 rounded-2xl font-bold text-base text-white
+              flex-1 h-14 rounded-mc-lg font-bold text-base
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
                 submitting || !selectedBranch || !calcData
-                  ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
+                  ? 'bg-mc-surface-2 text-mc-text-2 cursor-not-allowed'
+                  : 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
               }
             `}
           >
@@ -1389,13 +1391,13 @@ function StepUzpostPayment({
             onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
             disabled={submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)}
             className={`
-              flex-1 h-14 rounded-2xl font-bold text-base text-white
+              flex-1 h-14 rounded-mc-lg font-bold text-base
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
                 submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)
-                  ? 'bg-gray-300 dark:bg-white/10 text-gray-500 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25'
+                  ? 'bg-mc-surface-2 text-mc-text-2 cursor-not-allowed'
+                  : 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
               }
             `}
           >
@@ -1422,20 +1424,20 @@ const StepSuccess = memo(({ onGoHome }: { onGoHome: () => void }) => {
   const { t } = useTranslation();
   return (
   <div className="animate-in fade-in zoom-in-95 duration-500 text-center py-8">
-    <div className="w-24 h-24 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center mb-6">
-      <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+    <div className="w-24 h-24 mx-auto rounded-full bg-mc-success/12 flex items-center justify-center mb-6">
+      <CheckCircle2 className="w-14 h-14 text-mc-success" />
     </div>
     <h2 className="text-2xl font-extrabold mb-2">{t('deliveryRequest.steps.success.title')}</h2>
-    <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs mx-auto mb-8">
+    <p className="text-mc-text-2 text-sm max-w-xs mx-auto mb-8">
       {t('deliveryRequest.steps.success.desc')}
     </p>
 
     <button
       onClick={onGoHome}
       className="
-        w-full max-w-xs mx-auto h-14 rounded-2xl font-bold text-base text-white
+        w-full max-w-xs mx-auto h-14 rounded-mc-lg font-bold text-base text-mc-on-brand
         flex items-center justify-center gap-2
-        bg-amber-500 hover:bg-amber-600 active:scale-[0.98]
+        bg-mc-brand active:scale-[0.98]
         shadow-lg shadow-amber-500/25 transition-all duration-200
       "
     >
@@ -1454,24 +1456,24 @@ const ProfileIncompleteAlert = memo(
     const { t } = useTranslation();
     return (
     <div className="animate-in fade-in zoom-in-95 duration-400 text-center py-8">
-      <div className="w-20 h-20 mx-auto rounded-full bg-red-100 dark:bg-red-500/15 flex items-center justify-center mb-5">
-        <UserCog className="w-10 h-10 text-red-500" />
+      <div className="w-20 h-20 mx-auto rounded-full bg-mc-danger-soft flex items-center justify-center mb-5">
+        <UserCog className="w-10 h-10 text-mc-danger" />
       </div>
       <h2 className="text-xl font-extrabold mb-2">{t('deliveryRequest.profile.title')}</h2>
-      <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs mx-auto mb-2">
+      <p className="text-mc-text-2 text-sm max-w-xs mx-auto mb-2">
         {t('deliveryRequest.profile.desc')}
       </p>
 
       {missingFields.length > 0 && (
         <div className="max-w-xs mx-auto mb-6">
-          <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 text-left">
-            <p className="text-xs font-bold text-red-700 dark:text-red-400 mb-1.5">
+          <div className="rounded-mc-md bg-mc-danger-soft border border-mc-danger/25 p-3 text-left">
+            <p className="text-xs font-bold text-mc-danger dark:text-mc-danger mb-1.5">
               Quyidagi maydonlar to'ldirilmagan:
             </p>
             <ul className="space-y-1">
               {missingFields.map((field) => (
-                <li key={field} className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                <li key={field} className="flex items-center gap-1.5 text-xs text-mc-danger dark:text-mc-danger">
+                  <span className="w-1.5 h-1.5 rounded-full bg-mc-danger shrink-0" />
                   {field}
                 </li>
               ))}
@@ -1485,9 +1487,9 @@ const ProfileIncompleteAlert = memo(
           <button
             onClick={onGoProfile}
             className="
-              w-full h-14 rounded-2xl font-bold text-base text-white
+              w-full h-14 rounded-mc-lg font-bold text-base text-mc-on-brand
               flex items-center justify-center gap-2
-              bg-blue-500 hover:bg-blue-600 active:scale-[0.98]
+              bg-mc-brand active:scale-[0.98]
               shadow-lg shadow-blue-500/25 transition-all duration-200
             "
           >
@@ -1498,9 +1500,9 @@ const ProfileIncompleteAlert = memo(
         <button
           onClick={onBack}
           className="
-            w-full h-14 rounded-2xl font-bold text-base
+            w-full h-14 rounded-mc-lg font-bold text-base
             flex items-center justify-center gap-2
-            bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-200
+            bg-mc-surface-2 text-mc-text
             active:scale-[0.98] transition-all
           "
         >
@@ -1912,7 +1914,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => setProfileIncomplete(false)}
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-white/5 active:scale-90 transition-transform"
+            className="w-10 h-10 rounded-mc-md flex items-center justify-center bg-mc-surface-2 active:scale-90 transition-transform"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -1935,24 +1937,35 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
   }
 
   return (
-    <div className="pb-8">
+    // The page had no shell of its own: no background, no width limit and no
+    // horizontal padding, so its content ran to the screen edges while every
+    // other client screen sat in a max-w-lg column.
+    <div className="min-h-dvh bg-mc-bg">
+      <div className="mx-auto max-w-lg px-4 pb-8 pt-3">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex min-w-0 items-center gap-2.5">
           <button
             onClick={currentStep === 1 ? onBack : goBackStep}
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 dark:bg-white/5 active:scale-90 transition-transform"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-sm
+                       bg-mc-surface-2 text-mc-text transition-transform duration-150
+                       active:scale-95"
+            aria-label={t('deliveryRequest.back', 'Ortga')}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={2} />
           </button>
-          <h1 className="text-lg font-bold">{t('deliveryRequest.headerTitle')}</h1>
+          <h1 className="min-w-0 truncate text-[16px] font-extrabold text-mc-text">
+            {t('deliveryRequest.headerTitle')}
+          </h1>
         </div>
         {onNavigateToHistory && (
           <button
             onClick={onNavigateToHistory}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/5 text-xs font-semibold text-gray-600 dark:text-gray-300 active:scale-95 transition-transform hover:bg-gray-200 dark:hover:bg-white/10"
+            className="flex shrink-0 items-center gap-1.5 rounded-mc-sm bg-mc-surface-2
+                       px-2.5 py-2 text-[12px] font-bold text-mc-text-2
+                       transition-transform duration-150 active:scale-95"
           >
-            <Clock className="w-3.5 h-3.5" />
+            <Clock className="h-3.5 w-3.5" />
             {t('deliveryRequest.historyButton')}
           </button>
         )}
@@ -2031,6 +2044,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           user={userProfile}
         />
       )}
+    </div>
     </div>
   );
 }

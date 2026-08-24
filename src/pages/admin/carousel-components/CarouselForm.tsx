@@ -465,7 +465,7 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
           <input
             {...register('gradient')}
             placeholder="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-            className={`${inputClass} font-mono text-[12px]`}
+            className={`${inputClass} font-mono text-[16px]`}
           />
         </div>
 

@@ -109,13 +109,13 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
     const inp = [
         'h-12 rounded-[16px]',
-        'border border-gray-900/[0.07] dark:border-white/[0.085]',
-        'bg-white dark:bg-[#10151f]',
-        'text-gray-950 dark:text-[#fff8ed]',
-        'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+        'border border-mc-border dark:border-white/[0.085]',
+        'bg-mc-surface',
+        'text-mc-text',
+        'placeholder:text-mc-text-3 dark:placeholder:text-mc-text-2',
         'transition-colors duration-150',
         'shadow-[inset_0_2px_8px_rgba(15,23,42,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-        'focus:border-orange-500/70 focus:ring-2 focus:ring-orange-500/15 focus:ring-offset-0 focus:outline-none',
+        'focus:border-mc-brand/70 focus:ring-2 focus:ring-mc-brand/20 focus:ring-offset-0 focus:outline-none',
     ].join(' ');
 
     const currentDistricts = useMemo(() => formData.region ? DISTRICTS[formData.region] || [] : [], [formData.region]);
@@ -124,16 +124,16 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent
                 showCloseButton={false}
-                className="top-auto bottom-0 left-0 max-h-[88svh] w-full max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-b-none rounded-t-[30px] border border-gray-900/[0.07] bg-white/96 p-0 shadow-[0_-24px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:max-w-[460px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[30px] sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0 dark:border-white/[0.09] dark:bg-[#0a0e15]/96 dark:shadow-[0_-24px_70px_rgba(0,0,0,0.42)]"
+                className="top-auto bottom-0 left-0 max-h-[88svh] w-full max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-b-none rounded-t-mc-xl border border-mc-border bg-mc-surface p-0 shadow-[var(--mc-shadow-card)] backdrop-blur-xl data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:max-w-[460px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-mc-xl sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0"
             >
-                <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-gray-950/10 sm:hidden dark:bg-white/14" />
+                <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-mc-surface-2 sm:hidden dark:bg-white/14" />
                 <DialogHeader className="px-5 pb-2 pt-4 text-left sm:px-6">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <DialogTitle className="text-[22px] font-black tracking-normal text-gray-950 dark:text-[#fff8ed]">
+                            <DialogTitle className="text-[22px] font-black tracking-normal text-mc-text">
                                 {t('profile.edit.title')}
                             </DialogTitle>
-                            <DialogDescription className="mt-1 text-[13px] font-semibold leading-snug text-gray-500 dark:text-[#fff8ed]/56">
+                            <DialogDescription className="mt-1 text-[13px] font-semibold leading-snug text-mc-text-2/56">
                         {t('profile.edit.description')}
                     </DialogDescription>
                         </div>
@@ -142,7 +142,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                             variant="ghost"
                             size="icon"
                             onClick={onClose}
-                            className="h-10 w-10 shrink-0 rounded-full bg-gray-950/[0.04] text-gray-700 hover:bg-gray-950/[0.07] dark:bg-white/[0.06] dark:text-[#fff8ed]/72 dark:hover:bg-white/[0.1]"
+                            className="h-10 w-10 shrink-0 rounded-full bg-mc-surface-2 text-mc-text"
                             aria-label={t('profile.edit.cancel')}
                         >
                             <X className="h-5 w-5" />
@@ -152,7 +152,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
                 <form onSubmit={handleSubmit} className="max-h-[calc(88svh-92px)] space-y-4 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-2 sm:px-6">
                     <div className="space-y-2">
-                        <Label htmlFor="full_name" className="text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">{t('profile.edit.fullName')}</Label>
+                        <Label htmlFor="full_name" className="text-[12px] font-black text-mc-text/76">{t('profile.edit.fullName')}</Label>
                         <Input
                             id="full_name"
                             value={formData.full_name}
@@ -163,7 +163,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">{t('profile.edit.phone')}</Label>
+                        <Label htmlFor="phone" className="text-[12px] font-black text-mc-text/76">{t('profile.edit.phone')}</Label>
                         <Input
                             id="phone"
                             value={formData.phone}
@@ -176,20 +176,20 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
                     {/* Region Select */}
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-2 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
-                            <MapPin className="w-4 h-4 text-orange-500" />
+                        <Label className="flex items-center gap-2 text-[12px] font-black text-mc-text/76">
+                            <MapPin className="w-4 h-4 text-mc-brand" />
                             {t('profile.edit.region')}
                         </Label>
                         <Select onValueChange={handleRegionChange} value={formData.region}>
                             <SelectTrigger className={`${inp} w-full`}>
                                 <SelectValue placeholder={t('form.regionPlaceholder')} />
                             </SelectTrigger>
-                            <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-gray-900/[0.08] bg-white shadow-xl dark:border-white/[0.09] dark:bg-[#10151f]">
+                            <SelectContent className="max-h-60 overflow-hidden rounded-mc-lg border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
                                 {regions.map((r) => (
                                     <SelectItem
                                         key={r.value}
                                         value={r.value}
-                                        className="cursor-pointer rounded-lg hover:bg-orange-50 dark:text-[#fff8ed] dark:hover:bg-orange-500/10"
+                                        className="cursor-pointer rounded-mc-sm"
                                     >
                                         {t(r.label)}
                                     </SelectItem>
@@ -200,8 +200,8 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
 
                     {/* District Select */}
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-2 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
-                            <MapPin className="w-4 h-4 text-orange-500 opacity-50" />
+                        <Label className="flex items-center gap-2 text-[12px] font-black text-mc-text/76">
+                            <MapPin className="w-4 h-4 text-mc-brand opacity-50" />
                             {t('profile.edit.district')}
                         </Label>
                         <Select
@@ -213,12 +213,12 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                             <SelectTrigger className={`${inp} w-full`}>
                                 <SelectValue placeholder={t('form.districtPlaceholder')} />
                             </SelectTrigger>
-                            <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-gray-900/[0.08] bg-white shadow-xl dark:border-white/[0.09] dark:bg-[#10151f]">
+                            <SelectContent className="max-h-60 overflow-hidden rounded-mc-lg border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
                                 {currentDistricts.map((d) => (
                                     <SelectItem
                                         key={d.value}
                                         value={d.value}
-                                        className="cursor-pointer rounded-lg hover:bg-orange-50 dark:text-[#fff8ed] dark:hover:bg-orange-500/10"
+                                        className="cursor-pointer rounded-mc-sm"
                                     >
                                         {t(d.label)}
                                     </SelectItem>
@@ -228,7 +228,7 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="address" className="text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">{t('profile.edit.address')}</Label>
+                        <Label htmlFor="address" className="text-[12px] font-black text-mc-text/76">{t('profile.edit.address')}</Label>
                         <Input
                             id="address"
                             value={formData.address}
@@ -237,11 +237,11 @@ export const EditProfileModal = ({ isOpen, onClose, user }: EditProfileModalProp
                         />
                     </div>
 
-                    <DialogFooter className="sticky bottom-0 -mx-5 mt-6 border-t border-gray-900/[0.06] bg-white/92 px-5 pt-4 pb-5 backdrop-blur-xl sm:-mx-6 sm:px-6 dark:border-white/[0.08] dark:bg-[#0a0e15]/92">
-                        <Button type="button" variant="outline" onClick={onClose} className="h-12 rounded-[16px] border-gray-200 bg-white dark:border-white/10 dark:bg-white/[0.04] dark:text-[#fff8ed]/76">
+                    <DialogFooter className="sticky bottom-0 -mx-5 mt-6 border-t border-mc-border bg-mc-surface px-5 pt-4 pb-5 backdrop-blur-xl sm:-mx-6 sm:px-6">
+                        <Button type="button" variant="outline" onClick={onClose} className="h-12 rounded-mc-md border-mc-border bg-mc-surface-2 text-mc-text">
                             {t('profile.edit.cancel')}
                         </Button>
-                        <Button type="submit" disabled={isPending} className="h-12 rounded-[16px] bg-orange-500 font-black text-white shadow-[0_12px_24px_rgba(249,115,22,0.22)] hover:bg-orange-600">
+                        <Button type="submit" disabled={isPending} className="h-12 rounded-[16px] bg-mc-brand font-black text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]">
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {t('profile.edit.save')}
                         </Button>

@@ -254,7 +254,7 @@ export default function MarkTakenModal({
                         value={field.value ?? ""}
                         rows={3}
                         placeholder="Masalan: Telegram guruhi uchun isbot yuklandi..."
-                        className="w-full p-3.5 rounded-2xl border-2 text-[13px] bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.07] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-orange-400 dark:focus:border-orange-500/50 outline-none resize-none transition-all"
+                        className="w-full p-3.5 rounded-2xl border-2 text-[16px] bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/[0.07] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:bg-white dark:focus:bg-[#1a1a1a] focus:border-orange-400 dark:focus:border-orange-500/50 outline-none resize-none transition-all"
                       />
                     )}
                   />

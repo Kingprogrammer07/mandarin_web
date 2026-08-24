@@ -112,40 +112,46 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
 
   const statusClass =
     summaryStatus === "taken"
-      ? "border-slate-200 bg-slate-100 text-slate-700 dark:border-white/12 dark:bg-white/10 dark:text-slate-200"
+      ? "border-mc-border bg-mc-surface-2 text-mc-text-2"
       : summaryStatus === "reportReady" || summaryStatus === "inUzb"
-        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300"
+        ? "border-mc-success/25 bg-mc-success/12 text-mc-success"
         : summaryStatus === "inChina"
-          ? "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300"
-          : "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.07] dark:text-slate-300";
+          ? "border-mc-brand/25 bg-mc-brand-soft text-mc-brand"
+          : "border-mc-border bg-mc-surface-2 text-mc-text-2";
 
   return (
     <motion.div
       layout
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
       onClick={() => setExpanded((value) => !value)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        setExpanded((value) => !value);
+      }}
       className={[
-        "overflow-hidden rounded-3xl border bg-white shadow-sm transition-all duration-200 active:scale-[0.995]",
-        "dark:bg-[#0b1018] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_34px_rgba(0,0,0,0.22)]",
-        expanded
-          ? "border-orange-300 ring-4 ring-orange-500/10 dark:border-orange-300/35"
-          : "border-slate-200 dark:border-white/[0.12]",
+        "overflow-hidden rounded-mc-lg border bg-mc-surface shadow-[var(--mc-shadow-card)]",
+        "transition-colors duration-200 active:scale-[0.995]",
+        expanded ? "border-mc-brand/35 ring-2 ring-mc-brand/15" : "border-mc-border",
       ].join(" ")}
     >
-      <div className="space-y-3 p-4 sm:p-5">
+      <div className="space-y-2.5 p-3.5">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.09em] text-mc-text-3">
               {t("tracking.resultLabel")}
             </p>
-            <h3 className="truncate font-mono text-2xl font-black tracking-normal text-slate-950 sm:text-3xl dark:text-white">
+            <h3 className="truncate font-mono text-[22px] font-extrabold leading-tight text-mc-text">
               {data.track_code}
             </h3>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass}`}>
+              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold ${statusClass}`}>
                 {t(`cargoStatus.${summaryStatus}`)}
               </span>
               {primaryItem?.flight_name && (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300">
+                <span className="rounded-full border border-mc-border bg-mc-surface-2 px-2.5 py-0.5 text-[11px] font-bold text-mc-text-2">
                   {t("cargoHistory.flight", { name: primaryItem.flight_name })}
                 </span>
               )}
@@ -154,31 +160,31 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
 
           <motion.div
             animate={{ rotate: expanded ? 180 : 0 }}
-            className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.05]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-md border border-mc-border bg-mc-surface-2"
           >
-            <ChevronDown className="size-5 text-slate-400" />
+            <ChevronDown className="h-[18px] w-[18px] text-mc-text-2" strokeWidth={2} />
           </motion.div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.035]">
+        <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3">
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-black text-slate-900 dark:text-white">
+              <p className="truncate text-[13px] font-extrabold text-mc-text">
                 {getStepTitle(activeStep, t)}
               </p>
-              <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-[11px] font-medium text-mc-text-2">
                 {getStatusLabel(activeStep.visualStatus, t)}
               </p>
             </div>
-            <span className="font-mono text-sm font-black text-orange-600 dark:text-orange-300">
+            <span className="font-mono text-[13px] font-extrabold tabular-nums text-mc-brand">
               {progressPercentage}%
             </span>
           </div>
 
           <div className="relative grid grid-cols-6 gap-1">
-            <div className="absolute left-[8%] right-[8%] top-3.5 h-1 rounded-full bg-slate-200 dark:bg-white/10" />
+            <div className="absolute left-[8%] right-[8%] top-3.5 h-1 rounded-full bg-mc-border" />
             <div
-              className="absolute left-[8%] top-3.5 h-1 max-w-[84%] rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all"
+              className="absolute left-[8%] top-3.5 h-1 max-w-[84%] rounded-full bg-gradient-to-r from-mc-brand to-mc-brand-strong transition-all"
               style={{ width: `${Math.min(progressPercentage * 0.84, 84)}%` }}
             />
             {visualSteps.map((step, index) => {
@@ -190,15 +196,15 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
                 <div key={step.step} className="relative z-10 flex justify-center">
                   <span
                     className={[
-                      "flex size-9 items-center justify-center rounded-xl border text-xs font-black transition",
+                      "flex h-8 w-8 items-center justify-center rounded-mc-sm border transition-colors",
                       isCompleted
-                        ? "border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                        ? "border-mc-success bg-mc-success text-mc-on-success"
                         : isActive
-                          ? "border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-500/20 ring-4 ring-amber-500/15"
-                          : "border-slate-200 bg-white text-slate-300 dark:border-white/10 dark:bg-[#0b1018] dark:text-slate-600",
+                          ? "border-mc-brand bg-mc-brand text-mc-on-brand ring-4 ring-mc-brand/15"
+                          : "border-mc-border bg-mc-surface text-mc-text-3",
                     ].join(" ")}
                   >
-                    {isCompleted ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
+                    {isCompleted ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} /> : <Icon className="h-4 w-4" strokeWidth={2} />}
                   </span>
                 </div>
               );
@@ -215,7 +221,7 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.22, ease: "easeInOut" }}
           >
-            <div className="space-y-3 border-t border-slate-100 px-4 pb-5 pt-3 dark:border-white/[0.08] sm:px-5">
+            <div className="space-y-2.5 border-t border-mc-border px-3.5 pb-4 pt-3">
               <div className="space-y-3">
                 {allItems.map((item) => (
                   <CargoItemPanel key={item.id} item={item} />
@@ -238,9 +244,9 @@ function CargoItemPanel({ item }: { item: CargoItemResponse }) {
   const itemName = item.item_name_ru || item.item_name_cn || t("cargoHistory.names.notEntered");
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-      <div className={`absolute inset-y-0 left-0 w-1 ${item.is_taken_away ? "bg-slate-500" : item.is_sent_web ? "bg-emerald-500" : "bg-sky-500"}`} />
-      <div className="space-y-4 pl-1">
+    <div className="relative overflow-hidden rounded-mc-md border border-mc-border bg-mc-surface-2 p-3.5">
+      <div className={`absolute inset-y-0 left-0 w-1 ${item.is_taken_away ? "bg-mc-text-3" : item.is_sent_web ? "bg-mc-success" : "bg-mc-brand"}`} />
+      <div className="space-y-3 pl-1">
         <div className="flex flex-wrap gap-2">
           {item.flight_name && (
             <DetailChip icon={Plane} label={t("reports.flight")} value={item.flight_name} />
@@ -277,7 +283,7 @@ function CargoItemPanel({ item }: { item: CargoItemResponse }) {
         </div>
 
         {(checkinDate || arrivalDate || takenDate || item.exchange_rate) && (
-          <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-3 text-[11px] font-bold text-slate-500 dark:border-white/10 dark:text-slate-400">
+          <div className="flex flex-wrap gap-2 border-t border-mc-border pt-2.5 text-[11px] font-medium text-mc-text-2">
             {checkinDate && <span>CN: {checkinDate}</span>}
             {arrivalDate && <span>UZ: {arrivalDate}</span>}
             {takenDate && <span>{t("cargoStatus.taken")}: {takenDate}</span>}
@@ -291,9 +297,9 @@ function CargoItemPanel({ item }: { item: CargoItemResponse }) {
 
 function DetailChip({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
-      <Icon className="size-3.5 shrink-0 text-orange-500" />
-      <span className="shrink-0 text-slate-400">{label}:</span>
+    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-mc-border bg-mc-surface px-2.5 py-1 text-[11px] font-bold text-mc-text-2">
+      <Icon className="h-3.5 w-3.5 shrink-0 text-mc-brand" strokeWidth={2} />
+      <span className="shrink-0 text-mc-text-3">{label}:</span>
       <span className="min-w-0 truncate">{value}</span>
     </span>
   );
@@ -301,9 +307,9 @@ function DetailChip({ icon: Icon, label, value }: { icon: LucideIcon; label: str
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#0b1018]">
-      <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="text-sm font-bold text-slate-900 dark:text-white">{value}</p>
+    <div className="rounded-mc-sm border border-mc-border bg-mc-surface p-2.5">
+      <p className="mb-0.5 text-[10px] font-extrabold uppercase tracking-[0.09em] text-mc-text-3">{label}</p>
+      <p className="text-[13px] font-bold text-mc-text">{value}</p>
     </div>
   );
 }
@@ -320,12 +326,12 @@ function MetricBlock({
   accent?: boolean;
 }) {
   return (
-    <div className={`rounded-xl border p-3 ${accent ? "border-emerald-200 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-400/8" : "border-slate-200 bg-white dark:border-white/10 dark:bg-[#0b1018]"}`}>
-      <p className={`mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide ${accent ? "text-emerald-600 dark:text-emerald-300" : "text-slate-400"}`}>
-        <Icon className="size-3.5" />
-        {label}
+    <div className={`rounded-mc-sm border p-2.5 ${accent ? "border-mc-success/25 bg-mc-success/12" : "border-mc-border bg-mc-surface"}`}>
+      <p className={`mb-0.5 flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-[0.09em] ${accent ? "text-mc-success" : "text-mc-text-3"}`}>
+        <Icon className="h-3 w-3 shrink-0" strokeWidth={2} />
+        <span className="truncate">{label}</span>
       </p>
-      <p className={`font-mono text-sm font-black ${accent ? "text-emerald-700 dark:text-emerald-300" : "text-slate-900 dark:text-white"}`}>
+      <p className={`font-mono text-[13px] font-extrabold tabular-nums ${accent ? "text-mc-success" : "text-mc-text"}`}>
         {value}
       </p>
     </div>

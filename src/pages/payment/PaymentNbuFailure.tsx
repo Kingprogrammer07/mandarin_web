@@ -116,12 +116,12 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
   }, [orderId]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#06080d] flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-mc-surface-2 flex items-center justify-center p-4">
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="w-full max-w-sm bg-white dark:bg-[#151515] rounded-3xl border border-gray-200 dark:border-white/10 shadow-xl p-8 text-center space-y-6"
+        className="w-full max-w-sm bg-mc-surface rounded-mc-lg border border-mc-border shadow-xl p-8 text-center space-y-6"
       >
         {phase === 'checking' && (
           <>
@@ -129,15 +129,15 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
-              className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center mx-auto"
+              className="w-20 h-20 rounded-full bg-mc-warn-soft flex items-center justify-center mx-auto"
             >
-              <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+              <Loader2 className="w-10 h-10 text-mc-brand animate-spin" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+              <h1 className="text-xl font-black text-mc-text">
                 {t('nbu.pending.title')}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-mc-text-2">
                 {t('nbu.pending.body')}
               </p>
             </div>
@@ -150,34 +150,34 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
-              className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center mx-auto"
+              className="w-20 h-20 rounded-full bg-mc-success/12 flex items-center justify-center mx-auto"
             >
-              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+              <CheckCircle2 className="w-10 h-10 text-mc-success" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+              <h1 className="text-xl font-black text-mc-text">
                 {t('nbu.success.title')}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-mc-text-2">
                 {t('nbu.success.body')}
               </p>
             </div>
             {statusInfo && (
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-2xl p-4 space-y-2 text-left">
+              <div className="bg-mc-surface-2 dark:bg-white/[0.03] rounded-mc-lg p-4 space-y-2 text-left">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
+                  <span className="text-mc-text-2">
                     {t('nbu.success.amountLabel')}
                   </span>
-                  <span className="font-bold text-gray-900 dark:text-white">
+                  <span className="font-bold text-mc-text">
                     {formatMoney(statusInfo.amount_uzs)} so'm
                   </span>
                 </div>
                 {statusInfo.flight_name && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-mc-text-2">
                       {t('nbu.success.flightLabel')}
                     </span>
-                    <span className="font-bold text-gray-900 dark:text-white truncate ml-2">
+                    <span className="font-bold text-mc-text truncate ml-2">
                       {statusInfo.flight_name}
                     </span>
                   </div>
@@ -193,15 +193,15 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
-              className="w-20 h-20 rounded-full bg-sky-100 dark:bg-sky-500/15 flex items-center justify-center mx-auto"
+              className="w-20 h-20 rounded-full bg-mc-brand-soft flex items-center justify-center mx-auto"
             >
-              <CreditCard className="w-10 h-10 text-sky-500" />
+              <CreditCard className="w-10 h-10 text-mc-brand" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+              <h1 className="text-xl font-black text-mc-text">
                 {t('nbu.cardBound.title')}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-mc-text-2">
                 {t('nbu.cardBound.body')}
               </p>
             </div>
@@ -214,15 +214,15 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
-              className="w-20 h-20 rounded-full bg-rose-100 dark:bg-rose-500/15 flex items-center justify-center mx-auto"
+              className="w-20 h-20 rounded-full bg-mc-danger-soft flex items-center justify-center mx-auto"
             >
-              <XCircle className="w-10 h-10 text-rose-500" />
+              <XCircle className="w-10 h-10 text-mc-danger" />
             </motion.div>
             <div className="space-y-2">
-              <h1 className="text-xl font-black text-gray-900 dark:text-white">
+              <h1 className="text-xl font-black text-mc-text">
                 {t('nbu.failure.title')}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-mc-text-2">
                 {t('nbu.failure.body')}
               </p>
             </div>
@@ -230,7 +230,7 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
         )}
 
         {orderId && (
-          <p className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-white/5 rounded-lg px-3 py-2 inline-block">
+          <p className="text-xs font-mono text-mc-text-3 bg-mc-surface-2 rounded-mc-sm px-3 py-2 inline-block">
             ID: {orderId}
           </p>
         )}
@@ -239,9 +239,8 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
           <div className="space-y-3">
             <button
               onClick={handleRetry}
-              className="w-full h-14 rounded-2xl font-black text-[16px]
-                bg-gradient-to-r from-blue-500 to-indigo-500
-                hover:from-blue-600 hover:to-indigo-600
+              className="w-full h-14 rounded-mc-lg font-black text-[16px]
+                bg-gradient-to-r from-mc-brand to-mc-brand-strong
                 text-white shadow-xl shadow-blue-500/25
                 active:scale-[0.97] transition-all"
             >
@@ -249,11 +248,10 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
             </button>
             <button
               onClick={handleHome}
-              className="w-full h-14 rounded-2xl font-bold text-base
-                bg-white dark:bg-white/5
-                border border-gray-200 dark:border-white/10
-                text-gray-900 dark:text-white
-                hover:bg-gray-50 dark:hover:bg-white/10
+              className="w-full h-14 rounded-mc-lg font-bold text-base
+                bg-mc-surface
+                border border-mc-border
+                text-mc-text
                 active:scale-[0.97] transition-all"
             >
               {t('nbu.failure.homeButton')}
@@ -264,9 +262,8 @@ export default function PaymentNbuFailure({ onNavigateHome, onRetry }: PaymentNb
         {(phase === 'success' || phase === 'card_bound') && (
           <button
             onClick={handleHome}
-            className="w-full h-14 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-amber-500 to-orange-500
-              hover:from-amber-600 hover:to-orange-600
+            className="w-full h-14 rounded-mc-lg font-black text-[16px]
+              bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-white shadow-xl shadow-amber-500/25
               active:scale-[0.97] transition-all"
           >

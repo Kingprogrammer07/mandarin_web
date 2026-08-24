@@ -11,12 +11,14 @@ import {
   Link2,
   Loader2,
   UserPlus,
+  MessageCircle,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getReferralInfo } from '@/api/services/referralService';
 import { triggerSoftHaptic } from '@/utils/haptics';
+import { SUPPORT_TELEGRAM_URL } from '@/config/contacts';
 
 interface ReferralPageProps {
   onBack: () => void;
@@ -101,23 +103,23 @@ export default function ReferralPage({ onBack }: ReferralPageProps) {
   const qrCodeUrl = qrCode?.link === inviteLink ? qrCode.url : '';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#06080d] text-gray-900 dark:text-white pb-24">
-      <div className="relative z-10 max-w-2xl mx-auto px-4 pt-6">
+    <div className="min-h-dvh bg-mc-bg text-mc-text pb-5">
+      <div className="relative z-10 mx-auto max-w-lg px-4 pt-3">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="mb-3 flex items-center gap-2.5">
           <button
             onClick={onBack}
-            className="rounded-full border border-gray-200 bg-white/90 p-2 text-gray-600 active:scale-95 transition dark:border-white/10 dark:bg-white/5 dark:text-white/70 touch-manipulation"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-sm bg-mc-surface-2 text-mc-text transition-transform duration-150 active:scale-95"
             aria-label={t('referral.back')}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={2} />
           </button>
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <Gift className="w-5 h-5 text-amber-500" />
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-1.5 text-[16px] font-extrabold text-mc-text">
+              <Gift className="h-[18px] w-[18px] text-mc-brand" strokeWidth={2} />
               {t('referral.title')}
             </h1>
-            <p className="text-xs text-gray-500 dark:text-white/50">
+            <p className="truncate text-[11px] font-medium text-mc-text-2">
               {t('referral.subtitle')}
             </p>
           </div>
@@ -125,29 +127,77 @@ export default function ReferralPage({ onBack }: ReferralPageProps) {
 
         {isLoading ? (
           <div className="flex justify-center py-20">
-            <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
+            <Loader2 className="w-7 h-7 animate-spin text-mc-brand" />
           </div>
         ) : isError ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          <div className="rounded-mc-lg border border-mc-danger/25 bg-mc-danger-soft p-5 text-center text-[12px] font-medium text-mc-danger">
             {t('referral.loadError')}
           </div>
         ) : (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-2.5 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Stats */}
-            <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 p-5 text-white shadow-lg">
-              <div className="flex items-center gap-2 text-sm font-medium opacity-90">
-                <Users className="w-4 h-4" />
-                {t('referral.stats.invited')}
-              </div>
-              <div className="mt-1 text-4xl font-extrabold tabular-nums">
-                {data?.referral_count ?? 0}
+            {/* A label stacked on a number read as a form field. The medallion
+                gives the count something to sit in, and the two washes keep the
+                flat gradient from looking like an empty band. */}
+            <div className="relative overflow-hidden rounded-mc-lg bg-gradient-to-br from-mc-brand to-mc-brand-strong px-4 py-4 text-mc-on-brand shadow-[var(--mc-shadow-cta)]">
+              <div
+                className="pointer-events-none absolute -right-7 -top-9 h-28 w-28 rounded-full bg-mc-on-brand/[0.07]"
+                aria-hidden="true"
+              />
+              <div
+                className="pointer-events-none absolute -right-2 top-7 h-16 w-16 rounded-full bg-mc-on-brand/[0.07]"
+                aria-hidden="true"
+              />
+              <div className="relative flex items-center gap-3.5">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-mc-on-brand/[0.12]">
+                  <Users className="h-[22px] w-[22px]" strokeWidth={2} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.09em] opacity-75">
+                    {t('referral.stats.invited')}
+                  </p>
+                  <p className="mt-0.5 text-[34px] font-extrabold leading-none tabular-nums">
+                    {data?.referral_count ?? 0}
+                  </p>
+                </div>
               </div>
             </div>
 
+            {/* Rewards exist but are negotiated per case, so the card states that
+                they exist and hands the client to the staff chat rather than
+                promising an amount the app cannot compute. */}
+            <section className="rounded-mc-lg border border-mc-warn/25 bg-mc-warn-soft p-3.5">
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-mc-sm bg-mc-warn/15 text-mc-warn">
+                  <Gift className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-[13px] font-extrabold text-mc-warn">
+                    {t('referral.rewards.title')}
+                  </h2>
+                  <p className="mt-0.5 text-[12px] font-medium leading-snug text-mc-text-2">
+                    {t('referral.rewards.desc')}
+                  </p>
+                </div>
+              </div>
+              <a
+                href={SUPPORT_TELEGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => triggerSoftHaptic()}
+                className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-mc-md
+                           border border-mc-warn/30 bg-mc-surface text-[12px] font-extrabold
+                           text-mc-warn transition-transform active:scale-[0.98]"
+              >
+                <MessageCircle className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                {t('referral.rewards.cta')}
+              </a>
+            </section>
+
             {/* Invite link */}
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
-              <h2 className="text-sm font-bold flex items-center gap-2 mb-3">
-                <Link2 className="w-4 h-4 text-amber-500" />
+            <section className="rounded-mc-lg border border-mc-border bg-mc-surface p-3.5 shadow-[var(--mc-shadow-card)]">
+              <h2 className="mb-2.5 flex items-center gap-1.5 text-[13px] font-extrabold text-mc-text">
+                <Link2 className="h-4 w-4 text-mc-brand" strokeWidth={2} />
                 {t('referral.yourLink')}
               </h2>
 
@@ -155,46 +205,46 @@ export default function ReferralPage({ onBack }: ReferralPageProps) {
                 <>
                   {qrCodeUrl && (
                     <div className="mb-3 flex justify-center">
-                      <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-200 dark:ring-white/10">
+                      <div className="rounded-mc-lg bg-white p-3 shadow-[var(--mc-shadow-card)] ring-1 ring-mc-border">
                         <img
                           src={qrCodeUrl}
                           alt={t('referral.yourLink')}
-                          className="h-40 w-40 rounded-lg"
+                          className="h-36 w-36 rounded-mc-sm"
                         />
                       </div>
                     </div>
                   )}
-                  <div className="rounded-xl bg-gray-100 px-3 py-2.5 text-xs font-mono break-all text-gray-700 dark:bg-white/10 dark:text-white/80">
+                  <div className="rounded-mc-sm bg-mc-surface-2 px-3 py-2 font-mono text-[11px] break-all text-mc-text-2">
                     {inviteLink}
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
                       onClick={handleCopy}
-                      className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-semibold active:scale-[0.98] transition dark:border-white/10 dark:bg-white/5 touch-manipulation"
+                      className="flex h-11 items-center justify-center gap-1.5 rounded-mc-md border border-mc-border bg-mc-surface-2 text-[13px] font-extrabold text-mc-text active:scale-[0.98] transition-transform"
                     >
-                      <Copy className="w-4 h-4" />
+                      <Copy className="h-4 w-4" strokeWidth={2} />
                       {t('referral.copy')}
                     </button>
                     <button
                       onClick={handleShare}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white active:scale-[0.98] transition hover:bg-amber-600 touch-manipulation"
+                      className="flex h-11 items-center justify-center gap-1.5 rounded-mc-md bg-gradient-to-r from-mc-brand to-mc-brand-strong text-[13px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] active:scale-[0.98] transition-transform"
                     >
-                      <Share2 className="w-4 h-4" />
+                      <Share2 className="h-4 w-4" strokeWidth={2} />
                       {t('referral.share')}
                     </button>
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-gray-500 dark:text-white/50">
+                <p className="text-[12px] font-medium text-mc-text-2">
                   {t('referral.linkUnavailable')}
                 </p>
               )}
             </section>
 
             {/* How it works */}
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
-              <h2 className="text-sm font-bold mb-2">{t('referral.howTitle')}</h2>
-              <ol className="list-decimal pl-5 space-y-1 text-sm text-gray-600 dark:text-white/70">
+            <section className="rounded-mc-lg border border-mc-border bg-mc-surface p-3.5 shadow-[var(--mc-shadow-card)]">
+              <h2 className="mb-1.5 text-[13px] font-extrabold text-mc-text">{t('referral.howTitle')}</h2>
+              <ol className="list-decimal space-y-1 pl-5 text-[12px] leading-snug text-mc-text-2">
                 <li>{t('referral.how1')}</li>
                 <li>{t('referral.how2')}</li>
                 <li>{t('referral.how3')}</li>
@@ -202,61 +252,61 @@ export default function ReferralPage({ onBack }: ReferralPageProps) {
             </section>
 
             {/* Invited list */}
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
-              <h2 className="text-sm font-bold flex items-center gap-2 mb-3">
-                <UserPlus className="w-4 h-4 text-amber-500" />
+            <section className="rounded-mc-lg border border-mc-border bg-mc-surface p-3.5 shadow-[var(--mc-shadow-card)]">
+              <h2 className="mb-2.5 flex items-center gap-1.5 text-[13px] font-extrabold text-mc-text">
+                <UserPlus className="h-4 w-4 text-mc-brand" strokeWidth={2} />
                 {t('referral.invitedList')}
               </h2>
               {data && data.invited.length > 0 ? (
-                <ul className="divide-y divide-gray-100 dark:divide-white/10">
+                <ul className="divide-y divide-mc-border">
                   {data.invited.map((c, i) => (
                     <li
                       key={`${c.client_code ?? 'x'}-${i}`}
                       className="flex items-center justify-between py-2.5"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mc-brand-soft text-[13px] font-extrabold text-mc-brand">
                           {c.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div className="text-sm font-semibold">{c.name}</div>
+                          <div className="text-[13px] font-extrabold text-mc-text">{c.name}</div>
                           {c.client_code && (
-                            <div className="text-[11px] font-mono text-gray-400 dark:text-white/40">
+                            <div className="font-mono text-[11px] font-medium text-mc-text-3">
                               {c.client_code}
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="text-[11px] text-gray-400 dark:text-white/40">
+                      <div className="shrink-0 text-[11px] font-medium text-mc-text-3">
                         {c.joined_at}
                       </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="py-4 text-center text-sm text-gray-400 dark:text-white/40">
+                <p className="py-4 text-center text-[12px] font-medium text-mc-text-3">
                   {t('referral.empty')}
                 </p>
               )}
 
               {/* Pager — only when there is more than one page */}
               {data && data.referral_count > pageSize && (
-                <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-white/10">
+                <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-mc-border pt-2.5">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page <= 1 || isFetching}
-                    className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 active:scale-95 transition disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-white/80 touch-manipulation"
+                    className="flex h-9 items-center gap-1 rounded-mc-sm border border-mc-border bg-mc-surface-2 px-3 text-[12px] font-extrabold text-mc-text active:scale-95 transition-transform disabled:opacity-40"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     {t('referral.prev')}
                   </button>
-                  <span className="text-xs font-medium text-gray-500 dark:text-white/50">
+                  <span className="text-[11px] font-medium text-mc-text-2">
                     {t('referral.pageOf', { page, total: totalPages })}
                   </span>
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={!data.has_more || isFetching}
-                    className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 active:scale-95 transition disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-white/80 touch-manipulation"
+                    className="flex h-9 items-center gap-1 rounded-mc-sm border border-mc-border bg-mc-surface-2 px-3 text-[12px] font-extrabold text-mc-text active:scale-95 transition-transform disabled:opacity-40"
                   >
                     {t('referral.next')}
                     <ChevronRight className="w-4 h-4" />

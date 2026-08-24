@@ -154,18 +154,18 @@ export default function ImageUpload({
 
   return (
     <div className="space-y-2.5">
-      <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-        <span className="flex size-7 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 dark:bg-orange-400/10 dark:text-orange-300">
+      <label className="flex items-center gap-2 text-sm font-semibold text-mc-text">
+        <span className="flex size-7 items-center justify-center rounded-mc-md bg-mc-brand/10 text-mc-brand dark:bg-mc-brand-soft dark:text-mc-brand">
           <ImageIcon className="size-3.5" />
         </span>
         {label}
       </label>
 
       {isLoading ? (
-        <div className={`${isCompact ? 'h-[88px]' : 'h-[184px]'} relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#10151f]`}>
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/60 to-transparent dark:via-orange-400/10" />
+        <div className={`${isCompact ? 'h-[88px]' : 'h-[184px]'} relative overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface-2 dark:border-white/10`}>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-mc-brand/25 to-transparent dark:via-mc-brand/25" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="size-9 animate-spin text-orange-500" />
+            <Loader2 className="size-9 animate-spin text-mc-brand" />
           </div>
         </div>
       ) : !showReadyState ? (
@@ -176,41 +176,41 @@ export default function ImageUpload({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           className={[
-            'relative w-full rounded-2xl border text-left transition active:scale-[0.99]',
+            'relative w-full rounded-mc-lg border text-left transition active:scale-[0.99]',
             isCompact
               ? 'flex min-h-[88px] items-center gap-3 p-3'
               : 'flex min-h-[184px] flex-col items-center justify-center gap-4 p-5 text-center',
-            'bg-white shadow-sm',
-            'dark:bg-[#10151f] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]',
+            'bg-mc-surface shadow-sm',
+            ' dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]',
             isDragging
-              ? 'border-orange-400 ring-4 ring-orange-500/15 dark:border-orange-300/60'
-              : 'border-dashed border-slate-200 dark:border-white/12',
-            hasError ? 'border-red-400 ring-4 ring-red-500/10 dark:border-red-400/60' : '',
+              ? 'border-mc-brand ring-4 ring-mc-brand/20 dark:border-mc-brand/40'
+              : 'border-dashed border-mc-border dark:border-white/12',
+            hasError ? 'border-mc-danger ring-4 ring-mc-danger/15 dark:border-mc-danger/40' : '',
           ].join(' ')}
         >
-          <span className={`${isCompact ? 'size-14 shrink-0' : 'size-14'} flex items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500 shadow-none dark:bg-white/[0.055] dark:text-amber-300`}>
+          <span className={`${isCompact ? 'size-14 shrink-0' : 'size-14'} flex items-center justify-center rounded-mc-lg bg-mc-brand/10 text-mc-brand shadow-none dark:bg-white/[0.055] dark:text-mc-brand`}>
             {status === 'compressing' ? <Loader2 className="size-6 animate-spin" /> : <Upload className="size-6" />}
           </span>
 
           <span className="space-y-1">
-            <span className="block text-sm font-bold text-slate-800 dark:text-white">
+            <span className="block text-sm font-bold text-mc-text">
               {status === 'compressing' ? t('form.upload.compressing') : t('form.dragDropImage')}
             </span>
-            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="block text-xs font-medium text-mc-text-2">
               {t('form.supportedFormats')}
             </span>
           </span>
         </button>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/12 dark:bg-[#10151f] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]">
-          <div className={`${isCompact ? 'h-[112px]' : 'h-[184px]'} relative overflow-hidden bg-slate-100 dark:bg-black/20`}>
+        <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface shadow-sm dark:border-white/12 dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.34),inset_0_-1px_0_rgba(255,255,255,0.055)]">
+          <div className={`${isCompact ? 'h-[112px]' : 'h-[184px]'} relative overflow-hidden bg-mc-surface-2 dark:bg-black/20`}>
             <img
               src={preview ?? undefined}
               alt={label}
               onError={handlePreviewError}
               className="size-full object-cover"
             />
-            <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
+            <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-mc-success px-2.5 py-1 text-xs font-bold text-white shadow-lg">
               <CheckCircle2 className="size-3.5" />
               {t('form.upload.ready')}
             </div>
@@ -222,7 +222,7 @@ export default function ImageUpload({
                 type="button"
                 variant="outline"
                 onClick={openFilePicker}
-                className="h-11 rounded-xl border-slate-200 bg-white text-slate-700 active:scale-[0.98] dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-100"
+                className="h-11 rounded-mc-md border-mc-border bg-mc-surface text-mc-text active:scale-[0.98] dark:border-white/12 dark:bg-white/[0.04] dark:text-mc-text"
               >
                 <RefreshCcw className="size-4" />
                 {t('form.upload.change')}
@@ -231,7 +231,7 @@ export default function ImageUpload({
                 type="button"
                 variant="outline"
                 onClick={handleRemove}
-                className="h-11 rounded-xl border-red-200 bg-red-50 text-red-600 active:scale-[0.98] dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300"
+                className="h-11 rounded-mc-md border-mc-danger/25 bg-mc-danger-soft text-mc-danger active:scale-[0.98] dark:border-mc-danger/25 dark:bg-mc-danger/10 dark:text-mc-danger"
               >
                 <X className="size-4" />
                 {t('form.upload.remove')}
@@ -242,7 +242,7 @@ export default function ImageUpload({
       )}
 
       {hasError && error && (
-        <p className="flex items-center gap-1.5 text-xs font-medium text-red-500">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-mc-danger">
           <AlertCircle className="size-3.5" />
           {error}
         </p>

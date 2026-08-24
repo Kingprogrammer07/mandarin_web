@@ -221,9 +221,9 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 showCloseButton={false}
-                className="top-auto bottom-0 left-0 flex h-[88svh] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none rounded-t-[30px] border border-gray-900/[0.07] bg-white/96 p-0 shadow-[0_-24px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[30px] sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0 dark:border-white/[0.09] dark:bg-[#0a0e15]/96 dark:shadow-[0_-24px_70px_rgba(0,0,0,0.42)]"
+                className="top-auto bottom-0 left-0 flex h-[88svh] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none rounded-t-mc-xl border border-mc-border bg-mc-surface p-0 shadow-[var(--mc-shadow-card)] backdrop-blur-xl data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-mc-xl sm:data-[state=open]:zoom-in-95 sm:data-[state=open]:slide-in-from-bottom-0"
             >
-                <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-gray-950/10 sm:hidden dark:bg-white/14" />
+                <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-mc-surface-2 sm:hidden dark:bg-white/14" />
                 <DialogHeader className="px-5 pb-2 pt-4 text-left sm:px-6">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
@@ -231,13 +231,13 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                    className="-ml-2 h-9 w-9 shrink-0 rounded-full bg-gray-950/[0.04] text-gray-700 hover:bg-gray-950/[0.07] dark:bg-white/[0.06] dark:text-[#fff8ed]/72 dark:hover:bg-white/[0.1]"
+                                    className="-ml-2 h-9 w-9 shrink-0 rounded-full bg-mc-surface-2 text-mc-text"
                                 onClick={handleBack}
                             >
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
                         )}
-                            <DialogTitle className="truncate text-[22px] font-black tracking-normal text-gray-950 dark:text-[#fff8ed]">
+                            <DialogTitle className="truncate text-[22px] font-black tracking-normal text-mc-text">
                                 {isAdding ? t('wallet.cards.newCard', "Yangi karta") : t('wallet.cards.myCards', "Mening Kartalarim")}
                             </DialogTitle>
                         </div>
@@ -246,7 +246,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                             variant="ghost"
                             size="icon"
                             onClick={onClose}
-                            className="h-10 w-10 shrink-0 rounded-full bg-gray-950/[0.04] text-gray-700 hover:bg-gray-950/[0.07] dark:bg-white/[0.06] dark:text-[#fff8ed]/72 dark:hover:bg-white/[0.1]"
+                            className="h-10 w-10 shrink-0 rounded-full bg-mc-surface-2 text-mc-text"
                             aria-label={t('wallet.cards.cancel', "Bekor qilish")}
                         >
                             <X className="h-5 w-5" />
@@ -268,19 +268,19 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 className="col-start-1 row-start-1 h-full w-full space-y-4 overflow-y-auto bg-transparent px-1"
                             >
                                 <div className="space-y-4 pb-6">
-                                    <div className="mb-6 rounded-[22px] border border-white/8 bg-gradient-to-br from-gray-950 to-gray-800 p-6 text-white shadow-xl">
+                                    <div className="mb-6 rounded-mc-xl border border-white/10 bg-gradient-to-br from-mc-cardface to-mc-cardface-2 p-6 text-white shadow-[var(--mc-shadow-card)]">
                                         <div className="flex justify-between items-start mb-8">
                                             <div className="h-8 w-12 rounded bg-white/20" />
-                                            <CreditCard className="h-6 w-6 text-gray-400" />
+                                            <CreditCard className="h-6 w-6 text-white/60" />
                                         </div>
                                         <div className="space-y-4">
                                             <div>
-                                                <p className="text-xs text-gray-400 uppercase mb-1">{t('wallet.cards.cardNumber', "Karta raqami")}</p>
+                                                <p className="text-xs text-mc-text-3 uppercase mb-1">{t('wallet.cards.cardNumber', "Karta raqami")}</p>
                                                 <p className="font-mono text-base sm:text-xl tracking-widest truncate">{cardNumber || '0000 0000 0000 0000'}</p>
                                             </div>
                                             <div className="flex justify-between">
                                                 <div>
-                                                    <p className="text-xs text-gray-400 uppercase mb-1">{t('wallet.cards.cardHolder', "Egasi")}</p>
+                                                    <p className="text-xs text-mc-text-3 uppercase mb-1">{t('wallet.cards.cardHolder', "Egasi")}</p>
                                                     <p className="font-medium uppercase tracking-wide truncate max-w-[200px]">{cardHolder || 'ISMI FAMILIYASI'}</p>
                                                 </div>
                                             </div>
@@ -312,7 +312,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                     <Button
                                         onClick={handleAddCard}
                                         disabled={addCardMutation.isPending}
-                                            className="h-12 w-full rounded-[16px] bg-orange-500 font-black text-white shadow-[0_12px_24px_rgba(249,115,22,0.22)] hover:bg-orange-600"
+                                            className="h-12 w-full rounded-[16px] bg-mc-brand font-black text-mc-on-brand shadow-[0_12px_24px_rgba(249,115,22,0.22)]"
                                     >
                                         {addCardMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                                         {addCardMutation.isPending ? t('wallet.cards.saving', "Saqlanmoqda...") : t('wallet.cards.save', "Saqlash")}
@@ -338,17 +338,17 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 {nbuEnabled && (
                                     <section className="space-y-3">
                                         <div className="space-y-0.5">
-                                            <h3 className="text-[15px] font-black text-gray-950 dark:text-[#fff8ed]">
+                                            <h3 className="text-[15px] font-black text-mc-text">
                                                 {t('nbu.cards.title', "Saqlangan kartalar")}
                                             </h3>
-                                            <p className="text-xs text-gray-500 dark:text-[#fff8ed]/55">
+                                            <p className="text-xs text-mc-text-2/55">
                                                 {t('nbu.cards.sectionHintLong', "Yuk to'lovini shu karta bilan bir bosishda to'laysiz")}
                                             </p>
                                         </div>
 
                                         {nbuCardsLoading ? (
                                             <div className="flex justify-center py-6">
-                                                <Loader2 className="h-5 w-5 animate-spin text-sky-500" />
+                                                <Loader2 className="h-5 w-5 animate-spin text-mc-brand" />
                                             </div>
                                         ) : (
                                             <div className="space-y-2.5">
@@ -366,10 +366,10 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                     return (
                                                         <div
                                                             key={card.id}
-                                                            className="flex items-center gap-3 rounded-[18px] border border-sky-200/60 bg-gradient-to-br from-sky-50 to-cyan-50 p-3.5 dark:border-sky-500/20 dark:from-sky-500/10 dark:to-cyan-500/5"
+                                                            className="flex items-center gap-3 rounded-[18px] border border-mc-brand/20 bg-gradient-to-br from-mc-brand-soft to-mc-brand-soft p-3.5 dark:border-mc-brand/20 dark:from-mc-brand-soft dark:to-mc-brand-soft"
                                                         >
-                                                            <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-white/80 dark:bg-white/10 flex items-center justify-center">
-                                                                <CreditCard className="h-5 w-5 text-sky-600 dark:text-sky-300" />
+                                                            <div className="h-10 w-10 flex-shrink-0 rounded-mc-md bg-white/80 dark:bg-white/10 flex items-center justify-center">
+                                                                <CreditCard className="h-5 w-5 text-mc-brand dark:text-mc-brand" />
                                                             </div>
 
                                                             {isEditing ? (
@@ -387,7 +387,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                                         size="icon"
                                                                         disabled={nbuRenameMutation.isPending}
                                                                         onClick={submitEdit}
-                                                                        className="h-9 w-9 shrink-0 rounded-full text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                                                                        className="h-9 w-9 shrink-0 rounded-full text-mc-success dark:text-mc-success"
                                                                         aria-label={t('nbu.cards.save', "Saqlash")}
                                                                     >
                                                                         {nbuRenameMutation.isPending
@@ -398,7 +398,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         onClick={() => { setEditingCardId(null); setEditName(''); }}
-                                                                        className="h-9 w-9 shrink-0 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"
+                                                                        className="h-9 w-9 shrink-0 rounded-full text-mc-text-3"
                                                                         aria-label={t('nbu.cards.cancel', "Bekor qilish")}
                                                                     >
                                                                         <X className="h-4 w-4" />
@@ -407,10 +407,10 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                             ) : (
                                                                 <>
                                                                     <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-bold text-gray-950 truncate dark:text-[#fff8ed]">
+                                                                        <p className="text-sm font-bold text-mc-text truncate">
                                                                             {primaryLabel}
                                                                         </p>
-                                                                        <p className={`text-[11px] truncate ${card.nickname && card.card_masked ? 'font-mono text-gray-600 dark:text-[#fff8ed]/70' : 'text-gray-500 dark:text-[#fff8ed]/55'}`}>
+                                                                        <p className={`text-[11px] truncate ${card.nickname && card.card_masked ? 'font-mono text-mc-text-2/70' : 'text-mc-text-2/55'}`}>
                                                                             {secondaryLabel}
                                                                         </p>
                                                                     </div>
@@ -418,7 +418,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         onClick={() => startEdit(card.id, card.nickname)}
-                                                                        className="h-9 w-9 rounded-full text-gray-400 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-300"
+                                                                        className="h-9 w-9 rounded-full text-mc-text-3"
                                                                         aria-label={t('nbu.cards.rename', "Nomini o'zgartirish")}
                                                                     >
                                                                         <Pencil className="h-4 w-4" />
@@ -428,7 +428,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                                         size="icon"
                                                                         disabled={nbuDeleteMutation.isPending}
                                                                         onClick={() => handleNbuDelete(card.id)}
-                                                                        className="h-9 w-9 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                                                                        className="h-9 w-9 rounded-full text-mc-text-3"
                                                                         aria-label={t('nbu.cards.deleteConfirm', "Kartani o'chirasizmi?")}
                                                                     >
                                                                         <Trash2 className="h-4 w-4" />
@@ -442,7 +442,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 {/* Bind block: optional nickname (NBU never returns the PAN
                                                     on bind, so the label is the user's pre-charge anchor). */}
                                                 <div className="space-y-2 pt-1">
-                                                    <Label className="text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
+                                                    <Label className="text-[12px] font-black text-mc-text/76">
                                                         {t('nbu.cards.nicknameLabel', "Karta nomi (ixtiyoriy)")}
                                                     </Label>
                                                     <Input
@@ -451,20 +451,20 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                         placeholder={t('nbu.cards.nicknamePlaceholder', "Masalan: Asosiy kartam")}
                                                         className="h-11"
                                                     />
-                                                    <p className="px-1 text-[11px] leading-snug text-gray-400 dark:text-[#fff8ed]/45">
+                                                    <p className="px-1 text-[11px] leading-snug text-mc-text-3/45">
                                                         {t('nbu.cards.nicknameHint', "Kartani keyin tanib olishingiz uchun nom bering. Karta raqami birinchi to'lovdan keyin ko'rinadi.")}
                                                     </p>
                                                     {/* People reported "I can't add a card": tapping this leaves the
                                                         Uzbek app for NBU's Russian-only form with no warning. Say what
                                                         happens and what they will need before they get there. */}
-                                                    <p className="rounded-xl bg-sky-50 px-3 py-2 text-[11px] font-semibold leading-snug text-sky-900 dark:bg-sky-400/10 dark:text-sky-200">
+                                                    <p className="rounded-mc-md bg-mc-brand-soft px-3 py-2 text-[11px] font-semibold leading-snug text-mc-brand dark:bg-mc-brand-soft dark:text-mc-brand">
                                                         {t('nbu.cards.bindNotice')}
                                                     </p>
                                                     <Button
                                                         variant="outline"
                                                         disabled={nbuBindMutation.isPending}
                                                         onClick={handleNbuBind}
-                                                        className="w-full rounded-[18px] border-2 border-dashed border-sky-300 py-5 text-sky-700 hover:border-sky-500 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
+                                                        className="w-full rounded-[18px] border-2 border-dashed border-mc-brand/30 py-5 text-mc-brand dark:border-mc-brand/30 dark:text-mc-brand"
                                                     >
                                                         {nbuBindMutation.isPending ? (
                                                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -482,32 +482,32 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                 {/* ── Section 2: Refund cards (manual entry, refund payouts) ── */}
                                 <section className="space-y-3">
                                     <div className="space-y-0.5">
-                                        <h3 className="text-[15px] font-black text-gray-950 dark:text-[#fff8ed]">
+                                        <h3 className="text-[15px] font-black text-mc-text">
                                             {t('wallet.cards.refundTitle', "Qaytarish kartasi")}
                                         </h3>
-                                        <p className="text-xs text-gray-500 dark:text-[#fff8ed]/55">
+                                        <p className="text-xs text-mc-text-2/55">
                                             {t('wallet.cards.refundHint', "Pul qaytarish uchun ishlatiladi")}
                                         </p>
                                     </div>
 
                                     {isLoading ? (
                                     <div className="flex justify-center p-8">
-                                        <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+                                        <Loader2 className="h-6 w-6 animate-spin text-mc-brand" />
                                     </div>
                                 ) : cardsData?.cards.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500 flex flex-col items-center">
-                                        <div className="h-14 w-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-3">
-                                            <CreditCard className="h-7 w-7 text-gray-400" />
+                                    <div className="text-center py-8 text-mc-text-2 flex flex-col items-center">
+                                        <div className="h-14 w-14 bg-mc-surface-2 dark:bg-mc-surface-2 rounded-full flex items-center justify-center mb-3">
+                                            <CreditCard className="h-7 w-7 text-mc-text-3" />
                                         </div>
                                         {/* Refund-card empty state. Must NOT reuse the payment-card
                                             copy: a user with a saved payment card above was reading
                                             "Hozircha kartalar yo'q" and concluded their card binding
                                             had failed. */}
                                         <p className="font-medium mb-1 text-sm">{t('wallet.cards.noRefundCards', "Qaytarish kartasi qo'shilmagan")}</p>
-                                        <p className="text-xs text-gray-400 mb-5 max-w-xs">{t('wallet.cards.refundAddPrompt', "Bu karta faqat pul qaytarilganda ishlatiladi. To'lov uchun yuqoridagi “To'lov kartalari” bo'limidan foydalaning.")}</p>
+                                        <p className="text-xs text-mc-text-3 mb-5 max-w-xs">{t('wallet.cards.refundAddPrompt', "Bu karta faqat pul qaytarilganda ishlatiladi. To'lov uchun yuqoridagi “To'lov kartalari” bo'limidan foydalaning.")}</p>
                                         <Button
                                             onClick={() => setIsAdding(true)}
-                                            className="rounded-full bg-orange-500 px-6 font-black text-white hover:bg-orange-600"
+                                            className="rounded-full bg-mc-brand px-6 font-black text-mc-on-brand"
                                         >
                                             <Plus className="h-4 w-4 mr-2" />
                                             {t('wallet.cards.addCard', "Karta qo'shish")}
@@ -521,16 +521,16 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.1 }}
-                                                className="group relative overflow-hidden rounded-[22px] border border-white/8 bg-gradient-to-br from-gray-950 to-gray-800 p-5 text-white shadow-lg"
+                                                className="group relative overflow-hidden rounded-mc-xl border border-white/10 bg-gradient-to-br from-mc-cardface to-mc-cardface-2 p-5 text-white shadow-[var(--mc-shadow-card)]"
                                             >
                                                 {/* Card Background Patterns */}
                                                 <div className="absolute top-0 right-0 h-32 w-32 translate-x-12 translate-y-[-2rem] rounded-full bg-white/5 blur-3xl" />
-                                                <div className="absolute bottom-0 left-0 h-24 w-24 translate-x-[-2rem] translate-y-12 rounded-full bg-orange-500/10 blur-2xl" />
+                                                <div className="absolute bottom-0 left-0 h-24 w-24 translate-x-[-2rem] translate-y-12 rounded-full bg-mc-brand/10 blur-2xl" />
 
                                                 <div className="relative z-10 flex justify-between items-start">
                                                     <div>
                                                         <p className="font-mono text-xl tracking-widest">{card.masked_number}</p>
-                                                        <p className="mt-4 text-xs font-medium text-gray-400 uppercase tracking-wide">
+                                                        <p className="mt-4 text-xs font-medium text-white/60 uppercase tracking-wide">
                                                             {card.holder_name}
                                                         </p>
                                                     </div>
@@ -540,7 +540,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                 <Button
                                                     variant="destructive"
                                                     size="icon"
-                                                    className="absolute right-2 top-2 h-8 w-8 opacity-100 backdrop-blur-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100 dark:bg-red-900/50 dark:hover:bg-red-900"
+                                                    className="absolute right-2 top-2 h-9 w-9 backdrop-blur-sm"
                                                     onClick={() => handleDeleteCard(card.id)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -550,7 +550,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
 
                                         <Button
                                             variant="outline"
-                                            className="mt-4 w-full rounded-[18px] border-2 border-dashed py-6 text-gray-500 transition-colors hover:border-orange-500 hover:bg-orange-50 hover:text-orange-600 dark:border-white/10 dark:text-[#fff8ed]/58 dark:hover:bg-orange-500/10 dark:hover:text-amber-300"
+                                            className="mt-4 w-full rounded-[18px] border-2 border-dashed py-6 text-mc-text-2 transition-colors dark:border-white/10/58"
                                             onClick={() => setIsAdding(true)}
                                         >
                                             <Plus className="h-4 w-4 mr-2" />

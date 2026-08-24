@@ -138,15 +138,15 @@ export default function ApplicationEditForm({
 
   const inputClass = [
     'h-[54px] rounded-[18px]',
-    'border border-gray-900/[0.07] dark:border-white/[0.095]',
-    'bg-white dark:bg-[#10151f]',
-    'text-gray-950 dark:text-[#fff8ed]',
-    'placeholder:text-gray-400 dark:placeholder:text-[#fff8ed]/42',
-    'focus:border-orange-500/70 focus:ring-2 focus:ring-orange-500/15 focus:outline-none',
+    'border border-mc-border',
+    'bg-mc-surface',
+    'text-mc-text',
+    'placeholder:text-mc-text-3',
+    'focus:border-mc-brand/70 focus:ring-2 focus:ring-mc-brand/20 focus:outline-none',
   ].join(' ');
-  const labelClass = 'ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76';
+  const labelClass = 'ml-0.5 text-[12px] font-black text-mc-text';
   const iconBoxClass =
-    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300';
+    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand';
 
   return (
     <Form {...form}>
@@ -223,7 +223,7 @@ export default function ApplicationEditForm({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-orange-600 dark:text-amber-300"
+                    className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-mc-brand"
                   >
                     <CalendarIcon className="h-4 w-4" />
                   </Button>
@@ -231,7 +231,7 @@ export default function ApplicationEditForm({
               </div>
               <PopoverContent
                 align="start"
-                className="w-auto overflow-hidden rounded-2xl border-orange-500/20 p-0 shadow-xl dark:border-white/10 dark:bg-[#111827]"
+                className="w-auto overflow-hidden rounded-mc-lg border-mc-brand/20 p-0 shadow-xl dark:border-white/10"
               >
                 <Calendar
                   mode="single"
@@ -269,9 +269,9 @@ export default function ApplicationEditForm({
                   <SelectValue placeholder={t('form.regionPlaceholder')} />
                 </SelectTrigger>
               </FormControl>
-              <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-orange-500/20 shadow-xl dark:border-white/10 dark:bg-[#111827]">
+              <SelectContent className="max-h-60 overflow-hidden rounded-mc-lg border-mc-brand/20 shadow-xl dark:border-white/10">
                 {regions.map((region) => (
-                  <SelectItem key={region.value} value={region.value} className="cursor-pointer rounded-lg">
+                  <SelectItem key={region.value} value={region.value} className="cursor-pointer rounded-mc-sm">
                     {t(region.label)}
                   </SelectItem>
                 ))}
@@ -290,10 +290,10 @@ export default function ApplicationEditForm({
                   <SelectValue placeholder={t('form.districtPlaceholder')} />
                 </SelectTrigger>
               </FormControl>
-              <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-orange-500/20 shadow-xl dark:border-white/10 dark:bg-[#111827]">
+              <SelectContent className="max-h-60 overflow-hidden rounded-mc-lg border-mc-brand/20 shadow-xl dark:border-white/10">
                 {selectedRegion &&
                   DISTRICTS[selectedRegion]?.map((district) => (
-                    <SelectItem key={district.value} value={district.value} className="cursor-pointer rounded-lg">
+                    <SelectItem key={district.value} value={district.value} className="cursor-pointer rounded-mc-sm">
                       {t(district.label)}
                     </SelectItem>
                   ))}
@@ -308,7 +308,7 @@ export default function ApplicationEditForm({
             <FormLabel className={labelClass}>{t('form.address')}</FormLabel>
             <FormControl>
               <div className="relative">
-                <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] bg-mc-brand/10 text-mc-brand dark:bg-white/[0.055] dark:text-mc-brand">
                   <MapPin className="h-4 w-4" />
                 </div>
                 <textarea
@@ -328,7 +328,7 @@ export default function ApplicationEditForm({
             <FormControl>
               <div className="relative">
                 <div className={iconBoxClass}><Phone className="h-4 w-4" /></div>
-                <span className="pointer-events-none absolute left-[58px] top-1/2 z-10 -translate-y-1/2 text-[13px] font-black text-gray-600 dark:text-[#fff8ed]/72">
+                <span className="pointer-events-none absolute left-[58px] top-1/2 z-10 -translate-y-1/2 text-[13px] font-black text-mc-text-2">
                   +998
                 </span>
                 <Input
@@ -345,7 +345,7 @@ export default function ApplicationEditForm({
         )} />
 
         <div className="space-y-3">
-          <p className="text-[12px] font-bold text-gray-500 dark:text-white/45">
+          <p className="text-[12px] font-bold text-mc-text-2 dark:text-white/45">
             {t('application.edit.photosHint')}
           </p>
           <ImageUpload
@@ -368,14 +368,14 @@ export default function ApplicationEditForm({
             variant="outline"
             onClick={onCancel}
             disabled={isSaving}
-            className="h-12 rounded-2xl font-black"
+            className="h-12 rounded-mc-lg font-black"
           >
             {t('common.cancel')}
           </Button>
           <Button
             type="submit"
             disabled={isSaving}
-            className="h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 font-black text-white"
+            className="h-12 rounded-mc-lg bg-gradient-to-r from-mc-brand to-mc-brand-strong font-black text-white"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : t('application.edit.save')}
           </Button>

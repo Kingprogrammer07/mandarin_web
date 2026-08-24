@@ -122,23 +122,21 @@ const PaymentLinkButton = ({ link }: { link: PaymentLinkItem }) => {
       href={link.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200 dark:border-white/10
-        bg-white dark:bg-white/[0.03]
-        hover:border-amber-300 dark:hover:border-amber-500/30
-        hover:shadow-sm
+      className="flex items-center gap-3 p-3.5 rounded-mc-md border border-mc-border
+        bg-mc-surface
         active:scale-[0.97] transition-all duration-150"
     >
       {/* Brand badge */}
       <div
-        className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-base shadow-sm"
+        className="w-10 h-10 rounded-mc-md flex-shrink-0 flex items-center justify-center font-black text-base shadow-sm"
         style={{ background: brand.bg, color: brand.textColor }}
       >
         {brand.label}
       </div>
-      <span className="flex-1 font-bold text-sm text-gray-900 dark:text-white">
+      <span className="flex-1 font-bold text-sm text-mc-text">
         {link.name}
       </span>
-      <ExternalLink className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+      <ExternalLink className="w-4 h-4 text-mc-text-3 flex-shrink-0" />
     </a>
   );
 };
@@ -153,14 +151,14 @@ const FlightSkeleton = () => (
     {[1, 2, 3].map((i) => (
       <div
         key={i}
-        className="rounded-2xl p-4 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5"
+        className="rounded-mc-lg p-4 bg-mc-surface-2 border border-mc-border dark:border-white/5"
       >
         <div className="flex items-center justify-between">
           <div className="space-y-2 flex-1">
-            <div className="h-5 w-32 bg-gray-200 dark:bg-white/10 rounded-lg" />
-            <div className="h-4 w-20 bg-gray-200 dark:bg-white/10 rounded-lg" />
+            <div className="h-5 w-32 bg-mc-surface-2 rounded-mc-sm" />
+            <div className="h-4 w-20 bg-mc-surface-2 rounded-mc-sm" />
           </div>
-          <div className="h-8 w-28 bg-gray-200 dark:bg-white/10 rounded-xl" />
+          <div className="h-8 w-28 bg-mc-surface-2 rounded-mc-md" />
         </div>
       </div>
     ))}
@@ -170,17 +168,17 @@ const FlightSkeleton = () => (
 /** Detail skeleton */
 const DetailSkeleton = () => (
   <div className="animate-pulse space-y-4 p-1">
-    <div className="h-14 bg-gray-200 dark:bg-white/10 rounded-2xl" />
+    <div className="h-14 bg-mc-surface-2 rounded-mc-lg" />
     <div className="space-y-3">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex justify-between">
-          <div className="h-4 w-24 bg-gray-200 dark:bg-white/10 rounded" />
-          <div className="h-4 w-20 bg-gray-200 dark:bg-white/10 rounded" />
+          <div className="h-4 w-24 bg-mc-surface-2 rounded" />
+          <div className="h-4 w-20 bg-mc-surface-2 rounded" />
         </div>
       ))}
     </div>
-    <div className="h-14 bg-gray-200 dark:bg-white/10 rounded-2xl" />
-    <div className="h-14 bg-gray-200 dark:bg-white/10 rounded-2xl" />
+    <div className="h-14 bg-mc-surface-2 rounded-mc-lg" />
+    <div className="h-14 bg-mc-surface-2 rounded-mc-lg" />
   </div>
 );
 
@@ -191,12 +189,15 @@ const StepIndicator = memo(
       {Array.from({ length: total }, (_, i) => (
         <motion.div
           key={i}
+          // Amber (#f59e0b) is a different hue from the brand orange the rest
+          // of the client app uses; the token keeps the wizard in the same
+          // palette as the screen it was opened from.
           className={`rounded-full transition-colors duration-300 ${
             i === current
-              ? 'bg-amber-500 dark:bg-amber-400'
+              ? 'bg-mc-brand'
               : i < current
-                ? 'bg-amber-500/50 dark:bg-amber-400/40'
-                : 'bg-gray-200 dark:bg-white/10'
+                ? 'bg-mc-brand/45'
+                : 'bg-mc-surface-2'
           }`}
           animate={{
             width: i === current ? 24 : 8,
@@ -268,9 +269,9 @@ const BottomDrawer = ({ open, onClose, children }: BottomDrawerProps) => (
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed bottom-0 left-0 right-0 z-[10010] bg-white dark:bg-[#151515] rounded-t-[2rem] max-h-[85vh] flex flex-col shadow-2xl"
+          className="fixed bottom-0 left-0 right-0 z-[10010] bg-mc-surface rounded-t-[22px] max-h-[85dvh] flex flex-col shadow-2xl"
         >
-          <div className="w-12 h-1.5 bg-gray-300 dark:bg-white/20 rounded-full mx-auto mt-4 mb-2 flex-shrink-0" />
+          <div className="w-12 h-1.5 bg-mc-surface-2 dark:bg-white/20 rounded-full mx-auto mt-4 mb-2 flex-shrink-0" />
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-10">
             {children}
           </div>
@@ -880,14 +881,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
     if (flightsError) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-red-400" />
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className="flex flex-col items-center justify-center space-y-3 py-12 text-center">
+          <AlertCircle className="h-10 w-10 text-mc-danger" strokeWidth={1.8} />
+          <p className="text-[13px] font-medium text-mc-text-2">
             {t('makePayment.errorOccurred')}
           </p>
           <button
             onClick={() => refetchFlights()}
-            className="px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold text-base active:scale-95 transition-transform"
+            className="rounded-mc-md bg-mc-brand px-5 py-2.5 text-[14px] font-bold
+                       text-mc-on-brand transition-transform active:scale-95"
           >
             {t('makePayment.retry')}
           </button>
@@ -904,14 +906,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
     if (flights.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-            <Plane className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+        <div className="flex flex-col items-center justify-center space-y-2 py-16 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mc-surface-2">
+            <Plane className="h-7 w-7 text-mc-text-3" strokeWidth={1.7} />
           </div>
-          <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+          <p className="text-[15px] font-extrabold text-mc-text">
             {t('makePayment.noFlights')}
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 max-w-[280px]">
+          <p className="max-w-[280px] text-[12px] font-medium text-mc-text-2">
             {t('makePayment.noFlightsDesc')}
           </p>
         </div>
@@ -920,8 +922,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     return (
       <div className="space-y-3">
         {/* Header row — title + archive toggle for report-not-sent flights */}
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <p className="text-[13px] font-extrabold text-mc-text">
             {showArchive
               ? t('makePayment.archiveTitle', "Arxiv — hisobot yuborilmagan")
               : t('makePayment.selectFlight')}
@@ -929,9 +931,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           {(pendingFlights.length > 0 || showArchive) && (
             <button
               onClick={() => setShowArchive((v) => !v)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-bold
-                bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-300
-                hover:bg-gray-200 dark:hover:bg-white/[0.1] active:scale-95 transition-all shrink-0"
+              className="flex shrink-0 items-center gap-1.5 rounded-mc-sm bg-mc-surface-2
+                         px-2.5 py-1.5 text-[12px] font-bold text-mc-text-2
+                         transition-transform active:scale-95"
             >
               {showArchive ? (
                 <>
@@ -949,21 +951,21 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         </div>
 
         {visibleFlights.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-14 text-center space-y-2">
-            <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center space-y-2 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mc-surface-2">
               {showArchive ? (
-                <Archive className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+                <Archive className="h-7 w-7 text-mc-text-3" strokeWidth={1.7} />
               ) : (
-                <Plane className="w-7 h-7 text-gray-300 dark:text-gray-600" />
+                <Plane className="h-7 w-7 text-mc-text-3" strokeWidth={1.7} />
               )}
             </div>
-            <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 max-w-[260px]">
+            <p className="max-w-[260px] text-[13px] font-bold text-mc-text-2">
               {showArchive
                 ? t('makePayment.archiveEmpty', "Arxivda reys yo'q")
                 : t('makePayment.noReadyFlights', "Hisoboti tayyor reys yo'q")}
             </p>
             {!showArchive && pendingFlights.length > 0 && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 max-w-[260px]">
+              <p className="max-w-[260px] text-[11px] font-medium text-mc-text-3">
                 {t('makePayment.noReadyFlightsHint', "Hisobot yuborilmagan reyslar arxivda")}
               </p>
             )}
@@ -974,41 +976,34 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             key={flight.flight_name}
             whileTap={{ scale: 0.97 }}
             onClick={() => handleSelectFlight(flight)}
-            className="w-full text-left rounded-xl p-3
-              bg-white dark:bg-white/[0.04]
-              border border-gray-200 dark:border-white/10
-              hover:border-amber-300 dark:hover:border-amber-500/40
-              shadow-sm hover:shadow-md
-              transition-all duration-200 group cursor-pointer"
+            className="w-full rounded-mc-md border border-mc-border bg-mc-surface p-3
+                       text-left shadow-[var(--mc-shadow-card)] transition-transform
+                       duration-150"
           >
             <div className="flex items-center justify-between gap-3">
               {/* Left */}
               <div className="flex items-center gap-2.5 min-w-0">
+                {/* Blue appeared nowhere else in the client app; the chip now
+                    carries the same warn/brand pair the cargo list uses. */}
                 <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-mc-sm ${
                     flight.payment_status === 'partial'
-                      ? 'bg-amber-100 dark:bg-amber-500/15'
-                      : 'bg-blue-100 dark:bg-blue-500/15'
+                      ? 'bg-mc-warn-soft text-mc-warn'
+                      : 'bg-mc-brand-soft text-mc-brand'
                   }`}
                 >
-                  <Plane
-                    className={`w-4 h-4 ${
-                      flight.payment_status === 'partial'
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-blue-600 dark:text-blue-400'
-                    }`}
-                  />
+                  <Plane className="h-[18px] w-[18px]" strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-sm truncate text-gray-900 dark:text-white">
+                  <p className="truncate text-[14px] font-extrabold text-mc-text">
                     {flight.flight_name}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span
-                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${
                         flight.payment_status === 'partial'
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                          ? 'border-mc-warn/25 bg-mc-warn-soft text-mc-warn'
+                          : 'border-mc-danger/25 bg-mc-danger-soft text-mc-danger'
                       }`}
                     >
                       {flight.payment_status === 'partial'
@@ -1026,31 +1021,31 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     {flight.payment_status === 'partial' &&
                     flight.remaining_amount != null ? (
                       <div>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                        <p className="text-[11px] font-medium text-mc-text-2">
                           {t('makePayment.remaining')}
                         </p>
-                        <p className="text-sm font-extrabold text-amber-600 dark:text-amber-400">
+                        <p className="text-[14px] font-extrabold text-mc-danger tabular-nums">
                           {formatMoney(flight.remaining_amount)}
-                          <span className="text-[10px] ml-1 font-semibold opacity-70">
+                          <span className="ml-1 text-[10px] font-bold opacity-80">
                             so'm
                           </span>
                         </p>
                       </div>
                     ) : (
-                      <p className="text-sm font-extrabold text-gray-900 dark:text-white">
+                      <p className="text-[14px] font-extrabold text-mc-text tabular-nums">
                         {formatMoney(flight.total_payment)}
-                        <span className="text-[10px] ml-1 font-semibold text-gray-400">
+                        <span className="ml-1 text-[10px] font-bold text-mc-text-2">
                           so'm
                         </span>
                       </p>
                     )}
                   </>
                 ) : (
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">
+                  <span className="text-[11px] font-medium text-mc-text-3">
                     {t('makePayment.reportNotReady')}
                   </span>
                 )}
-                <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 ml-auto mt-0.5 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="ml-auto mt-0.5 h-3.5 w-3.5 text-mc-text-3" />
               </div>
             </div>
           </motion.button>
@@ -1067,21 +1062,22 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     // Flight has no cargo calculated yet — show friendly message instead of error
     if (detailsError || !details || details.total_payment == null) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-center space-y-5 px-2">
-          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center">
-            <Package className="w-8 h-8 text-amber-500" />
+        <div className="flex flex-col items-center justify-center space-y-4 px-2 py-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mc-warn-soft">
+            <Package className="h-7 w-7 text-mc-warn" strokeWidth={1.8} />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-lg font-black text-gray-900 dark:text-white">
+          <div className="space-y-1.5">
+            <h3 className="text-[16px] font-extrabold text-mc-text">
               {t('makePayment.reportNotReady')}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[260px] mx-auto leading-relaxed">
+            <p className="mx-auto max-w-[260px] text-[12px] font-medium leading-relaxed text-mc-text-2">
               {t('makePayment.reportNotReadyDesc')}
             </p>
           </div>
           <button
             onClick={goBack}
-            className="px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold text-sm active:scale-95 transition-transform"
+            className="rounded-mc-md bg-mc-brand px-5 py-2.5 text-[14px] font-bold
+                       text-mc-on-brand transition-transform active:scale-95"
           >
             {t('makePayment.retry')}
           </button>
@@ -1107,7 +1103,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             sitting under the main CTA would be read after the money had already
             moved. Both routes go through the same top-up. */}
         {nbuEnabled && isBelowNbuMinimum && (
-          <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900 dark:bg-amber-400/10 dark:text-amber-200 space-y-0.5">
+          <div className="space-y-0.5 rounded-mc-md border border-mc-warn/25 bg-mc-warn-soft px-3 py-2.5 text-[12px] text-mc-text">
             <p className="font-bold">
               {t('makePayment.belowNbuMinimum', { min: nbuMinimumParts.min })}
             </p>
@@ -1134,10 +1130,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         {nbuEnabled && hasSavedCards && (
           <div data-tour="pay-saved-card" className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+              <p className="text-[13px] font-extrabold text-mc-text">
                 {t('nbu.cards.title')}
               </p>
-              <span className="text-[11px] text-gray-400 dark:text-gray-500">
+              <span className="text-[11px] font-medium text-mc-text-3">
                 {t('nbu.cards.tapToPay', "Bir bosishda to'lash")}
               </span>
             </div>
@@ -1148,30 +1144,35 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 ? (card.nickname ? card.card_masked : t('nbu.cards.tokenized'))
                 : t('nbu.cards.pendingMasked');
               return (
+                // Sky blue was a third accent hue on a screen that already had
+                // amber and orange; the row now uses the same surface and brand
+                // pair as every other card in the client app.
                 <div
                   key={card.id}
-                  className="flex items-center gap-2.5 p-2.5 rounded-lg
-                    bg-sky-50/60 dark:bg-sky-500/5
-                    border border-sky-100 dark:border-sky-500/10"
+                  className="flex items-center gap-2.5 rounded-mc-md border border-mc-border
+                             bg-mc-surface p-2.5"
                 >
-                  <div className="w-8 h-8 rounded-md bg-white dark:bg-white/5 flex items-center justify-center flex-shrink-0">
-                    <CreditCard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-mc-sm bg-mc-brand-soft text-mc-brand">
+                    <CreditCard className="h-[18px] w-[18px]" strokeWidth={2} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-xs text-gray-900 dark:text-white truncate">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-bold text-mc-text">
                       {primaryLabel}
                     </p>
-                    <p className={`text-[10px] truncate ${card.nickname && card.card_masked ? 'font-mono text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <p
+                      className={`truncate text-[11px] text-mc-text-2 ${
+                        card.nickname && card.card_masked ? 'font-mono' : ''
+                      }`}
+                    >
                       {secondaryLabel}
                     </p>
                   </div>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setConfirmChargeCard(card)}
-                    className="shrink-0 px-3 py-2 rounded-md
-                      bg-sky-500 hover:bg-sky-600 text-white
-                      active:scale-95 transition-all
-                      whitespace-nowrap text-[11px] font-bold"
+                    className="shrink-0 whitespace-nowrap rounded-mc-sm bg-mc-brand px-3 py-2
+                               text-[11px] font-bold text-mc-on-brand transition-transform
+                               active:scale-95"
                   >
                     {t('nbu.cards.payWithCard')}
                   </motion.button>
@@ -1182,17 +1183,21 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         )}
 
         {/* ---- Big Amount Display ---- */}
-        <div data-tour="pay-amount" className="text-center py-5 px-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/[0.08] dark:to-orange-500/[0.05] border border-amber-300/70 dark:border-amber-500/25 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-amber-700/80 dark:text-amber-400/70 mb-1.5">
+        <div
+          data-tour="pay-amount"
+          className="rounded-mc-lg border border-mc-brand/20 bg-mc-brand-soft px-4 py-5 text-center"
+        >
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-mc-text-2">
             {details.has_existing_partial
               ? t('makePayment.existingRemaining')
               : t('makePayment.totalAmount')}
           </p>
-          <p className="text-5xl sm:text-[56px] font-black text-gray-900 dark:text-white tracking-tight leading-none">
+          {/* Sized down from 56px: the figure is the point of the screen, but at
+              that size a seven-digit sum wrapped on a narrow phone. `break-words`
+              is the guard if it ever still does. */}
+          <p className="break-words text-[34px] font-black leading-none tracking-tight text-mc-text tabular-nums sm:text-[40px]">
             {formatMoney(payableAmount)}
-            <span className="text-xl ml-2 font-bold text-amber-600 dark:text-amber-400">
-              so'm
-            </span>
+            <span className="ml-2 text-[16px] font-bold text-mc-brand">so'm</span>
           </p>
         </div>
 
@@ -1214,7 +1219,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   animate={{ rotate: showCargoPrices ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                  <ChevronDown className="w-3.5 h-3.5 text-mc-text-3" />
                 </motion.div>
               }
             />
@@ -1244,7 +1249,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   animate={{ rotate: showTrackCodes ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                  <ChevronDown className="w-3.5 h-3.5 text-mc-text-3" />
                 </motion.div>
               }
             />
@@ -1261,8 +1266,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               transition={{ duration: 0.25, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02] p-3 space-y-1.5">
-                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
+              <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3 space-y-1.5">
+                <p className="text-[11px] font-medium text-mc-text-3 uppercase tracking-wide mb-2">
                   {t('makePayment.trackCodes')}
                 </p>
                 {details.track_codes.map((code, idx) => (
@@ -1272,17 +1277,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.03 }}
                     onClick={() => handleTrackClick(code)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg
-                      bg-white dark:bg-white/[0.04]
-                      border border-gray-100 dark:border-white/5
-                      hover:border-amber-300 dark:hover:border-amber-500/30
-                      hover:bg-amber-50 dark:hover:bg-amber-500/5
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-mc-sm
+                      bg-mc-surface
+                      border border-mc-border
                       active:scale-[0.98] transition-all group"
                   >
-                    <span className="text-sm font-mono font-semibold text-gray-700 dark:text-gray-300 truncate">
+                    <span className="text-sm font-mono font-semibold text-mc-text truncate">
                       {code}
                     </span>
-                    <Search className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors flex-shrink-0 ml-2" />
+                    <Search className="w-3.5 h-3.5 text-mc-text-3 flex-shrink-0 ml-2" />
                   </motion.button>
                 ))}
               </div>
@@ -1300,8 +1303,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               transition={{ duration: 0.25, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02] p-3 space-y-2">
-                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
+              <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3 space-y-2">
+                <p className="text-[11px] font-medium text-mc-text-3 uppercase tracking-wide mb-2">
                   Har bir yuk narxi
                 </p>
                 {details.cargo_prices.map((cargo, idx) => (
@@ -1310,21 +1313,21 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg
-                      bg-white dark:bg-white/[0.04]
-                      border border-gray-100 dark:border-white/5"
+                    className="flex items-center justify-between px-3 py-2 rounded-mc-sm
+                      bg-mc-surface
+                      border border-mc-border"
                   >
                     <div className="flex items-center gap-3">
-                      <Scale className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                      <Scale className="w-3.5 h-3.5 text-mc-text-3" />
+                      <span className="text-sm text-mc-text-2">
                         {cargo.weight_kg} kg
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                      <span className="text-sm font-bold text-mc-text">
                         ${cargo.price_per_kg_usd.toFixed(2)}
                       </span>
-                      <span className="text-xs text-gray-400 ml-1">/kg</span>
+                      <span className="text-xs text-mc-text-3 ml-1">/kg</span>
                     </div>
                   </motion.div>
                 ))}
@@ -1338,20 +1341,20 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <div className="space-y-2">
             <button
               onClick={() => setIsPartial(!isPartial)}
-              className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 ${
+              className={`w-full flex items-center justify-between p-3.5 rounded-mc-md border transition-all duration-200 ${
                 isPartial
-                  ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30'
-                  : 'bg-white dark:bg-white/[0.03] border-gray-200 dark:border-white/10'
+                  ? 'bg-mc-brand-soft border-mc-brand/25'
+                  : 'bg-mc-surface border-mc-border'
               }`}
             >
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-semibold text-mc-text">
                 {t('makePayment.customAmount')}
               </span>
               <div
                 className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${
                   isPartial
-                    ? 'bg-amber-500'
-                    : 'bg-gray-300 dark:bg-white/20'
+                    ? 'bg-mc-brand'
+                    : 'bg-mc-surface-2'
                 }`}
               >
                 <motion.div
@@ -1379,15 +1382,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     }
                   }}
                   placeholder={t('makePayment.enterAmount')}
-                  className="w-full px-4 py-3.5 rounded-xl text-lg font-bold
-                    bg-white dark:bg-white/[0.04]
-                    border border-gray-200 dark:border-white/10
-                    text-gray-900 dark:text-white
-                    placeholder:text-gray-400 dark:placeholder:text-gray-600
-                    focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500
+                  className="w-full px-4 py-3.5 rounded-mc-md text-lg font-bold
+                    bg-mc-surface
+                    border border-mc-border
+                    text-mc-text
+                    placeholder:text-mc-text-3 dark:placeholder:text-mc-text-2
+                    focus:outline-none focus:ring-2 focus:ring-mc-brand/40 focus:border-mc-brand
                     transition-all"
                 />
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
+                <p className="text-xs text-mc-text-3 mt-1 px-1">
                   {t('makePayment.minAmount', { amount: '1 000' })} ·{' '}
                   {t('makePayment.maxAmount', {
                     amount: formatMoney(payableAmount),
@@ -1401,12 +1404,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         {/* ---- Wallet Balance & Toggle ---- */}
         <div
           data-tour="pay-wallet"
-          className={`p-3.5 rounded-xl border transition-all duration-200 ${
+          className={`p-3.5 rounded-mc-md border transition-all duration-200 ${
             details.wallet_balance <= 0
-              ? 'bg-gray-50 dark:bg-white/[0.02] border-gray-200 dark:border-white/5 opacity-75'
+              ? 'bg-mc-surface-2 border-mc-border dark:border-white/5 opacity-75'
               : useWallet
-                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30'
-                : 'bg-white dark:bg-white/[0.03] border-gray-200 dark:border-white/10'
+                ? 'bg-mc-success/12 border-mc-success/30'
+                : 'bg-mc-surface border-mc-border'
           }`}
         >
           <button
@@ -1421,29 +1424,29 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               <WalletCards
                 className={`w-5 h-5 ${
                   details.wallet_balance <= 0
-                    ? 'text-gray-300 dark:text-gray-600'
+                    ? 'text-mc-text-3'
                     : useWallet
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-gray-400 dark:text-gray-500'
+                      ? 'text-mc-success'
+                      : 'text-mc-text-3'
                 }`}
               />
               <div className="text-left">
                 <p className={`text-sm font-semibold ${
                   details.wallet_balance <= 0
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : 'text-gray-700 dark:text-gray-300'
+                    ? 'text-mc-text-3'
+                    : 'text-mc-text'
                 }`}>
                   {t('makePayment.useWallet')}
                 </p>
                 {details.wallet_balance > 0 ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                  <p className="text-xs text-mc-text-3">
                     {t('makePayment.yourBalance')}:{' '}
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="font-bold text-mc-success">
                       {formatMoney(details.wallet_balance)} so'm
                     </span>
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                  <p className="text-xs text-mc-text-3">
                     Hisobingizda mablag' yo'q
                   </p>
                 )}
@@ -1452,10 +1455,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             <div
               className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${
                 details.wallet_balance <= 0
-                  ? 'bg-gray-200 dark:bg-white/10'
+                  ? 'bg-mc-surface-2'
                   : useWallet
-                    ? 'bg-emerald-500'
-                    : 'bg-gray-300 dark:bg-white/20'
+                    ? 'bg-mc-success'
+                    : 'bg-mc-surface-2'
               }`}
             >
               <motion.div
@@ -1475,20 +1478,20 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-500/20 space-y-1">
+                <div className="mt-3 pt-3 border-t border-mc-success/25 space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-mc-text-2">
                       {t('makePayment.walletApplied')}
                     </span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="font-bold text-mc-success">
                       -{formatMoney(walletDeduction)} so'm
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">
+                    <span className="font-semibold text-mc-text">
                       {t('makePayment.youPay')}
                     </span>
-                    <span className="font-extrabold text-gray-900 dark:text-white">
+                    <span className="font-extrabold text-mc-text">
                       {formatMoney(finalPayable)} so'm
                     </span>
                   </div>
@@ -1503,10 +1506,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => handleChooseMethod('wallet')}
-            className="w-full h-16 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-emerald-500 to-teal-500
-              hover:from-emerald-600 hover:to-teal-600
-              text-white shadow-lg shadow-emerald-500/20
+            className="w-full h-16 rounded-mc-lg font-black text-[16px]
+              bg-gradient-to-r from-mc-success to-mc-success
+              text-mc-on-success shadow-lg shadow-emerald-500/20
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
           >
             <Wallet className="w-5 h-5" />
@@ -1529,10 +1531,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             whileTap={{ scale: 0.97 }}
             onClick={handleNbuPayment}
             disabled={isNbuInitiating}
-            className="w-full h-16 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-sky-500 to-cyan-500
-              hover:from-sky-600 hover:to-cyan-600
-              text-white shadow-lg shadow-sky-500/20
+            className="w-full h-16 rounded-mc-lg font-black text-[16px]
+              bg-gradient-to-r from-mc-brand to-mc-brand-strong
+              text-mc-on-brand shadow-lg shadow-sky-500/20
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
               disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -1562,10 +1563,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => handleChooseMethod('online')}
-              className="h-16 rounded-2xl font-black text-[16px]
-                bg-gradient-to-r from-blue-500 to-indigo-500
-                hover:from-blue-600 hover:to-indigo-600
-                text-white shadow-lg shadow-blue-500/20
+              className="h-16 rounded-mc-lg font-black text-[16px]
+                bg-gradient-to-r from-mc-brand to-mc-brand-strong
+                text-mc-on-brand shadow-lg shadow-blue-500/20
                 active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
             >
               <CreditCard className="w-5 h-5" />
@@ -1579,10 +1579,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             disabled={isPartial}
             aria-disabled={isPartial}
             className={
-              `h-16 rounded-2xl font-black text-[16px]
-              bg-white
-              hover:bg-[#eef6ff]
-              text-[#07182f] border border-[#dbe8f4] shadow-sm
+              `h-16 rounded-mc-lg font-black text-[16px]
+              bg-mc-surface text-mc-text border border-mc-border shadow-sm
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
               disabled:opacity-60 disabled:cursor-not-allowed`
             }
@@ -1614,21 +1612,21 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
-            className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center"
+            className="w-20 h-20 rounded-full bg-mc-success/12 flex items-center justify-center"
           >
-            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            <CheckCircle2 className="w-10 h-10 text-mc-success" />
           </motion.div>
-          <h3 className="text-2xl font-black text-gray-900 dark:text-white">
+          <h3 className="text-2xl font-black text-mc-text">
             {t('makePayment.successTitle')}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[260px]">
+          <p className="text-sm text-mc-text-2 max-w-[260px]">
             {t('makePayment.successDesc')}
           </p>
           <button
             onClick={handleClose}
-            className="mt-4 w-full max-w-[280px] h-16 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-amber-500 to-orange-500
-              text-white shadow-xl shadow-amber-500/25
+            className="mt-4 w-full max-w-[280px] h-16 rounded-mc-lg font-black text-[16px]
+              bg-gradient-to-r from-mc-brand to-mc-brand-strong
+              text-mc-on-brand shadow-xl shadow-amber-500/25
               active:scale-[0.97] transition-all"
           >
             {t('makePayment.done')}
@@ -1641,14 +1639,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     if (paymentMethod === 'cash') {
       return (
         <div className="flex flex-col items-center justify-center py-8 text-center space-y-5">
-          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-            <Banknote className="w-8 h-8 text-gray-600 dark:text-gray-300" />
+          <div className="w-16 h-16 rounded-full bg-mc-surface-2 flex items-center justify-center">
+            <Banknote className="w-8 h-8 text-mc-text-2" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-xl font-bold text-mc-text">
               {t('makePayment.cashConfirmTitle')}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[280px] mx-auto">
+            <p className="text-sm text-mc-text-2 max-w-[280px] mx-auto">
               {t('makePayment.cashConfirmDesc')}
             </p>
           </div>
@@ -1656,30 +1654,29 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               address and today's hours they arrive at a closed door. */}
           <OfficeVisitSummary />
           {walletDeduction > 0 && (
-            <div className="w-full max-w-xs mx-auto rounded-xl p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
+            <div className="w-full max-w-xs mx-auto rounded-mc-md p-3 bg-mc-success/12 border border-mc-success/25">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">
+                <span className="text-mc-text-2">
                   {t('makePayment.walletApplied')}
                 </span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="font-bold text-mc-success">
                   -{formatMoney(walletDeduction)} so'm
                 </span>
               </div>
             </div>
           )}
-          <p className="text-3xl font-black text-gray-900 dark:text-white">
+          <p className="text-3xl font-black text-mc-text">
             {formatMoney(finalPayable)}
-            <span className="text-base ml-1.5 text-amber-600 dark:text-amber-400 font-bold">
+            <span className="text-base ml-1.5 text-mc-brand font-bold">
               so'm
             </span>
           </p>
           <button
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="w-full max-w-xs h-14 rounded-2xl font-bold text-base
-              bg-gradient-to-r from-amber-500 to-orange-500
-              hover:from-amber-600 hover:to-orange-600
-              text-white shadow-lg shadow-amber-500/20
+            className="w-full max-w-xs h-14 rounded-mc-lg font-bold text-base
+              bg-gradient-to-r from-mc-brand to-mc-brand-strong
+              text-mc-on-brand shadow-lg shadow-amber-500/20
               active:scale-[0.97] transition-all
               disabled:opacity-60 disabled:cursor-not-allowed
               flex items-center justify-center gap-2"
@@ -1701,30 +1698,29 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     if (paymentMethod === 'wallet') {
       return (
         <div className="flex flex-col items-center justify-center py-8 text-center space-y-5">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center">
-            <Wallet className="w-8 h-8 text-emerald-500" />
+          <div className="w-16 h-16 rounded-full bg-mc-success/12 flex items-center justify-center">
+            <Wallet className="w-8 h-8 text-mc-success" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-xl font-bold text-mc-text">
               {t('makePayment.walletConfirmTitle')}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[280px] mx-auto">
+            <p className="text-sm text-mc-text-2 max-w-[280px] mx-auto">
               {t('makePayment.walletConfirmDesc', {
                 amount: `${formatMoney(effectiveAmount)} so'm`,
               })}
             </p>
           </div>
-          <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+          <p className="text-3xl font-black text-mc-success">
             {formatMoney(effectiveAmount)}
             <span className="text-base ml-1.5 font-bold">so'm</span>
           </p>
           <button
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="w-full max-w-xs h-16 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-emerald-500 to-teal-500
-              hover:from-emerald-600 hover:to-teal-600
-              text-white shadow-xl shadow-emerald-500/25
+            className="w-full max-w-xs h-16 rounded-mc-lg font-black text-[16px]
+              bg-gradient-to-r from-mc-success to-mc-success
+              text-mc-on-success shadow-xl shadow-emerald-500/25
               active:scale-[0.97] transition-all
               disabled:opacity-60 disabled:cursor-not-allowed
               flex items-center justify-center gap-2"
@@ -1751,8 +1747,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       if (!hasCard && !hasLinks) {
         return (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-            <AlertCircle className="w-12 h-12 text-amber-400" />
-            <p className="text-gray-600 dark:text-gray-400 max-w-[260px]">
+            <AlertCircle className="w-12 h-12 text-mc-brand" />
+            <p className="text-mc-text-2 max-w-[260px]">
               {t('makePayment.noCardAvailable')}
             </p>
           </div>
@@ -1761,20 +1757,20 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
       return (
         <div className="space-y-5">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">
+          <h3 className="text-lg font-bold text-mc-text text-center">
             {t('makePayment.onlineTitle')}
           </h3>
 
           {/* Amount summary */}
           <div className="text-center">
-            <p className="text-3xl font-black text-gray-900 dark:text-white">
+            <p className="text-3xl font-black text-mc-text">
               {formatMoney(finalPayable)}
-              <span className="text-sm ml-1.5 text-amber-600 dark:text-amber-400 font-bold">
+              <span className="text-sm ml-1.5 text-mc-brand font-bold">
                 so'm
               </span>
             </p>
             {walletDeduction > 0 && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+              <p className="text-xs text-mc-success mt-1 font-medium">
                 {t('makePayment.walletApplied')}: -{formatMoney(walletDeduction)}{' '}
                 so'm
               </p>
@@ -1783,8 +1779,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
           {/* Card info */}
           {hasCard && (
-            <div className="rounded-2xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 dark:from-white/[0.06] dark:to-white/[0.03] border border-gray-700 dark:border-white/10">
-              <p className="text-xs font-medium text-gray-400 mb-1">
+            <div className="rounded-mc-lg p-4 bg-mc-surface-2 border border-mc-border">
+              <p className="text-xs font-medium text-mc-text-3 mb-1">
                 {t('makePayment.transferTo')}
               </p>
               <div className="flex items-center justify-between">
@@ -1793,17 +1789,17 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 </p>
                 <button
                   onClick={handleCopyCard}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 transition-all"
+                  className="p-2.5 rounded-mc-md bg-white/10 active:scale-90 transition-all"
                 >
                   {copied ? (
-                    <Check className="w-5 h-5 text-emerald-400" />
+                    <Check className="w-5 h-5 text-mc-success" />
                   ) : (
                     <Copy className="w-5 h-5 text-white/70" />
                   )}
                 </button>
               </div>
               {details!.card_owner && (
-                <p className="text-xs text-gray-400 mt-1.5">
+                <p className="text-xs text-mc-text-3 mt-1.5">
                   {t('makePayment.cardOwner')}: {details!.card_owner}
                 </p>
               )}
@@ -1815,14 +1811,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             <div className="space-y-2">
               {hasCard && (
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
-                  <span className="text-xs font-medium text-gray-400 dark:text-gray-500 px-1">
+                  <div className="flex-1 h-px bg-mc-surface-2" />
+                  <span className="text-xs font-medium text-mc-text-3 px-1">
                     yoki
                   </span>
-                  <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                  <div className="flex-1 h-px bg-mc-surface-2" />
                 </div>
               )}
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <p className="text-xs font-semibold text-mc-text-2 uppercase tracking-wide">
                 {hasCard ? "Online to'lov tizimi orqali" : "To'lov tizimini tanlang"}
               </p>
               {paymentLinks.map((link) => (
@@ -1834,11 +1830,11 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           {/* Divider before upload */}
           {(hasCard || hasLinks) && (
             <div className="flex items-center gap-2 pt-1">
-              <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
-              <span className="text-xs font-medium text-gray-400 dark:text-gray-500 px-1">
+              <div className="flex-1 h-px bg-mc-surface-2" />
+              <span className="text-xs font-medium text-mc-text-3 px-1">
                 To'lov chekini yuboring
               </span>
-              <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+              <div className="flex-1 h-px bg-mc-surface-2" />
             </div>
           )}
 
@@ -1847,11 +1843,11 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`relative rounded-2xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-200
+            className={`relative rounded-mc-lg border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-200
               ${
                 receiptFile
-                  ? 'border-emerald-400 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-500/5'
-                  : 'border-gray-300 dark:border-white/15 bg-gray-50 dark:bg-white/[0.02] hover:border-amber-400 dark:hover:border-amber-500/40'
+                  ? 'border-mc-success dark:border-mc-success/40 bg-mc-success/12 dark:bg-mc-success/5'
+                  : 'border-mc-border dark:border-white/15 bg-mc-surface-2'
               }`}
           >
             <input
@@ -1871,27 +1867,27 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <img
                     src={receiptPreview}
                     alt="Receipt"
-                    className="max-h-36 mx-auto rounded-xl object-contain"
+                    className="max-h-36 mx-auto rounded-mc-md object-contain"
                   />
                 ) : (
-                  <div className="w-16 h-16 mx-auto rounded-xl bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center">
-                    <FileImage className="w-8 h-8 text-emerald-500" />
+                  <div className="w-16 h-16 mx-auto rounded-mc-md bg-mc-success/12 flex items-center justify-center">
+                    <FileImage className="w-8 h-8 text-mc-success" />
                   </div>
                 )}
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate px-2">
+                <p className="text-sm font-semibold text-mc-text truncate px-2">
                   {receiptFile.name}
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                <p className="text-xs text-mc-brand font-medium">
                   {t('makePayment.changeFile')}
                 </p>
               </div>
             ) : (
               <div className="space-y-2 py-3">
-                <Upload className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto" />
-                <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                <Upload className="w-10 h-10 text-mc-text-3 mx-auto" />
+                <p className="text-sm font-semibold text-mc-text-2">
                   {t('makePayment.dragOrClick')}
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
+                <p className="text-xs text-mc-text-3">
                   {t('makePayment.uploadReceiptDesc')}
                 </p>
               </div>
@@ -1902,10 +1898,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <button
             onClick={handleConfirm}
             disabled={!receiptFile || isSubmitting}
-            className="w-full h-16 rounded-2xl font-black text-[16px]
-              bg-gradient-to-r from-blue-500 to-indigo-500
-              hover:from-blue-600 hover:to-indigo-600
-              text-white shadow-xl shadow-blue-500/25
+            className="w-full h-16 rounded-mc-lg font-black text-[16px]
+              bg-gradient-to-r from-mc-brand to-mc-brand-strong
+              text-mc-on-brand shadow-xl shadow-blue-500/25
               active:scale-[0.97] transition-all
               disabled:opacity-50 disabled:cursor-not-allowed
               flex items-center justify-center gap-2.5"
@@ -1965,47 +1960,55 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 : { type: 'spring', stiffness: 400, damping: 28 }
             }
             onClick={(e) => e.stopPropagation()}
-            className={`fixed z-[10000] bg-white dark:bg-[#141210]
+            role="dialog"
+            aria-modal="true"
+            className={`fixed z-[10000] bg-mc-surface
               ${
                 isMobile
-                  ? 'bottom-0 left-0 right-0 rounded-t-3xl max-h-[92vh]'
-                  : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-3xl max-h-[90vh]'
+                  ? 'bottom-0 left-0 right-0 rounded-t-[22px] max-h-[92dvh]'
+                  : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-[22px] max-h-[90dvh]'
               }
-              overflow-hidden shadow-2xl border border-gray-200 dark:border-white/10
+              overflow-hidden shadow-2xl border border-mc-border
               flex flex-col`}
           >
             {/* ---- Header ---- */}
-            <div className="flex-shrink-0 px-5 pt-5 pb-3 border-b border-gray-100 dark:border-white/5">
+            <div className="flex-shrink-0 border-b border-mc-border px-4 pb-2 pt-4">
               {/* Drag handle (mobile) */}
               {isMobile && (
-                <div className="w-10 h-1 bg-gray-300 dark:bg-white/20 rounded-full mx-auto mb-3" />
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-mc-surface-2" />
               )}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 {step > 0 && !showSuccess ? (
                   <button
                     onClick={goBack}
-                    className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-sm
+                               bg-mc-surface-2 text-mc-text transition-transform duration-150
+                               active:scale-95"
+                    aria-label={t('reports.back', 'Ortga')}
                   >
-                    <ChevronLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                    <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
                   </button>
                 ) : (
-                  <div className="w-9" />
+                  <div className="h-10 w-10 shrink-0" />
                 )}
-                <h2 className="text-base font-bold text-gray-900 dark:text-white text-center flex-1 truncate px-2">
+                <h2 className="min-w-0 flex-1 truncate px-1 text-center text-[15px] font-extrabold text-mc-text">
                   {showSuccess ? t('makePayment.successTitle') : stepTitles[step]}
                 </h2>
                 <button
                   onClick={handleClose}
-                  className="p-2 -mr-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-sm
+                             bg-mc-surface-2 text-mc-text-2 transition-transform duration-150
+                             active:scale-95"
+                  aria-label={t('common.close', 'Yopish')}
                 >
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                  <X className="h-[18px] w-[18px]" strokeWidth={2} />
                 </button>
               </div>
               {!showSuccess && <StepIndicator current={step} total={3} />}
             </div>
 
             {/* ---- Body (scrollable, animated) ---- */}
-            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
                   key={showSuccess ? 'success' : step}
@@ -2032,15 +2035,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Search className="w-5 h-5 text-amber-500" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <Search className="w-5 h-5 text-mc-brand" />
+                <h3 className="text-lg font-bold text-mc-text">
                   {selectedTrackCode}
                 </h3>
               </div>
 
               {isTrackLoading && (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-mc-brand animate-spin" />
                 </div>
               )}
 
@@ -2050,8 +2053,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
               {!isTrackLoading && !trackData && selectedTrackCode && (
                 <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-                  <Package className="w-10 h-10 text-gray-300 dark:text-gray-600" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <Package className="w-10 h-10 text-mc-text-3" />
+                  <p className="text-sm text-mc-text-2">
                     {t('makePayment.errorOccurred')}
                   </p>
                 </div>
@@ -2069,51 +2072,51 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             {confirmChargeCard && !chargeDone && (
               <div className="space-y-5">
                 <div className="text-center space-y-1">
-                  <h3 className="text-xl font-black text-gray-900 dark:text-white">
+                  <h3 className="text-xl font-black text-mc-text">
                     {t('nbu.confirm.title')}
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-mc-text-2">
                     {t('nbu.confirm.subtitle')}
                   </p>
                 </div>
 
                 {/* Amount */}
-                <div className="text-center py-4 rounded-2xl bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-500/[0.08] dark:to-cyan-500/[0.05] border border-sky-200/70 dark:border-sky-500/25">
-                  <p className="text-xs font-bold uppercase tracking-wider text-sky-700/80 dark:text-sky-400/70 mb-1">
+                <div className="text-center py-4 rounded-mc-lg bg-mc-brand-soft border border-mc-brand/20">
+                  <p className="text-xs font-bold uppercase tracking-wider text-mc-brand dark:text-mc-brand mb-1">
                     {t('nbu.confirm.amountLabel')}
                   </p>
-                  <p className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                  <p className="text-4xl font-black text-mc-text tracking-tight">
                     {formatMoney(payableAmount)}
-                    <span className="text-lg ml-1.5 font-bold text-sky-600 dark:text-sky-400">so'm</span>
+                    <span className="text-lg ml-1.5 font-bold text-mc-brand">so'm</span>
                   </p>
                 </div>
 
                 {/* Card + flight */}
                 <div className="space-y-2.5">
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10">
-                    <div className="w-9 h-9 rounded-lg bg-sky-100 dark:bg-sky-500/15 flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="w-4.5 h-4.5 text-sky-600 dark:text-sky-400" />
+                  <div className="flex items-center gap-3 p-3 rounded-mc-md bg-mc-surface-2 dark:bg-white/[0.03] border border-mc-border">
+                    <div className="w-9 h-9 rounded-mc-sm bg-mc-brand-soft flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="w-4.5 h-4.5 text-mc-brand" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-gray-400 dark:text-gray-500">{t('nbu.confirm.cardLabel')}</p>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                      <p className="text-[11px] text-mc-text-3">{t('nbu.confirm.cardLabel')}</p>
+                      <p className="text-sm font-bold text-mc-text truncate">
                         {confirmChargeCard.nickname || confirmChargeCard.card_masked || t('nbu.cards.namedCardFallback')}
                       </p>
                       {confirmChargeCard.nickname && confirmChargeCard.card_masked && (
-                        <p className="font-mono text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                        <p className="font-mono text-[11px] text-mc-text-2 truncate">
                           {confirmChargeCard.card_masked}
                         </p>
                       )}
                     </div>
                   </div>
                   {selectedFlightName && (
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10">
-                      <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                        <Plane className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />
+                    <div className="flex items-center gap-3 p-3 rounded-mc-md bg-mc-surface-2 dark:bg-white/[0.03] border border-mc-border">
+                      <div className="w-9 h-9 rounded-mc-sm bg-mc-brand-soft flex items-center justify-center flex-shrink-0">
+                        <Plane className="w-4.5 h-4.5 text-mc-brand" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-gray-400 dark:text-gray-500">{t('nbu.confirm.flightLabel')}</p>
-                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{selectedFlightName}</p>
+                        <p className="text-[11px] text-mc-text-3">{t('nbu.confirm.flightLabel')}</p>
+                        <p className="text-sm font-bold text-mc-text truncate">{selectedFlightName}</p>
                       </div>
                     </div>
                   )}
@@ -2123,10 +2126,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <button
                     onClick={confirmCharge}
                     disabled={nbuChargeMutation.isPending}
-                    className="w-full h-14 rounded-2xl font-black text-[16px]
-                      bg-gradient-to-r from-sky-500 to-cyan-500
-                      hover:from-sky-600 hover:to-cyan-600
-                      text-white shadow-lg shadow-sky-500/25
+                    className="w-full h-14 rounded-mc-lg font-black text-[16px]
+                      bg-gradient-to-r from-mc-brand to-mc-brand-strong
+                      text-mc-on-brand shadow-lg shadow-sky-500/25
                       active:scale-[0.97] transition-all
                       disabled:opacity-60 disabled:cursor-not-allowed
                       flex items-center justify-center gap-2"
@@ -2146,9 +2148,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <button
                     onClick={closeChargeDrawer}
                     disabled={nbuChargeMutation.isPending}
-                    className="w-full h-12 rounded-2xl font-bold text-sm
-                      bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300
-                      hover:bg-gray-200 dark:hover:bg-white/10
+                    className="w-full h-12 rounded-mc-lg font-bold text-sm
+                      bg-mc-surface-2 text-mc-text
                       active:scale-[0.97] transition-all disabled:opacity-50"
                   >
                     {t('nbu.confirm.cancel')}
@@ -2167,37 +2168,37 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.05 }}
-                  className="w-24 h-24 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center"
+                  className="w-24 h-24 rounded-full bg-mc-success/12 flex items-center justify-center"
                 >
-                  <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                  <CheckCircle2 className="w-12 h-12 text-mc-success" />
                 </motion.div>
                 <div className="space-y-1.5">
-                  <h3 className="text-2xl font-black text-gray-900 dark:text-white">
+                  <h3 className="text-2xl font-black text-mc-text">
                     {t('nbu.chargeSuccessTitle')}
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[280px]">
+                  <p className="text-sm text-mc-text-2 max-w-[280px]">
                     {t('nbu.chargeSuccessBody')}
                   </p>
                 </div>
-                <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                <p className="text-3xl font-black text-mc-success">
                   {formatMoney(payableAmount)}
                   <span className="text-base ml-1.5 font-bold">so'm</span>
                 </p>
 
                 {/* Delivery upsell — strike while the iron is hot */}
-                <div className="w-full max-w-[280px] rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/5 border border-amber-200 dark:border-amber-500/20 p-3 space-y-1">
-                  <p className="text-sm font-black text-amber-700 dark:text-amber-300">
+                <div className="w-full max-w-[280px] rounded-mc-lg bg-mc-brand-soft border border-mc-brand/20 p-3 space-y-1">
+                  <p className="text-sm font-black text-mc-brand dark:text-mc-brand">
                     {t('nbu.deliveryCta.title', "1 daqiqada zayavka qoldiring")}
                   </p>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] text-mc-text-2">
                     {t('nbu.deliveryCta.body', 'Yukingiz tezda yetkazib beriladi')}
                   </p>
                 </div>
                 <button
                   onClick={() => { window.location.href = '/?tab=request'; }}
-                  className="w-full max-w-[280px] h-14 rounded-2xl font-black text-[16px]
-                    bg-gradient-to-r from-amber-500 to-orange-500
-                    text-white shadow-xl shadow-amber-500/25
+                  className="w-full max-w-[280px] h-14 rounded-mc-lg font-black text-[16px]
+                    bg-gradient-to-r from-mc-brand to-mc-brand-strong
+                    text-mc-on-brand shadow-xl shadow-amber-500/25
                     active:scale-[0.97] transition-all flex items-center justify-center gap-2"
                 >
                   <Package className="w-5 h-5" />
@@ -2205,8 +2206,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 </button>
                 <button
                   onClick={closeChargeDrawer}
-                  className="w-full max-w-[280px] h-12 rounded-2xl font-bold text-sm
-                    bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200
+                  className="w-full max-w-[280px] h-12 rounded-mc-lg font-bold text-sm
+                    bg-mc-surface-2 dark:bg-white/10 text-mc-text dark:text-mc-text
                     active:scale-[0.97] transition-all"
                 >
                   {t('nbu.chargeSuccessDone')}
@@ -2245,13 +2246,13 @@ const InfoCard = memo(
   }) => (
     <div
       onClick={onClick}
-      className={`rounded-xl p-3 border ${
+      className={`rounded-mc-md p-3 border ${
         accent
-          ? 'bg-amber-50 dark:bg-amber-500/[0.06] border-amber-200 dark:border-amber-500/20'
-          : 'bg-gray-50 dark:bg-white/[0.03] border-gray-200 dark:border-white/10'
+          ? 'bg-mc-brand-soft dark:bg-mc-brand/[0.06] border-mc-brand/20'
+          : 'bg-mc-surface-2 dark:bg-white/[0.03] border-mc-border'
       } ${
         onClick
-          ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-colors active:scale-[0.98]'
+          ? 'cursor-pointer transition-colors active:scale-[0.98]'
           : ''
       }`}
     >
@@ -2259,13 +2260,13 @@ const InfoCard = memo(
         <span
           className={
             accent
-              ? 'text-amber-500 dark:text-amber-400'
-              : 'text-gray-400 dark:text-gray-500'
+              ? 'text-mc-brand'
+              : 'text-mc-text-3'
           }
         >
           {icon}
         </span>
-        <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+        <span className="text-[11px] font-medium text-mc-text-3 uppercase tracking-wide">
           {label}
         </span>
         {trailing && <span className="ml-auto">{trailing}</span>}
@@ -2273,8 +2274,8 @@ const InfoCard = memo(
       <p
         className={`text-sm font-bold ${
           accent
-            ? 'text-amber-700 dark:text-amber-300'
-            : 'text-gray-800 dark:text-gray-200'
+            ? 'text-mc-brand'
+            : 'text-mc-text dark:text-mc-text'
         }`}
       >
         {value}

@@ -22,9 +22,9 @@ export function TopProgressBar() {
       aria-label="Yuklanmoqda"
       className="fixed top-0 inset-x-0 z-[9999] h-[3px] overflow-hidden pointer-events-none"
     >
-      <div className="absolute inset-0 bg-orange-500/10" />
+      <div className="absolute inset-0 bg-mc-brand/10" />
       <div
-        className="absolute top-0 h-full bg-orange-500"
+        className="absolute top-0 h-full bg-mc-brand"
         style={{ animation: 'topbar-slide 1.6s cubic-bezier(0.4,0,0.2,1) infinite' }}
       />
       <style>{`

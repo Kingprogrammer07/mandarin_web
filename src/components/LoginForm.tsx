@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { regions, DISTRICTS } from '@/lib/validation';
 import TranslatedFormMessage from './TranslatedFormMessage';
-import PrivacyPolicyModal from './legal/PrivacyPolicyModal';
+import LegalDocumentModal from './legal/LegalDocumentModal';
+import type { LegalDocId } from './legal/legalDocuments';
 import { triggerSuccessHaptic } from '@/utils/haptics';
 
 const loginSchema = z.object({
@@ -57,6 +58,11 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
 
   const [showAddressDrawer, setShowAddressDrawer] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [policyDoc, setPolicyDoc] = useState<LegalDocId>('offer');
+  const openDoc = (id: LegalDocId) => {
+    setPolicyDoc(id);
+    setShowPolicy(true);
+  };
   const [credentials, setCredentials] = useState<{ clientCode: string; phoneNumber: string } | null>(null);
 
   const [mounted, setMounted] = useState(false);
@@ -198,14 +204,14 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
   };
 
   const inp = [
-    'h-[54px] rounded-[18px]',
-    'border border-gray-900/[0.07] dark:border-white/[0.085]',
-    'bg-white dark:bg-[#10151f]',
-    'text-gray-950 dark:text-[#fff8ed]',
-    'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+    'h-[54px] rounded-mc-md',
+    'border border-mc-border',
+    'bg-mc-surface-2',
+    'text-mc-text',
+    'placeholder:text-mc-text-3 dark:placeholder:text-mc-text-2',
     'transition-colors duration-150',
     'shadow-[0_8px_18px_rgba(15,23,42,0.045)] dark:shadow-none',
-    'focus:border-orange-500/70 focus:ring-2 focus:ring-orange-500/15 focus:ring-offset-0 focus:outline-none',
+    'focus:border-mc-brand/70 focus:ring-2 focus:ring-mc-brand/20 focus:ring-offset-0 focus:outline-none',
   ].join(' ');
 
   return (
@@ -219,19 +225,17 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
       )}
 
       <div className="mx-auto flex min-h-[calc(100svh-72px)] w-full max-w-md items-center px-4 py-6 sm:px-6">
-        <div className="relative overflow-hidden rounded-[30px] border border-orange-500/18 bg-white/92 p-5 shadow-[0_22px_46px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.92)] dark:border-white/[0.085] dark:bg-[#0a0e15] dark:shadow-[0_22px_54px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.07)]">
-          <div className="pointer-events-none absolute -right-20 -top-14 h-44 w-80 rotate-[-14deg] rounded-[42%] bg-[linear-gradient(110deg,rgba(255,255,255,0.08),transparent_28%),linear-gradient(90deg,rgba(245,158,11,0.16),rgba(59,130,246,0.08),transparent_72%)] opacity-75 blur-[18px]" />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:100%_42px] [mask-image:linear-gradient(to_bottom,transparent,black_18%,transparent_88%)]" />
+        <div className="relative overflow-hidden rounded-mc-xl border border-mc-border bg-mc-surface p-5 shadow-[var(--mc-shadow-card)]">
 
           <div className="relative z-10 mb-5 flex items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[17px] border border-orange-500/20 bg-orange-500/10 text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-amber-300">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-mc-md border border-mc-brand/20 bg-mc-brand/10 text-mc-brand">
               <LogIn className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-[24px] font-black leading-tight tracking-normal text-gray-950 dark:text-[#fff8ed]">
+              <h1 className="text-[24px] font-black leading-tight tracking-normal text-mc-text">
                 {t('login.title')}
               </h1>
-              <p className="mt-1 text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/56">
+              <p className="mt-1 text-[12px] font-bold leading-snug text-mc-text-2 ">
                 {t('login.subtitle')}
               </p>
             </div>
@@ -241,12 +245,12 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
             <form onSubmit={form.handleSubmit(onSubmit)} className="relative z-10 space-y-4">
               <FormField control={form.control} name="clientCode" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
+                  <FormLabel className="ml-0.5 text-[12px] font-black text-mc-text ">
                     {t('login.clientCode')}
                   </FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-[13px] font-black text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-[13px] font-black text-mc-brand ">
                         ID
                       </div>
                       <Input
@@ -264,17 +268,17 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
 
               <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76">
+                  <FormLabel className="ml-0.5 text-[12px] font-black text-mc-text ">
                     {t('login.phoneNumber')}
                   </FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                      <div className="pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-mc-brand ">
                         <Phone className="h-4 w-4" />
                       </div>
                       <div className="pointer-events-none absolute left-[58px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
-                        <span className="text-[13px] font-black text-gray-600 dark:text-[#fff8ed]/72">+998</span>
-                        <div className="h-4 w-px bg-gray-200 dark:bg-white/10" />
+                        <span className="text-[13px] font-black text-mc-text-2 ">+998</span>
+                        <div className="h-4 w-px bg-mc-surface-2" />
                       </div>
                       <Input
                         type="tel"
@@ -295,32 +299,32 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
               <Button
                 type="submit"
                 disabled={submitStatus === 'loading'}
-                className="mt-2 h-14 w-full rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[15px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.24)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-2 h-14 w-full rounded-mc-md border-0 bg-gradient-to-r from-mc-brand to-mc-brand-strong text-[15px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] transition-opacity duration-150 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('login.submit')}
               </Button>
 
               <div className="pt-1 text-center">
-                <p className="text-[12px] font-bold text-gray-500 dark:text-[#fff8ed]/52">
+                <p className="text-[12px] font-bold text-mc-text-2 ">
                   {t('login.noAccount')}{' '}
                   <button
                     type="button"
                     onClick={onNavigateToRegister}
-                    className="font-black text-orange-600 transition-colors hover:text-orange-500 dark:text-amber-300 dark:hover:text-amber-200"
+                    className="font-black text-mc-brand transition-colors dark:text-mc-brand"
                   >
                     {t('login.register')}
                   </button>
                 </p>
                 {/* Login implies acceptance — existing users already consented at
                     registration; the link keeps the policy accessible. */}
-                <p className="mt-2 text-[11px] font-semibold leading-snug text-gray-400 dark:text-[#fff8ed]/40">
+                <p className="mt-2 text-[11px] font-semibold leading-snug text-mc-text-3 ">
                   {t('login.consent.prefix', 'Kirish orqali siz ')}
                   <button
                     type="button"
-                    onClick={() => setShowPolicy(true)}
-                    className="font-black text-orange-600/90 underline decoration-orange-400/40 underline-offset-2 dark:text-amber-300/90"
+                    onClick={() => openDoc('offer')}
+                    className="font-extrabold text-mc-brand underline decoration-mc-brand/40 underline-offset-2"
                   >
-                    {t('login.consent.link', 'Maxfiylik siyosati')}
+                    {t('login.consent.link', 'huquqiy hujjatlar')}
                   </button>
                   {t('login.consent.suffix', 'ga rozilik bildirasiz')}
                 </p>
@@ -346,14 +350,16 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed bottom-0 left-0 right-0 z-[10000] mx-auto flex max-h-[82vh] max-w-md flex-col overflow-y-auto rounded-t-[28px] border border-b-0 border-gray-900/[0.07] bg-white p-5 pb-7 shadow-[0_-20px_54px_rgba(15,23,42,0.18)] dark:border-white/[0.10] dark:bg-[#0a0e15] dark:shadow-[0_-24px_60px_rgba(0,0,0,0.48)]"
+                role="dialog"
+                aria-modal="true"
+                className="fixed bottom-0 left-0 right-0 z-[10000] mx-auto flex max-h-[82dvh] max-w-md flex-col overflow-y-auto rounded-t-mc-xl border border-b-0 border-mc-border bg-mc-surface p-5 pb-7 shadow-2xl"
               >
-                <div className="mx-auto mb-5 h-1.5 w-11 rounded-full bg-gray-200 dark:bg-white/20" />
+                <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-mc-border" />
                 <div className="mb-5">
-                  <h2 className="text-[21px] font-black leading-tight text-gray-950 dark:text-[#fff8ed]">
+                  <h2 className="text-[21px] font-black leading-tight text-mc-text">
                     {t('login.addressDrawer.title')}
                   </h2>
-                  <p className="mt-1.5 text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/54">
+                  <p className="mt-1.5 text-[12px] font-bold leading-snug text-mc-text-2 ">
                     {t('login.addressDrawer.subtitle')}
                   </p>
                 </div>
@@ -362,8 +368,8 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                   <form onSubmit={addressForm.handleSubmit(onAddressSubmit)} className="space-y-5">
                     <FormField control={addressForm.control} name="region" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-orange-500" />
+                        <FormLabel className="font-semibold text-sm text-mc-text tracking-wide flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-mc-brand" />
                           {t('form.region')}
                         </FormLabel>
                         <Select onValueChange={(value) => {
@@ -375,12 +381,12 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                               <SelectValue placeholder={t('form.regionPlaceholder')} />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="z-[10010] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
+                          <SelectContent className="z-[10010] dark:border-mc-brand/20 rounded-mc-lg overflow-hidden shadow-xl max-h-60">
                             {regions.map((r) => (
                               <SelectItem
                                 key={r.value}
                                 value={r.value}
-                                className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
+                                className="rounded-mc-sm cursor-pointer dark:text-mc-text"
                               >
                                 {t(r.label)}
                               </SelectItem>
@@ -393,8 +399,8 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
 
                     <FormField control={addressForm.control} name="district" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-orange-500 opacity-50" />
+                        <FormLabel className="font-semibold text-sm text-mc-text tracking-wide flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-mc-brand opacity-50" />
                           {t('form.district')}
                         </FormLabel>
                         <Select
@@ -407,12 +413,12 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                               <SelectValue placeholder={t('form.districtPlaceholder')} />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="z-[10010] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl max-h-60">
+                          <SelectContent className="z-[10010] dark:border-mc-brand/20 rounded-mc-lg overflow-hidden shadow-xl max-h-60">
                             {addressForm.watch('region') && DISTRICTS[addressForm.watch('region')]?.map((d) => (
                               <SelectItem
                                 key={d.value}
                                 value={d.value}
-                                className="rounded-lg cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-gray-200"
+                                className="rounded-mc-sm cursor-pointer dark:text-mc-text"
                               >
                                 {t(d.label)}
                               </SelectItem>
@@ -427,7 +433,7 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
                       <Button
                         type="submit"
                         disabled={submitStatus === 'loading'}
-                        className="h-14 w-full rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[15px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.24)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-14 w-full rounded-mc-md border-0 bg-gradient-to-r from-mc-brand to-mc-brand-strong text-[15px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] transition-opacity duration-150 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {t('login.addressDrawer.submit')}
                       </Button>
@@ -441,7 +447,11 @@ export default function LoginForm({ onNavigateToRegister, onLoginSuccess }: Logi
         document.body,
       )}
 
-      <PrivacyPolicyModal open={showPolicy} onClose={() => setShowPolicy(false)} />
+      <LegalDocumentModal
+        open={showPolicy}
+        onClose={() => setShowPolicy(false)}
+        initialDoc={policyDoc}
+      />
     </>
   );
 }

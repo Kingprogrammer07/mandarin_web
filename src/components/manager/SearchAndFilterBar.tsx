@@ -68,7 +68,7 @@ export default function SearchAndFilterBar({
           defaultValue={value}
           onChange={handleInputChange}
           placeholder={currentOption.placeholder}
-          className="w-full h-10 pl-10 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-[13px]"
+          className="w-full h-10 pl-10 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 transition-all text-[16px]"
         />
       </div>
 

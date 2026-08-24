@@ -450,7 +450,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
         <input
           {...register('system_username')}
           placeholder="username"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
+          className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[16px] transition-all"
         />
         {errors.system_username && (
           <p className="mt-1 text-[11px] text-red-500">{errors.system_username.message}</p>
@@ -465,7 +465,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
           {...register('pin')}
           type="password"
           placeholder="••••"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
+          className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[16px] transition-all"
         />
         {errors.pin && (
           <p className="mt-1 text-[11px] text-red-500">{errors.pin.message}</p>
@@ -845,7 +845,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                   </label>
                   <input
                     {...registerEdit('system_username')}
-                    className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
+                    className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[16px] transition-all"
                   />
                   {editErrors.system_username && (
                     <p className="mt-1 text-[11px] text-red-500">{editErrors.system_username.message}</p>
@@ -993,7 +993,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                     {...registerPin('new_pin')}
                     type="password"
                     placeholder="••••"
-                    className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[13px] transition-all"
+                    className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/50 text-[16px] transition-all"
                   />
                   {pinErrors.new_pin && (
                     <p className="mt-1 text-[11px] text-red-500">{pinErrors.new_pin.message}</p>

@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ImageUpload from './ImageUpload';
 import RegistrationPendingScreen from './RegistrationPendingScreen';
 import TranslatedFormMessage from './TranslatedFormMessage';
-import PrivacyPolicyModal, { PRIVACY_POLICY_VERSION } from './legal/PrivacyPolicyModal';
+import LegalDocumentModal from './legal/LegalDocumentModal';
+import { LEGAL_CONSENT_VERSION, type LegalDocId } from './legal/legalDocuments';
 import { DISTRICTS, formSchema, regions, type RegistrationFormData } from '@/lib/validation';
 
 interface RegistrationFormProps {
@@ -48,6 +49,11 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
   // account (with passport/KYC data) is created.
   const [agreedToPolicy, setAgreedToPolicy] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [policyDoc, setPolicyDoc] = useState<LegalDocId>('offer');
+  const openDoc = (id: LegalDocId) => {
+    setPolicyDoc(id);
+    setShowPolicy(true);
+  };
 
   useEffect(() => {
     if (sessionStorage.getItem('access_token') && onNavigateToLogin) {
@@ -132,7 +138,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
         date_of_birth: format(data.dateOfBirth, 'yyyy-MM-dd'),
         telegram_id: telegramData.user.id,
         passport_images: data.passportImages,
-        privacy_policy_version: PRIVACY_POLICY_VERSION,
+        privacy_policy_version: LEGAL_CONSENT_VERSION,
       };
 
       const response = await registerApi(registerData);
@@ -216,25 +222,25 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
   };
 
   const inputClass = [
-    'h-[54px] rounded-[18px]',
-    'border border-gray-900/[0.07] dark:border-white/[0.095]',
-    'bg-white dark:bg-[#10151f]',
-    'text-gray-950 dark:text-[#fff8ed]',
-    'placeholder:text-gray-400 dark:placeholder:text-[#fff8ed]/42',
+    'h-[54px] rounded-mc-md',
+    'border border-mc-border',
+    'bg-mc-surface-2',
+    'text-mc-text',
+    'placeholder:text-mc-text-3',
     'transition-colors duration-150',
     'shadow-[0_8px_18px_rgba(15,23,42,0.045)]',
     'dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.36),inset_0_-1px_0_rgba(255,255,255,0.055),0_1px_0_rgba(255,255,255,0.045)]',
-    'focus:border-orange-500/70 focus:ring-2 focus:ring-orange-500/15 focus:ring-offset-0 focus:outline-none',
+    'focus:border-mc-brand/70 focus:ring-2 focus:ring-mc-brand/20 focus:ring-offset-0 focus:outline-none',
   ].join(' ');
 
-  const labelClass = 'ml-0.5 text-[12px] font-black text-gray-800 dark:text-[#fff8ed]/76';
+  const labelClass = 'ml-0.5 text-[12px] font-black text-mc-text ';
   const iconBoxClass =
-    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300';
+    'pointer-events-none absolute left-3 top-1/2 z-10 grid h-[34px] w-[34px] -translate-y-1/2 place-items-center rounded-mc-sm bg-mc-brand/10 text-mc-brand ';
 
   if (isCheckingApplication) {
     return (
       <div className="flex min-h-[40svh] items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+        <Loader2 className="h-7 w-7 animate-spin text-mc-brand" />
       </div>
     );
   }
@@ -271,14 +277,14 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
         <div className="w-full space-y-4">
           <div className="px-1">
             <div className="mb-4 flex items-center gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[17px] border border-orange-500/20 bg-orange-500/10 text-orange-600 dark:border-white/[0.085] dark:bg-white/[0.055] dark:text-amber-300">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-mc-md border border-mc-brand/20 bg-mc-brand/10 text-mc-brand">
                 <IdCard className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-[24px] font-black leading-tight tracking-normal text-gray-950 dark:text-[#fff8ed]">
+                <h1 className="text-[24px] font-black leading-tight tracking-normal text-mc-text">
                   {t('form.title')}
                 </h1>
-                <p className="mt-1 text-[12px] font-bold leading-snug text-gray-500 dark:text-[#fff8ed]/56">
+                <p className="mt-1 text-[12px] font-bold leading-snug text-mc-text-2 ">
                   {steps[currentStep - 1].description}
                 </p>
               </div>
@@ -296,10 +302,10 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                       if (step.id < currentStep) setCurrentStep(step.id);
                     }}
                     className={[
-                      'min-w-0 rounded-[18px] border px-2 py-2.5 text-left transition',
+                      'min-w-0 rounded-mc-md border px-2 py-2.5 text-left transition',
                       isActive
-                        ? 'border-orange-500/35 bg-orange-500/10 dark:border-amber-300/22 dark:bg-white/[0.055]'
-                        : 'border-gray-900/[0.06] bg-white/60 dark:border-white/[0.07] dark:bg-white/[0.03]',
+                        ? 'border-mc-brand/35 bg-mc-brand/10'
+                        : 'border-mc-border bg-mc-surface-2',
                       isDone ? 'opacity-90' : '',
                     ].join(' ')}
                   >
@@ -307,13 +313,13 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                       className={[
                         'mb-1 grid h-6 w-6 place-items-center rounded-full text-[11px] font-black',
                         isActive || isDone
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-[#fff8ed]/48',
+                          ? 'bg-mc-brand text-mc-on-brand'
+                          : 'bg-mc-surface-2 text-mc-text-2',
                       ].join(' ')}
                     >
                       {step.id}
                     </span>
-                    <span className="block min-h-[24px] text-[10px] font-black leading-[1.15] text-gray-900 dark:text-[#fff8ed] sm:text-[11px]">
+                    <span className="block min-h-[24px] text-[10px] font-black leading-[1.15] text-mc-text sm:text-[11px]">
                       {step.title}
                     </span>
                   </button>
@@ -322,9 +328,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
             </div>
           </div>
 
-          <div className="relative w-full overflow-hidden rounded-[30px] border border-orange-500/18 bg-white/92 p-5 shadow-[0_22px_46px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.92)] dark:border-white/[0.085] dark:bg-[#0a0e15] dark:shadow-[0_22px_54px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.07)]">
-            <div className="pointer-events-none absolute -right-20 -top-14 h-44 w-80 rotate-[-14deg] rounded-[42%] bg-[linear-gradient(110deg,rgba(255,255,255,0.08),transparent_28%),linear-gradient(90deg,rgba(245,158,11,0.16),rgba(59,130,246,0.08),transparent_72%)] opacity-75 blur-[18px]" />
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:100%_42px] [mask-image:linear-gradient(to_bottom,transparent,black_18%,transparent_88%)]" />
+          <div className="relative w-full overflow-hidden rounded-mc-xl border border-mc-border bg-mc-surface p-5 shadow-[var(--mc-shadow-card)]">
 
           <Form {...form}>
             <form
@@ -417,7 +421,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-orange-600 hover:bg-orange-500/10 dark:text-amber-300"
+                              className="absolute right-1.5 top-1/2 h-10 w-10 -translate-y-1/2 rounded-[14px] text-mc-brand"
                             >
                               <CalendarIcon className="h-4 w-4" />
                             </Button>
@@ -425,7 +429,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                         </div>
                         <PopoverContent
                           align="start"
-                          className="w-auto overflow-hidden rounded-2xl border-orange-500/20 p-0 shadow-xl dark:border-white/10 dark:bg-[#111827]"
+                          className="w-auto overflow-hidden rounded-mc-lg border-mc-brand/20 p-0 shadow-xl"
                         >
                           <Calendar
                             mode="single"
@@ -467,12 +471,12 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             <SelectValue placeholder={t('form.regionPlaceholder')} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-orange-500/20 shadow-xl dark:border-white/10 dark:bg-[#111827]">
+                        <SelectContent className="max-h-60 overflow-hidden rounded-mc-lg border-mc-brand/20 shadow-xl">
                           {regions.map((region) => (
                             <SelectItem
                               key={region.value}
                               value={region.value}
-                              className="cursor-pointer rounded-lg dark:text-gray-200 dark:hover:bg-orange-500/10"
+                              className="cursor-pointer rounded-mc-sm dark:text-mc-text"
                             >
                               {t(region.label)}
                             </SelectItem>
@@ -492,13 +496,13 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             <SelectValue placeholder={t('form.districtPlaceholder')} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="max-h-60 overflow-hidden rounded-2xl border-orange-500/20 shadow-xl dark:border-white/10 dark:bg-[#111827]">
+                        <SelectContent className="max-h-60 overflow-hidden rounded-mc-lg border-mc-brand/20 shadow-xl">
                           {selectedRegion &&
                             DISTRICTS[selectedRegion]?.map((district) => (
                               <SelectItem
                                 key={district.value}
                                 value={district.value}
-                                className="cursor-pointer rounded-lg dark:text-gray-200 dark:hover:bg-orange-500/10"
+                                className="cursor-pointer rounded-mc-sm dark:text-mc-text"
                               >
                                 {t(district.label)}
                               </SelectItem>
@@ -514,7 +518,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                       <FormLabel className={labelClass}>{t('form.address')}</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] bg-orange-500/10 text-orange-600 dark:bg-white/[0.055] dark:text-amber-300">
+                          <div className="pointer-events-none absolute left-3 top-4 z-10 grid h-[34px] w-[34px] place-items-center rounded-mc-sm bg-mc-brand/10 text-mc-brand ">
                             <MapPin className="h-4 w-4" />
                           </div>
                           <textarea
@@ -539,8 +543,8 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                             <Phone className="h-4 w-4" />
                           </div>
                           <div className="pointer-events-none absolute left-[58px] top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
-                            <span className="text-[13px] font-black text-gray-600 dark:text-[#fff8ed]/72">+998</span>
-                            <div className="h-4 w-px bg-gray-200 dark:bg-white/10" />
+                            <span className="text-[13px] font-black text-mc-text-2 ">+998</span>
+                            <div className="h-4 w-px bg-mc-surface-2" />
                           </div>
                           <Input
                             type="tel"
@@ -598,14 +602,14 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                   <button
                     type="button"
                     onClick={() => setAgreedToPolicy((v) => !v)}
-                    className="flex w-full items-start gap-2.5 rounded-[16px] border border-gray-900/[0.07] bg-white/60 p-3 text-left dark:border-white/[0.09] dark:bg-white/[0.03]"
+                    className="flex w-full items-start gap-2.5 rounded-mc-md border border-mc-border bg-mc-surface-2 p-3 text-left"
                   >
                     <span
                       className={[
-                        'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-[7px] border-2 transition-colors',
+                        'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-mc-sm border-2 transition-colors',
                         agreedToPolicy
-                          ? 'border-orange-500 bg-orange-500 text-white'
-                          : 'border-gray-300 dark:border-white/25',
+                          ? 'border-mc-brand bg-mc-brand text-mc-on-brand'
+                          : 'border-mc-border',
                       ].join(' ')}
                     >
                       {agreedToPolicy && (
@@ -618,19 +622,33 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                         </svg>
                       )}
                     </span>
-                    <span className="text-[12px] font-bold leading-snug text-gray-700 dark:text-[#fff8ed]/78">
+                    {/* Each document is its own link: a single combined link
+                        would open one sheet and leave the client to discover that
+                        two other agreements were bundled into their consent. */}
+                    <span className="text-[12px] font-bold leading-snug text-mc-text">
                       {t('form.consent.prefix', 'Men ')}
-                      <span
-                        role="link"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowPolicy(true);
-                        }}
-                        className="cursor-pointer font-black text-orange-600 underline decoration-orange-400/50 underline-offset-2 dark:text-amber-300"
-                      >
-                        {t('form.consent.link', 'Maxfiylik siyosati va Foydalanuvchi kelishuvi')}
-                      </span>
+                      {(['offer', 'privacy', 'terms'] as LegalDocId[]).map((id, index) => (
+                        <span key={id}>
+                          {index > 0 && (index === 2 ? t('form.consent.and', ' va ') : ', ')}
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDoc(id);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'Enter' && event.key !== ' ') return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              openDoc(id);
+                            }}
+                            className="cursor-pointer font-extrabold text-mc-brand underline decoration-mc-brand/40 underline-offset-2"
+                          >
+                            {t(`form.consent.docs.${id}`)}
+                          </span>
+                        </span>
+                      ))}
                       {t('form.consent.suffix', 'ga roziman')}
                     </span>
                   </button>
@@ -643,7 +661,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                     type="button"
                     variant="outline"
                     onClick={onNavigateToLogin}
-                    className="h-13 rounded-[18px] border-gray-900/[0.07] bg-white/70 text-[14px] font-black text-gray-700 active:scale-[0.99] dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-[#fff8ed]/70"
+                    className="h-13 rounded-mc-md border-mc-border bg-mc-surface-2 text-[14px] font-black text-mc-text active:scale-[0.99]"
                   >
                     {t('form.login')}
                   </Button>
@@ -652,7 +670,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                     type="button"
                     variant="outline"
                     onClick={goBack}
-                    className="h-13 rounded-[18px] border-gray-900/[0.07] bg-white/70 text-[14px] font-black text-gray-700 active:scale-[0.99] dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-[#fff8ed]/70"
+                    className="h-13 rounded-mc-md border-mc-border bg-mc-surface-2 text-[14px] font-black text-mc-text active:scale-[0.99]"
                   >
                     {t('form.back')}
                   </Button>
@@ -662,7 +680,7 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                   <Button
                     type="button"
                     onClick={() => void goToNext()}
-                    className="h-13 rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[14px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.22)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99]"
+                    className="h-13 rounded-mc-md border-0 bg-gradient-to-r from-mc-brand to-mc-brand-strong text-[14px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] transition-opacity duration-150 active:scale-[0.99]"
                   >
                     {t('form.next')}
                   </Button>
@@ -670,19 +688,19 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
                   <Button
                     type="submit"
                     disabled={submitStatus === 'loading' || !agreedToPolicy}
-                    className="h-13 rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-[14px] font-black text-white shadow-[0_15px_30px_rgba(249,115,22,0.22)] transition-opacity duration-150 hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-13 rounded-mc-md border-0 bg-gradient-to-r from-mc-brand to-mc-brand-strong text-[14px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] transition-opacity duration-150 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t('form.submit')}
                   </Button>
                 )}
               </div>
 
-              <p className="pt-1 text-center text-[12px] font-bold text-gray-500 dark:text-[#fff8ed]/52">
+              <p className="pt-1 text-center text-[12px] font-bold text-mc-text-2 ">
                 {t('form.haveAccount')}{' '}
                 <button
                   type="button"
                   onClick={onNavigateToLogin}
-                  className="font-black text-orange-600 transition-colors hover:text-orange-500 dark:text-amber-300 dark:hover:text-amber-200"
+                  className="font-black text-mc-brand transition-colors dark:text-mc-brand"
                 >
                   {t('form.login')}
                 </button>
@@ -693,7 +711,11 @@ export default function RegistrationForm({ onNavigateToLogin }: RegistrationForm
         </div>
       </div>
 
-      <PrivacyPolicyModal open={showPolicy} onClose={() => setShowPolicy(false)} />
+      <LegalDocumentModal
+        open={showPolicy}
+        onClose={() => setShowPolicy(false)}
+        initialDoc={policyDoc}
+      />
     </>
   );
 }

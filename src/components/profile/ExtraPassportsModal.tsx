@@ -225,13 +225,13 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
     };
 
     const inp = [
-        'h-12 rounded-xl',
-        'border border-gray-200 dark:border-white/10',
-        'bg-gray-50 dark:bg-white/5',
-        'text-gray-900 dark:text-white',
-        'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+        'h-12 rounded-mc-md',
+        'border border-mc-border',
+        'bg-mc-surface-2',
+        'text-mc-text',
+        'placeholder:text-mc-text-3 dark:placeholder:text-mc-text-2',
         'transition-colors duration-150',
-        'focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:ring-offset-0 focus:outline-none',
+        'focus:border-mc-brand focus:ring-2 focus:ring-mc-brand/20 focus:ring-offset-0 focus:outline-none',
     ].join(' ');
 
     return (
@@ -256,16 +256,17 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                 animate="visible"
                                 exit="exit"
                                 variants={isDesktop ? desktopDrawerVariants : drawerVariants}
-                                className="fixed bottom-0 left-0 right-0 sm:left-auto sm:top-0 sm:bottom-0 sm:w-[450px] h-[92vh] sm:h-screen bg-white dark:bg-zinc-950 z-[999] rounded-t-3xl sm:rounded-none sm:rounded-l-3xl flex flex-col shadow-2xl border-t border-gray-200 dark:border-gray-800 sm:border-t-0 sm:border-l"
+                                className="fixed bottom-0 left-0 right-0 sm:left-auto sm:top-0 sm:bottom-0 sm:w-[450px] h-[92dvh] sm:h-dvh bg-mc-surface z-[999] rounded-t-3xl sm:rounded-none sm:rounded-l-3xl flex flex-col shadow-2xl border-t border-mc-border dark:border-mc-border sm:border-t-0 sm:border-l"
                             >
                                 {/* Header */}
-                                <div className="p-4 border-b dark:border-zinc-800 flex items-center justify-between flex-shrink-0 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-sm rounded-t-3xl sm:rounded-t-none">
+                                <div className="p-4 border-b dark:border-mc-border flex items-center justify-between flex-shrink-0 bg-mc-surface-2 backdrop-blur-sm rounded-t-3xl sm:rounded-t-none">
                                     <div className="flex items-center gap-2">
                                         {isAdding && (
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-8 w-8 -ml-2 rounded-full"
+                                                className="h-9 w-9 -ml-2 rounded-full"
+                                                aria-label={t('common.back', "Ortga")}
                                                 onClick={handleBack}
                                             >
                                                 <ChevronLeft className="h-5 w-5" />
@@ -273,13 +274,13 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                         )}
                                         <h2 className="text-lg font-semibold">{isAdding ? t('passport.addNew', "Yangi pasport") : t('passport.extraPassports', "Qo'shimcha pasportlar")}</h2>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" aria-label={t('common.close', "Yopish")} onClick={onClose}>
                                         <X className="h-5 w-5" />
                                     </Button>
                                 </div>
 
                                 {/* Scrollable Body */}
-                                <div className="flex-1 relative overflow-hidden bg-gray-50/50 dark:bg-zinc-950">
+                                <div className="flex-1 relative overflow-hidden bg-mc-surface-2/50 dark:bg-mc-surface">
                                     <AnimatePresence mode="wait" initial={false} custom={isAdding ? 1 : -1}>
                                         {isAdding ? (
                                             <motion.div
@@ -297,7 +298,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                         {/* Pasport Seriyasi */}
                                                         <FormField control={form.control} name="passportSeries" render={({ field }) => (
                                                             <FormItem>
-                                                                <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
+                                                                <FormLabel className="font-semibold text-sm text-mc-text tracking-wide">
                                                                     {t('form.passportSeries')}
                                                                 </FormLabel>
                                                                 <FormControl>
@@ -318,7 +319,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                         {/* PINFL */}
                                                         <FormField control={form.control} name="pinfl" render={({ field }) => (
                                                             <FormItem>
-                                                                <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
+                                                                <FormLabel className="font-semibold text-sm text-mc-text tracking-wide">
                                                                     {t('form.pinfl')}
                                                                 </FormLabel>
                                                                 <FormControl>
@@ -337,7 +338,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                         {/* Tug'ilgan sana */}
                                                         <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
                                                             <FormItem className="flex flex-col">
-                                                                <FormLabel className="font-semibold text-sm text-gray-700 dark:text-gray-200 tracking-wide">
+                                                                <FormLabel className="font-semibold text-sm text-mc-text tracking-wide">
                                                                     {t('form.dateOfBirth')}
                                                                 </FormLabel>
                                                                 <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -354,15 +355,15 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                                                 type="button"
                                                                                 variant="ghost"
                                                                                 size="icon"
-                                                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-500/10"
+                                                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 rounded-mc-sm"
                                                                             >
-                                                                                <CalendarIcon className="h-4 w-4 text-orange-400" />
+                                                                                <CalendarIcon className="h-4 w-4 text-mc-brand" />
                                                                             </Button>
                                                                         </PopoverTrigger>
                                                                     </div>
                                                                     <PopoverContent
                                                                         align="start"
-                                                                        className="w-auto p-0 z-[1050] dark:bg-[#1a1209] dark:border-orange-500/20 rounded-2xl overflow-hidden shadow-xl"
+                                                                        className="w-auto p-0 z-[1050] dark:border-mc-brand/20 rounded-mc-lg overflow-hidden shadow-xl"
                                                                     >
                                                                         <Calendar
                                                                             mode="single"
@@ -388,7 +389,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                         {/* Rasmlar */}
                                                         <FormField control={form.control} name="passportImages" render={({ field }) => (
                                                             <FormItem>
-                                                                <FormLabel className="font-semibold text-base text-gray-700 dark:text-gray-200">
+                                                                <FormLabel className="font-semibold text-base text-mc-text">
                                                                     {t('form.passportImages')}
                                                                 </FormLabel>
                                                                 <div className="grid grid-cols-1 gap-4 mt-2">
@@ -425,7 +426,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                         <Button
                                                             type="submit"
                                                             disabled={createPassportMutation.isPending}
-                                                            className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/20 sticky bottom-0 z-10"
+                                                            className="w-full h-12 bg-gradient-to-r from-mc-brand to-mc-brand-strong text-mc-on-brand shadow-lg shadow-blue-500/20 sticky bottom-0 z-10"
                                                         >
                                                             {createPassportMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                                                             {createPassportMutation.isPending ? t('common.saving', "Saqlanmoqda...") : t('common.save', "Saqlash")}
@@ -446,18 +447,18 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                             >
                                                 {isLoading ? (
                                                     <div className="flex justify-center p-8">
-                                                        <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                                                        <Loader2 className="h-6 w-6 animate-spin text-mc-brand" />
                                                     </div>
                                                 ) : passportsData?.items.length === 0 ? (
-                                                    <div className="text-center py-12 text-gray-500 flex flex-col items-center">
-                                                        <div className="h-16 w-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                                                            <FileText className="h-8 w-8 text-gray-400" />
+                                                    <div className="text-center py-12 text-mc-text-2 flex flex-col items-center">
+                                                        <div className="h-16 w-16 bg-mc-surface-2 dark:bg-mc-surface-2 rounded-full flex items-center justify-center mb-4">
+                                                            <FileText className="h-8 w-8 text-mc-text-3" />
                                                         </div>
                                                         <p className="font-medium mb-1">{t('passport.noPassports', "Hozircha pasportlar yo'q")}</p>
-                                                        <p className="text-sm text-gray-400 mb-6 max-w-xs">{t('passport.addPrompt', "Yangi pasport qo'shish uchun pastdagi tugmani bosing")}</p>
+                                                        <p className="text-sm text-mc-text-3 mb-6 max-w-xs">{t('passport.addPrompt', "Yangi pasport qo'shish uchun pastdagi tugmani bosing")}</p>
                                                         <Button
                                                             onClick={() => setIsAdding(true)}
-                                                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6"
+                                                            className="bg-mc-brand text-mc-on-brand rounded-full px-6"
                                                         >
                                                             <Plus className="h-4 w-4 mr-2" />
                                                             {t('passport.add', "Pasport qo'shish")}
@@ -471,12 +472,12 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                                 initial={{ opacity: 0, y: 10 }}
                                                                 animate={{ opacity: 1, y: 0 }}
                                                                 transition={{ delay: index * 0.1 }}
-                                                                className="group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-4 border border-gray-200 dark:border-gray-800 shadow-sm cursor-pointer hover:bg-white dark:hover:bg-zinc-900 hover:border-gray-300 dark:hover:border-gray-700 transition-all"
+                                                                className="group relative overflow-hidden rounded-mc-md bg-white dark:bg-mc-surface-2 p-4 border border-mc-border dark:border-mc-border shadow-sm cursor-pointer transition-all"
                                                                 onClick={() => setSelectedPassport(passport)}
                                                             >
                                                                 <div className="flex gap-4 items-center">
                                                                     {/* Image Thumbnail */}
-                                                                    <div className="h-16 w-16 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-700">
+                                                                    <div className="h-16 w-16 rounded-md bg-mc-surface-2 dark:bg-mc-surface-2 overflow-hidden flex-shrink-0 border border-mc-border dark:border-mc-border">
                                                                         {passport.image_urls && passport.image_urls[0] ? (
                                                                             <img
                                                                                 src={passport.image_urls[0]}
@@ -484,7 +485,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                                                                 className="h-full w-full object-cover"
                                                                             />
                                                                         ) : (
-                                                                            <div className="h-full w-full flex items-center justify-center text-gray-400">
+                                                                            <div className="h-full w-full flex items-center justify-center text-mc-text-3">
                                                                                 <FileText className="h-6 w-6" />
                                                                             </div>
                                                                         )}
@@ -492,14 +493,14 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
 
                                                                     <div className="flex-1 min-w-0">
                                                                         <h3 className="font-semibold text-lg truncate">{passport.passport_series}</h3>
-                                                                        <p className="text-sm text-gray-500 truncate">{t('form.pinfl', 'JSHSHIR (PINFL)')}: {passport.pinfl}</p>
-                                                                        <p className="text-xs text-gray-400 mt-1">{passport.date_of_birth}</p>
+                                                                        <p className="text-sm text-mc-text-2 truncate">{t('form.pinfl', 'JSHSHIR (PINFL)')}: {passport.pinfl}</p>
+                                                                        <p className="text-xs text-mc-text-3 mt-1">{passport.date_of_birth}</p>
                                                                     </div>
 
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                        className="h-10 w-10 text-mc-danger"
                                                                         onClick={(e) => handleDelete(passport.id, e)}
                                                                     >
                                                                         <Trash2 className="h-5 w-5" />
@@ -510,7 +511,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
 
                                                         <Button
                                                             variant="outline"
-                                                            className="w-full border-dashed border-2 py-6 text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors mt-6"
+                                                            className="w-full border-dashed border-2 py-6 text-mc-text-2 transition-colors mt-6"
                                                             onClick={() => setIsAdding(true)}
                                                         >
                                                             <Plus className="h-4 w-4 mr-2" />
@@ -545,12 +546,14 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 0.9, opacity: 0 }}
                                 onClick={(e) => e.stopPropagation()}
+                                role="dialog"
+                                aria-modal="true"
                                 className="relative w-full max-w-4xl mx-auto min-h-full flex flex-col justify-center p-4 py-16 sm:p-8"
                             >
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="absolute top-4 right-4 sm:fixed sm:top-6 sm:right-6 z-[1010] text-white/70 hover:text-white hover:bg-white/10 rounded-full bg-black/20"
+                                    className="absolute top-4 right-4 sm:fixed sm:top-6 sm:right-6 z-[1010] text-white/70 rounded-full bg-black/20"
                                     onClick={() => setSelectedPassport(null)}
                                 >
                                     <X className="h-8 w-8" />
@@ -560,7 +563,7 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                     {/* Images */}
                                     <div className="space-y-4">
                                         {selectedPassport.image_urls?.map((url, idx) => (
-                                            <div key={idx} className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-gray-900">
+                                            <div key={idx} className="relative rounded-mc-lg overflow-hidden shadow-2xl border border-white/10 bg-mc-surface-2">
                                                 <img
                                                     src={url}
                                                     alt={`Passport ${idx + 1}`}
@@ -569,28 +572,28 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                             </div>
                                         ))}
                                         {(!selectedPassport.image_urls || selectedPassport.image_urls.length === 0) && (
-                                            <div className="h-64 rounded-2xl bg-gray-800 flex items-center justify-center text-gray-500">
+                                            <div className="h-64 rounded-mc-lg bg-mc-surface-2 flex items-center justify-center text-mc-text-2">
                                                 <FileText className="h-12 w-12 opacity-50" />
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Details Panel */}
-                                    <div className="glass-panel p-6 rounded-3xl bg-white/10 backdrop-blur-md border border-white/10 text-white shadow-xl md:sticky md:top-8">
+                                    <div className="glass-panel p-6 rounded-mc-lg bg-white/10 backdrop-blur-md border border-white/10 text-white shadow-xl md:sticky md:top-8">
                                         <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                            <FileText className="h-6 w-6 text-emerald-400" />
+                                            <FileText className="h-6 w-6 text-mc-success" />
                                             {t('passport.details', "Pasport ma'lumotlari")}
                                         </h3>
 
                                         <div className="space-y-6">
                                             <div className="relative group">
-                                                <p className="text-sm text-gray-300 mb-1">{t('form.passportSeries', "Pasport seriyasi va raqami")}</p>
+                                                <p className="text-sm text-mc-text-3 mb-1">{t('form.passportSeries', "Pasport seriyasi va raqami")}</p>
                                                 <div className="flex items-center gap-3">
                                                     <p className="text-2xl font-mono font-semibold tracking-wider">{selectedPassport.passport_series}</p>
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
-                                                        className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/10 rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-all"
+                                                        className="h-8 w-8 text-white/50 rounded-mc-sm opacity-100 md:opacity-0 transition-all"
                                                         onClick={() => handleCopy(selectedPassport.passport_series, t('form.passportSeries'))}
                                                     >
                                                         <Copy className="h-4 w-4" />
@@ -601,13 +604,13 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                             <div className="my-4 h-px bg-white/10" />
 
                                             <div className="relative group">
-                                                <p className="text-sm text-gray-300 mb-1">{t('form.pinfl', "JSHSHIR (PINFL)")}</p>
+                                                <p className="text-sm text-mc-text-3 mb-1">{t('form.pinfl', "JSHSHIR (PINFL)")}</p>
                                                 <div className="flex items-center gap-3">
                                                     <p className="text-xl font-mono font-medium tracking-widest">{selectedPassport.pinfl}</p>
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
-                                                        className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/10 rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-all"
+                                                        className="h-8 w-8 text-white/50 rounded-mc-sm opacity-100 md:opacity-0 transition-all"
                                                         onClick={() => handleCopy(selectedPassport.pinfl, t('form.pinfl'))}
                                                     >
                                                         <Copy className="h-4 w-4" />
@@ -618,9 +621,9 @@ export function ExtraPassportsModal({ isOpen, onClose }: ExtraPassportsModalProp
                                             <div className="my-4 h-px bg-white/10" />
 
                                             <div>
-                                                <p className="text-sm text-gray-300 mb-1">{t('form.dateOfBirth', "Tug'ilgan sana")}</p>
+                                                <p className="text-sm text-mc-text-3 mb-1">{t('form.dateOfBirth', "Tug'ilgan sana")}</p>
                                                 <p className="text-lg font-medium flex items-center gap-2">
-                                                    <CalendarIcon className="h-4 w-4 text-emerald-400" />
+                                                    <CalendarIcon className="h-4 w-4 text-mc-success" />
                                                     {selectedPassport.date_of_birth}
                                                 </p>
                                             </div>

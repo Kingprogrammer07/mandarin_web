@@ -20,13 +20,25 @@ interface TrackCodeTabProps {
     initialView?: 'search' | 'history';
     autoFocus?: boolean;
     onFocusConsumed?: () => void;
+    /**
+     * Track code to look up on mount, handed over by the home screen's search
+     * bar. Without it the home search could only open this screen, leaving the
+     * client to retype the code they had already entered.
+     */
+    initialCode?: string;
 }
 
-export default function TrackCodeTab({ initialView = 'search', autoFocus=false, onFocusConsumed }: TrackCodeTabProps) {
+export default function TrackCodeTab({ initialView = 'search', autoFocus=false, onFocusConsumed, initialCode }: TrackCodeTabProps) {
     const { t } = useTranslation();
-    const [query, setQuery] = useState("");
+    // Seeded from the initial state rather than an effect: the query below is
+    // enabled by `activeSearch`, so setting it after mount would render one
+    // empty frame before the request starts.
+    const seeded = initialCode?.trim().toUpperCase() ?? "";
+    const [query, setQuery] = useState(seeded);
     const [history, setHistory] = useState<HistoryItem[]>([]);
-    const [activeSearch, setActiveSearch] = useState<string | null>(null);
+    const [activeSearch, setActiveSearch] = useState<string | null>(
+        seeded.length >= 3 ? seeded : null,
+    );
     const [showHistory, setShowHistory] = useState(initialView === 'history');
     const inputRef = useRef<HTMLInputElement>(null);
     // Load history
@@ -119,31 +131,33 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
     };
 
     return (
-        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-5">
 
             {/* Title & History Toggle */}
-            <div className="flex items-center justify-between gap-3 px-1">
-                <h2 className="flex min-w-0 items-center gap-2 text-xl font-black tracking-normal text-slate-950 dark:text-white">
-                    <span className="inline-block h-6 w-1 rounded-full bg-orange-500" />
-                    {showHistory ? t('tracking.historyTitle') : t('tracking.title')}
+            <div className="flex items-center justify-between gap-2">
+                <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-extrabold text-mc-text">
+                    <span className="inline-block h-4 w-1 shrink-0 rounded-full bg-mc-brand" />
+                    <span className="truncate">
+                        {showHistory ? t('tracking.historyTitle') : t('tracking.title')}
+                    </span>
                 </h2>
 
                 <button
                     onClick={() => setShowHistory(!showHistory)}
                     className="
-                        flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold
-                        border-slate-200 bg-white text-slate-700 shadow-sm
-                        active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200
+                        flex shrink-0 items-center gap-1.5 rounded-full border border-mc-border
+                        bg-mc-surface-2 px-2.5 py-1.5 text-[12px] font-extrabold text-mc-text-2
+                        transition-transform duration-150 active:scale-95
                     "
                 >
                     {showHistory ? (
                         <>
-                            <ArrowLeft className="w-4 h-4" />
+                            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
                             <span>{t('tracking.back')}</span>
                         </>
                     ) : (
                         <>
-                            <HistoryIcon className="w-4 h-4" />
+                            <HistoryIcon className="h-3.5 w-3.5" strokeWidth={2} />
                             <span>{t('tracking.myCargo')}</span>
                         </>
                     )}
@@ -159,8 +173,9 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
 
                     {/* Search Input */}
 {/* Search Input */}
-<form onSubmit={handleSearch} className="space-y-3">
-    {/* Input */}
+<form onSubmit={handleSearch} className="space-y-2">
+    {/* Input — 18px is above the 16px floor, so focusing it does not make iOS
+        Safari zoom the page. */}
     <div className="relative">
         <input
             type="text"
@@ -168,16 +183,19 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
             value={query}
             onChange={(e) => setQuery(e.target.value.toUpperCase())}
             placeholder={t('tracking.placeholder')}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
             className="
-                w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4
-                font-mono text-lg font-black tracking-normal text-slate-950 shadow-sm
-                placeholder:font-sans placeholder:text-sm placeholder:font-medium placeholder:text-slate-400
-                focus:border-orange-500 focus:outline-none focus:ring-4 focus:ring-orange-500/15
-                dark:border-white/10 dark:bg-white/[0.05] dark:text-white dark:placeholder:text-slate-500
-                transition-all duration-200
+                w-full rounded-mc-md border border-mc-border bg-mc-surface py-3 pl-11 pr-3
+                font-mono text-[18px] font-extrabold text-mc-text
+                placeholder:font-sans placeholder:text-[13px] placeholder:font-medium placeholder:text-mc-text-3
+                focus:border-mc-brand focus:outline-none focus:ring-2 focus:ring-mc-brand/25
+                transition-colors duration-200
             "
         />
-        <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+        <Search className="absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-mc-text-3" strokeWidth={2} />
     </div>
 
     {/* Search Button */}
@@ -185,21 +203,21 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
         type="submit"
         disabled={isLoading}
         className="
-            flex w-full items-center justify-center gap-2.5 rounded-2xl
-            bg-gradient-to-r from-orange-500 to-amber-500 py-3.5
-            text-sm font-black tracking-normal text-white
-            shadow-lg shadow-orange-500/20 active:scale-[0.98]
-            transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60
+            flex h-12 w-full items-center justify-center gap-2 rounded-mc-md
+            bg-gradient-to-r from-mc-brand to-mc-brand-strong
+            text-[14px] font-extrabold text-mc-on-brand
+            shadow-[var(--mc-shadow-cta)] active:scale-[0.98]
+            transition-transform duration-200 disabled:cursor-not-allowed disabled:opacity-60
         "
     >
         {isLoading ? (
             <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 <span>{t('tracking.searching')}</span>
             </>
         ) : (
             <>
-                <Search className="w-4 h-4" />
+                <Search className="h-4 w-4" strokeWidth={2} />
                 <span>{t('tracking.search', 'Qidirish')}</span>
             </>
         )}
@@ -208,31 +226,31 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
 
                     {/* History Chips */}
                     {history.length > 0 && !data && (
-                        <div className="space-y-2">
-                            <div className="ml-1 flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                                <History className="w-4 h-4" />
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.09em] text-mc-text-3">
+                                <History className="h-3.5 w-3.5" strokeWidth={2} />
                                 <span>{t('tracking.recentSearches')}</span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1.5">
                                 {history.map(item => (
                                     <button
                                         key={item.code}
                                         onClick={() => handleChipClick(item)}
                                         className="
-                   group flex items-center gap-2 rounded-full border border-slate-200
-                   bg-white px-3 py-1.5 text-sm font-mono font-bold text-slate-700 shadow-sm
-                   transition-all active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300
+                   flex items-center gap-1.5 rounded-full border border-mc-border
+                   bg-mc-surface-2 px-2.5 py-1 font-mono text-[12px] font-bold text-mc-text
+                   transition-transform active:scale-95
                  "
                                     >
                                         <span className="font-bold">{item.code}</span>
                                         {item.flightName && (
-                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                                            <span className="rounded-full bg-mc-brand-soft px-1.5 py-0.5 font-sans text-[10px] font-bold text-mc-brand">
                                                 {item.flightName}
                                             </span>
                                         )}
                                         <X
                                             onClick={(e) => removeFromHistory(e, item.code)}
-                                            className="size-3 text-slate-400 opacity-100 transition-colors active:text-red-500 sm:opacity-0 sm:group-hover:opacity-100"
+                                            className="h-3.5 w-3.5 shrink-0 text-mc-text-3 transition-colors active:text-mc-danger"
                                         />
                                     </button>
                                 ))}
@@ -243,16 +261,16 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
                     {/* Results Region */}
                     <div className="min-h-[200px]">
                         {isLoading && (
-                            <div className="flex flex-col items-center justify-center py-10 opacity-70">
-                                <Loader2 className="mb-2 size-10 animate-spin text-orange-500" />
-                                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t('tracking.searching')}</p>
+                            <div className="flex flex-col items-center justify-center py-10">
+                                <Loader2 className="mb-2 h-8 w-8 animate-spin text-mc-brand" />
+                                <p className="text-[12px] font-medium text-mc-text-2">{t('tracking.searching')}</p>
                             </div>
                         )}
 
                         {error && (
-                            <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400">
-                                <AlertCircle className="w-6 h-6 flex-shrink-0" />
-                                <p className="text-sm font-medium">{t('tracking.error')}</p>
+                            <div className="flex items-center gap-2.5 rounded-mc-lg border border-mc-danger/25 bg-mc-danger-soft p-3.5 text-mc-danger">
+                                <AlertCircle className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                                <p className="text-[12px] font-medium">{t('tracking.error')}</p>
                             </div>
                         )}
 
@@ -274,11 +292,11 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
                                         animate={{ opacity: 1, scale: 1 }}
                                         className="flex flex-col items-center justify-center py-10 text-center"
                                     >
-                                        <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
-                                            <Search className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                                        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-mc-surface-2">
+                                            <Search className="h-7 w-7 text-mc-text-3" strokeWidth={1.8} />
                                         </div>
-                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('tracking.notFoundTitle')}</h3>
-                                        <p className="text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
+                                        <h3 className="text-[15px] font-extrabold text-mc-text">{t('tracking.notFoundTitle')}</h3>
+                                        <p className="mx-auto mt-1 max-w-xs text-[12px] font-medium leading-snug text-mc-text-2">
                                             {t('tracking.notFoundDesc', { code: activeSearch })}
                                         </p>
                                     </motion.div>

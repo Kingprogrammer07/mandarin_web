@@ -1,12 +1,12 @@
 import "./i18n/config";
 
-import { useState, useEffect, useCallback, lazy, Suspense, useTransition } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense, useTransition } from "react";
 import { useTranslation } from "react-i18next";
 
 import NavigationBar from "./components/NavigationBar";
 import AdminLayout from "./components/admin/AdminLayout";
 import TelegramWebAppGuard from "./components/TelegramWebAppGuard";
-import { UserNav } from "./components/navigation/UserNav";
+import { BottomNav, type BottomNavPage } from "./components/user/BottomNav";
 import { Toaster } from "sonner";
 import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
 import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
@@ -217,7 +217,17 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const GUEST_PAGES: Page[] = ["login", "admin-login", "register"];
-const USER_PAGES: Page[] = ["user-profile", "user-home", "user-reports", "user-history"];
+// Every page a client account can open. Used to pick which login screen an
+// unauthenticated deep link lands on — `saved_cards` and `user-referral` were
+// missing, so a logged-out client following either link met the ADMIN login.
+const USER_PAGES: Page[] = [
+  "user-profile",
+  "user-home",
+  "user-reports",
+  "user-history",
+  "saved_cards",
+  "user-referral",
+];
 const PUBLIC_PAGES: Page[] = ["pickup-tv", "payment_nbu_success", "payment_nbu_failure"];
 
 function isGuestPage(page: Page): boolean {
@@ -620,8 +630,15 @@ function AppContent() {
 
   // ── Browser back / forward ───────────────────────────────────────────────
 
+  // How many pushes this session has made on top of the entry route. A page
+  // opened from inside the app can hand the user back where they came from;
+  // one opened by deep link has nothing behind it but the Telegram host, so
+  // `history.back()` there would close the Mini App instead of navigating.
+  const pushDepthRef = useRef(0);
+
   useEffect(() => {
     const handlePopState = () => {
+      pushDepthRef.current = Math.max(0, pushDepthRef.current - 1);
       applyRoute(
         resolvePageFromPath(window.location.pathname),
         userRole,
@@ -640,7 +657,23 @@ function AppContent() {
       flightName?: string,
       clientId?: number,
     ) => {
+      pushDepthRef.current += 1;
       applyRoute({ page, flightName, clientId }, userRole, "push");
+    },
+    [userRole, applyRoute],
+  );
+
+  /**
+   * Back that returns to wherever the user actually came from, falling back to
+   * a fixed page when there is no in-app history to pop.
+   */
+  const navigateBack = useCallback(
+    (fallback: Page) => {
+      if (pushDepthRef.current > 0) {
+        window.history.back();
+        return;
+      }
+      applyRoute({ page: fallback }, userRole, "replace");
     },
     [userRole, applyRoute],
   );
@@ -714,12 +747,13 @@ function AppContent() {
 
   // ── Derived flags ────────────────────────────────────────────────────────
 
-  const isUserPages = [
-    "user-profile",
-    "user-home",
-    "user-reports",
-    "user-history",
-  ].includes(currentPage);
+  const isUserPages = USER_PAGES.includes(currentPage as Page);
+
+  // The redesigned client surface: the tab bar, the token background and no top
+  // NavigationBar. Guest screens belong to it too — they are what a client sees
+  // first — but admin-login does not.
+  const isClientSurface =
+    isUserPages || currentPage === "login" || currentPage === "register";
 
   const isAdminLoginPage = currentPage === "admin-login";
 
@@ -839,12 +873,14 @@ function AppContent() {
       />
     )}
     <div
-      className={`min-h-screen relative overflow-hidden transition-colors duration-300 ${
+      className={`min-h-dvh relative overflow-hidden transition-colors duration-300 ${
         showAdminMaintenanceBanner ? 'pt-9' : ''
       } ${
         isAdminArea
           ? "bg-[#f5f5f4] dark:bg-[#09090b]"
-          : "bg-[#f8fafc] dark:bg-[#06080d]"
+          : isClientSurface
+            ? "bg-mc-bg"
+            : "bg-[#f8fafc] dark:bg-[#06080d]"
       }`}
     >
       {/* One-time admin responsibility agreement (self-gates; shows once after login). */}
@@ -852,8 +888,11 @@ function AppContent() {
         <AdminAgreementModal currentPage={currentPage} userRole={userRole} />
       </Suspense>
 
+      {/* The old design's header wash. Staff screens still run on that palette;
+          the client surface paints its own --mc-bg, and during the auth check
+          there is no page over it at all — which is where it kept showing up. */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {!isAdminArea && (
+        {!isAdminArea && !isClientSurface && !isCheckingAuth && (
           <>
             <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.18),rgba(249,115,22,0.07)_38%,transparent_72%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.20),rgba(249,115,22,0.08)_38%,transparent_72%)]" />
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-300/70 to-transparent dark:via-orange-200/55" />
@@ -862,28 +901,28 @@ function AppContent() {
         )}
       </div>
 
-      {!isAdminArea && (
-        <>
-          <NavigationBar
-            onStatisticsClick={() => navigateToPage("statistics")}
-            currentPage={currentPage}
-          />
-
-          {isUserPages && (
-            <UserNav
-              currentPage={currentPage}
-              onNavigate={(page) => navigateToPage(page as Page)}
-            />
-          )}
-        </>
+      {/* Client pages navigate from the bottom bar; every other non-admin page
+          keeps the top NavigationBar. Rendering both would put two navigation
+          systems at the same hierarchy level. */}
+      {!isAdminArea && !isClientSurface && (
+        <NavigationBar
+          onStatisticsClick={() => navigateToPage("statistics")}
+          currentPage={currentPage}
+        />
+      )}
+      {!isAdminArea && isUserPages && (
+        <BottomNav
+          currentPage={currentPage}
+          onNavigate={(page: BottomNavPage) => navigateToPage(page as Page)}
+        />
       )}
 
       {isCheckingAuth ? (
-        <div className="pt-24 px-4 space-y-4 max-w-lg mx-auto animate-in fade-in duration-300">
-          <Skeleton className="h-10 w-1/3 rounded-xl" />
-          <Skeleton className="h-32 w-full rounded-3xl" />
-          <Skeleton className="h-32 w-full rounded-3xl" />
-          <Skeleton className="h-32 w-3/4 rounded-3xl" />
+        <div className="mx-auto max-w-lg space-y-2.5 px-4 pt-6 animate-in fade-in duration-300">
+          <Skeleton className="h-9 w-1/3 rounded-mc-md" />
+          <Skeleton className="h-28 w-full rounded-mc-lg" />
+          <Skeleton className="h-28 w-full rounded-mc-lg" />
+          <Skeleton className="h-28 w-3/4 rounded-mc-lg" />
         </div>
       ) : (
       <Suspense fallback={<TopProgressBar />}>
@@ -972,7 +1011,7 @@ function AppContent() {
         <main
           className={`relative ${
             isUserPages
-              ? "pb-0 md:pb-0 pt-0"
+              ? "pt-0 pb-[calc(var(--mc-nav-h)+env(safe-area-inset-bottom))]"
               : isAdminLoginPage
                 ? "p-0"
                 : ["flights", "cargo-list", "cargo-add", "statistics"].includes(currentPage)
@@ -1050,7 +1089,10 @@ function AppContent() {
           )}
 
           {currentPage === "user-profile" && (
-            <UserPage onLogout={handleLogout} />
+            <UserPage
+              onLogout={handleLogout}
+              onNavigateToReferral={() => navigateToPage("user-referral")}
+            />
           )}
 
           {currentPage === "user-home" && (
@@ -1074,15 +1116,15 @@ function AppContent() {
           )}
 
           {currentPage === "user-history" && (
-            <UserHistoryPage onBack={() => navigateToPage("user-home")} />
+            <UserHistoryPage />
           )}
 
           {currentPage === "saved_cards" && (
-            <SavedCardsPage onBack={() => navigateToPage("user-home")} />
+            <SavedCardsPage onBack={() => navigateBack("user-home")} />
           )}
 
           {currentPage === "user-referral" && (
-            <ReferralPage onBack={() => navigateToPage("user-home")} />
+            <ReferralPage onBack={() => navigateBack("user-home")} />
           )}
 
           {currentPage === "system-settings" && (

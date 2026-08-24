@@ -1,19 +1,5 @@
-import {
-  ShieldAlert,
-  ShieldOff,
-  // IdCard,
-  Rocket,
-  Plane,
-  Calculator,
-  MapPin,
-  MapPinned,
-  Calendar,
-  ListOrdered,
-  Wallet,
-  Edit3,
-  FileText,
-} from 'lucide-react';
-import type { CarouselItemData, MainActionItem } from './types';
+import { ShieldAlert, ShieldOff, Rocket, Plane } from 'lucide-react';
+import type { CarouselItemData } from './types';
 
 export const CAROUSEL_ITEMS: CarouselItemData[] = [
   {
@@ -21,9 +7,9 @@ export const CAROUSEL_ITEMS: CarouselItemData[] = [
     type: 'feature',
     titleKey: 'dashboard.carousel.prohibited.title',
     subKey: 'dashboard.carousel.prohibited.sub',
-    gradient: 'from-red-900 to-red-600',
-    bgIcon: <ShieldAlert className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
-    mainIcon: <ShieldOff className="text-white/90" style={{ width: 32, height: 32 }} />,
+    tone: 'warn',
+    bgIcon: <ShieldAlert className="absolute -right-5 -top-5" style={{ width: 96, height: 96 }} />,
+    mainIcon: <ShieldOff style={{ width: 20, height: 20 }} />,
   },
   // Temporarily hidden: "ID olish" feature.
   // {
@@ -40,96 +26,8 @@ export const CAROUSEL_ITEMS: CarouselItemData[] = [
     type: 'feature',
     titleKey: 'dashboard.carousel.delivery.title',
     subKey: 'dashboard.carousel.delivery.sub',
-    gradient: 'from-purple-900 to-purple-600',
-    bgIcon: <Rocket className="text-white/10 absolute -right-4 -top-4" style={{ width: 96, height: 96 }} />,
-    mainIcon: <Plane className="text-white/90" style={{ width: 32, height: 32 }} />,
+    tone: 'brand',
+    bgIcon: <Rocket className="absolute -right-5 -top-5" style={{ width: 96, height: 96 }} />,
+    mainIcon: <Plane style={{ width: 20, height: 20 }} />,
   },
 ];
-
-export const PRIMARY_ACTIONS: MainActionItem[] = [
-  {
-    id: 'payment',
-    icon: <Wallet className="w-5 h-5" />,
-    bgIcon: <Wallet style={{ width: 88, height: 88 }} />,
-    labelKey: 'dashboard.actions.payment.label',
-    descKey: 'dashboard.actions.payment.desc',
-    badgeKey: 'dashboard.actions.payment.badge',
-    actionLabelKey: 'dashboard.actions.payment.action',
-    theme: 'amber',
-  },
-  {
-    id: 'request',
-    icon: <Edit3 className="w-5 h-5" />,
-    bgIcon: <Edit3 style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.request.label',
-    descKey: 'dashboard.actions.request.desc',
-    badgeKey: 'dashboard.actions.request.badge',
-    actionLabelKey: 'dashboard.actions.request.action',
-    theme: 'emerald',
-  },
-  {
-    id: 'china',
-    icon: <MapPin className="w-5 h-5" />,
-    bgIcon: <MapPin style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.china.label',
-    descKey: 'dashboard.actions.china.desc',
-    badgeKey: 'dashboard.actions.china.badge',
-    actionLabelKey: 'dashboard.actions.china.action',
-    theme: 'amber',
-  },
-  {
-    id: 'delivery_history',
-    icon: <ListOrdered className="w-5 h-5" />,
-    bgIcon: <ListOrdered style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.history.label',
-    descKey: 'dashboard.actions.history.desc',
-    badgeKey: 'dashboard.actions.history.badge',
-    actionLabelKey: 'dashboard.actions.history.action',
-    theme: 'violet',
-  },
-];
-
-export const SECONDARY_ACTIONS: MainActionItem[] = [
-  {
-    id: 'calculator',
-    icon: <Calculator className="w-5 h-5" />,
-    bgIcon: <Calculator style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.calculator.label',
-    descKey: 'dashboard.actions.calculator.desc',
-    badgeKey: 'dashboard.actions.calculator.badge',
-    actionLabelKey: 'dashboard.actions.calculator.action',
-    theme: 'cyan',
-  },
-  {
-    id: 'schedule',
-    icon: <Calendar className="w-5 h-5" />,
-    bgIcon: <Calendar style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.schedule.label',
-    descKey: 'dashboard.actions.schedule.desc',
-    badgeKey: 'dashboard.actions.schedule.badge',
-    actionLabelKey: 'dashboard.actions.schedule.action',
-    theme: 'sky',
-  },
-  {
-    id: 'our_address',
-    icon: <MapPinned className="w-5 h-5" />,
-    bgIcon: <MapPinned style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.ourAddress.label',
-    descKey: 'dashboard.actions.ourAddress.desc',
-    badgeKey: 'dashboard.actions.ourAddress.badge',
-    actionLabelKey: 'dashboard.actions.ourAddress.action',
-    theme: 'amber',
-  },
-  {
-    id: 'report',
-    icon: <FileText className="w-5 h-5" />,
-    bgIcon: <FileText style={{ width: 80, height: 80 }} />,
-    labelKey: 'dashboard.actions.report.label',
-    descKey: 'dashboard.actions.report.desc',
-    badgeKey: 'dashboard.actions.report.badge',
-    actionLabelKey: 'dashboard.actions.report.action',
-    theme: 'rose',
-  },
-];
-
-export const MAIN_ACTIONS = SECONDARY_ACTIONS;

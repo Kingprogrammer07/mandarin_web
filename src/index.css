@@ -4,6 +4,39 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* One family for the whole client app. `font-family` was never defined
+   * anywhere in this codebase — the app ran on whatever the OS supplied, which
+   * is why the same screen looked different on iOS and Android. */
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Mandarin Cargo brand tokens → Tailwind utilities (bg-mc-surface, …) */
+  --color-mc-bg: var(--mc-bg);
+  --color-mc-surface: var(--mc-surface);
+  --color-mc-surface-2: var(--mc-surface-2);
+  --color-mc-nav: var(--mc-nav);
+  --color-mc-border: var(--mc-border);
+  --color-mc-text: var(--mc-text);
+  --color-mc-text-2: var(--mc-text-2);
+  --color-mc-text-3: var(--mc-text-3);
+  --color-mc-brand: var(--mc-brand);
+  --color-mc-brand-strong: var(--mc-brand-strong);
+  --color-mc-brand-soft: var(--mc-brand-soft);
+  --color-mc-on-brand: var(--mc-on-brand);
+  --color-mc-danger: var(--mc-danger);
+  --color-mc-danger-soft: var(--mc-danger-soft);
+  --color-mc-warn: var(--mc-warn);
+  --color-mc-warn-soft: var(--mc-warn-soft);
+  --color-mc-success: var(--mc-success);
+  --color-mc-cardface: var(--mc-cardface);
+  --color-mc-cardface-2: var(--mc-cardface-2);
+  --color-mc-danger-fill: var(--mc-danger-fill);
+  --color-mc-on-danger: var(--mc-on-danger);
+  --color-mc-on-success: var(--mc-on-success);
+  --color-mc-on-warn: var(--mc-on-warn);
+  --radius-mc-sm: var(--mc-r-sm);
+  --radius-mc-md: var(--mc-r-md);
+  --radius-mc-lg: var(--mc-r-lg);
+  --radius-mc-xl: var(--mc-r-xl);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -42,6 +75,133 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ─── Mandarin Cargo brand tokens ──────────────────────────────────────────
+ *
+ * A separate namespace from the shadcn tokens above ON PURPOSE.
+ *
+ * Those describe a different product: `--primary` there is near-black
+ * (oklch(0.205 0 0)), which is why almost nothing on the client side ever
+ * used them — the user surface carries 104 hardcoded hex values and only 4
+ * semantic token references. Repainting `--primary` orange would repaint
+ * every shadcn primitive at once, and `src/components/ui/` references those
+ * tokens 122 times across an admin panel seventeen staff use daily.
+ *
+ * So this is a migration seam, not a second system: the client app uses
+ * `--mc-*` exclusively, and when the admin panel is redesigned `--primary`
+ * gets pointed at `--mc-brand` and the seam closes.
+ *
+ * Values are read from the supplied design. Replace with exact values if the
+ * source file has them.
+ */
+:root {
+  /* Surfaces */
+  --mc-bg: #f7f7f8;
+  --mc-surface: #ffffff;
+  --mc-surface-2: #f1f1f3;      /* inset chips: search magnifier, dividers */
+  --mc-nav: #ffffff;            /* bottom tab bar — its own plane */
+  /* Height of the bottom tab bar, excluding the safe-area inset it adds
+     itself. Read by BottomNav for its own height and by App.tsx to clear it —
+     a literal in both places drifted apart once already. */
+  --mc-nav-h: 58px;
+  --mc-border: rgba(16, 16, 20, 0.06);
+
+  /* Text — three levels is enough; a fourth always becomes gray-on-gray */
+  --mc-text: #16161a;
+  --mc-text-2: #6f6f78;   /* 4.98:1 on surface, 4.65:1 on bg — AA */
+  --mc-text-3: #8e8e97;   /* 3.25:1 on surface, 3.03:1 on bg */
+
+  /* Brand */
+  --mc-brand: #ff7a1a;
+  --mc-brand-strong: #f26a0a;   /* gradient end, pressed state */
+  --mc-brand-soft: #fff2e8;     /* icon chips, active-cargo card */
+  --mc-on-brand: #2a1400;
+
+  /* Two tones per hue. The vivid value fills buttons, dots and borders; the
+   * -text value is what the same hue must become when it *is* the text:
+   * #ff7a1a reaches only 2.6:1 on a white card and #27c265 only 2.3:1, both
+   * under the 4.5:1 WCAG AA floor. `.text-mc-*` is bound to the -text tone at
+   * the bottom of this file, so no class name had to change.
+   * A filled button pairs its fill with --mc-on-<hue>: near-black on orange,
+   * green and amber (6-8:1), white on a darkened red (5.7:1). */
+  --mc-on-success: #052b13;
+  --mc-on-warn: #241800;
+  --mc-on-danger: #ffffff;
+  --mc-danger-fill: #c62419;
+
+  --mc-brand-text: #b4530a;     /* 5.02:1 on surface */
+  --mc-danger-text: #c62419;    /* 5.72:1 */
+  --mc-warn-text: #8a5600;      /* 6.16:1 */
+  --mc-success-text: #0f7a3d;   /* 5.42:1 */
+
+  /* Semantic — money owed is the one colour a cargo client looks for */
+  --mc-danger: #ff3b30;
+  --mc-danger-soft: #fff1f0;
+  --mc-warn: #d98800;
+  --mc-warn-soft: #fff3e0;
+  --mc-success: #27c265;
+
+  /* A bank-card graphic is a picture of a physical object, so it keeps its own
+   * dark ground in both themes — the same value appears in the .dark block on
+   * purpose. Flattening these onto --mc-surface-2 left white text on a white
+   * card in light mode. */
+  --mc-cardface: #1d1d24;
+  --mc-cardface-2: #33333f;
+
+  /* Radius — four steps. The audit found 22 different arbitrary radii on the
+   * client side; anything not on this scale is a mistake. */
+  --mc-r-sm: 10px;
+  --mc-r-md: 14px;
+  --mc-r-lg: 18px;
+  --mc-r-xl: 22px;
+
+  /* Elevation. Light mode separates cards with shadow, dark mode with border —
+   * a shadow on a near-black surface is invisible. */
+  --mc-shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 8px 24px rgba(16, 16, 20, 0.05);
+  --mc-shadow-cta: 0 8px 20px rgba(255, 122, 26, 0.28);
+}
+
+.dark {
+  --mc-bg: #0f0f11;
+  --mc-surface: #1a1a1d;
+  --mc-surface-2: #232327;
+  --mc-nav: #141416;
+  --mc-border: rgba(255, 255, 255, 0.13);
+
+  --mc-text: #f5f5f7;
+  --mc-text-2: #8e8e96;
+  --mc-text-3: #6e6e76;
+
+  /* Slightly brighter: the same orange reads duller against near-black. */
+  --mc-brand: #ff8a2b;
+  --mc-brand-strong: #f97316;
+  --mc-brand-soft: rgba(255, 122, 26, 0.14);
+  --mc-on-brand: #2a1400;
+
+  /* On near-black the vivid tones already clear AA as text (6.9-8.4:1), so the
+   * -text tier collapses back onto them; only the fill pairings stay fixed. */
+  --mc-on-success: #052b13;
+  --mc-on-warn: #241800;
+  --mc-on-danger: #ffffff;
+  --mc-danger-fill: #c62419;
+
+  --mc-brand-text: var(--mc-brand);
+  --mc-danger-text: var(--mc-danger);
+  --mc-warn-text: var(--mc-warn);
+  --mc-success-text: var(--mc-success);
+
+  --mc-danger: #ff5a4e;
+  --mc-danger-soft: rgba(255, 90, 78, 0.14);
+  --mc-warn: #e9a23b;
+  --mc-warn-soft: rgba(233, 162, 59, 0.14);
+  --mc-success: #34c759;
+
+  --mc-cardface: #1d1d24;
+  --mc-cardface-2: #33333f;
+
+  --mc-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.38);
+  --mc-shadow-cta: 0 8px 20px rgba(255, 122, 26, 0.22);
 }
 
 :root {
@@ -116,6 +276,47 @@
 }
 
 @layer base {
+  /* iOS / Telegram Mini App platform base.
+   *
+   * The client app only ever runs inside a WKWebView on a phone, so none of
+   * this is progressive enhancement — it is the platform it ships on. Kept in
+   * @layer base so any Tailwind utility still overrides it per element.
+   *
+   * The 16px input floor is deliberately NOT enforced here: a blanket
+   * font-size would also flatten the deliberately large number inputs. It is a
+   * review rule instead — see "iOS-first" in frontend/CLAUDE.md. */
+  html {
+    /* Rotating to landscape must not inflate body text. */
+    -webkit-text-size-adjust: 100%;
+    /* Safari paints a grey block over every tapped element by default. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    /* Stops the whole app rubber-banding when an inner list hits its end. */
+    overscroll-behavior-y: none;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  label,
+  [role="button"] {
+    /* Drops Safari's 300ms wait for a possible double-tap-to-zoom. */
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea,
+  select {
+    /* Safari draws its own inset shadow, gradient and corner radius on text
+     * controls; rounded-* and bg-* utilities land on top of this reset. */
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
   * {
     @apply border-border;
     outline: none;
@@ -256,6 +457,20 @@
   background-color: rgba(156, 163, 175, 0.8);
 }
 
+/* Strips that carry their own position indicator (the home carousel) must not
+   also show a bar. Declared here, unlayered and after the global rules above,
+   because a Tailwind arbitrary variant sits in @layer utilities and loses to
+   anything unlayered no matter how specific it is. */
+.mc-no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.mc-no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 input,
 textarea,
 select {
@@ -274,4 +489,71 @@ select {
   0%   { --nav-ring-angle: 0deg;   opacity: 1; }
   80%  { --nav-ring-angle: 360deg; opacity: 1; }
   100% { --nav-ring-angle: 360deg; opacity: 0; }
+}
+
+/* Unlayered on purpose: a utility generated inside @layer utilities loses to
+ * any unlayered declaration, which is exactly what is wanted here — the class
+ * keeps its name and gains the accessible tone. One rule per class so a grep
+ * for the class name still lands on it. */
+.text-mc-brand {
+  color: var(--mc-brand-text);
+}
+.text-mc-danger {
+  color: var(--mc-danger-text);
+}
+.text-mc-warn {
+  color: var(--mc-warn-text);
+}
+.text-mc-success {
+  color: var(--mc-success-text);
+}
+
+/* Sweeping colour ring for the home action cards.
+ *
+ * A rotated child clipped by the parent, not a masked pseudo-element: the
+ * animation is a plain `transform`, so it stays on the compositor and does not
+ * repaint the card underneath on every frame. The inner card is opaque, so only
+ * the 1px gap around it shows the gradient.
+ *
+ * Runs twice and fades out — an endlessly spinning border on the main screen
+ * reads as a loading state, and the point here is to draw the eye once on
+ * arrival. The static --mc-border underneath is what remains.
+ */
+:root {
+  --mc-sweep-1: #4285f4;
+  --mc-sweep-2: #ea4335;
+  --mc-sweep-3: #fbbc05;
+  --mc-sweep-4: #34a853;
+}
+
+.mc-ring-sweep {
+  background: conic-gradient(
+    var(--mc-sweep-1),
+    var(--mc-sweep-2),
+    var(--mc-sweep-3),
+    var(--mc-sweep-4),
+    var(--mc-sweep-1)
+  );
+  animation: mc-ring-sweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes mc-ring-sweep {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-ring-sweep {
+    animation: none;
+    opacity: 0;
+  }
 }

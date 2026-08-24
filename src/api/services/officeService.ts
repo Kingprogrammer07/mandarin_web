@@ -27,6 +27,9 @@ export interface OfficeInfo {
   holidays: string[];
   notice: string | null;
   map_url: string | null;
+  /** Branch photo shown on the home card. Nullable: staff may not have
+   *  uploaded one, and the card falls back to an icon rather than a gap. */
+  photo_url: string | null;
   is_open_now: boolean;
   today_hours: OfficeDayHours | null;
   closed_reason: 'holiday' | 'weekday' | 'outside_hours' | null;
