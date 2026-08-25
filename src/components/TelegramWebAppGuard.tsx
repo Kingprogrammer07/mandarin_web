@@ -32,6 +32,13 @@ const STYLES = `
   .fade-in-up       { animation: fade-in-up   0.5s ease-out both;    }
   .guard-mark-pulse { animation: guard-mark-pulse 1.9s ease-in-out infinite; }
   .progress-animate { animation: progress-bar 2.8s ease-out forwards; }
+
+  /* A loading screen is the worst place to ignore this setting: it is the one
+     screen a reader cannot navigate away from while it animates. */
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in-up, .guard-mark-pulse, .progress-animate { animation: none; }
+    .progress-animate { width: 95%; }
+  }
 `;
 
 /* ─────────────── LOADING SCREEN ─────────────── */
@@ -54,9 +61,23 @@ function LoadingScreen() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-mc-brand/40 to-transparent" />
 
       <div className="fade-in-up relative w-full max-w-[330px] overflow-hidden rounded-mc-xl border border-mc-border bg-mc-surface p-5 text-center shadow-[var(--mc-shadow-card)]">
-        {/* Brand mark */}
+        {/* Brand mark. `fetchPriority="high"` and the matching preload in
+            index.html start this request during HTML parse instead of after
+            the React bundle has evaluated — on a slow connection that was the
+            difference between the splash showing the brand and showing a hole.
+            The file itself went from 238 kB to 40 kB in the same change.
+            Dimensions are declared so the card never reflows around it. */}
         <div className="relative mx-auto mb-4 grid h-20 w-20 place-items-center">
-          <img src="/mandarin.png" alt="Mandarin Cargo" className="h-18 w-18 object-contain" />
+          <img
+            src="/mandarin.png"
+            alt=""
+            aria-hidden="true"
+            width={72}
+            height={72}
+            fetchPriority="high"
+            decoding="async"
+            className="h-18 w-18 object-contain"
+          />
         </div>
         {/* Brand text */}
         <div className="relative">

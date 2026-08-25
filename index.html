@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/mandarin_cargo_logo.png" />
+    <!-- The splash screen paints this before the React bundle has finished
+         evaluating, so the fetch has to start during HTML parse, not after. -->
+    <link rel="preload" as="image" href="/mandarin.png" fetchpriority="high" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mandarin Cargo</title>
 
