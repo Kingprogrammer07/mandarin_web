@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3, CalendarDays,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import RoleSwitcher from './RoleSwitcher';
 
+import { useAppTheme } from '@/hooks/useAppTheme';
 interface AdminLayoutProps {
   children: React.ReactNode;
   currentPage: string;
@@ -95,28 +96,14 @@ const quickAccessPages = [
   },
 ] as const;
 
-function getInitialTheme() {
-  // Default to light mode; only dark if explicitly saved in localStorage
-  return localStorage.getItem('adminTheme') === 'dark';
-}
-
 export default function AdminLayout({ children, currentPage, onNavigate, onLogout }: AdminLayoutProps) {
-  const [isDark, setIsDark] = useState(getInitialTheme);
+  // `next-themes` owns the `dark` class app-wide. Writing it here as well
+  // meant the provider reasserted its own value on the next state change and
+  // the toggle silently reverted.
+  const { theme, toggle: toggleTheme } = useAppTheme();
+  const isDark = theme === 'dark';
   const [showPagesMenu, setShowPagesMenu] = useState(false);
   const [showOtherPages, setShowOtherPages] = useState(true);
-
-  useEffect(() => {
-    if (isDark) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDark]);
-
-  const toggleTheme = () => {
-    const newTheme = !isDark;
-    setIsDark(newTheme);
-    localStorage.setItem('adminTheme', newTheme ? 'dark' : 'light');
-    if (newTheme) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  };
 
   const handleNav = (id: string) => {
     onNavigate(id);

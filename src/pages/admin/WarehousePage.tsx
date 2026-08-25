@@ -42,6 +42,7 @@ import { revertTakenStatus, exportWarehouseTransactions } from "../../api/servic
 import type { PickupMethod, PickupQueuePriority } from "../../api/pickupQueue";
 import { PICKUP_PRIORITY_LABELS } from "../../api/pickupQueue";
 import { playNotificationSound } from "../../utils/notificationSounds";
+import { useAppTheme } from '@/hooks/useAppTheme';
 import {
   requestNotificationPermission,
   showLocalNotification,
@@ -90,13 +91,6 @@ interface WarehousePageProps {
 
 // ── Theme helper ──────────────────────────────────────────────────────────────
 
-function getInitialTheme(): boolean {
-  return (
-    localStorage.getItem("adminTheme") === "dark" ||
-    (!("adminTheme" in localStorage) &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
-  );
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -132,7 +126,8 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
   } = useWarehouseStore();
 
   const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
-  const [isDark, setIsDark] = useState(getInitialTheme);
+  const { theme, toggle: toggleTheme } = useAppTheme();
+  const isDark = theme === 'dark';
   const [exporting, setExporting] = useState(false);
 
   const canView = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('warehouse:read');
@@ -260,20 +255,6 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
     page: 1,
     size: 50,
   });
-
-  // Apply theme immediately on mount and on every toggle
-  useEffect(() => {
-    if (isDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, [isDark]);
-
-  const toggleTheme = useCallback(() => {
-    const next = !isDark;
-    setIsDark(next);
-    localStorage.setItem("adminTheme", next ? "dark" : "light");
-    if (next) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, [isDark]);
 
   // Silent token refresh on mount so permissions stay current
   useEffect(() => {

@@ -22,20 +22,13 @@ import { pickVisible } from '../../utils/tour';
 import type { DriveStep } from 'driver.js';
 import { useTranslation } from 'react-i18next';
 
+import { useAppTheme } from '@/hooks/useAppTheme';
 // Lazy — the full add/edit client form is heavy and only opened on demand.
 const ClientForm = lazy(() => import('../../pages/shared/ClientForm'));
 
 interface ManagerPageProps {
   onNavigate: (page: string) => void;
   onLogout: () => void;
-}
-
-function getInitialTheme(): boolean {
-  return (
-    localStorage.getItem('adminTheme') === 'dark' ||
-    (!('adminTheme' in localStorage) &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
-  );
 }
 
 export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) {
@@ -48,7 +41,8 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
   const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
   const canCreateClient =
     jwtClaims.isSuperAdmin || jwtClaims.permissions.has('clients:create');
-  const [isDark, setIsDark] = useState(getInitialTheme);
+  const { theme, toggle: toggleTheme } = useAppTheme();
+  const isDark = theme === 'dark';
   // Overflow ("more") menu for the secondary nav icons on narrow screens.
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -59,20 +53,6 @@ export default function ManagerPage({ onNavigate, onLogout }: ManagerPageProps) 
   // Default to 'code' — staff most often look clients up by their cargo code.
   const [searchType, setSearchType] = useState<SearchType>('code');
   const [strictSearch, setStrictSearch] = useState(false);
-
-  // Apply theme on mount and when toggled
-  useEffect(() => {
-    if (isDark) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDark]);
-
-  const toggleTheme = useCallback(() => {
-    const next = !isDark;
-    setIsDark(next);
-    localStorage.setItem('adminTheme', next ? 'dark' : 'light');
-    if (next) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDark]);
 
   // Silent token refresh on mount so permissions stay current
   useEffect(() => {

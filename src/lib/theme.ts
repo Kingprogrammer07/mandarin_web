@@ -26,8 +26,37 @@ export const THEME_COLOR: Record<ResolvedTheme, string> = {
   dark: '#0f0f11',
 };
 
+/**
+ * Staff screens each kept their own key and wrote `document.documentElement`
+ * by hand, while `next-themes` — mounted above the whole app — reasserts the
+ * class on every state change. The two fought, and which one won depended on
+ * render order. The keys are folded into the preference once, so a cashier or
+ * an admin keeps the theme they had chosen.
+ */
+const LEGACY_KEYS = ['adminTheme', 'pos_theme'] as const;
+
+function adoptLegacyPreference(): void {
+  try {
+    if (localStorage.getItem(THEME_PREF_KEY)) {
+      LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
+      return;
+    }
+    for (const key of LEGACY_KEYS) {
+      const value = localStorage.getItem(key);
+      if (value === 'dark' || value === 'light') {
+        localStorage.setItem(THEME_PREF_KEY, value);
+        break;
+      }
+    }
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Storage unavailable — the staff member just re-picks their theme once.
+  }
+}
+
 export function getThemePreference(): ThemePreference {
   try {
+    adoptLegacyPreference();
     const stored = localStorage.getItem(THEME_PREF_KEY);
     if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
   } catch {

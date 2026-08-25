@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+import { useAppTheme } from '@/hooks/useAppTheme';
 interface NavigationBarProps {
   onStatisticsClick?: () => void;
   onVerificationClick?: () => void;
@@ -102,21 +103,9 @@ const LanguageMenu = () => {
 
 // ─── THEME TOGGLE ───────────────────────────────────────────────────────────
 const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme');
-      return saved === 'dark' ? 'dark' : 'light';
-    }
-    return 'light';
-  });
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-
-    localStorage.setItem('theme', theme);
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-  }, [theme]);
+  // Reads and writes the shared preference instead of holding its own copy and
+  // writing the root class directly — `next-themes` is the only writer.
+  const { theme, toggle } = useAppTheme();
 
   const nextTheme = theme === 'dark' ? 'light' : 'dark';
   const Icon = theme === 'dark' ? Sun : Moon;
@@ -124,7 +113,7 @@ const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
   return (
     <button
       type="button"
-      onClick={() => setTheme(nextTheme)}
+      onClick={toggle}
       className={cn(
         "grid h-10 w-10 place-items-center rounded-[15px] border transition-all duration-200 max-[360px]:h-9 max-[360px]:w-9",
         isDark
@@ -143,7 +132,7 @@ const NavbarThemeToggle = ({ isDark }: { isDark: boolean }) => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function NavigationBar(_props: NavigationBarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useAppTheme().theme === 'dark';
 
   // Scroll listener
   useEffect(() => {
@@ -152,14 +141,6 @@ export default function NavigationBar(_props: NavigationBarProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Dark mode watcher
-  useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   const useLightText = isDark;
 

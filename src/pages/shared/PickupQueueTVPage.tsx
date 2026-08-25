@@ -638,30 +638,30 @@ export default function PickupQueueTVPage() {
     });
   }, []);
 
-  // Apply dark class to document for Tailwind dark mode
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
 
   if (!token) {
     return (
-      <ActivationScreen
-        onActivated={(t) => setToken(t)}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-      />
+      <div className={theme === "dark" ? "dark" : undefined}>
+        <ActivationScreen
+          onActivated={(t) => setToken(t)}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+        />
+      </div>
     );
   }
 
+  // The warehouse display keeps its own light/dark under TV_THEME_KEY — a
+  // screen on a wall is not the same choice as the browser an admin is using.
+  // The class is scoped to this page instead of `documentElement`, which
+  // `next-themes` owns app-wide; Tailwind's dark variant matches any ancestor.
   return (
-    <TVBoard
-      token={token}
-      theme={theme}
-      onToggleTheme={handleToggleTheme}
-    />
+    <div className={theme === "dark" ? "dark" : undefined}>
+      <TVBoard
+        token={token}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+      />
+    </div>
   );
 }

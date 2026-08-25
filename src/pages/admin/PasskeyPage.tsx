@@ -12,6 +12,7 @@ import {
 import { webauthnCreate } from '../../utils/webauthn';
 import { getAdminJwtClaims } from '../../api/services/adminManagement';
 
+import { useAppTheme } from '@/hooks/useAppTheme';
 interface PasskeyPageProps {
   onNavigate: (page: string) => void;
   onLogout: () => void;
@@ -32,32 +33,12 @@ function getDeviceName(): string {
   return 'Unknown device';
 }
 
-function getInitialTheme(): boolean {
-  return (
-    localStorage.getItem('adminTheme') === 'dark' ||
-    (!('adminTheme' in localStorage) &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
-  );
-}
-
 export default function PasskeyPage({ onLogout }: PasskeyPageProps) {
   const queryClient = useQueryClient();
   const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
-  const [isDark, setIsDark] = useState(getInitialTheme);
+  const { theme, toggle: toggleTheme } = useAppTheme();
+  const isDark = theme === 'dark';
   const deviceName = getDeviceName();
-
-  useEffect(() => {
-    if (isDark) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDark]);
-
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    localStorage.setItem('adminTheme', next ? 'dark' : 'light');
-    if (next) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  };
 
   // Silent token refresh on mount
   useEffect(() => {

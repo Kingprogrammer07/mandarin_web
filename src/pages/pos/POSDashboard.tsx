@@ -88,6 +88,7 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import { WarehouseRequestCard } from "./components/WarehouseRequestCard";
 import { PosPickupQueuePreviewCard } from "./components/PosPickupQueuePreviewCard";
 
+import { useAppTheme } from '@/hooks/useAppTheme';
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 // Stable fallback so the notification drawers don't receive a fresh object literal
@@ -126,46 +127,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   }, [centerWidth]);
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    // Default to light mode; only dark if explicitly saved in localStorage
-    const saved = localStorage.getItem("pos_theme");
-    if (saved) return saved === "dark";
-    return false;
-  });
-
-  /** Put the root element in exactly one theme class.
-   *
-   * `classList.toggle("dark", next)` left any existing `light` in place, so
-   * toggling produced `<html class="light dark">` — both at once, with the
-   * outcome decided by stylesheet order rather than by intent. NavigationBar
-   * already removes both before adding one; this matches it so the two cannot
-   * disagree about the same element.
-   */
-  const applyTheme = (dark: boolean) => {
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(dark ? "dark" : "light");
-  };
-
-  // Pure updater. The DOM write and the localStorage write used to sit inside
-  // it, which React does not guarantee to run once — two quick clicks left the
-  // class and the state disagreeing. Side effects belong in the effect below.
-  const toggleDark = useCallback(() => setIsDark((prev) => !prev), []);
-
-  // Single source of truth for the root class. Also fixes a separate bug: the
-  // saved preference was read into state at mount but never applied, so after a
-  // reload the toggle claimed dark while the page rendered light.
-  useEffect(() => {
-    applyTheme(isDark);
-    localStorage.setItem("pos_theme", isDark ? "dark" : "light");
-  }, [isDark]);
-
-  // Hand the root class back to the app-wide theme on the way out; the admin
-  // screens drive the same element from their own key (NavigationBar.tsx:113)
-  // and would otherwise inherit whatever the cashier last chose.
-  useEffect(() => {
-    return () => applyTheme(localStorage.getItem("theme") === "dark");
-  }, []);
+  // `next-themes` owns the root class for the whole app. This screen used to
+  // write it directly from its own `pos_theme` key and restore it on unmount
+  // from a third key — three writers on one element, with the winner decided by
+  // render order. The preference is shared now; the migration in lib/theme.ts
+  // carries whatever the cashier had chosen.
+  const { theme: posTheme, toggle: toggleDark } = useAppTheme();
+  const isDark = posTheme === 'dark';
 
   // ── Payment notifications (PostgreSQL-backed) ─────────────────────────────
   const {

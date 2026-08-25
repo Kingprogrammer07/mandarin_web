@@ -319,8 +319,12 @@
 
   * {
     @apply border-border;
-    outline: none;
   }
+
+  /* `* { outline: none }` used to sit here. It never actually suppressed the
+   * focus ring — the `*:focus-visible` rule below lives in @layer utilities,
+   * which wins over @layer base — so it was dead weight that would have
+   * silently won against any unlayered focus styling added later. */
 
   body {
     @apply bg-background text-foreground;
@@ -410,9 +414,11 @@
     scroll-behavior: smooth;
   }
 
-  /* Focus ring mandarin theme */
+  /* Keyboard focus ring. `:focus-visible` fires for keyboard and assistive
+   * navigation only, so a mouse or touch press still shows nothing. Uses the
+   * brand token so it follows the theme instead of pinning one orange. */
   *:focus-visible {
-    outline: 2px solid oklch(0.646 0.222 41.116);
+    outline: 2px solid var(--mc-brand);
     outline-offset: 2px;
   }
 }
