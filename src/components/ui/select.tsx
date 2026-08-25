@@ -50,6 +50,21 @@ function SelectTrigger({
   )
 }
 
+/**
+ * Portalled content sits at z-[1000], not z-50.
+ *
+ * Radix renders this into <body>, so it stacks against the APP's overlays
+ * rather than against its own parent — and this app puts sheets and modals
+ * from z-100 up to z-999. At z-50 a dropdown opened inside any of them
+ * painted behind the backdrop: present in the DOM, invisible on screen.
+ * 1000 clears every overlay in the app and still sits below the z-9998/9999
+ * system strips (top progress bar, maintenance banner), which are a few
+ * pixels tall and are meant to stay on top.
+ *
+ * Fixed here rather than at the call sites: a per-instance `z-[110]` is
+ * merged by tailwind-merge as the winning z-*, so it would cap this back
+ * down and break again inside a z-999 modal.
+ */
 function SelectContent({
   className,
   children,
@@ -62,7 +77,7 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md",
+          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-[1000] max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className

@@ -456,7 +456,7 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
                     </FormControl>
                     <SelectContent
                       position="popper"
-                      className="z-[110] max-h-72 rounded-xl border-orange-200 bg-white text-gray-900 shadow-xl dark:border-white/[0.08] dark:bg-[#1a1a1a] dark:text-white"
+                      className="max-h-72 rounded-xl border-orange-200 bg-white text-gray-900 shadow-xl dark:border-white/[0.08] dark:bg-[#1a1a1a] dark:text-white"
                     >
                       {regions.map((region) => (
                         <SelectItem key={region.value} value={region.value} className="cursor-pointer hover:bg-orange-50 focus:bg-orange-100">{t(region.label)}</SelectItem>
@@ -481,7 +481,7 @@ export default function ClientForm({ mode, clientData, clientId, onSuccess, onCa
                     </FormControl>
                     <SelectContent
                       position="popper"
-                      className="z-[110] max-h-72 rounded-xl border-orange-200 bg-white text-gray-900 shadow-xl dark:border-white/[0.08] dark:bg-[#1a1a1a] dark:text-white"
+                      className="max-h-72 rounded-xl border-orange-200 bg-white text-gray-900 shadow-xl dark:border-white/[0.08] dark:bg-[#1a1a1a] dark:text-white"
                     >
                       {selectedRegion && DISTRICTS[selectedRegion as keyof typeof DISTRICTS]?.map((dist) => (
                         <SelectItem key={dist.value} value={dist.value} className="cursor-pointer hover:bg-orange-50 focus:bg-orange-100">{t(dist.label)}</SelectItem>
