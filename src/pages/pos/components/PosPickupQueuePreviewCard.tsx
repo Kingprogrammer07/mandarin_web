@@ -308,40 +308,49 @@ function PosPickupQueuePreviewCardBase() {
         isExpanded ? "min-h-0" : "shrink-0"
       )}
     >
-      {/* Header */}
-      <button
-        onClick={toggleExpand}
-        className="w-full px-4 py-3 border-b border-gray-100 dark:border-white/[0.06] flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Package className="w-4 h-4 text-blue-500 shrink-0" />
-          <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-            Sklad navbati
-          </p>
-          {items.length > 0 && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              {items.length}
+      {/* Header.
+       *
+       * The TV link is a SIBLING of the toggle, not a child. An <a href> inside
+       * a <button> is invalid HTML — the browser's parser splits them anyway,
+       * and which of the two receives a click stops being predictable. Overlaid
+       * so the row keeps its order (title … TV … chevron) while the toggle
+       * keeps the full-width hit area. */}
+      <div className="relative border-b border-gray-100 dark:border-white/[0.06]">
+        <button
+          type="button"
+          onClick={toggleExpand}
+          aria-expanded={isExpanded}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              Sklad navbati
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <a
-            href="/pickup-tv"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
-            title="TV ekranni ochish"
-          >
-            <Monitor className="w-4 h-4" />
-          </a>
-          {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronUp className="w-4 h-4 text-gray-400" />
-          )}
-        </div>
-      </button>
+            {items.length > 0 && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                {items.length}
+              </span>
+            )}
+          </span>
+          <span className="flex items-center">
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronUp className="w-4 h-4 text-gray-400" />
+            )}
+          </span>
+        </button>
+        <a
+          href="/pickup-tv"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute right-9 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
+          title="TV ekranni ochish"
+        >
+          <Monitor className="w-4 h-4" />
+        </a>
+      </div>
 
       {/* Body */}
       <AnimatePresence initial={false}>

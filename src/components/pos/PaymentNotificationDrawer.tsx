@@ -26,6 +26,11 @@ import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle, DrawerTr
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  STATUS_META,
+  formatDateTime,
+  formatSum,
+} from "./paymentNotificationFormat";
 import { QuickDatePresets } from "@/components/ui/QuickDatePresets";
 import { posNotificationService, type PosNotificationItem, type NotificationFilters } from "@/api/services/posNotificationService";
 import { ZayafkaNotificationBubble } from "./ZayafkaNotificationBubble";
@@ -57,39 +62,6 @@ interface Props {
   onClientAndFlightClick?: (code: string, flightName: string, notif: PosNotificationItem) => void;
 }
 
-// ─── Status helpers ───────────────────────────────────────────────────────────
-
-export const STATUS_META: Record<string, { label: string; bg: string; text: string; dot: string; border: string }> = {
-  pending: {
-    label: "To'lanmagan",
-    bg: "bg-red-50 dark:bg-red-500/10",
-    text: "text-red-700 dark:text-red-400",
-    dot: "bg-red-500",
-    border: "border-red-200 dark:border-red-500/30",
-  },
-  partial: {
-    label: "Qisman",
-    bg: "bg-amber-50 dark:bg-amber-500/10",
-    text: "text-amber-700 dark:text-amber-400",
-    dot: "bg-amber-500",
-    border: "border-amber-200 dark:border-amber-500/30",
-  },
-  paid: {
-    label: "To'langan",
-    bg: "bg-green-50 dark:bg-green-500/10",
-    text: "text-green-700 dark:text-green-400",
-    dot: "bg-green-500",
-    border: "border-green-200 dark:border-green-500/30",
-  },
-  rejected: {
-    label: "Rad etildi",
-    bg: "bg-gray-50 dark:bg-gray-500/10",
-    text: "text-gray-600 dark:text-gray-400",
-    dot: "bg-gray-400",
-    border: "border-gray-200 dark:border-gray-500/20",
-  },
-};
-
 const TYPE_LABEL: Record<string, string> = {
   wallet: "Hamyon",
   cash: "Naqd",
@@ -98,25 +70,6 @@ const TYPE_LABEL: Record<string, string> = {
   payme: "Payme",
   card: "Karta",
 };
-
-export function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("uz-UZ", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    // Pinned, not inherited from the machine. The till closes on Tashkent
-    // hours and the backend stores Tashkent time; a counter PC with a stale
-    // or wrong system timezone would otherwise shift every timestamp on the
-    // screen while the totals stayed put.
-    timeZone: "Asia/Tashkent",
-  });
-}
-
-export function formatSum(n: number): string {
-  return `${n.toLocaleString("uz-UZ")} so'm`;
-}
 
 // ─── Receipt Preview Modal ────────────────────────────────────────────────────
 
@@ -994,35 +947,31 @@ function FilterBar({
 
   return (
     <div className="bg-gray-50/80 dark:bg-white/[0.03] border-b border-gray-100 dark:border-white/[0.06]">
-      {/* Collapsible header */}
-      <button
-        type="button"
-        onClick={() => setShowFilters((p) => !p)}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-100/50 dark:hover:bg-white/[0.02] transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-            Filter
+      {/* Collapsible header.
+       *
+       * "Tozalash" is a SIBLING of the toggle, not a child of it. A <button>
+       * inside a <button> is invalid HTML: React reports a hydration error and
+       * the browser's own parser closes the outer button early, so the two
+       * controls end up as siblings anyway — but with the layout broken. It is
+       * overlaid rather than placed in the flow so the row keeps its original
+       * order (label … Tozalash … chevron) without the toggle having to give up
+       * its full-width hit area. */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setShowFilters((p) => !p)}
+          aria-expanded={showFilters}
+          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-100/50 dark:hover:bg-white/[0.02] transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              Filter
+            </span>
+            {hasFilters && (
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            )}
           </span>
-          {hasFilters && (
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReset();
-              }}
-              className="flex items-center gap-1 text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors"
-            >
-              <RotateCcw className="w-3 h-3" />
-              Tozalash
-            </button>
-          )}
           <span className="text-gray-300 dark:text-gray-700">
             {showFilters ? (
               <ChevronUp className="w-4 h-4" />
@@ -1030,8 +979,18 @@ function FilterBar({
               <ChevronDown className="w-4 h-4" />
             )}
           </span>
-        </div>
-      </button>
+        </button>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="absolute right-8 top-1/2 flex -translate-y-1/2 items-center gap-1 px-1.5 py-2 text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Tozalash
+          </button>
+        )}
+      </div>
 
       <AnimatePresence initial={false}>
         {showFilters && (

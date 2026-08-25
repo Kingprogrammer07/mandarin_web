@@ -47,7 +47,7 @@ import {
 } from "@/hooks/useEventSource";
 import { usePaymentNotifications } from "@/hooks/usePaymentNotifications";
 import { PaymentNotificationDrawer } from "@/components/pos/PaymentNotificationDrawer";
-import { formatDateTime } from "@/components/pos/PaymentNotificationDrawer";
+import { formatDateTime } from "@/components/pos/paymentNotificationFormat";
 import type {
   PaymentProvider,
   CashierLogFilter,

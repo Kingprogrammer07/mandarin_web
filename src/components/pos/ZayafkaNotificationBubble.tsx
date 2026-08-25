@@ -10,7 +10,7 @@ import {
   posNotificationService,
   type PosNotificationItem,
 } from "@/api/services/posNotificationService";
-import { STATUS_META, formatSum, formatDateTime } from "./PaymentNotificationDrawer";
+import { STATUS_META, formatSum, formatDateTime } from "./paymentNotificationFormat";
 import { apiErrorMessage } from "@/utils/apiError";
 
 // ─── Receipt Preview (re-used inline) ────────────────────────────────────────
