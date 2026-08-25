@@ -28,6 +28,7 @@ import type { UpdateClientPersonalFormValues } from "../../schemas/clientSchemas
 import type { ClientTransactionItem, FinancesFilterType } from "../../api/services/adminClients";
 import { Skeleton } from "../ui/skeleton";
 import { regions, DISTRICTS } from "@/lib/validation";
+import { NATIVE_OPTION_CLASS, NATIVE_SELECT_CLASS } from "@/components/ui/select-styles";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,8 @@ const BASE_INPUT =
   "text-[16px] md:text-[13px] transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
 const BASE_SELECT =
-  BASE_INPUT + " appearance-none cursor-pointer";
+  NATIVE_SELECT_CLASS +
+  " w-full h-11 md:h-10 appearance-none cursor-pointer text-[16px] md:text-[13px] transition-all disabled:cursor-not-allowed";
 
 // ─── Payment Detail Sub-panel ─────────────────────────────────────────────────
 
@@ -750,9 +752,9 @@ export function ClientDetailDrawer() {
                           }}
                           className={BASE_SELECT}
                         >
-                          <option value="">Viloyatni tanlang</option>
+                          <option value="" className={NATIVE_OPTION_CLASS}>Viloyatni tanlang</option>
                           {regions.map((r) => (
-                            <option key={r.value} value={r.value}>
+                            <option key={r.value} value={r.value} className={NATIVE_OPTION_CLASS}>
                               {t(r.label)}
                             </option>
                           ))}
@@ -776,9 +778,9 @@ export function ClientDetailDrawer() {
                           disabled={!selectedRegion}
                           className={BASE_SELECT}
                         >
-                          <option value="">Tumanni tanlang</option>
+                          <option value="" className={NATIVE_OPTION_CLASS}>Tumanni tanlang</option>
                           {availableDistricts.map((d) => (
-                            <option key={d.value} value={d.value}>
+                            <option key={d.value} value={d.value} className={NATIVE_OPTION_CLASS}>
                               {t(d.label)}
                             </option>
                           ))}
