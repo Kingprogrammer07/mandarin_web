@@ -1,11 +1,22 @@
 {
+  /* Solution-style config: it compiles nothing itself and only points at the
+     two real projects. That is why `npx tsc --noEmit` reports a clean tree even
+     when `src` does not compile — with `files: []` there is nothing for it to
+     check. Use `npx tsc -b` (what `npm run build` runs); anything else is a
+     false all-clear. */
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
-    "baseUrl": ".",
+    /* No `baseUrl`: it is deprecated and stops working in TypeScript 7, and it
+       was redundant here — with it absent, the patterns below resolve relative
+       to this file, which is exactly what `baseUrl: "."` meant. Silencing the
+       warning with `ignoreDeprecations` would only defer the same edit.
+
+       Kept for editors resolving `@/` outside the referenced projects; the
+       build reads the copy in tsconfig.app.json. */
     "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"]

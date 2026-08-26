@@ -32,8 +32,15 @@ export default function RoleSwitcher({ dropUp = false, menuAlign = "right" }: Ro
         setIsOpen(false);
       }
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
     document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handle);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [isOpen]);
 
   const handleSwitch = useCallback(
@@ -76,35 +83,41 @@ export default function RoleSwitcher({ dropUp = false, menuAlign = "right" }: Ro
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setIsOpen((p) => !p)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/[0.06] hover:bg-gray-200 dark:hover:bg-white/[0.1] rounded-lg border border-gray-200 dark:border-white/[0.08] transition-colors"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className="flex h-11 items-center gap-1.5 rounded-mc-sm border border-mc-border bg-mc-surface-2 px-2.5 text-[12px] font-bold text-mc-text-2 transition-colors hover:text-mc-text active:scale-95"
       >
-        <Shield className="w-3.5 h-3.5" />
+        <Shield className="h-3.5 w-3.5" />
         <span className="max-w-[80px] truncate">{currentRole}</span>
         <ChevronDown
-          className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
 
       {isOpen && (
         <div
-          className={`absolute w-44 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/[0.08] shadow-lg z-50 py-1 ${
+          role="menu"
+          className={`absolute z-50 w-44 rounded-mc-md border border-mc-border bg-mc-surface py-1 shadow-[var(--mc-shadow-card)] ${
             menuAlign === "left" ? "left-0" : "right-0"
           } ${dropUp ? "bottom-full mb-1.5" : "mt-1.5"}`}
         >
           {roleNames.map((role) => (
             <button
               key={role}
+              type="button"
+              role="menuitem"
               onClick={() => handleSwitch(role)}
-              className={`w-full text-left px-3 py-2 text-[12px] font-medium transition-colors ${
+              className={`w-full px-3 py-2.5 text-left text-[12px] font-semibold transition-colors ${
                 role === currentRole
-                  ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04]"
+                  ? "bg-mc-brand-soft text-mc-brand"
+                  : "text-mc-text-2 hover:bg-mc-surface-2 hover:text-mc-text"
               }`}
             >
               <span className="flex items-center gap-2">
                 {role === currentRole && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-mc-brand" />
                 )}
                 {role}
               </span>

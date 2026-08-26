@@ -25,7 +25,7 @@ export function CargoTab({ cargoData, rawAnalyticsData, exporting, onTabExport }
           <StatCard title="O'rtacha 1 mijoz" value={`${formatDecimal(cargoData?.volume.avg_weight_per_client)} kg`} subtitle="Bir mijozga to'g'ri keladigan o'rtacha yuk vazni" icon={Users} color="gray" />
           <StatCard title="O'rtacha 1 trek" value={`${formatDecimal(cargoData?.volume.avg_weight_per_track)} kg`} subtitle="Bitta trek (paket) uchun o'rtacha vazn" icon={Package} color="gray" />
           <StatCard title="Omborda qolgan" value={formatNum(cargoData?.bottlenecks.uz_paid_not_taken)} subtitle="To'langan, lekin ombordan hali olinmagan" icon={Activity} color="orange" />
-          <StatCard title="Mijozga topshirilgan" value={formatNum(cargoData?.bottlenecks.uz_taken_away)} subtitle="Mijoz o'zi kelib olib ketgan" icon={Users} color="green" />
+          <StatCard title="Mijozga topshirilgan" value={formatNum(cargoData?.bottlenecks.uz_taken_away)} subtitle="O'zi olgan, kuryer yoki pochta orqali" icon={Users} color="green" />
           <StatCard title="Xitoyda hisobsiz" value={formatNum(cargoData?.bottlenecks.china_unaccounted)} subtitle="Xitoyda mavjud, lekin tizimga kiritilmagan" icon={Package} color="red" />
           <StatCard title="To'lov kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_pending_payment)} subtitle="UZda bor, hisobot yuborilgan, to'lov kutilmoqda" icon={DollarSign} color="orange" />
         </div>

@@ -36,15 +36,36 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // NOTE: react/react-dom cannot be extracted from the entry chunk — Rollup keeps
-          // them inline when the entry directly depends on them. Specifying them here
-          // produces an empty chunk, so they are intentionally omitted.
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-charts": ["recharts"],
-          "vendor-map": ["leaflet", "react-leaflet"],
-          "vendor-motion": ["framer-motion"],
-          "vendor-qr": ["html5-qrcode"],
+        // The object form buckets a package *and its whole dependency closure*.
+        // `{"vendor-charts": ["recharts"]}` therefore swallowed react-dom, the
+        // use-sync-external-store shim and clsx, and every chunk that needed
+        // one of those — the entry included — had to statically import
+        // vendor-charts. Recharts (378 kB / 112 kB gzip) was downloaded on
+        // every cold start even though its only two import sites live behind
+        // `lazy(() => import("./pages/shared/StatisticsDashboard"))`.
+        //
+        // The id form buckets one module at a time, so the always-needed
+        // packages can be claimed BEFORE recharts gets a chance to absorb them.
+        // Order below is load-bearing.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined
+
+          // Claimed first: everything downstream depends on these.
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/.test(id))
+            return "vendor-react"
+          if (/[\\/]node_modules[\\/](clsx|tailwind-merge|class-variance-authority)[\\/]/.test(id))
+            return "vendor-ui-utils"
+
+          if (id.includes("node_modules/@tanstack/react-query")) return "vendor-query"
+          // d3 / victory-vendor are recharts' own weight — keep them in the
+          // lazy chunk instead of letting Rollup strand them in a shared one.
+          if (/[\\/]node_modules[\\/](recharts|d3-[a-z]+|victory-vendor|internmap|decimal\.js-light|fast-equals)[\\/]/.test(id))
+            return "vendor-charts"
+          if (/[\\/]node_modules[\\/](leaflet|react-leaflet|@react-leaflet)[\\/]/.test(id)) return "vendor-map"
+          if (id.includes("node_modules/framer-motion")) return "vendor-motion"
+          if (id.includes("node_modules/html5-qrcode")) return "vendor-qr"
+
+          return undefined
         },
       },
     },

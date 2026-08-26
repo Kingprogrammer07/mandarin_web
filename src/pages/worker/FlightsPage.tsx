@@ -1,634 +1,532 @@
-import { useEffect, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+/**
+ * Reyslar — the flight board.
+ *
+ * Three sections, and the third one drives the other two: a flight appears in
+ * "Foto hisobot" and "Trek kod" only once it is switched on below, in the order
+ * set there. Before this the two lists showed "the newest five active flights",
+ * so the board rearranged itself whenever a manifest landed and there was no
+ * way to pin the flights actually being worked on.
+ *
+ * **The whole list is fetched once and filtered in the browser.** The previous
+ * version issued a request per keystroke with no debounce and no cancellation,
+ * so a slow response for "M2" could land after "M26" and repaint the older
+ * result. There are 49 flights; one request of at most 100 removes the race
+ * rather than papering over it with a timer. If the count ever passes what one
+ * page can hold, the footer says so instead of silently truncating.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
-  ArrowLeft,
-  ArrowRight,
-  Boxes,
-  ChevronDown,
-  Clock,
-  Database,
   FileImage,
   LogOut,
   Package,
-  Plane,
   Plus,
-  RefreshCw,
-  Search,
   ShieldAlert,
   Users,
   Weight,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
-import { refreshAdminToken } from '@/api/services/adminAuth';
 import { createEmptyFlight } from '@/api/services/expectedCargo';
-import type { FlightDashboardItem } from '@/api/services/flightSchedule';
-import RoleSwitcher from '@/components/admin/RoleSwitcher';
-import { useFlightsPageStore } from '@/store/useFlightsPageStore';
+import {
+  getFlightBoardSummary,
+  getFlightsDashboard,
+  setFlightBoardOrder,
+  setFlightVisibility,
+  type FlightDashboardItem,
+} from '@/api/services/flightSchedule';
+import { FlightBoardCards } from '@/components/admin/flights/FlightBoardCards';
+import { FlightBoardTable } from '@/components/admin/flights/FlightBoardTable';
+import {
+  FlightUploadSection,
+  type FlightMeta,
+} from '@/components/admin/flights/FlightUploadSection';
+import {
+  boardStatusOf,
+  compareBoardOrder,
+  lastImportLabel,
+  type BoardStatus,
+} from '@/components/admin/flights/boardStatus';
+import { formatWeightKg } from '@/lib/format';
+import { useExpectedCargoStore } from '@/store/expectedCargoStore';
+
+/** The API caps a page at 100; the board is read in one request. */
+const BOARD_FETCH_SIZE = 100;
+const ROWS_PER_PAGE = 12;
 
 interface FlightsPageProps {
   onSelectFlight: (flightName: string) => void;
   onLogout?: () => void;
   onNavigate?: (page: string) => void;
+  /** True when AdminLayout already supplies the header, sidebar and account menu. */
+  embedded?: boolean;
 }
-
-type SectionTone = 'blue' | 'green' | 'violet';
 
 function AccessDenied() {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-white/[0.06]">
-        <ShieldAlert className="h-8 w-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+    <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg bg-mc-surface-2">
+        <ShieldAlert className="h-8 w-8 text-mc-text-3" strokeWidth={1.5} />
       </div>
       <div>
-        <p className="text-[16px] font-bold text-gray-700 dark:text-gray-300">Ruxsat yo'q</p>
-        <p className="mt-1 max-w-xs text-[13px] text-gray-400 dark:text-gray-500">
-          Sizda ushbu sahifani ko'rish yoki tahrirlash uchun huquq yo'q.
+        <p className="text-[16px] font-bold text-mc-text">Ruxsat yo‘q</p>
+        <p className="mt-1 max-w-xs text-[13px] text-mc-text-3">
+          Sizda bu sahifani ochish uchun huquq yo‘q.
         </p>
       </div>
     </div>
   );
 }
 
-function getApiError(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === 'string' && message.trim()) return message;
-  }
-  if (typeof error === 'object' && error !== null && 'data' in error) {
-    const detail = (error as { data?: { detail?: unknown } }).data?.detail;
-    if (typeof detail === 'string' && detail.trim()) return detail;
-  }
-  return 'Xatolik yuz berdi';
-}
-
-function parseFlightName(name: string): { code: string; year: string | null } {
-  const idx = name.lastIndexOf('-');
-  if (idx !== -1) {
-    const suffix = name.slice(idx + 1);
-    if (/^\d{4}$/.test(suffix)) return { code: name.slice(0, idx), year: suffix };
-  }
-  return { code: name, year: null };
-}
-
-function formatKg(value: number): string {
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}t`;
-  return `${value.toFixed(value % 1 === 0 ? 0 : 1)}kg`;
-}
-
-function getFlightLabel(flight: FlightDashboardItem): string {
-  if (flight.source === 'expected_cargo') return 'Expected cargo';
-  if (flight.type === 'ostatka') return 'Ostatka';
-  if (flight.type === 'avia') return 'Google Sheet';
-  return 'Expected cargo';
-}
-
-function DashboardSection({
-  icon,
-  title,
-  subtitle,
-  count,
-  tone,
-  isOpen,
-  onToggle,
-  children,
+/**
+ * Add-flight sheet.
+ *
+ * Written with the modal rules this project already states and the old one
+ * ignored: Escape closes it, focus is trapped inside, the page behind stops
+ * scrolling, and it announces itself as a dialog.
+ */
+function AddFlightModal({
+  onClose,
+  onCreate,
+  isCreating,
+  error,
 }: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  count?: number;
-  tone: SectionTone;
-  isOpen: boolean;
-  onToggle: () => void;
-  children?: ReactNode;
+  onClose: () => void;
+  onCreate: (name: string) => void;
+  isCreating: boolean;
+  error: string | null;
 }) {
-  const toneClasses: Record<SectionTone, string> = {
-    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-    green: 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400',
-    violet: 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400',
-  };
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#111]">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+      <div
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-flight-title"
+        className="relative w-full max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-mc-xl border border-mc-border bg-mc-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[var(--mc-shadow-card)] sm:max-w-md sm:rounded-mc-xl sm:pb-4"
       >
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${toneClasses[tone]}`}>
-          {icon}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-black text-gray-900 dark:text-white">
-            {title}{typeof count === 'number' ? ` (${count} ta)` : ''}
-          </span>
-          <span className="mt-0.5 block truncate text-[11px] text-gray-500 dark:text-gray-400">
-            {subtitle}
-          </span>
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {isOpen && <div className="border-t border-gray-100 dark:border-white/[0.06]">{children}</div>}
-    </section>
-  );
-}
-
-function FlightRow({
-  flight,
-  onClick,
-  compact = false,
-}: {
-  flight: FlightDashboardItem;
-  onClick: () => void;
-  compact?: boolean;
-}) {
-  const { code, year } = parseFlightName(flight.name);
-  const remainingCargo = flight.stats.remaining_cargos;
-  const remainingClients = flight.stats.remaining_clients;
-  const remainingWeight = flight.stats.remaining_weight_kg;
-  const hasRemaining = remainingCargo > 0;
-  const isNew = flight.is_new || flight.status === 'new';
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-center gap-3 border-b border-gray-100 px-3 py-3 text-left last:border-b-0 hover:bg-orange-50/60 dark:border-white/[0.06] dark:hover:bg-orange-500/[0.05]"
-    >
-      <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-          isNew
-            ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400'
-            : 'bg-orange-50 text-orange-500 dark:bg-orange-500/10 dark:text-orange-400'
-        }`}
-      >
-        {isNew ? <Clock className="h-5 w-5" /> : <Plane className="h-5 w-5" />}
-      </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className="truncate text-[14px] font-black text-gray-900 dark:text-white">
-            {code}
-          </span>
-          {year && <span className="text-[12px] font-semibold text-gray-400">{year}</span>}
-          {isNew && (
-            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400">
-              Yangi
-            </span>
-          )}
-        </span>
-        <span className="mt-0.5 block text-[11px] text-gray-400 dark:text-gray-500">
-          {getFlightLabel(flight)} reysi
-        </span>
-
-        <span className={`mt-1.5 flex flex-wrap items-center gap-2 ${compact ? 'text-[11px]' : 'text-[12px]'}`}>
-          <Metric icon={<Package className="h-3.5 w-3.5" />} value={hasRemaining ? `${remainingCargo} qoldi` : `${flight.stats.cargo_count} yuk`} />
-          <Metric icon={<Users className="h-3.5 w-3.5" />} value={hasRemaining ? `${remainingClients} odam` : `${flight.stats.client_count} mijoz`} />
-          <Metric icon={<Weight className="h-3.5 w-3.5" />} value={formatKg(hasRemaining ? remainingWeight : flight.stats.total_weight_kg)} />
-          {isNew && flight.stats.expected_track_codes > 0 && (
-            <Metric icon={<Boxes className="h-3.5 w-3.5" />} value={`${flight.stats.expected_track_codes} trek`} />
-          )}
-        </span>
-      </span>
-
-      <ArrowRight className="h-4 w-4 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-orange-500 dark:text-gray-600" />
-    </button>
-  );
-}
-
-function Metric({ icon, value }: { icon: ReactNode; value: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-bold text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
-      {icon}
-      {value}
-    </span>
-  );
-}
-
-function FlightListSkeleton({ count = 5 }: { count?: number }) {
-  return (
-    <div className="divide-y divide-gray-100 dark:divide-white/[0.06]">
-      {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="flex items-center gap-3 px-3 py-3">
-          <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-gray-100 dark:bg-white/[0.06]" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100 dark:bg-white/[0.06]" />
-            <div className="h-2.5 w-40 animate-pulse rounded bg-gray-100 dark:bg-white/[0.04]" />
-          </div>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h2 id="add-flight-title" className="text-[16px] font-extrabold text-mc-text">
+            Kutilayotgan reys qo‘shish
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Yopish"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm text-mc-text-3"
+          >
+            <X className="h-5 w-5" strokeWidth={2.2} />
+          </button>
         </div>
-      ))}
-    </div>
-  );
-}
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-      <Plane className="h-10 w-10 text-gray-200 dark:text-white/[0.08]" />
-      <p className="text-[13px] font-medium text-gray-400 dark:text-gray-500">{message}</p>
-    </div>
-  );
-}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (name.trim()) onCreate(name.trim());
+          }}
+        >
+          <label
+            htmlFor="add-flight-name"
+            className="mb-1.5 block text-[12px] font-semibold text-mc-text-2"
+          >
+            Reys nomi
+          </label>
+          <input
+            id="add-flight-name"
+            ref={inputRef}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Masalan: M266"
+            className="h-11 w-full rounded-mc-md border border-mc-border bg-mc-surface-2 px-3 text-[16px] font-medium text-mc-text placeholder:text-mc-text-3 focus:border-mc-brand focus:outline-none"
+          />
+          {error && (
+            <p className="mt-1.5 text-[12px] font-semibold text-mc-danger">{error}</p>
+          )}
+          <p className="mt-1.5 text-[11px] font-medium text-mc-text-3">
+            Reys bazaga qo‘shiladi. Yuqoridagi bo‘limlarda chiqishi uchun jadvaldan
+            KO‘RSATISH tugmasini yoqing.
+          </p>
 
-function Pagination({
-  page,
-  totalPages,
-  onPageChange,
-}: {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}) {
-  const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
-  const visiblePages = totalPages <= 5
-    ? pages
-    : page <= 3
-      ? [1, 2, 3, 4, totalPages]
-      : page >= totalPages - 2
-        ? [1, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
-        : [1, page - 1, page, page + 1, totalPages];
-
-  return (
-    <div className="flex items-center justify-center gap-1.5 px-3 py-4">
-      <button
-        type="button"
-        onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 disabled:opacity-40 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-400"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-      </button>
-      {visiblePages.map((item, index) => {
-        const showGap = index > 0 && item - visiblePages[index - 1] > 1;
-        return (
-          <span key={item} className="flex items-center gap-1.5">
-            {showGap && <span className="text-xs font-bold text-gray-300">...</span>}
+          <div className="mt-4 flex gap-2">
             <button
               type="button"
-              onClick={() => onPageChange(item)}
-              className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[12px] font-black ${
-                item === page
-                  ? 'bg-orange-500 text-white'
-                  : 'border border-gray-200 bg-white text-gray-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-300'
-              }`}
+              onClick={onClose}
+              className="h-11 flex-1 rounded-mc-md border border-mc-border text-[13px] font-bold text-mc-text-2"
             >
-              {item}
+              Bekor qilish
             </button>
-          </span>
-        );
-      })}
-      <button
-        type="button"
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 disabled:opacity-40 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-400"
-      >
-        <ArrowRight className="h-3.5 w-3.5" />
-      </button>
+            <button
+              type="submit"
+              disabled={isCreating || !name.trim()}
+              className="h-11 flex-1 rounded-mc-md bg-mc-brand text-[13px] font-extrabold text-mc-on-brand disabled:opacity-50"
+            >
+              {isCreating ? 'Saqlanmoqda…' : 'Qo‘shish'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
-export default function FlightsPage({ onSelectFlight, onLogout, onNavigate }: FlightsPageProps) {
-  const [jwtClaims, setJwtClaims] = useState(() => getAdminJwtClaims());
-  const canView = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('flights:read');
-  const canManage = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('expected_cargo:manage');
+export default function FlightsPage({
+  onSelectFlight,
+  onLogout,
+  onNavigate,
+  embedded = false,
+}: FlightsPageProps) {
+  const { i18n } = useTranslation();
+  const language = i18n.language;
+  const queryClient = useQueryClient();
 
-  const {
-    flights,
-    featuredFlights,
-    total,
-    totalPages,
-    page,
-    perPage,
-    searchQuery,
-    typeFilter,
-    showCompleted,
-    sort,
-    isLoading,
-    isRefreshing,
-    isFeaturedLoading,
-    error,
-    fetchFlights,
-    fetchFeaturedFlights,
-    setPage,
-    setPerPage,
-    setSearchQuery,
-    setTypeFilter,
-    setShowCompleted,
-    setSort,
-    refresh,
-  } = useFlightsPageStore();
+  const claims = useMemo(() => getAdminJwtClaims(), []);
+  const canView = claims.isSuperAdmin || claims.permissions.has('flights:read');
+  const canManage = claims.isSuperAdmin || claims.permissions.has('flights:update');
 
-  const [photoOpen, setPhotoOpen] = useState(true);
-  const [databaseOpen, setDatabaseOpen] = useState(false);
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [newFlightName, setNewFlightName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | BoardStatus>('all');
+  const [page, setPage] = useState(1);
+  const [addOpen, setAddOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const flightNameInputRef = useRef<HTMLInputElement>(null);
-  const visibleFeaturedFlights = [...featuredFlights].reverse();
+  const [pendingFlight, setPendingFlight] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    refreshAdminToken()
-      .then((data) => {
-        if (cancelled) return;
-        localStorage.setItem('access_token', data.access_token);
-        setJwtClaims(getAdminJwtClaims());
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const summary = useQuery({
+    queryKey: ['flights-board', 'summary'],
+    queryFn: getFlightBoardSummary,
+    enabled: canView,
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    void fetchFeaturedFlights();
-    void fetchFlights();
-  }, [fetchFeaturedFlights, fetchFlights]);
+  const board = useQuery({
+    queryKey: ['flights-board', 'all'],
+    queryFn: () =>
+      getFlightsDashboard({
+        page: 1,
+        per_page: BOARD_FETCH_SIZE,
+        status: 'all',
+        type: 'all',
+        sort: 'newest',
+      }),
+    enabled: canView,
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    if (addModalOpen) {
-      setTimeout(() => flightNameInputRef.current?.focus(), 50);
-    } else {
-      setNewFlightName('');
+  const visible = useQuery({
+    queryKey: ['flights-board', 'visible'],
+    queryFn: () =>
+      getFlightsDashboard({
+        page: 1,
+        per_page: BOARD_FETCH_SIZE,
+        status: 'all',
+        type: 'all',
+        visible_only: true,
+      }),
+    enabled: canView,
+    staleTime: 60_000,
+  });
+
+  const refreshAll = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['flights-board'] });
+  }, [queryClient]);
+
+  const toggleVisibility = useMutation({
+    mutationFn: (flight: FlightDashboardItem) =>
+      setFlightVisibility(flight.name, !flight.is_visible),
+    onMutate: (flight) => setPendingFlight(flight.name),
+    onSuccess: (_data, flight) => {
+      toast.success(
+        flight.is_visible
+          ? `${flight.name} yashirildi`
+          : `${flight.name} yoqildi`,
+      );
+      refreshAll();
+    },
+    onError: () => toast.error('Ko‘rinishni o‘zgartirib bo‘lmadi'),
+    onSettled: () => setPendingFlight(null),
+  });
+
+  const reorder = useMutation({
+    mutationFn: (names: string[]) => setFlightBoardOrder(names),
+    onSuccess: refreshAll,
+    onError: () => {
+      toast.error('Tartibni saqlab bo‘lmadi');
+      refreshAll();
+    },
+  });
+
+  const createFlight = useMutation({
+    mutationFn: (flightName: string) => createEmptyFlight({ flight_name: flightName }),
+    onSuccess: (_data, flightName) => {
+      setAddOpen(false);
       setCreateError(null);
-    }
-  }, [addModalOpen]);
+      toast.success(`${flightName} qo‘shildi`);
+      refreshAll();
+    },
+    onError: (error: unknown) => {
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : 'Reys qo‘shib bo‘lmadi';
+      setCreateError(message);
+    },
+  });
+
+  const allFlights = useMemo(() => board.data?.items ?? [], [board.data]);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const serverIndex = new Map(allFlights.map((flight, index) => [flight.name, index]));
+    return allFlights
+      .filter((flight) => {
+        if (query && !flight.name.toLowerCase().includes(query)) return false;
+        if (statusFilter !== 'all' && boardStatusOf(flight) !== statusFilter) return false;
+        return true;
+      })
+      .sort(compareBoardOrder(serverIndex));
+  }, [allFlights, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  // Clamped rather than reset in an effect: a filter that shrinks the list to
+  // one page must not leave the reader staring at an empty page 3, and clearing
+  // the filter then returns them to where they were.
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
+
+  /**
+   * Move one flight and renumber the WHOLE filtered list.
+   *
+   * The table shows twelve rows at a time; sending only those would leave
+   * positions on other pages untouched and colliding. Sending everything makes
+   * the order explicit for every row in one write — there are at most a
+   * hundred names, so the cost is a single small request.
+   */
+  const handleReorder = useCallback(
+    (from: number, to: number) => {
+      const names = filtered.map((flight) => flight.name);
+      if (to < 0 || to >= names.length || from === to) return;
+      const next = [...names];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      reorder.mutate(next);
+    },
+    [filtered, reorder],
+  );
+
+  /**
+   * Open the track-code page ON the flight that was clicked.
+   *
+   * The route is a bare `/admin/expected-cargo` with no flight in it, and the
+   * page takes no flight prop — it reads `activeFlightName` from its own store
+   * and auto-selects the first tab when that is empty. Setting the store before
+   * navigating is therefore the only way to land on a chosen flight; without it
+   * every row in this section opened whatever tab happened to be first, which
+   * is indistinguishable from the click being ignored.
+   *
+   * If the name has no tab on that page (its list comes from
+   * `expected_flight_cargos` alone), the page falls back to its first tab —
+   * which is what it did before, so nothing regresses.
+   */
+  const openTrackImport = useCallback(
+    (flightName: string) => {
+      useExpectedCargoStore.getState().setActiveFlight(flightName);
+      onNavigate?.('expected-cargo');
+    },
+    [onNavigate],
+  );
+
+  const visibleFlights = visible.data?.items ?? [];
+
+  const photoMeta = useCallback(
+    (flight: FlightDashboardItem): FlightMeta[] => [
+      {
+        Icon: Weight,
+        text: formatWeightKg(flight.stats.total_weight_kg),
+        title: 'Omborda tortilgan vazn',
+      },
+      { Icon: Users, text: `${flight.stats.client_count} mijoz` },
+      {
+        Icon: Package,
+        text: `${flight.stats.expected_track_codes || flight.stats.cargo_count} trek`,
+      },
+    ],
+    [],
+  );
+
+  const trackMeta = useCallback(
+    (flight: FlightDashboardItem): FlightMeta[] => [
+      {
+        Icon: Package,
+        text: `${flight.stats.expected_track_codes || flight.stats.cargo_count} trek`,
+      },
+      { Icon: FileImage, text: lastImportLabel(flight, language) },
+    ],
+    [language],
+  );
 
   if (!canView) return <AccessDenied />;
 
-  async function handleRefresh() {
-    await refresh();
-  }
-
-  async function handleCreateFlight(e: FormEvent) {
-    e.preventDefault();
-    const name = newFlightName.trim();
-    if (!name) return;
-
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      await createEmptyFlight({ flight_name: name });
-      await refresh();
-      setAddModalOpen(false);
-    } catch (err) {
-      setCreateError(getApiError(err));
-    } finally {
-      setIsCreating(false);
-    }
-  }
+  const truncated = (board.data?.total ?? 0) > allFlights.length;
 
   return (
-    <div className="min-h-screen bg-[#f7f7f8] dark:bg-[#090909]">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-4 pb-8">
-        <header className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-[22px] font-black tracking-tight text-gray-950 dark:text-white">
-              Reys tanlang
-            </h1>
-            <p className="mt-0.5 text-[13px] font-medium text-gray-500 dark:text-gray-400">
-              {total} ta reys mavjud
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {onNavigate && <RoleSwitcher onNavigate={onNavigate} />}
+    <div className={embedded ? 'space-y-4' : 'mx-auto max-w-6xl space-y-4 px-4 py-4'}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-mc-text">
+            Reyslar
+          </h1>
+          <p className="mt-0.5 text-[12px] font-medium text-mc-text-2">
+            Toshkent omboriga kelgan yuklar uchun reyslarni boshqarish
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {canManage && (
             <button
               type="button"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition-colors hover:text-orange-500 disabled:opacity-50 dark:border-white/[0.08] dark:bg-[#111] dark:text-gray-400"
+              onClick={() => {
+                setCreateError(null);
+                setAddOpen(true);
+              }}
+              className="inline-flex h-11 items-center gap-1.5 rounded-mc-md bg-mc-brand px-4 text-[13px] font-extrabold text-mc-on-brand transition-transform active:scale-95"
             >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <Plus className="h-4 w-4" strokeWidth={2.4} />
+              Reys qo‘shish
             </button>
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setAddModalOpen(true)}
-                className="flex h-10 items-center gap-1.5 rounded-xl border border-orange-200 bg-white px-3 text-[12px] font-black text-orange-600 shadow-sm transition-colors hover:bg-orange-50 dark:border-orange-500/20 dark:bg-[#111] dark:text-orange-400"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Reys qo'shish
-              </button>
-            )}
-            {onLogout && (
-              <button
-                type="button"
-                onClick={onLogout}
-                title="Chiqish"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:border-white/[0.08] dark:bg-[#111] dark:hover:bg-red-500/[0.08]"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </header>
-
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
-            {error}
-          </div>
-        )}
-
-        <DashboardSection
-          icon={<FileImage className="h-5 w-5" />}
-          title="Foto hisobot yuklash"
-          subtitle="Reysni tanlang va foto hisobot sahifasiga o'ting"
-          count={visibleFeaturedFlights.length}
-          tone="blue"
-          isOpen={photoOpen}
-          onToggle={() => setPhotoOpen((value) => !value)}
-        >
-          {isFeaturedLoading && visibleFeaturedFlights.length === 0 ? (
-            <FlightListSkeleton />
-          ) : visibleFeaturedFlights.length === 0 ? (
-            <EmptyState message="Faol yoki yangi reys topilmadi" />
-          ) : (
-            <div>
-              {visibleFeaturedFlights.map((flight) => (
-                <FlightRow
-                  key={flight.name}
-                  flight={flight}
-                  compact
-                  onClick={() => onSelectFlight(flight.name)}
-                />
-              ))}
-            </div>
           )}
-        </DashboardSection>
-
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => onNavigate?.('expected-cargo')}
-            className="flex w-full items-center gap-3 rounded-2xl border border-gray-200/80 bg-white px-4 py-4 text-left shadow-sm transition-colors hover:bg-green-50 dark:border-white/[0.08] dark:bg-[#111] dark:hover:bg-green-500/[0.05]"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400">
-              <Boxes className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-black text-gray-900 dark:text-white">
-                Trek kod yuklash
-              </span>
-              <span className="mt-0.5 block truncate text-[11px] text-gray-500 dark:text-gray-400">
-                Trek kodlarni yuklang va tizimga import qiling
-              </span>
-            </span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" />
-          </button>
-        )}
-
-        <DashboardSection
-          icon={<Database className="h-5 w-5" />}
-          title="Reyslar bazasi"
-          subtitle="Qidiruv, filter va sahifalash orqali barcha reyslarni ko'ring"
-          count={total}
-          tone="violet"
-          isOpen={databaseOpen}
-          onToggle={() => setDatabaseOpen((value) => !value)}
-        >
-          <div className="space-y-3 p-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Reys nomi bo'yicha qidiruv..."
-                className="h-10 w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3 text-[13px] font-semibold text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <select
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
-                className="h-10 rounded-xl border border-gray-200 bg-white px-2 text-[12px] font-bold text-gray-700 outline-none dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-200"
-              >
-                <option value="all">Barcha</option>
-                <option value="avia">Google Sheet</option>
-                <option value="ostatka">Ostatka</option>
-                <option value="custom">Expected</option>
-              </select>
-              <label
-                className="flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 text-[12px] font-bold text-gray-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={showCompleted}
-                  onChange={(event) => setShowCompleted(event.target.checked)}
-                  className="h-4 w-4 shrink-0 accent-orange-500"
-                />
-                <span className="truncate">Tugaganlarni ko'rsatish</span>
-              </label>
-              <select
-                value={sort}
-                onChange={(event) => setSort(event.target.value as typeof sort)}
-                className="h-10 rounded-xl border border-gray-200 bg-white px-2 text-[12px] font-bold text-gray-700 outline-none dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-200"
-              >
-                <option value="newest">Yangi birinchi</option>
-                <option value="remaining_desc">Qolgan yuk</option>
-                <option value="name_asc">Nomi A-Z</option>
-              </select>
-              <select
-                value={perPage}
-                onChange={(event) => setPerPage(Number(event.target.value))}
-                className="h-10 rounded-xl border border-gray-200 bg-white px-2 text-[12px] font-bold text-gray-700 outline-none dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-200"
-              >
-                <option value={5}>5 ta</option>
-                <option value={10}>10 ta</option>
-                <option value={20}>20 ta</option>
-                <option value={50}>50 ta</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100 dark:border-white/[0.06]">
-            {isLoading && flights.length === 0 ? (
-              <FlightListSkeleton count={perPage} />
-            ) : flights.length === 0 ? (
-              <EmptyState message="Filter bo'yicha reys topilmadi" />
-            ) : (
-              <div>
-                {flights.map((flight) => (
-                  <FlightRow
-                    key={flight.name}
-                    flight={flight}
-                    onClick={() => onSelectFlight(flight.name)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          {/* Only when the shell is absent. AdminLayout carries logout in its
+              account menu; a worker gets this page and nothing else, so without
+              it there is no way out of the app at all. */}
+          {!embedded && onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              aria-label="Chiqish"
+              title="Chiqish"
+              className="flex h-11 w-11 items-center justify-center rounded-mc-md border border-mc-border text-mc-text-2 transition-transform active:scale-95"
+            >
+              <LogOut className="h-4 w-4" strokeWidth={2} />
+            </button>
           )}
-        </DashboardSection>
+        </div>
       </div>
 
-      {addModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setAddModalOpen(false);
-          }}
-        >
-          <div className="w-full max-w-sm overflow-hidden rounded-t-3xl border border-gray-200 bg-white shadow-xl dark:border-white/[0.08] dark:bg-[#151515] sm:rounded-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-500 dark:bg-orange-500/10">
-                  <Plane className="h-4 w-4" />
-                </div>
-                <span className="text-[15px] font-black text-gray-900 dark:text-white">
-                  Kutilayotgan reys qo'shish
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAddModalOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <FlightBoardCards summary={summary.data} isLoading={summary.isLoading} />
 
-            <form onSubmit={handleCreateFlight} className="px-5 py-4">
-              <label className="mb-1.5 block text-[12px] font-bold text-gray-500 dark:text-gray-400">
-                Reys nomi
-              </label>
-              <input
-                ref={flightNameInputRef}
-                value={newFlightName}
-                onChange={(event) => setNewFlightName(event.target.value)}
-                placeholder="Masalan: M213 yoki A-2026-05"
-                className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-[14px] font-semibold text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white"
-              />
-              {createError && <p className="mt-2 text-[12px] font-semibold text-red-500">{createError}</p>}
-              <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-                Reys foto yuklanmaguncha yangi reys sifatida tepada ko'rinadi.
-              </p>
-
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAddModalOpen(false)}
-                  className="h-10 flex-1 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 hover:bg-gray-200 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.10]"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating || !newFlightName.trim()}
-                  className="h-10 flex-1 rounded-xl bg-orange-500 text-[13px] font-black text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isCreating ? 'Saqlanmoqda...' : "Qo'shish"}
-                </button>
-              </div>
-            </form>
-          </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className="space-y-4">
+          <FlightUploadSection
+            title="1. Foto hisobot yuklash"
+            subtitle="Omborga kelgan yuklar uchun foto hisobot"
+            flights={visibleFlights}
+            isLoading={visible.isLoading}
+            isError={visible.isError}
+            onRetry={refreshAll}
+            onSelect={onSelectFlight}
+            renderMeta={photoMeta}
+            footerLabel="Ko‘rinayotganlarni boshqarish"
+            // Filters the table below to exactly what this section lists, so
+            // the link leads somewhere. `setStatusFilter('all')` was a no-op
+            // whenever the filter was already "all", which is its default.
+            onFooterClick={() => setStatusFilter('visible')}
+          />
+          <FlightUploadSection
+            title="2. Trek kod yuklash"
+            subtitle="Trek kodlarni yuklash va bazaga kiritish"
+            flights={visibleFlights}
+            isLoading={visible.isLoading}
+            isError={visible.isError}
+            onRetry={refreshAll}
+            onSelect={openTrackImport}
+            renderMeta={trackMeta}
+            footerLabel="Kutilayotgan yuklar"
+            onFooterClick={() => onNavigate?.('expected-cargo')}
+          />
         </div>
+
+        <div className="space-y-2">
+          <FlightBoardTable
+            flights={rows}
+            firstRowIndex={(safePage - 1) * ROWS_PER_PAGE}
+            total={filtered.length}
+            page={safePage}
+            totalPages={totalPages}
+            isLoading={board.isLoading}
+            isError={board.isError}
+            onRetry={refreshAll}
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            onPageChange={setPage}
+            onToggleVisibility={(flight) => toggleVisibility.mutate(flight)}
+            onReorder={handleReorder}
+            pendingFlight={pendingFlight}
+            canManage={canManage}
+          />
+          {truncated && (
+            // Never a silent cut: the reader has to know the table is not the
+            // whole database before they conclude a flight is missing.
+            <p className="px-1 text-[11px] font-medium text-mc-warn">
+              {board.data?.total} reysdan birinchi {allFlights.length} tasi
+              ko‘rsatilmoqda.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {addOpen && (
+        <AddFlightModal
+          onClose={() => setAddOpen(false)}
+          onCreate={(name) => createFlight.mutate(name)}
+          isCreating={createFlight.isPending}
+          error={createError}
+        />
       )}
     </div>
   );

@@ -326,6 +326,30 @@
    * which wins over @layer base — so it was dead weight that would have
    * silently won against any unlayered focus styling added later. */
 
+  /* Tailwind 4's Preflight dropped the `cursor: pointer` that v3 put on
+   * buttons, returning them to the browser default of an arrow. Every control
+   * in this app is a <button>, so on desktop nothing looked clickable and only
+   * 44 files had thought to add `cursor-pointer` by hand.
+   *
+   * Fixed once here rather than at several hundred call sites. In @layer base,
+   * so a utility class still wins per element where a different cursor is
+   * genuinely wanted (grab, text, wait). */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  a[href],
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+
+  /* Reads as "this control exists but is not available now" — an arrow leaves
+   * the reader clicking a dead button and wondering what broke. */
+  :disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
   body {
     @apply bg-background text-foreground;
   }

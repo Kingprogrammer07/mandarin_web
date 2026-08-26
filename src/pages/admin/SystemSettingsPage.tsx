@@ -745,8 +745,15 @@ export default function SystemSettingsPage() {
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Callback kelmagan tranzaksiyalar — qo'lda reconcile qilish
                 {nbuPending && (
-                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
-                    {nbuPending.count}
+                  <span
+                    className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[10px] font-bold"
+                    title={
+                      (nbuPending.total ?? nbuPending.count) > nbuPending.count
+                        ? `${nbuPending.count} ta ko'rsatilmoqda`
+                        : undefined
+                    }
+                  >
+                    {nbuPending.total ?? nbuPending.count}
                   </span>
                 )}
               </p>
@@ -947,8 +954,15 @@ export default function SystemSettingsPage() {
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 UzPost pending zayafkalarini reconcile yoki reject qilish
                 {uzpostPending && (
-                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
-                    {uzpostPending.count}
+                  <span
+                    className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold"
+                    title={
+                      (uzpostPending.total ?? uzpostPending.count) > uzpostPending.count
+                        ? `${uzpostPending.count} ta ko'rsatilmoqda`
+                        : undefined
+                    }
+                  >
+                    {uzpostPending.total ?? uzpostPending.count}
                   </span>
                 )}
               </p>

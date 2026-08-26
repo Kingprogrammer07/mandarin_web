@@ -1,8 +1,16 @@
 import { apiClient } from '../client';
 
+/**
+ * Admin tokens live in `localStorage`; `sessionStorage` is where a CLIENT
+ * session token is kept. Falling back to it sent a user's own token as
+ * `X-Admin-Authorization`, and the literal string "Bearer null" when neither
+ * existed. The `apiClient` interceptor already attaches admin auth correctly
+ * and mutually exclusively, so an absent token here means "send nothing" and
+ * let it do its job.
+ */
 export const getAdminHeaders = () => {
-  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-  return { 'X-Admin-Authorization': `Bearer ${token}` };
+  const token = localStorage.getItem('access_token');
+  return token ? { 'X-Admin-Authorization': `Bearer ${token}` } : {};
 };
 
 // -------------------------------------------------------------
@@ -61,9 +69,24 @@ export interface OverviewStats {
   total_clients: number;
   new_clients: number;
   active_clients: number;
+  /** Registered over 60 days ago with no cargo in the last 60 days. */
   passive_clients: number;
+  /** Never ordered any cargo at all — not "inactive for six months". */
   zombie_clients: number;
   logged_in_clients: number;
+  /**
+   * Clients who currently owe money. Current state — ignores the date range.
+   *
+   * The next three are optional for deploy skew: Vercel ships the SPA on push
+   * while the backend needs a rebuild, so a frontend-first deploy talks to a
+   * server that does not send them yet. Typed as required, `undefined` reached
+   * `Intl.NumberFormat.format` and printed `NaN`.
+   */
+  debtor_clients?: number;
+  /** Lifetime paid at or above `vip_threshold`. */
+  vip_clients?: number;
+  /** The bar `vip_clients` was counted against, in so'm. */
+  vip_threshold?: number;
 }
 export interface RetentionStats {
   repeat_clients: number;

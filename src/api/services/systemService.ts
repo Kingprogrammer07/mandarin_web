@@ -168,7 +168,15 @@ export interface NbuPendingPaymentRow {
 }
 
 export interface NbuPendingPaymentsResponse {
+  /** Rows in THIS page — the backend clamps `limit` to 500, so it saturates. */
   count: number;
+  /**
+   * The real backlog, from a separate COUNT. Optional because the SPA deploys
+   * to Vercel independently of the backend: a frontend-first deploy talks to a
+   * server that does not send it yet, and a required field would render
+   * `undefined` in the badge.
+   */
+  total?: number;
   rows: NbuPendingPaymentRow[];
 }
 
@@ -215,7 +223,10 @@ export interface UzPostPendingRow {
 }
 
 export interface UzPostPendingResponse {
+  /** Rows in THIS page. See {@link NbuPendingPaymentsResponse}. */
   count: number;
+  /** Real backlog; optional for the same deploy-skew reason. */
+  total?: number;
   rows: UzPostPendingRow[];
 }
 

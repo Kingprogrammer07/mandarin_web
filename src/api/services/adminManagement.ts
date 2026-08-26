@@ -98,6 +98,14 @@ export interface AuditLogResponse {
   id: number;
   admin_account_id: number | null;
   role_snapshot: string | null;
+  /** Raw username captured when the row was written. */
+  actor_system_username: string | null;
+  /**
+   * Display name the backend computes for the actor (models/admin_audit_log.py).
+   * It was always on the wire and simply missing from this interface, so every
+   * consumer fell back to rendering the numeric account id.
+   */
+  actor_label: string | null;
   action: string;
   details: Record<string, unknown> | null;
   ip_address: string | null;

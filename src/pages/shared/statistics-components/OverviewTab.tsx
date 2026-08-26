@@ -22,7 +22,7 @@ export function OverviewTab({ cargoData, clientData, financeData, rawAnalyticsDa
           <StatCard title="Jami Tushum" value={formatMoney(financeData?.total_revenue)} subtitle="Barcha hisoblangan summa" icon={DollarSign} color="green" delay={0.08} />
           <StatCard title="Jami Qarz" value={formatMoney(financeData?.total_debt)} subtitle="Hali to'lanmagan umumiy summa" icon={DollarSign} color="red" delay={0.10} />
           <StatCard title="Omborda kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_paid_not_taken)} subtitle="To'langan, lekin ombordan hali olinmagan" icon={Package} color="orange" delay={0.12} />
-          <StatCard title="Mijozga topshirilgan" value={formatNum(cargoData?.bottlenecks.uz_taken_away)} subtitle="Mijoz o'zi kelib olib ketgan yuklar" icon={Activity} color="cyan" delay={0.14} />
+          <StatCard title="Mijozga topshirilgan" value={formatNum(cargoData?.bottlenecks.uz_taken_away)} subtitle="O'zi olgan, kuryer yoki pochta orqali" icon={Activity} color="cyan" delay={0.14} />
           <StatCard title="Dostavka / Pochta" value={formatNum(cargoData?.bottlenecks.post_approved)} subtitle="Kuryer yoki pochtaga topshirilgan yuklar" icon={Package} color="purple" delay={0.16} />
           <StatCard title="Xitoyda hisobsiz" value={formatNum(cargoData?.bottlenecks.china_unaccounted)} subtitle="Xitoyda mavjud, lekin tizimga kiritilmagan" icon={Package} color="red" delay={0.18} />
           <StatCard title="To'lov kutayotgan" value={formatNum(cargoData?.bottlenecks.uz_pending_payment)} subtitle="UZda bor, hisobot yuborilgan, to'lov kutilmoqda" icon={DollarSign} color="orange" delay={0.20} />

@@ -1,443 +1,466 @@
-import React, { useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Users, Shield, Clock, LogOut, Sun, Moon, User, Layers, BarChart3, CalendarDays,
-  LayoutGrid, Plane, Monitor, UserCheck, Warehouse, PackageSearch,
-  Upload, X, ChevronDown, Truck, TrendingDown, Settings,
-} from 'lucide-react';
-import RoleSwitcher from './RoleSwitcher';
+import { ArrowUpRight, LayoutGrid, Moon, Search, Shield, Sun, X } from 'lucide-react';
 
+import { AdminAccountMenu } from './AdminAccountMenu';
+import { useManagerStore } from '@/store/useManagerStore';
+
+import { CommandPalette } from './CommandPalette';
+import {
+  ADMIN_NAV,
+  ADMIN_NAV_PRIMARY,
+  findAdminNavItem,
+  type AdminNavItem,
+} from './navigation';
+import { TopProgressBar } from '@/components/ui/TopProgressBar';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { formatTashkentDate } from '@/lib/format';
+
 interface AdminLayoutProps {
   children: React.ReactNode;
   currentPage: string;
-  onNavigate: (page: string) => void;
+  /** `flightName` is passed through for rows that open one flight's cargo. */
+  onNavigate: (page: string, flightName?: string) => void;
   onLogout: () => void;
 }
 
-// Pages shown in the AdminLayout sidebar / bottom nav
-const navItems = [
-  { id: 'admin-accounts',        label: 'Adminlar',   icon: Users,         description: 'Hisoblar boshqaruvi' },
-  { id: 'admin-roles',           label: 'Rollar',     icon: Shield,        description: 'Huquqlar tizimi' },
-  { id: 'admin-carousel',        label: 'Karusel',    icon: Layers,        description: 'Banner & reklama' },
-  { id: 'admin-audit',           label: 'Audit',      icon: Clock,         description: 'Faoliyat tarixi' },
-  { id: 'admin-expenses',        label: 'Rasxodlar',  icon: TrendingDown,  description: 'Chiqimlar hisoboti' },
-  { id: 'system-settings',       label: 'Tizim',      icon: Settings,      description: 'Sozlamalar & Redis' },
-  { id: 'statistics',            label: 'Statistika', icon: BarChart3,     description: "Ko'rsatkichlar tahlili" },
-  { id: 'flight-schedule-admin', label: 'Jadval',     icon: CalendarDays,  description: 'Reys jadvali' },
-  { id: 'admin-profile',         label: 'Profil',     icon: User,          description: 'Shaxsiy sozlamalar' },
-];
-
-// Other role home-pages that a super-admin may need to reach quickly
-const quickAccessPages = [
-  {
-    id: 'flights',
-    label: 'Reyslar',
-    icon: Plane,
-    description: 'Ishchi bosh sahifasi',
-    iconBg: 'bg-blue-100 dark:bg-blue-500/15',
-    iconColor: 'text-blue-600 dark:text-blue-400',
-  },
-  {
-    id: 'pos-dashboard',
-    label: 'Kassa',
-    icon: Monitor,
-    description: 'POS kassa paneli',
-    iconBg: 'bg-purple-100 dark:bg-purple-500/15',
-    iconColor: 'text-purple-600 dark:text-purple-400',
-  },
-  {
-    id: 'manager-page',
-    label: 'Mijozlar',
-    icon: UserCheck,
-    description: 'Menejer bosh sahifasi',
-    iconBg: 'bg-indigo-100 dark:bg-indigo-500/15',
-    iconColor: 'text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    id: 'warehouse-page',
-    label: 'Ombor',
-    icon: Warehouse,
-    description: 'Ombor paneli',
-    iconBg: 'bg-orange-100 dark:bg-orange-500/15',
-    iconColor: 'text-orange-600 dark:text-orange-400',
-  },
-  {
-    id: 'expected-cargo',
-    label: 'Kutilmoqda',
-    icon: PackageSearch,
-    description: 'Kutilayotgan yuklar',
-    iconBg: 'bg-amber-100 dark:bg-amber-500/15',
-    iconColor: 'text-amber-600 dark:text-amber-400',
-  },
-  {
-    id: 'import',
-    label: 'Import',
-    icon: Upload,
-    description: "Ma'lumot import qilish",
-    iconBg: 'bg-slate-100 dark:bg-slate-500/15',
-    iconColor: 'text-slate-600 dark:text-slate-400',
-  },
-  {
-    id: 'admin-delivery-request',
-    label: 'Zayavka',
-    icon: Truck,
-    description: "Yetkazib berish zayavkasi",
-    iconBg: 'bg-rose-100 dark:bg-rose-500/15',
-    iconColor: 'text-rose-600 dark:text-rose-400',
-  },
-  {
-    id: 'pickup-tv',
-    label: 'TV Ekran',
-    icon: Monitor,
-    description: "Navbat televizor ekrani",
-    iconBg: 'bg-cyan-100 dark:bg-cyan-500/15',
-    iconColor: 'text-cyan-600 dark:text-cyan-400',
-  },
-] as const;
-
+/**
+ * Every destination is authorised twice already — `checkAccess` in `App.tsx`
+ * bounces a forbidden route and the backend rejects the request behind it — so
+ * the sidebar lists what the role can reach rather than hiding entries by
+ * permission. Hiding here would only make a reachable screen undiscoverable.
+ */
 export default function AdminLayout({ children, currentPage, onNavigate, onLogout }: AdminLayoutProps) {
   // `next-themes` owns the `dark` class app-wide. Writing it here as well
   // meant the provider reasserted its own value on the next state change and
   // the toggle silently reverted.
   const { theme, toggle: toggleTheme } = useAppTheme();
   const isDark = theme === 'dark';
-  const [showPagesMenu, setShowPagesMenu] = useState(false);
-  const [showOtherPages, setShowOtherPages] = useState(true);
+  const [isSheetOpen, setSheetOpen] = useState(false);
+  const [isSearchOpen, setSearchOpen] = useState(false);
+  const sheetCloseRef = useRef<HTMLButtonElement>(null);
 
-  const handleNav = (id: string) => {
-    onNavigate(id);
-    setShowPagesMenu(false);
-  };
+  const handleNav = useCallback(
+    (id: string) => {
+      onNavigate(id);
+      setSheetOpen(false);
+    },
+    [onNavigate],
+  );
+
+  // Escape closes the sheet and the body stays put behind it — a sheet that
+  // scrolls the page underneath reads as a broken overlay on a phone.
+  useEffect(() => {
+    if (!isSheetOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSheetOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+    sheetCloseRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isSheetOpen]);
+
+  // Ctrl+K / Cmd+K anywhere in the shell. Registered here rather than inside the
+  // palette so the shortcut works while the palette is closed.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const active = findAdminNavItem(currentPage);
+  const today = formatTashkentDate(new Date(), undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
 
   return (
-    <div className="fixed inset-0 flex bg-[#f5f5f4] dark:bg-[#09090b] text-gray-900 dark:text-gray-100 transition-colors z-50">
-
-      {/* ── Desktop Sidebar ── */}
-      <aside className="hidden md:flex flex-col w-[260px] border-r border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-[#0f0f0f] shrink-0 z-20">
-
-        {/* Brand */}
-        <div className="p-6 pb-5 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <Shield className="w-5 h-5 text-white" strokeWidth={2} />
-            </div>
-            <div>
-              <h1 className="text-[15px] font-bold text-gray-900 dark:text-white tracking-tight">
-                Super Admin
-              </h1>
-              <p className="text-[11px] text-gray-400 dark:text-gray-600">
-                Boshqaruv paneli
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex bg-mc-bg text-mc-text">
+      {/* ── Desktop sidebar ── */}
+      <aside className="hidden w-[248px] shrink-0 flex-col border-r border-mc-border bg-mc-surface md:flex">
+        <div className="flex items-center gap-2.5 px-5 py-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-mc-md bg-mc-brand">
+            <Shield className="h-[18px] w-[18px] text-mc-on-brand" strokeWidth={2.2} />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[14px] font-extrabold leading-tight tracking-tight text-mc-text">
+              Mandarin Cargo
+            </p>
+            <p className="truncate text-[11px] font-medium text-mc-text-3">Boshqaruv paneli</p>
           </div>
         </div>
 
-        <div className="mx-5 h-px bg-gray-100 dark:bg-white/[0.05]" />
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-1">
-          <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-[0.12em]">
-            Asosiy
-          </p>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPage === item.id;
-            return (
-              <motion.button
-                key={item.id}
-                onClick={() => handleNav(item.id)}
-                whileTap={{ scale: 0.97 }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all relative ${
-                  isActive
-                    ? 'bg-orange-500/[0.08] dark:bg-orange-500/[0.12] text-orange-600 dark:text-orange-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.04]'
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="sidebar-active"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-orange-500 rounded-full"
-                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                  />
-                )}
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                  isActive
-                    ? 'bg-orange-500/[0.12] dark:bg-orange-500/[0.15]'
-                    : 'bg-gray-100/80 dark:bg-white/[0.05]'
-                }`}>
-                  <Icon className={`w-[16px] h-[16px] ${isActive ? 'text-orange-500' : ''}`} strokeWidth={2} />
-                </div>
-                <div className="text-left">
-                  <div className="leading-tight">{item.label}</div>
-                  <div className={`text-[10px] font-normal mt-px ${isActive ? 'text-orange-500/60' : 'text-gray-400 dark:text-gray-600'}`}>
-                    {item.description}
-                  </div>
-                </div>
-              </motion.button>
-            );
-          })}
-
-          {/* ── Collapsible: other role home pages ── */}
-          <div className="pt-2">
-            <div className="px-3 mb-2 text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-[0.12em]">
-              Bosh sahifalar
-            </div>
-            <button
-              onClick={() => setShowOtherPages((v) => !v)}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.04] transition-all"
+        <nav aria-label="Admin navigatsiya" className="flex-1 overflow-y-auto overscroll-contain px-3 pb-5">
+          {ADMIN_NAV.map((group) => (
+            <div
+              key={group.id}
+              className={group.divider ? 'mt-3 border-t border-mc-border pt-3' : ''}
             >
-              <div className="w-8 h-8 rounded-lg bg-gray-100/80 dark:bg-white/[0.05] flex items-center justify-center">
-                <LayoutGrid className="w-[16px] h-[16px]" strokeWidth={2} />
-              </div>
-              <span className="flex-1 text-left">Barchasi</span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${showOtherPages ? 'rotate-180' : ''}`}
-                strokeWidth={2}
-              />
-            </button>
-
-            <AnimatePresence initial={false}>
-              {showOtherPages && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2, ease: 'easeInOut' }}
-                  className="overflow-hidden"
-                >
-                  <div className="mt-1 ml-3 border-l border-gray-100 dark:border-white/[0.06] pl-3 space-y-0.5 pb-1">
-                    {quickAccessPages.map((page) => {
-                      const Icon = page.icon;
-                      return (
-                        <button
-                          key={page.id}
-                          onClick={() => handleNav(page.id)}
-                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white transition-all"
-                        >
-                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${page.iconBg}`}>
-                            <Icon className={`w-3.5 h-3.5 ${page.iconColor}`} strokeWidth={2} />
-                          </div>
-                          <div className="text-left min-w-0">
-                            <div className="leading-tight truncate">{page.label}</div>
-                            <div className="text-[10px] text-gray-400 dark:text-gray-600 leading-tight truncate">
-                              {page.description}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </motion.div>
+              {group.label && (
+                <p className="px-2.5 pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-mc-text-3">
+                  {group.label}
+                </p>
               )}
-            </AnimatePresence>
-          </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <SidebarItem
+                    key={item.id}
+                    item={item}
+                    isActive={item.shell === 'shell' && currentPage === item.id}
+                    onSelect={handleNav}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
-
-        {/* Footer actions */}
-        <div className="p-3 border-t border-gray-100 dark:border-white/[0.05] shrink-0 space-y-1">
-          <div className="px-3.5 py-2">
-            <RoleSwitcher onNavigate={onNavigate} />
-          </div>
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.04] transition-colors"
-          >
-            <div className="w-8 h-8 rounded-lg bg-gray-100/80 dark:bg-white/[0.05] flex items-center justify-center">
-              {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-            </div>
-            {isDark ? 'Tungi rejim' : 'Kunduzgi rejim'}
-          </button>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium text-red-500/80 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/[0.08] transition-colors"
-          >
-            <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-500/[0.08] flex items-center justify-center">
-              <LogOut className="w-4 h-4" />
-            </div>
-            Chiqish
-          </button>
-        </div>
       </aside>
 
-      {/* ── Main Content ── */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
+      {/* ── Main column ── */}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {/* Desktop header */}
+        {/* No page title here: every page inside this shell already renders its
+            own <h1>, so a header title printed it twice. */}
+        <header className="hidden shrink-0 items-center justify-between gap-4 border-b border-mc-border bg-mc-surface px-6 py-3 md:flex">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="flex h-11 min-w-0 max-w-[420px] flex-1 items-center gap-2.5 rounded-mc-md border border-mc-border bg-mc-surface-2 px-3 text-left transition-colors hover:border-mc-brand/30"
+          >
+            <Search className="h-4 w-4 shrink-0 text-mc-text-3" strokeWidth={2.2} />
+            <span
+              className="min-w-0 flex-1 truncate text-[13px] font-medium text-mc-text-3"
+              title="Qidirish (mijoz, reys, trek kod)"
+            >
+              Qidirish (mijoz, reys, trek kod)
+            </span>
+            <kbd className="shrink-0 rounded border border-mc-border bg-mc-surface px-1.5 py-0.5 text-[10px] font-bold text-mc-text-3">
+              Ctrl K
+            </kbd>
+          </button>
 
-        {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-2xl border-b border-black/[0.05] dark:border-white/[0.06] z-20 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-[15px] text-gray-900 dark:text-white">Admin</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <RoleSwitcher onNavigate={onNavigate} />
-            <button
-              onClick={toggleTheme}
-              className="p-2 text-gray-500 active:bg-gray-100 dark:active:bg-white/10 rounded-lg transition-colors"
-            >
-              {isDark ? <Moon className="w-[18px] h-[18px]" /> : <Sun className="w-[18px] h-[18px]" />}
-            </button>
-            <button
-              onClick={onLogout}
-              className="p-2 text-red-500/80 active:bg-red-50 dark:active:bg-red-500/10 rounded-lg transition-colors"
-            >
-              <LogOut className="w-[18px] h-[18px]" />
-            </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden rounded-mc-sm bg-mc-surface-2 px-2.5 py-1.5 text-[12px] font-semibold text-mc-text-2 lg:inline">
+              {today}
+            </span>
+            <HeaderAction label={isDark ? 'Kunduzgi rejim' : 'Tungi rejim'} onClick={toggleTheme}>
+              {isDark ? <Moon className="h-[18px] w-[18px]" /> : <Sun className="h-[18px] w-[18px]" />}
+            </HeaderAction>
+            <AdminAccountMenu onLogout={onLogout} />
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto pb-24 md:pb-0 relative scroll-smooth">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="min-h-full p-4 md:p-8 lg:p-10"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-
-      {/* ── Mobile Bottom Navigation ── */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0f0f0f]/95 backdrop-blur-2xl border-t border-black/[0.05] dark:border-white/[0.06] z-30 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom)]">
-        <div
-          className="flex overflow-x-auto px-1"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNav(item.id)}
-                className="flex flex-col items-center py-1.5 px-2 flex-shrink-0 w-[60px] transition-transform active:scale-90 touch-manipulation relative"
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="mobile-active"
-                    className="absolute -top-1 w-6 h-[3px] bg-orange-500 rounded-full"
-                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                  />
-                )}
-                <div className={`p-1.5 rounded-xl transition-all duration-200 ${
-                  isActive ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500'
-                }`}>
-                  <Icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.2 : 1.8} />
-                </div>
-                <span className={`text-[9px] mt-0.5 font-semibold transition-colors duration-200 truncate w-full text-center ${
-                  isActive ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-600'
-                }`}>
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-
-          {/* ── Quick-access toggle button ── */}
-          <button
-            onClick={() => setShowPagesMenu((v) => !v)}
-            className="flex flex-col items-center py-1.5 px-2 flex-shrink-0 w-[60px] touch-manipulation active:scale-90 transition-transform relative"
-          >
-            {showPagesMenu && (
-              <motion.div
-                layoutId="mobile-active"
-                className="absolute -top-1 w-6 h-[3px] bg-orange-500 rounded-full"
-                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              />
-            )}
-            <div className={`p-1.5 rounded-xl transition-all duration-200 ${
-              showPagesMenu
-                ? 'text-orange-500 bg-orange-50 dark:bg-orange-500/10'
-                : 'text-gray-400 dark:text-gray-500'
-            }`}>
-              <LayoutGrid className="w-[22px] h-[22px]" strokeWidth={showPagesMenu ? 2.2 : 1.8} />
+        {/* Mobile header */}
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-mc-border bg-mc-surface px-4 py-2.5 md:hidden">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-mc-sm bg-mc-brand">
+              <Shield className="h-4 w-4 text-mc-on-brand" strokeWidth={2.2} />
             </div>
-            <span className={`text-[9px] mt-0.5 font-semibold truncate w-full text-center ${
-              showPagesMenu ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-600'
-            }`}>
-              Barchasi
-            </span>
-          </button>
+            <p
+              className="truncate text-[14px] font-extrabold text-mc-text"
+              title={active?.label ?? 'Admin'}
+            >
+              {active?.label ?? 'Admin'}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <HeaderAction label="Qidirish" onClick={() => setSearchOpen(true)}>
+              <Search className="h-[18px] w-[18px]" />
+            </HeaderAction>
+            <HeaderAction label={isDark ? 'Kunduzgi rejim' : 'Tungi rejim'} onClick={toggleTheme}>
+              {isDark ? <Moon className="h-[18px] w-[18px]" /> : <Sun className="h-[18px] w-[18px]" />}
+            </HeaderAction>
+            <AdminAccountMenu onLogout={onLogout} />
+          </div>
+        </header>
+
+        {/* Page content. The Suspense boundary sits inside the shell so a lazy
+            page chunk no longer unmounts the sidebar while it loads. */}
+        <div className="relative flex-1 overflow-y-auto overscroll-contain pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+          <div className="mx-auto w-full max-w-[1500px] p-4 md:p-6 lg:p-8">
+            <Suspense fallback={<TopProgressBar />}>
+              {/* Keyed on the page so a route change fades in. No `AnimatePresence`:
+                  an exit animation would hold the outgoing page on screen while the
+                  incoming chunk is still loading.
+
+                  OPACITY ONLY — never `y`, `x`, `scale` or any other transform.
+                  A transformed ancestor becomes the containing block for every
+                  `position: fixed` descendant, so a 6px entrance rise silently
+                  re-anchored every full-screen overlay in the admin panel to
+                  this scrolling box instead of the viewport. Eight pages use
+                  `fixed` inside this shell — WarehousePage's `fixed inset-0`
+                  panel among them — and they rendered over the wrong area,
+                  swallowing clicks meant for the controls beneath.
+
+                  `will-change` follows the animated property, so opacity alone
+                  does not reintroduce the containing block either. */}
+              <motion.div
+                key={currentPage}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+              >
+                {children}
+              </motion.div>
+            </Suspense>
+          </div>
         </div>
       </div>
 
-      {/* ── Mobile Bottom Sheet: quick-access pages ── */}
+      {/* ── Mobile bottom navigation ── */}
+      <nav
+        aria-label="Admin navigatsiya"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-mc-border bg-mc-nav pt-1 pb-[calc(0.35rem+env(safe-area-inset-bottom))] md:hidden"
+      >
+        {ADMIN_NAV_PRIMARY.map((item) => {
+          const isActive = currentPage === item.id;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleNav(item.id)}
+              aria-current={isActive ? 'page' : undefined}
+              className="relative flex flex-1 flex-col items-center gap-0.5 py-1.5 transition-transform active:scale-90"
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="admin-mobile-active"
+                  className="absolute -top-1 h-[3px] w-6 rounded-full bg-mc-brand"
+                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                />
+              )}
+              <Icon
+                className={`h-[21px] w-[21px] ${isActive ? 'text-mc-brand' : 'text-mc-text-3'}`}
+                strokeWidth={isActive ? 2.2 : 1.8}
+              />
+              {/* `short` where the full label does not fit 64px. A tooltip
+                  would be the usual answer and is useless on a touch screen. */}
+              <span
+                className={`w-full truncate px-1 text-center text-[10px] font-bold ${
+                  isActive ? 'text-mc-brand' : 'text-mc-text-3'
+                }`}
+              >
+                {item.short ?? item.label}
+              </span>
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={isSheetOpen}
+          className="relative flex flex-1 flex-col items-center gap-0.5 py-1.5 transition-transform active:scale-90"
+        >
+          <LayoutGrid
+            className={`h-[21px] w-[21px] ${isSheetOpen ? 'text-mc-brand' : 'text-mc-text-3'}`}
+            strokeWidth={isSheetOpen ? 2.2 : 1.8}
+          />
+          <span
+            className={`w-full truncate px-1 text-center text-[10px] font-bold ${
+              isSheetOpen ? 'text-mc-brand' : 'text-mc-text-3'
+            }`}
+          >
+            Barchasi
+          </span>
+        </button>
+      </nav>
+
+      <CommandPalette
+        open={isSearchOpen}
+        onClose={() => setSearchOpen(false)}
+        onNavigate={(target) => {
+          // A client result opens that client. The drawer reads its id from
+          // the manager store rather than from the route, which only carries a
+          // client id for the `client-edit` page.
+          if (target.clientId !== undefined) {
+            useManagerStore.getState().setSelectedClientId(target.clientId);
+          }
+          onNavigate(target.page, target.flightName);
+          setSearchOpen(false);
+        }}
+      />
+
+      {/* ── Mobile sheet: the full destination list ── */}
       <AnimatePresence>
-        {showPagesMenu && (
+        {isSheetOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
-              key="backdrop"
+              key="admin-sheet-backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-              onClick={() => setShowPagesMenu(false)}
+              onClick={() => setSheetOpen(false)}
+              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm md:hidden"
             />
-
-            {/* Sheet panel */}
             <motion.div
-              key="sheet"
+              key="admin-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="admin-sheet-title"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-              className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#141414] rounded-t-2xl shadow-2xl"
+              className="fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col rounded-t-mc-xl border-t border-mc-border bg-mc-surface md:hidden"
             >
-              {/* Drag handle */}
-              <div className="w-10 h-1 bg-gray-200 dark:bg-white/10 rounded-full mx-auto mt-3" />
-
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3">
-                <h2 className="text-[14px] font-bold text-gray-900 dark:text-white">
-                  Bosh sahifalar
-                </h2>
-                <button
-                  onClick={() => setShowPagesMenu(false)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+              <div className="shrink-0 px-4 pt-3">
+                <div className="mx-auto h-1 w-10 rounded-full bg-mc-border" />
+                <div className="flex items-center justify-between py-3">
+                  <h2 id="admin-sheet-title" className="text-[15px] font-extrabold text-mc-text">
+                    Barcha bo‘limlar
+                  </h2>
+                  <button
+                    ref={sheetCloseRef}
+                    type="button"
+                    onClick={() => setSheetOpen(false)}
+                    aria-label="Yopish"
+                    className="flex h-11 w-11 items-center justify-center rounded-mc-sm bg-mc-surface-2 text-mc-text-2 transition-transform active:scale-90"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* 3-column grid of page cards */}
-              <div className="grid grid-cols-3 gap-2 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-                {quickAccessPages.map((page) => {
-                  const Icon = page.icon;
-                  return (
-                    <button
-                      key={page.id}
-                      onClick={() => handleNav(page.id)}
-                      className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.04] hover:bg-gray-100 dark:hover:bg-white/[0.07] active:scale-95 transition-all touch-manipulation"
-                    >
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${page.iconBg}`}>
-                        <Icon className={`w-5 h-5 ${page.iconColor}`} strokeWidth={1.8} />
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[11px] font-bold text-gray-800 dark:text-white leading-tight">
-                          {page.label}
-                        </div>
-                        <div className="text-[9px] text-gray-400 dark:text-gray-600 leading-tight mt-0.5">
-                          {page.description}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                {ADMIN_NAV.map((group) => (
+                  <div
+                    key={group.id}
+                    className={group.divider ? 'mt-3 border-t border-mc-border pt-3' : ''}
+                  >
+                    <div className="space-y-1">
+                      {group.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = item.shell === 'shell' && currentPage === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleNav(item.id)}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={`flex w-full items-center gap-3 rounded-mc-md border px-3 py-2.5 text-left transition-transform active:scale-[0.98] ${
+                              isActive
+                                ? 'border-mc-brand/25 bg-mc-brand-soft'
+                                : 'border-mc-border bg-mc-surface-2'
+                            }`}
+                          >
+                            <span
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-mc-sm ${
+                                isActive ? 'bg-mc-brand text-mc-on-brand' : 'bg-mc-surface text-mc-text-2'
+                              }`}
+                            >
+                              <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span
+                                className={`block truncate text-[13px] font-bold ${
+                                  isActive ? 'text-mc-brand' : 'text-mc-text'
+                                }`}
+                              >
+                                {item.label}
+                              </span>
+                              <span
+                                className="block truncate text-[11px] font-medium text-mc-text-3"
+                                title={item.description}
+                              >
+                                {item.description}
+                              </span>
+                            </span>
+                            {item.shell === 'standalone' && (
+                              <ArrowUpRight className="h-4 w-4 shrink-0 text-mc-text-3" strokeWidth={2} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function SidebarItem({
+  item,
+  isActive,
+  onSelect,
+}: {
+  item: AdminNavItem;
+  isActive: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const Icon = item.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(item.id)}
+      aria-current={isActive ? 'page' : undefined}
+      className={`group relative flex w-full items-center gap-2.5 rounded-mc-sm px-2.5 py-2 text-[13px] font-semibold transition-colors ${
+        isActive
+          ? 'bg-mc-brand-soft text-mc-brand'
+          : 'text-mc-text-2 hover:bg-mc-surface-2 hover:text-mc-text'
+      }`}
+    >
+      {isActive && (
+        <motion.span
+          layoutId="admin-sidebar-active"
+          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-mc-brand"
+          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        />
+      )}
+      <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={isActive ? 2.2 : 1.9} />
+      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+      {/* A standalone entry swaps the whole screen for another console; the
+          arrow is the only warning the sidebar is about to disappear. */}
+      {item.shell === 'standalone' && (
+        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-mc-text-3" strokeWidth={2} />
+      )}
+    </button>
+  );
+}
+
+function HeaderAction({
+  label,
+  onClick,
+  children,
+  tone = 'default',
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  tone?: 'default' | 'danger';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`flex h-11 w-11 items-center justify-center rounded-mc-sm transition-colors active:scale-95 ${
+        tone === 'danger'
+          ? 'text-mc-danger hover:bg-mc-danger-soft'
+          : 'text-mc-text-2 hover:bg-mc-surface-2 hover:text-mc-text'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
