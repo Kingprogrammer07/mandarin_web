@@ -240,21 +240,10 @@ function ExpenseFormModal({
   const [reason, setReason] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
-  // Reset form when opening for new expense (not edit)
-  useEffect(() => {
-    if (isOpen && !isEdit) {
-      setCategoryId(categories[0]?.id ?? 0);
-      setEmployeeId("");
-      setAmount("");
-      setPaymentMethod("cash");
-      setDescription("");
-      setExpenseDate(defaultDate);
-      setExpenseTime(defaultTime);
-      setImages([]);
-      setPendingFiles([]);
-      setReason("");
-    }
-  }, [isOpen, isEdit, categories]);
+  // Form state comes from the `useState` initializers above. The caller keys
+  // this modal per open, so every open is a fresh mount and they re-run — no
+  // reset effect. The effect this replaced only reset the *new-expense* case,
+  // so opening "edit" on a second row showed the first row's values.
 
   const handleReset = () => {
     if (isEdit && initial) {
@@ -929,16 +918,23 @@ export default function ExpensesPage() {
     if (p >= 1 && p <= totalPages) setPage(p);
   };
 
-  // Close action menu on outside click
-  useState(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+  /**
+   * Close the row action menu on an outside click.
+   *
+   * This was `useState(() => ...)`: the initializer ran once and React stored
+   * the returned cleanup as state instead of calling it, so the `document`
+   * listener was never removed. Every visit to this page left another handler
+   * behind, each one calling `setActionMenuId` on an unmounted tree.
+   */
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setActionMenuId(null);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-[#0f0f0f] p-4 lg:p-6">
@@ -1276,6 +1272,8 @@ export default function ExpensesPage() {
 
       {/* Modals */}
       <ExpenseFormModal
+        // Remount per open so the form's initializers re-read `initial`.
+        key={`${formModalOpen}-${editingExpense?.id ?? "new"}`}
         isOpen={formModalOpen}
         onClose={() => setFormModalOpen(false)}
         initial={editingExpense}

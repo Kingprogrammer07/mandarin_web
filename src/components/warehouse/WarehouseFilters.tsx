@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Search, Plane, Filter, RotateCcw, ChevronDown } from "lucide-react";
 import { useWarehouseStore } from "../../store/useWarehouseStore";
 import { useWarehouseFlights } from "../../api/hooks/useWarehouse";
+import { triggerSoftHaptic } from "@/utils/haptics";
 
 const PAYMENT_OPTIONS = [
   { value: "all", label: "Barchasi" },
@@ -34,8 +35,32 @@ export default function WarehouseFilters() {
   // Local controlled state for the search input so external resets are reflected
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [showFlightDropdown, setShowFlightDropdown] = useState(false);
+  const flightBoxRef = useRef<HTMLDivElement | null>(null);
 
   const { data: flightsData } = useWarehouseFlights();
+
+  /**
+   * Dismiss the flight dropdown on an outside click, WITHOUT eating that click.
+   *
+   * This used to be a `fixed inset-0 z-10` backdrop with an `onClick`. It closed
+   * the dropdown, but it also swallowed the click that closed it — so the first
+   * press on anything else did nothing visible. On this toolbar the casualty was
+   * the "Strict" checkbox sitting right beside the flight field: select a
+   * flight, reach for Strict, and the tick never appeared. Reported twice as
+   * "the Strict button does not work".
+   *
+   * A capture-phase `pointerdown` listener closes the dropdown and lets the
+   * event carry on to whatever was actually pressed.
+   */
+  useEffect(() => {
+    if (!showFlightDropdown) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (flightBoxRef.current?.contains(event.target as Node)) return;
+      setShowFlightDropdown(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [showFlightDropdown]);
 
   // Sync local input when store resets searchQuery to "" — uses React's render-time
   // state update pattern instead of useEffect to avoid cascading re-renders.
@@ -80,7 +105,7 @@ export default function WarehouseFilters() {
       <div className="flex flex-col sm:flex-row gap-2">
 
         {/* Flight Name — with recent flights dropdown */}
-        <div className="relative min-w-0 flex-1">
+        <div ref={flightBoxRef} className="relative min-w-0 flex-1">
           <Plane
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400 z-10"
             strokeWidth={1.8}
@@ -110,11 +135,6 @@ export default function WarehouseFilters() {
           {/* Recent flights dropdown */}
           {showFlightDropdown && recentFlights.length > 0 && (
             <>
-              {/* Backdrop */}
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowFlightDropdown(false)}
-              />
               <div className="absolute top-full left-0 right-0 mt-1.5 z-20 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
                 <div className="px-3 py-1.5 border-b border-gray-100 dark:border-white/[0.06]">
                   <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
@@ -180,17 +200,52 @@ export default function WarehouseFilters() {
               className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] sm:text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
             />
           </div>
-          <label className="flex items-center gap-1.5 shrink-0 px-2 py-1.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-lg cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={strictSearch}
-              onChange={(e) => setStrictSearch(e.target.checked)}
-              className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-            />
-            <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+          {/* A switch, not a checkbox: a 14px tick box is a poor target for
+              someone holding a scanner, and the state reads at a glance from
+              across the bench. The whole control is the target, not just the
+              switch. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={strictSearch}
+            aria-label="Aniq moslik (strict)"
+            onClick={() => {
+              triggerSoftHaptic();
+              setStrictSearch(!strictSearch);
+            }}
+            className={`flex items-center gap-2 shrink-0 px-2.5 h-[42px] rounded-xl border select-none transition-colors ${
+              strictSearch
+                ? "bg-orange-50 border-orange-300 dark:bg-orange-500/[0.08] dark:border-orange-500/30"
+                : "bg-white border-gray-200 dark:bg-white/[0.04] dark:border-white/[0.08]"
+            }`}
+          >
+            <span
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 ${
+                strictSearch
+                  ? "bg-orange-500"
+                  : "bg-gray-200 dark:bg-white/[0.12]"
+              }`}
+              aria-hidden="true"
+            >
+              <span
+                className="inline-block rounded-full bg-white shadow transition-transform duration-150"
+                style={{
+                  height: 15,
+                  width: 15,
+                  transform: `translateX(${strictSearch ? 18 : 3}px)`,
+                }}
+              />
+            </span>
+            <span
+              className={`text-[11px] font-bold transition-colors ${
+                strictSearch
+                  ? "text-orange-600 dark:text-orange-400"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
+            >
               Strict
             </span>
-          </label>
+          </button>
         </div>
       </div>
 

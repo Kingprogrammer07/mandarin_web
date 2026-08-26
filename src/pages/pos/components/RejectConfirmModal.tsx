@@ -27,10 +27,19 @@ export function RejectConfirmModal({
     onConfirm(comment.trim() || null);
   }, [comment, onConfirm]);
 
-  // Reset comment when modal opens
-  useEffect(() => {
+  /**
+   * Clear the draft during the render that opens the modal.
+   *
+   * As an effect this ran a frame late, so the box opened showing the comment
+   * typed for the *previous* rejection before blanking — on a fast confirm the
+   * cashier could send the old text. This is React's documented
+   * adjust-state-on-prop-change pattern, not a setState-in-effect cascade.
+   */
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) setComment("");
-  }, [isOpen]);
+  }
 
   // Keyboard shortcuts
   useEffect(() => {

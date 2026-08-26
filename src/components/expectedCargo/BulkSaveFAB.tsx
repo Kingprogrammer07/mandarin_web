@@ -215,7 +215,12 @@ export function BulkSaveFAB({ flightName }: BulkSaveFABProps) {
           exit={{ scale: 0, opacity: 0 }}
           whileTap={{ scale: 0.92 }}
           onClick={() => setIsConfirmOpen(true)}
-          className="fixed bottom-[72px] right-4 z-50 flex items-center gap-2 h-12 pl-4 pr-5 rounded-full shadow-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors"
+          /* z-[44]: above the two z-40 bars, below every overlay that owns the
+             screen while open — the flight menu backdrop (z-45) and panel
+             (z-46), and the notification drawer (z-50). At z-50 the FAB sat
+             on top of the open flight menu at bottom-right, so tapping a
+             flight row there fired "Saqlash" instead of switching flights. */
+          className="fixed bottom-[72px] right-4 z-[44] flex items-center gap-2 h-12 pl-4 pr-5 rounded-full shadow-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors"
         >
           <Save className="size-5" />
           Saqlash

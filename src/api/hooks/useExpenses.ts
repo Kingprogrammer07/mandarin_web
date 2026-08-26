@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { expenseService, type ExpenseFilters } from '../services/expenseService';
+import { apiErrorMessage } from '@/utils/apiError';
 
 export const expenseKeys = {
   all: ['expenses'] as const,
@@ -131,8 +132,8 @@ export function useCreateExpense() {
       toast.success("Rasxod qo'shildi");
       queryClient.invalidateQueries({ queryKey: expenseKeys.all });
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.detail || "Rasxod qo'shishda xatolik");
+    onError: (err: unknown) => {
+      toast.error(apiErrorMessage(err, "Rasxod qo'shishda xatolik"));
     },
   });
 }
@@ -146,8 +147,8 @@ export function useUpdateExpense() {
       toast.success("Rasxod yangilandi");
       queryClient.invalidateQueries({ queryKey: expenseKeys.all });
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.detail || "Rasxod yangilashda xatolik");
+    onError: (err: unknown) => {
+      toast.error(apiErrorMessage(err, "Rasxod yangilashda xatolik"));
     },
   });
 }
@@ -167,8 +168,8 @@ export function useDeleteExpense() {
       toast.success("Rasxod o'chirildi");
       queryClient.invalidateQueries({ queryKey: expenseKeys.all });
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.detail || "Rasxod o'chirishda xatolik");
+    onError: (err: unknown) => {
+      toast.error(apiErrorMessage(err, "Rasxod o'chirishda xatolik"));
     },
   });
 }

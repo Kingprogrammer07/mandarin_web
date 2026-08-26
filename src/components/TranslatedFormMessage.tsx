@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useFormField } from '@/components/ui/form';
+import { useFormField } from '@/components/ui/form-context';
 
 export default function TranslatedFormMessage() {
   const { t } = useTranslation();

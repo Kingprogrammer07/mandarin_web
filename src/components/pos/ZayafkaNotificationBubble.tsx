@@ -121,7 +121,6 @@ export function ZayafkaNotificationBubble({ n, onClientClick, onRefresh }: Props
     if (!editMode) {
       setAmount(prefillAmount);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillAmount, n.id, editMode]);
 
   const handleReceiptClick = async () => {
