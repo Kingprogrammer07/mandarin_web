@@ -10,7 +10,8 @@ import { walletService } from '@/api/services/walletService';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { openNbuUrl } from '@/utils/nbuReturnContext';
+import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 
 interface CardsManagerModalProps {
     isOpen: boolean;
@@ -72,6 +73,13 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
         enabled: isOpen && nbuEnabled,
     });
 
+      /**
+       * A gateway session is already open in the in-app browser. The app is no
+       * longer replaced by the gateway, so this button stayed live while the user
+       * was at the bank — a second tap starts a second binding for the same card.
+       */
+      const paymentPending = useNbuSessionOpen('card_binding');
+
     const nbuBindMutation = useMutation({
         mutationFn: (nickname?: string) => nbuPaymentService.bindCard(nickname),
         onSuccess: (data) => {
@@ -80,7 +88,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                 toast.error(t('makePayment.errorOccurred', "Xatolik yuz berdi"));
                 return;
             }
-            redirectToNbuUrl({
+            openNbuUrl({
                 orderId: data.order_id,
                 kind: 'card_binding',
                 paymentUrl,
@@ -462,7 +470,7 @@ export function CardsManagerModal({ isOpen, onClose }: CardsManagerModalProps) {
                                                     </p>
                                                     <Button
                                                         variant="outline"
-                                                        disabled={nbuBindMutation.isPending}
+                                                        disabled={nbuBindMutation.isPending || paymentPending}
                                                         onClick={handleNbuBind}
                                                         className="w-full rounded-mc-lg border-2 border-dashed border-mc-brand/30 py-5 text-mc-brand dark:border-mc-brand/30 dark:text-mc-brand"
                                                     >

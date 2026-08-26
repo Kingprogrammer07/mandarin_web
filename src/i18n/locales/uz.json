@@ -1895,7 +1895,8 @@
       "homeButton": "Davom etish"
     },
     "reauth": {
-      "confirm": "To'lov amalga oshmadi. Ko'pincha kartani uzib qayta ulash yordam beradi. Hozir qayta ulaysizmi? Bekor qilsangiz, keyinroq to'lashingiz mumkin."
+      "confirm": "To'lov amalga oshmadi. Ko'pincha kartani uzib qayta ulash yordam beradi. Hozir qayta ulaysizmi? Bekor qilsangiz, keyinroq to'lashingiz mumkin.",
+      "alreadyOpen": "Avvalgi to‘lov oynasi hali ochiq. Avval uni yakunlang."
     },
     "payOnlineNbu": "Bank kartasi orqali to'lash",
     "error": {
@@ -1954,7 +1955,14 @@
       "body": "Yukingiz tezda yetkazib beriladi",
       "button": "Zayavka qoldirish"
     },
-    "payOnlineNbuHint": "Yangi karta bilan — bank sahifasiga o‘tasiz (sahifa ruscha)"
+    "payOnlineNbuHint": "Yangi karta bilan — bank sahifasiga o‘tasiz (sahifa ruscha)",
+    "returnToApp": "Bu oynani yopib, ilovaga qayting — to‘lov holati u yerda yangilanadi.",
+    "refunded": {
+      "body": "Summa kartangizga qaytarildi."
+    },
+    "expired": {
+      "body": "To‘lov oynasi yopilgan. Qaytadan boshlashingiz mumkin."
+    }
   },
   "maintenance": {
     "title": "Texnik ishlar olib borilmoqda",
@@ -2012,20 +2020,6 @@
       "notif": {
         "title": "Bildirishnomalar",
         "desc": "Yuk holati va to'lovlar haqidagi yangiliklarni shu yerdan kuzatib boring."
-      }
-    },
-    "profile": {
-      "hero": {
-        "title": "Profilingiz",
-        "desc": "Ismingiz va hisob balansingiz shu yerda. Balansni bosib hamyonni ochasiz."
-      },
-      "actions": {
-        "title": "Tez amallar",
-        "desc": "Hamyon, to'lov kartalari va pasport ma'lumotlarini shu yerdan boshqarasiz."
-      },
-      "personal": {
-        "title": "Shaxsiy ma'lumotlar",
-        "desc": "Maxfiy ma'lumotlarni ko'rsatish/yashirish va profilni tahrirlash shu bo'limda."
       }
     },
     "cardBinding": {
@@ -2167,5 +2161,19 @@
       "label": "Yuk kodi yoki tracking raqami",
       "placeholder": "Yuk kodi yoki tracking raqami"
     }
+  },
+  "nbuWatch": {
+    "waitTitle": "To‘lov tekshirilmoqda",
+    "waitHint": "Bank oynasida yakunlang",
+    "waitHintAmount": "{{amount}} so‘m · bankda ochildi",
+    "slowTitle": "To‘lov hali tasdiqlanmadi",
+    "slowHint": "Keyinroq tekshiring yoki qaytadan urinib ko‘ring",
+    "retry": "Tekshirish",
+    "dismiss": "Yopish",
+    "paidToast": "To‘lov qabul qilindi",
+    "boundToast": "Karta muvaffaqiyatli ulandi",
+    "failedToast": "To‘lov amalga oshmadi",
+    "refundedToast": "To‘lov qaytarildi",
+    "expiredToast": "To‘lov muddati tugadi"
   }
 }

@@ -51,7 +51,8 @@ import { nbuPaymentService, type SavedCardItem } from '@/api/services/nbuPayment
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
-import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { openNbuUrl } from '@/utils/nbuReturnContext';
+import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 import { OfficeVisitSummary } from '@/components/office/OfficeStatus';
 import { playApplePaySound } from '@/utils/audioUtils';
@@ -320,6 +321,17 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isNbuInitiating, setIsNbuInitiating] = useState(false);
+  /**
+   * A gateway session is open in the in-app browser.
+   *
+   * The gateway now opens ON TOP of the app rather than replacing it, so this
+   * modal is still here when the user comes back from the bank — with the pay
+   * button live. Tapping it again minted a SECOND full-amount session for the
+   * same flight: the backend only 409s once the local row reads `paid`, and its
+   * sweeper waits 60s, so the entire window between paying and settling was
+   * open. The surplus lands in the wallet rather than being refunded.
+   */
+  const paymentPending = useNbuSessionOpen('payment');
   // Tracks which card's charge is in flight (used to reset state cleanly); the
   // value itself isn't rendered — the drawer reflects status via the mutation.
   const [, setChargingCardId] = useState<number | null>(null);
@@ -756,7 +768,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setIsNbuInitiating(true);
     try {
       const response = await nbuPaymentService.init({ flight_name: selectedFlightName });
-      redirectToNbuUrl({
+      openNbuUrl({
         orderId: response.order_id,
         kind: 'payment',
         paymentUrl: response.payment_url,
@@ -1171,9 +1183,13 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setConfirmChargeCard(card)}
+                    // Locked for the same reason as the redirect button: a
+                    // saved-card charge while a gateway session is still open
+                    // is a second payment for the same flight.
+                    disabled={paymentPending}
                     className="shrink-0 whitespace-nowrap rounded-mc-sm bg-mc-brand px-3 py-2
                                text-[11px] font-bold text-mc-on-brand transition-transform
-                               active:scale-95"
+                               active:scale-95 disabled:opacity-50"
                   >
                     {t('nbu.cards.payWithCard')}
                   </motion.button>
@@ -1531,7 +1547,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             data-tour="pay-methods"
             whileTap={{ scale: 0.97 }}
             onClick={handleNbuPayment}
-            disabled={isNbuInitiating}
+            disabled={isNbuInitiating || paymentPending}
             className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-mc-on-brand shadow-lg shadow-sky-500/20
@@ -2127,7 +2143,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 <div className="space-y-2.5 pt-1">
                   <button
                     onClick={confirmCharge}
-                    disabled={nbuChargeMutation.isPending}
+                    disabled={nbuChargeMutation.isPending || paymentPending}
                     className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
                       bg-gradient-to-r from-mc-brand to-mc-brand-strong
                       text-mc-on-brand shadow-lg shadow-sky-500/25

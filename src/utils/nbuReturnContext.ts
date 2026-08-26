@@ -72,7 +72,99 @@ function safeSameOriginPath(path: string): URL | null {
   }
 }
 
-export function redirectToNbuUrl(input: SaveNbuReturnContextInput): void {
+/** How the gateway was reached, so the caller knows whether it still exists. */
+export type NbuOpenMode = 'external' | 'redirect';
+
+const PENDING_KEY = 'nbu_pending_external_orders';
+
+/**
+ * Orders opened in the in-app browser and not yet settled.
+ *
+ * A LIST, not one slot. A single slot meant a second payment overwrote the
+ * first: the first was then never polled and never announced, and if it had
+ * succeeded while the second expired the user was told "to'lov amalga oshmadi"
+ * for money that had in fact left their card.
+ */
+export interface PendingNbuOrder {
+  orderId: string;
+  kind: NbuReturnKind;
+  /** When the gateway was opened, for the client-side release below. */
+  openedAt: number;
+}
+
+/**
+ * How long a gateway session keeps a pay button locked.
+ *
+ * The lock exists to stop a second charge for the same thing while the first is
+ * unresolved — but a user who opens the gateway and closes it WITHOUT paying
+ * leaves the row PENDING, and the backend only auto-expires it after 3600s
+ * (nbu_reconciler.py AUTO_EXPIRE_SECONDS). Holding every pay button for an hour
+ * because someone changed their mind is worse than the risk it guards. Fifteen
+ * minutes is far longer than a real card payment and far shorter than that.
+ */
+const PENDING_TTL_MS = 15 * 60 * 1000;
+
+function readPending(): PendingNbuOrder[] {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry): PendingNbuOrder[] => {
+      if (typeof entry !== 'object' || entry === null) return [];
+      const { orderId, kind, openedAt } = entry as Partial<PendingNbuOrder>;
+      if (typeof orderId !== 'string' || !orderId) return [];
+      if (kind !== 'payment' && kind !== 'card_binding') return [];
+      return [{ orderId, kind, openedAt: typeof openedAt === 'number' ? openedAt : 0 }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writePending(orders: PendingNbuOrder[]): void {
+  try {
+    if (orders.length === 0) localStorage.removeItem(PENDING_KEY);
+    else localStorage.setItem(PENDING_KEY, JSON.stringify(orders));
+  } catch {
+    // Best effort; the watcher degrades to "nothing pending".
+  }
+  for (const listener of pendingListeners) listener();
+}
+
+const pendingListeners = new Set<() => void>();
+
+/** Lets a pay button disable itself while a gateway session is open. */
+export function subscribePendingNbuOrders(listener: () => void): () => void {
+  pendingListeners.add(listener);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === PENDING_KEY) listener();
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    pendingListeners.delete(listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+/**
+ * Send the user to the NBU gateway.
+ *
+ * Inside the Mini App this opens Telegram's in-app browser ON TOP of the app
+ * (`WebApp.openLink`) instead of replacing it. Replacing it was the whole
+ * problem: once the webview navigated to nbu.uz our code was gone, nothing was
+ * left to show a back control, and a user who changed their mind had to kill
+ * the app and reopen it.
+ *
+ * `target="_blank"` is not the alternative — a Mini App webview has no tabs and
+ * ignores it. `openLink` is the platform's own answer.
+ *
+ * The outcome no longer depends on NBU redirecting back to us: NbuPaymentWatch
+ * polls `payment-status-public/{orderId}`, which reconciles against NBU when the
+ * row is still pending. Outside the Mini App (an ordinary browser, the admin
+ * console) nothing changes — a plain same-tab redirect, where Back already works.
+ */
+export function openNbuUrl(input: SaveNbuReturnContextInput): NbuOpenMode {
   safeWrite({
     orderId: input.orderId,
     kind: input.kind,
@@ -82,7 +174,72 @@ export function redirectToNbuUrl(input: SaveNbuReturnContextInput): void {
     createdAt: Date.now(),
   });
 
+  const webApp = window.Telegram?.WebApp;
+  // Three separate things, all required:
+  //  - `initData` is the only reliable "really inside Telegram" signal; the
+  //    object itself exists on any page that loaded telegram-web-app.js.
+  //  - the method exists.
+  //  - the CLIENT supports it. telegram-web-app.js has defined `openLink` since
+  //    long before older clients could honour it, so presence proves nothing —
+  //    on one of those the call is a silent no-op and the user taps Pay and
+  //    watches nothing happen. `web_app_open_link` is Bot API 6.1.
+  const supportsOpenLink =
+    Boolean(webApp?.initData) &&
+    typeof webApp?.openLink === 'function' &&
+    webApp.isVersionAtLeast?.('6.1') !== false;
+
+  if (supportsOpenLink) {
+    const pending = readPending();
+    if (!pending.some((entry) => entry.orderId === input.orderId)) {
+      writePending([
+        ...pending,
+        { orderId: input.orderId, kind: input.kind, openedAt: Date.now() },
+      ]);
+    }
+    webApp.openLink(input.paymentUrl, { try_instant_view: false });
+    return 'external';
+  }
+
   window.location.assign(input.paymentUrl);
+  return 'redirect';
+}
+
+/**
+ * Orders still awaiting an outcome, newest last.
+ *
+ * Self-pruning: an order whose 24h return context has expired is dropped, so a
+ * gateway session the user abandoned days ago cannot keep a pay button locked
+ * or a status strip on screen forever.
+ */
+/**
+ * Orders still awaiting an outcome, oldest first.
+ *
+ * PURE — it prunes nothing. It is read from React render (via
+ * `usePendingNbuOrders`), and a getter that wrote to storage would notify its
+ * own subscribers mid-render. {@link prunePendingExternalOrders} does the
+ * writing, from an effect.
+ */
+export function getPendingExternalOrders(): PendingNbuOrder[] {
+  const now = Date.now();
+  return readPending().filter((entry) => {
+    if (now - entry.openedAt > PENDING_TTL_MS) return false;
+    return safeRead(`${KEY_PREFIX}${entry.orderId}`)?.orderId === entry.orderId;
+  });
+}
+
+/** Drop entries the getter above already ignores. Call from an effect. */
+export function prunePendingExternalOrders(): void {
+  const stored = readPending();
+  const alive = getPendingExternalOrders();
+  if (alive.length !== stored.length) writePending(alive);
+}
+
+export function removePendingExternalOrder(orderId: string): void {
+  writePending(readPending().filter((entry) => entry.orderId !== orderId));
+}
+
+export function clearPendingExternalOrders(): void {
+  writePending([]);
 }
 
 /**

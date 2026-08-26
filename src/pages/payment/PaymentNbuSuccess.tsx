@@ -31,7 +31,15 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
-type Phase = 'pending' | 'timeout' | 'success' | 'card_bound' | 'failure' | 'no_data';
+type Phase =
+  | 'pending'
+  | 'timeout'
+  | 'success'
+  | 'card_bound'
+  | 'failure'
+  | 'refunded'
+  | 'expired'
+  | 'no_data';
 
 function phaseFromStatus(s: PublicNbuPaymentStatus | null): Phase {
   if (!s) return 'pending';
@@ -39,6 +47,10 @@ function phaseFromStatus(s: PublicNbuPaymentStatus | null): Phase {
   if (s.status === 'SUCCESS') {
     return s.purpose === 'CARD_BINDING' ? 'card_bound' : 'success';
   }
+  // Terminal, but neither is a failed payment: REFUNDED means the money came
+  // back, and telling that user to "try again" invites a second charge.
+  if (s.status === 'REFUNDED') return 'refunded';
+  if (s.status === 'EXPIRED') return 'expired';
   return 'failure';
 }
 
@@ -141,17 +153,28 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
   }, [orderId, pollKey]);
 
   const hasStoredSession = useCallback(
-    () =>
-      Boolean(
-        localStorage.getItem('access_token') ||
-        sessionStorage.getItem('access_token'),
-      ),
+    // sessionStorage ONLY. Client tokens live there; localStorage holds the
+    // ADMIN token, so accepting it made a staff member on the client surface
+    // look attached inside the in-app browser — and hand them the trap CTAs.
+    () => Boolean(sessionStorage.getItem('access_token')),
     [],
   );
 
   // Auto-navigate home only when the redirect tab still has an app session.
   // External bank/browser returns often lose sessionStorage, and forcing
   // user-home from there resolves to /auth/login.
+  /**
+   * This page is running somewhere the app's session does not exist.
+   *
+   * That is what Telegram's in-app browser looks like: the gateway redirect
+   * lands here, but `sessionStorage` is a fresh context, so every in-app route
+   * this page offers is a trap — `/user/...` fails the Telegram guard and shows
+   * an error screen, and `/` is replaced with the marketing site. The Mini App
+   * is still alive behind this window and its watcher settles the payment, so
+   * the only useful instruction is "go back to it".
+   */
+  const isDetachedWindow = !hasStoredSession();
+
   useEffect(() => {
     if (phase !== 'success' && phase !== 'card_bound') return;
     if (!hasStoredSession()) return;
@@ -242,6 +265,8 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               </p>
               <button
                 onClick={handleLeaveDelivery}
+                disabled={isDetachedWindow}
+                hidden={isDetachedWindow}
                 className="w-full h-12 rounded-mc-md font-extrabold text-sm
                   bg-gradient-to-r from-mc-brand to-mc-brand-strong
                   text-white shadow-lg shadow-amber-500/25
@@ -296,6 +321,33 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
           </>
         )}
 
+        {(phase === 'refunded' || phase === 'expired') && (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+              className="w-20 h-20 rounded-full bg-mc-surface-2 flex items-center justify-center mx-auto"
+            >
+              <XCircle className="w-10 h-10 text-mc-text-3" />
+            </motion.div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-extrabold text-mc-text">
+                {phase === 'refunded'
+                  ? t('nbuWatch.refundedToast', "To‘lov qaytarildi")
+                  : t('nbuWatch.expiredToast', "To‘lov muddati tugadi")}
+              </h1>
+              {/* No "try again" here on purpose: a refunded order re-paid is a
+                  second charge for something the client already got back. */}
+              <p className="text-sm text-mc-text-2">
+                {phase === 'refunded'
+                  ? t('nbu.refunded.body', 'Summa kartangizga qaytarildi.')
+                  : t('nbu.expired.body', "To‘lov oynasi yopilgan. Qaytadan boshlashingiz mumkin.")}
+              </p>
+            </div>
+          </>
+        )}
+
         {phase === 'failure' && (
           <>
             <motion.div
@@ -335,20 +387,31 @@ export default function PaymentNbuSuccess({ onNavigateHome }: PaymentNbuSuccessP
               <RefreshCw className="w-5 h-5" />
               {t('nbu.timeout.retryButton')}
             </button>
-            <button
-              onClick={handleHome}
-              className="w-full h-14 rounded-mc-lg font-bold text-base
-                bg-mc-surface
-                border border-mc-border
-                text-mc-text
-                active:scale-[0.97] transition-all"
-            >
-              {t('nbu.timeout.homeButton')}
-            </button>
+            {!isDetachedWindow && (
+              <button
+                onClick={handleHome}
+                className="w-full h-14 rounded-mc-lg font-bold text-base
+                  bg-mc-surface
+                  border border-mc-border
+                  text-mc-text
+                  active:scale-[0.97] transition-all"
+              >
+                {t('nbu.timeout.homeButton')}
+              </button>
+            )}
           </div>
         )}
 
-        {phase !== 'pending' && phase !== 'timeout' && (
+        {phase !== 'pending' && isDetachedWindow && (
+          <p className="rounded-mc-lg border border-mc-border bg-mc-surface px-4 py-3 text-center text-[13px] font-semibold text-mc-text-2">
+            {t(
+              'nbu.returnToApp',
+              'Bu oynani yopib, ilovaga qayting — to‘lov holati u yerda yangilanadi.',
+            )}
+          </p>
+        )}
+
+        {phase !== 'pending' && phase !== 'timeout' && !isDetachedWindow && (
           <button
             onClick={handleHome}
             className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]

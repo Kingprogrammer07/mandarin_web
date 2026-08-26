@@ -1,6 +1,8 @@
+import { toast } from 'sonner';
+
 import i18n from '@/i18n/config';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
-import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { getPendingExternalOrders, openNbuUrl } from '@/utils/nbuReturnContext';
 
 /**
  * Backend signal (HTTP 409) raised when a saved-card charge failed with an NBU
@@ -85,6 +87,19 @@ export async function promptCardReauth(error: unknown): Promise<void> {
   );
   if (!proceed) return; // user chose "pay later"
 
+  // The one gateway entry point that is not a component and so cannot use the
+  // usePendingNbuOrders lock. Guarded directly: the gateway now opens on top of
+  // the app rather than replacing it, so a session may already be open, and a
+  // second one would leave the first unwatched behind this one.
+  if (getPendingExternalOrders().length > 0) {
+    toast.info(
+      i18n.t('nbu.reauth.alreadyOpen', {
+        defaultValue: "Avvalgi to'lov oynasi hali ochiq. Avval uni yakunlang.",
+      }),
+    );
+    return;
+  }
+
   try {
     // Best-effort — remove the dead card so it can't be picked again. Even if
     // this hiccups we still proceed to bind a fresh token.
@@ -95,7 +110,7 @@ export async function promptCardReauth(error: unknown): Promise<void> {
 
   const bind = await nbuPaymentService.bindCard();
   if (bind.payment_url) {
-    redirectToNbuUrl({
+    openNbuUrl({
       orderId: bind.order_id,
       kind: 'card_binding',
       paymentUrl: bind.payment_url,

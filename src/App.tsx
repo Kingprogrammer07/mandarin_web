@@ -22,6 +22,7 @@ import { useMaintenanceStore } from "./store/useMaintenanceStore";
 import { isPosPath } from "@/lib/posRoutes";
 import { setRouterDepth } from "@/lib/backStack";
 import { TelegramBackBridge } from "@/components/TelegramBackBridge";
+import { NbuPaymentWatch } from "@/components/payment/NbuPaymentWatch";
 
 // Both of these pull `framer-motion` (122 kB raw / 40 kB gzip). Imported
 // statically they sat in the entry chunk, so every client — who never renders
@@ -951,6 +952,10 @@ function AppContent() {
           arm the bridge on pages that are neither (a mis-resolved route, the
           auth check), where there is no Telegram host to talk to. */}
       <TelegramBackBridge enabled={isClientSurface} />
+
+      {/* Resolves a payment opened in Telegram's in-app browser. Renders
+          nothing until one is pending. */}
+      {isClientSurface && <NbuPaymentWatch />}
 
       {/* One-time admin responsibility agreement (self-gates; shows once after login). */}
       <Suspense fallback={null}>

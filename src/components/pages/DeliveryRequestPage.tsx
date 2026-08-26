@@ -52,7 +52,8 @@ import {
   nbuPaymentService,
   type SavedCardItem,
 } from '@/api/services/nbuPaymentService';
-import { redirectToNbuUrl } from '@/utils/nbuReturnContext';
+import { openNbuUrl } from '@/utils/nbuReturnContext';
+import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 
 const UzpostBranchPicker = lazy(() =>
@@ -686,6 +687,8 @@ interface StepUzpostProps {
   profileName: string;
   recipientName: string | null;
   onRecipientNameChange: (value: string | null) => void;
+  /** A gateway session is open in the in-app browser — pay controls are locked. */
+  paymentLocked: boolean;
   nbuEnabled: boolean;
   savedCards: SavedCardItem[];
   onPayOnline: (walletUsed: number, phoneNumber: string) => void;
@@ -711,6 +714,7 @@ function StepUzpostPayment({
   profileName,
   recipientName,
   onRecipientNameChange,
+  paymentLocked,
   nbuEnabled,
   savedCards,
   onPayOnline,
@@ -1393,13 +1397,15 @@ function StepUzpostPayment({
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
-                submitting || !selectedBranch || !calcData
+                submitting || paymentLocked || !selectedBranch || !calcData
                   ? 'bg-mc-surface-2 text-mc-text-2 cursor-not-allowed'
                   : 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
               }
             `}
           >
-            {submitting ? (
+            {paymentLocked ? (
+              t('nbuWatch.waitTitle', "To‘lov tekshirilmoqda")
+            ) : submitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
@@ -1599,6 +1605,16 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
   const [calcData, setCalcData] = useState<CalculateUzpostResponse | null>(null);
   const [calcLoading, setCalcLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * A gateway session is open in the in-app browser.
+   *
+   * The app is no longer replaced by the gateway, so every pay control here
+   * stays live while the user is at the bank. Without this lock they could
+   * return, tap Pay again, and mint a second full-amount session — the backend
+   * only rejects a duplicate once the local row reads `paid`, and its sweeper
+   * waits 60s, so the whole window between paying and settling was open.
+   */
+  const paymentPending = useNbuSessionOpen('payment');
 
   // Recalculate UzPost price when branch is selected (step 3)
   useEffect(() => {
@@ -1876,7 +1892,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         });
         saveUzpostBranchPreference(selectedUzpostBranch);
         if (res.payment_url) {
-          redirectToNbuUrl({
+          const mode = openNbuUrl({
             orderId: res.order_id,
             kind: 'payment',
             paymentUrl: res.payment_url,
@@ -1884,6 +1900,12 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
             // After a zayafka payment, land on the delivery-history tab.
             homePath: '/user/home?tab=delivery_history',
           });
+          // The gateway now opens ON TOP of the app instead of replacing it, so
+          // this wizard stays mounted — and `submitting` stayed true forever,
+          // leaving the pay button a dead spinner. Release it; re-submission is
+          // blocked by `paymentPending` instead, which clears only when the
+          // payment actually settles.
+          if (mode === 'external') setSubmitting(false);
         } else {
           toast.error("To'lov havolasi olinmadi. Qayta urinib ko'ring.");
           setSubmitting(false);
@@ -2067,6 +2089,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           loading={calcLoading}
           selectedFlights={selectedFlights}
           submitting={submitting}
+          paymentLocked={paymentPending}
           branches={uzpostBranchesQuery.data ?? []}
           branchesLoading={uzpostBranchesQuery.isLoading}
           branchesError={uzpostBranchesQuery.isError}
