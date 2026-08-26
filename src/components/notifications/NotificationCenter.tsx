@@ -487,8 +487,13 @@ export default function NotificationCenter() {
                 queryClient.invalidateQueries({ queryKey: ['webFlights'] });
             }
             // Navigate to reports page
-            window.history.pushState({ page: 'user-reports' }, '', '/user/reports');
-            window.dispatchEvent(new PopStateEvent('popstate'));
+            // Goes through the router so the push is COUNTED. The old
+            // pushState + synthetic popstate pair navigated correctly but left
+            // the router's depth at zero, so back from the reports page closed
+            // the Mini App instead of returning here.
+            window.dispatchEvent(
+              new CustomEvent('app:navigate', { detail: { page: 'user-reports' } }),
+            );
         } else {
             // 2. API Notification -> Open detail dialog
             // selectedNotification state persists after drawer closes,
@@ -754,7 +759,8 @@ export default function NotificationCenter() {
                                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                                 role="dialog"
                                 aria-modal="true"
-                                className="fixed bottom-0 left-0 right-0 z-[9999] flex max-h-[85dvh] flex-col overflow-hidden rounded-t-mc-xl border-t border-mc-border bg-mc-surface shadow-[0_-16px_44px_rgba(0,0,0,0.16)]"
+                                // min-h so that a sheet with one row still rises past the middle of the screen. Height was content-driven, so a single flight left the panel clinging to the bottom edge — it read as a toast, not as a sheet, and the grab handle sat within a thumb's width of the home indicator.
+                                className="fixed bottom-0 left-0 right-0 z-[9999] flex max-h-[85dvh] min-h-[58dvh] flex-col overflow-hidden rounded-t-mc-xl border-t border-mc-border bg-mc-surface shadow-[0_-16px_44px_rgba(0,0,0,0.16)]"
                             >
                                 <div className="mx-auto mt-3 mb-1 h-1.5 w-12 shrink-0 rounded-full bg-mc-border" />
                                 {renderContent()}

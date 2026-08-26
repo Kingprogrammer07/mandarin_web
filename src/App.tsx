@@ -1,10 +1,9 @@
 import "./i18n/config";
 
-import { useState, useEffect, useCallback, useRef, lazy, Suspense, useTransition } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense, useTransition } from "react";
 import { useTranslation } from "react-i18next";
 
 import NavigationBar from "./components/NavigationBar";
-import AdminLayout from "./components/admin/AdminLayout";
 import TelegramWebAppGuard from "./components/TelegramWebAppGuard";
 import { BottomNav, type BottomNavPage } from "./components/user/BottomNav";
 import { Toaster } from "sonner";
@@ -15,18 +14,26 @@ import { TopProgressBar } from "./components/ui/TopProgressBar";
 import StatusAnimation from "./components/StatusAnimation";
 import { Skeleton } from "./components/ui/skeleton";
 import MaintenancePage from "./components/MaintenancePage";
-import MaintenanceOverlay from "./components/system/MaintenanceOverlay";
 import { useHealthCheck } from "./hooks/useHealthCheck";
 import { useVersionWatcher } from "./hooks/useVersionWatcher";
 import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
 import { isPosPath } from "@/lib/posRoutes";
+import { setRouterDepth } from "@/lib/backStack";
+import { TelegramBackBridge } from "@/components/TelegramBackBridge";
 
+// Both of these pull `framer-motion` (122 kB raw / 40 kB gzip). Imported
+// statically they sat in the entry chunk, so every client — who never renders
+// an admin shell and rarely sees a maintenance screen — downloaded the whole
+// animation library on first paint.
+const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
+const MaintenanceOverlay = lazy(() => import("./components/system/MaintenanceOverlay"));
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
 const LoginForm = lazy(() => import("./components/LoginForm"));
 const AdminLoginForm = lazy(() => import("./components/AdminLoginForm"));
 const AdminAgreementModal = lazy(() => import("./components/admin/AdminAgreementModal"));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const AdminAccountsPage = lazy(() => import("./pages/admin/AdminAccountsPage"));
 const AdminRolesPage = lazy(() => import("./pages/admin/AdminRolesPage"));
 const AdminProfilePage = lazy(() => import("./pages/admin/AdminProfilePage"));
@@ -34,7 +41,9 @@ const AdminAuditLogsPage = lazy(() => import("./pages/admin/AdminAuditLogsPage")
 const AdminCarouselPage = lazy(() => import("./pages/admin/AdminCarouselPage"));
 const FlightScheduleAdminPage = lazy(() => import("./pages/admin/FlightScheduleAdminPage"));
 const POSDashboard = lazy(() => import("./pages/pos/POSDashboard"));
-const Pos2Page = lazy(() => import("./pages/pos2/Pos2Page"));
+// Temporary route while the cashier console is rebuilt. `/pos` keeps
+// running the old screen until this one is finished.
+const CashierPage = lazy(() => import("./pages/pos/CashierPage"));
 const ImportPage = lazy(() => import("./pages/shared/ImportPage"));
 const ClientForm = lazy(() => import("./pages/shared/ClientForm"));
 const FlightsPage = lazy(() => import("./pages/worker/FlightsPage"));
@@ -77,13 +86,14 @@ type Page =
   | "user-reports"
   | "user-history"
   | "user-referral"
+  | "admin-dashboard"
   | "admin-accounts"
   | "admin-roles"
   | "admin-audit"
   | "admin-profile"
   | "admin-carousel"
   | "pos-dashboard"
-  | "pos2-grid"
+  | "kassa"
   | "manager-page"
   | "passkey-page"
   | "warehouse-page"
@@ -119,17 +129,18 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
     default: "pos-dashboard",
     allowed: [
       "pos-dashboard",
+      "kassa",
       // The trial spreadsheet console. Reachable but not the default: the
       // cashier's day still starts on the screen that can take money.
-      "pos2-grid",
       "admin-profile",
       "passkey-page",
       "admin-expenses",
     ],
   },
   admin: {
-    default: "admin-accounts",
+    default: "admin-dashboard",
     allowed: [
+      "admin-dashboard",
       "import",
       "client-add",
       "client-edit",
@@ -148,7 +159,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-profile",
       "admin-carousel",
       "pos-dashboard",
-      "pos2-grid",
+      "kassa",
       "warehouse-page",
       "expected-cargo",
       "passkey-page",
@@ -163,8 +174,12 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
     ],
   },
   "super-admin": {
-    default: "admin-accounts",
+    // The super-admin role is created by scripts/seed_super_admin.py with no
+    // `home_page`, so the JWT claim is null and this static default is what
+    // actually decides where a login lands.
+    default: "admin-dashboard",
     allowed: [
+      "admin-dashboard",
       "import",
       "client-add",
       "client-edit",
@@ -183,7 +198,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-profile",
       "admin-carousel",
       "pos-dashboard",
-      "pos2-grid",
+      "kassa",
       "warehouse-page",
       "expected-cargo",
       "manager-page",
@@ -304,6 +319,7 @@ function getPathForPage(
   if (page === "user-home") return "/user/home";
   if (page === "user-reports") return "/user/reports";
   if (page === "user-history") return "/user/history";
+  if (page === "admin-dashboard") return "/admin/dashboard";
   if (page === "admin-accounts") return "/admin/accounts";
   if (page === "admin-roles") return "/admin/roles";
   if (page === "admin-audit") return "/admin/audit";
@@ -313,7 +329,7 @@ function getPathForPage(
   if (page === "passkey-page") return "/admin/passkey";
   if (page === "warehouse-page") return "/admin/warehouse";
   if (page === "pos-dashboard") return "/pos";
-  if (page === "pos2-grid") return "/pos2";
+  if (page === "kassa") return "/kassa";
   if (page === "expected-cargo") return "/admin/expected-cargo";
   if (page === "flight-schedule-admin") return "/admin/flight-schedule";
   if (page === "admin-delivery-request") return "/admin/delivery-request";
@@ -363,6 +379,12 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/user/reports") return { page: "user-reports" };
   if (path === "/user/history") return { page: "user-history" };
   if (path === "/user/referral") return { page: "user-referral" };
+  // The super-admin role in production carries `home_page: "/admin"`, a path
+  // nothing here matched — it fell through to `login`, was rejected as a guest
+  // page, and only landed correctly because ROLE_CONFIG has the same default.
+  // Mapping it makes the JWT claim mean what it says.
+  if (path === "/admin" || path === "/admin/dashboard")
+    return { page: "admin-dashboard" };
   if (path === "/admin/accounts") return { page: "admin-accounts" };
   if (path === "/admin/roles") return { page: "admin-roles" };
   if (path === "/admin/audit") return { page: "admin-audit" };
@@ -374,7 +396,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/admin/expected-cargo") return { page: "expected-cargo" };
   if (path === "/admin/flight-schedule") return { page: "flight-schedule-admin" };
   if (path === "/pos") return { page: "pos-dashboard" };
-  if (path === "/pos2") return { page: "pos2-grid" };
+  if (path === "/kassa") return { page: "kassa" };
   if (path === "/admin/expenses") return { page: "admin-expenses" };
   if (path === "/pickup-tv") return { page: "pickup-tv" };
   if (path === "/payment/nbu/success") return { page: "payment_nbu_success" };
@@ -441,19 +463,20 @@ function AppContent() {
       const currentParams = window.location.search;
       const url = currentParams ? `${path}${currentParams}` : path;
 
+      // How deep this entry sits on top of the entry route, carried IN the
+      // history entry rather than in a counter. A counter has to guess on
+      // popstate — it can only decrement — so browser-forward, or any pushState
+      // made outside this function, silently desynchronised it from reality.
+      // The browser restores this value for us on every pop and every forward.
+      const currentDepth = (window.history.state as { depth?: number } | null)?.depth ?? 0;
+      const depth = method === "push" ? currentDepth + 1 : currentDepth;
+
       if (method === "push") {
-        window.history.pushState(
-          { page, flightName, clientId },
-          "",
-          url,
-        );
+        window.history.pushState({ page, flightName, clientId, depth }, "", url);
       } else {
-        window.history.replaceState(
-          { page, flightName, clientId },
-          "",
-          url,
-        );
+        window.history.replaceState({ page, flightName, clientId, depth }, "", url);
       }
+      setRouterDepth(depth);
 
       // startTransition keeps the current page visible while the lazy chunk loads,
       // eliminating the blank-screen flash between route changes.
@@ -630,15 +653,20 @@ function AppContent() {
 
   // ── Browser back / forward ───────────────────────────────────────────────
 
-  // How many pushes this session has made on top of the entry route. A page
-  // opened from inside the app can hand the user back where they came from;
-  // one opened by deep link has nothing behind it but the Telegram host, so
-  // `history.back()` there would close the Mini App instead of navigating.
-  const pushDepthRef = useRef(0);
+  // How many pushes sit on top of the entry route, read from the history entry
+  // itself (written by applyRoute). A page opened from inside the app can hand
+  // the user back where they came from; one opened by deep link has nothing
+  // behind it but the Telegram host, so `history.back()` there would close the
+  // Mini App instead of navigating.
+  const routerDepth = (): number =>
+    (window.history.state as { depth?: number } | null)?.depth ?? 0;
 
   useEffect(() => {
     const handlePopState = () => {
-      pushDepthRef.current = Math.max(0, pushDepthRef.current - 1);
+      // Read, do not decrement: the browser has already restored the entry (and
+      // its depth) that we are landing on. No haptic here either — popstate is
+      // the RESULT of a back, and runBack() already buzzed at the press.
+      setRouterDepth(routerDepth());
       applyRoute(
         resolvePageFromPath(window.location.pathname),
         userRole,
@@ -657,11 +685,35 @@ function AppContent() {
       flightName?: string,
       clientId?: number,
     ) => {
-      pushDepthRef.current += 1;
       applyRoute({ page, flightName, clientId }, userRole, "push");
     },
     [userRole, applyRoute],
   );
+
+  /**
+   * Navigation requested from a component too deep to hold a router callback.
+   *
+   * NotificationCenter used to do this with a raw `history.pushState` followed
+   * by a synthetic `popstate`. That reached the right page, but the pushState
+   * never incremented `pushDepthRef` while the synthetic pop decremented it —
+   * so the app believed it had nothing behind it, and a real back press on the
+   * page it had just opened closed the Mini App instead of returning.
+   *
+   * Same `window` CustomEvent convention as `auth:logout` / `auth:role-switched`.
+   */
+  useEffect(() => {
+    const handleNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<{ page?: unknown }>).detail;
+      // Validated, not cast: any script on the page can dispatch this event,
+      // and an unknown page would route the user to a blank screen.
+      const page = detail?.page;
+      if (typeof page === "string" && USER_PAGES.includes(page as Page)) {
+        navigateToPage(page as Page);
+      }
+    };
+    window.addEventListener("app:navigate", handleNavigate);
+    return () => window.removeEventListener("app:navigate", handleNavigate);
+  }, [navigateToPage]);
 
   /**
    * Back that returns to wherever the user actually came from, falling back to
@@ -669,7 +721,7 @@ function AppContent() {
    */
   const navigateBack = useCallback(
     (fallback: Page) => {
-      if (pushDepthRef.current > 0) {
+      if (routerDepth() > 0) {
         window.history.back();
         return;
       }
@@ -758,6 +810,10 @@ function AppContent() {
   const isAdminLoginPage = currentPage === "admin-login";
 
   const isSuperAdminPages = [
+    "admin-dashboard",
+    // The Reyslar board moved into the admin shell. Worker roles still reach it
+    // without a sidebar — see the `isStandaloneAdminSubpage` branch below.
+    "flights",
     "admin-accounts",
     "admin-roles",
     "admin-audit",
@@ -785,7 +841,10 @@ function AppContent() {
   // Both cashier consoles. They share the standalone layout (no AdminLayout, no
   // NavigationBar) and the maintenance exemption — a spreadsheet buried under a
   // "Texnik ishlar" screen is as useless as a till buried under one.
-  const isPOSPage = currentPage === "pos-dashboard" || currentPage === "pos2-grid";
+  // Both cashier consoles. `/kassa` is rendered by its own branch above, so
+  // this flag only grants it what the name implies: the maintenance-takeover
+  // exemption a till needs in the middle of taking money.
+  const isPOSPage = currentPage === "pos-dashboard" || currentPage === "kassa";
   const isManagerPage = currentPage === "manager-page";
   const isPasskeyPage = currentPage === "passkey-page";
   const isWarehousePage = currentPage === "warehouse-page";
@@ -845,7 +904,11 @@ function AppContent() {
     return (
       <>
         {isMaintenanceMode && !isServerDownMaintenanceExemptPage && <MaintenancePage />}
-        <MaintenanceOverlay />
+        {/* `MaintenancePage` above already fills the screen while the overlay
+            chunk loads, so a null fallback shows nothing missing. */}
+        <Suspense fallback={null}>
+          <MaintenanceOverlay />
+        </Suspense>
         <Toaster position="top-center" richColors />
       </>
     );
@@ -883,6 +946,12 @@ function AppContent() {
             : "bg-[#f8fafc] dark:bg-[#06080d]"
       }`}
     >
+      {/* Routes Telegram's back button into the app's back stack.
+          Gated POSITIVELY on the client surface: `!isAdminArea` would also
+          arm the bridge on pages that are neither (a mis-resolved route, the
+          auth check), where there is no Telegram host to talk to. */}
+      <TelegramBackBridge enabled={isClientSurface} />
+
       {/* One-time admin responsibility agreement (self-gates; shows once after login). */}
       <Suspense fallback={null}>
         <AdminAgreementModal currentPage={currentPage} userRole={userRole} />
@@ -930,9 +999,19 @@ function AppContent() {
       {isSuperAdminPages && canAccessAdminPanel ? (
         <AdminLayout
           currentPage={currentPage}
-          onNavigate={(page) => navigateToPage(page as Page)}
+          onNavigate={(page, flightName) => navigateToPage(page as Page, flightName)}
           onLogout={handleLogout}
         >
+          {currentPage === "admin-dashboard" && (
+            <AdminDashboardPage onNavigate={(page) => navigateToPage(page as Page)} />
+          )}
+          {currentPage === "flights" && (
+            <FlightsPage
+              embedded
+              onSelectFlight={(flightName) => navigateToPage("cargo-list", flightName)}
+              onNavigate={(page) => navigateToPage(page as Page)}
+            />
+          )}
           {currentPage === "admin-accounts" && <AdminAccountsPage />}
           {currentPage === "admin-roles" && <AdminRolesPage />}
           {currentPage === "admin-audit" && <AdminAuditLogsPage />}
@@ -943,8 +1022,11 @@ function AppContent() {
           {currentPage === "admin-expenses" && <ExpensesPage />}
           {currentPage === "system-settings" && <SystemSettingsPage />}
         </AdminLayout>
-      ) : currentPage === "pos2-grid" ? (
-        <Pos2Page onNavigate={(page) => navigateToPage(page as Page)} />
+      ) : currentPage === "kassa" ? (
+        <CashierPage
+          onNavigate={(page) => navigateToPage(page as Page)}
+          onLogout={handleLogout}
+        />
       ) : isPOSPage ? (
         <POSDashboard
           onNavigate={(page) => navigateToPage(page as Page)}
@@ -974,6 +1056,13 @@ function AppContent() {
           )}
           {currentPage === "admin-expenses" && (
             <ExpensesPage />
+          )}
+          {currentPage === "flights" && (
+            <FlightsPage
+              onSelectFlight={(flightName) => navigateToPage("cargo-list", flightName)}
+              onLogout={handleLogout}
+              onNavigate={(page) => navigateToPage(page as Page)}
+            />
           )}
         </>
       ) : isManagerPage && canAccessManagerPage ? (
@@ -1044,16 +1133,6 @@ function AppContent() {
             <ClientForm
               mode="edit"
               clientId={resolvePageFromPath(window.location.pathname).clientId}
-            />
-          )}
-
-          {currentPage === "flights" && (
-            <FlightsPage
-              onSelectFlight={(flightName) =>
-                navigateToPage("cargo-list", flightName)
-              }
-              onLogout={handleLogout}
-              onNavigate={(page) => navigateToPage(page as Page)}
             />
           )}
 

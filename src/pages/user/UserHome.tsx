@@ -1,4 +1,6 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
+import { useBackHandler } from '@/hooks/useBackHandler';
+import { BackPriority } from '@/lib/backStack';
 import { HomeScreen } from './HomeScreen';
 import type { CarouselItemData } from './dashboard-components/types';
 
@@ -67,6 +69,49 @@ export default function UserHome({
   const [fullView, setFullView] = useState<FullView>(null);
   const [mediaItem, setMediaItem] = useState<CarouselItemData | null>(null);
   const [trackCode, setTrackCode] = useState('');
+
+  /**
+   * Back-button wiring.
+   *
+   * None of these layers is in `window.history` — `fullView` replaces the whole
+   * screen from local state and the modals are plain booleans — so without this
+   * the system back button would skip straight past them to the router, or, at
+   * the root, close the Mini App.
+   *
+   * Priorities, not registration order, decide who wins: an overlay opened on
+   * top of a full view must be dismissed first even though the view registered
+   * later.
+   */
+  useBackHandler(fullView !== null, () => {
+    setFullView(null);
+    return true;
+  }, BackPriority.VIEW);
+
+  useBackHandler(mediaItem !== null, () => {
+    setMediaItem(null);
+    return true;
+  }, BackPriority.OVERLAY);
+
+  useBackHandler(isChinaOpen, () => {
+    setIsChinaOpen(false);
+    return true;
+  });
+  useBackHandler(isPaymentOpen, () => {
+    setIsPaymentOpen(false);
+    return true;
+  });
+  useBackHandler(isCalculatorOpen, () => {
+    setIsCalculatorOpen(false);
+    return true;
+  });
+  useBackHandler(isAddressOpen, () => {
+    setIsAddressOpen(false);
+    return true;
+  });
+  useBackHandler(isProhibitedOpen, () => {
+    setIsProhibitedOpen(false);
+    return true;
+  });
 
   const navigate = useCallback(
     (page: string) => {
