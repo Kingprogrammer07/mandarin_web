@@ -21,8 +21,13 @@
  * already in customers' hands carry a QR pointing at `{BASE}/pos?receipt=<id>`
  * (backend `nbu_payment.py`, `payments_nbu.py`). Retire the component behind
  * the path, never the path.
+ *
+ * `/kassa` is the rebuilt console. It is listed here for the same two reasons
+ * `/pos` is: a cashier opens it in an ordinary browser, so it must skip the
+ * Telegram Mini App guard, and it must survive a maintenance takeover — a
+ * banner over a till in the middle of taking money costs more than it protects.
  */
-export const POS_PATHS = ['/pos', '/pos2'] as const;
+export const POS_PATHS = ['/pos', '/kassa'] as const;
 
 /**
  * Other operator consoles that share the POS's maintenance exemption.

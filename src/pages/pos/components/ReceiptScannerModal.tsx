@@ -87,7 +87,19 @@ export default function ReceiptScannerModal({
   const [result, setResult] = useState<ReceiptResolveResponse | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  /**
+   * Bumped to restart the camera.
+   *
+   * The start effect keys on `result`, and a scan that failed to resolve
+   * leaves `result` null — the value it already held — so nothing in the
+   * dependency list changed and the camera, stopped by the decode callback,
+   * never came back.
+   */
+  const [scanNonce, setScanNonce] = useState(0);
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  /** The in-flight `start()`, so `stop()` is never called before it lands. */
+  const startPromiseRef = useRef<Promise<unknown> | null>(null);
   const resolvingRef = useRef(false);
 
   const resolve = useCallback(
@@ -134,7 +146,9 @@ export default function ReceiptScannerModal({
     let cancelled = false;
     const scanner = new Html5Qrcode(CAMERA_ELEMENT_ID);
     scannerRef.current = scanner;
-    scanner
+    // Kept so stopCamera can wait for it. Already `.catch`ed, so awaiting
+    // it never rejects.
+    startPromiseRef.current = scanner
       .start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 240, height: 240 } },
@@ -152,7 +166,7 @@ export default function ReceiptScannerModal({
       cancelled = true;
       void stopCamera();
     };
-  }, [open, mode, result, resolve, stopCamera, t]);
+  }, [open, mode, result, scanNonce, resolve, stopCamera, t]);
 
   // Keep the hardware-scanner input focused while in input mode.
   useEffect(() => {
@@ -187,6 +201,7 @@ export default function ReceiptScannerModal({
     setResult(null);
     setError(null);
     setManualValue('');
+    setScanNonce((n) => n + 1);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -388,9 +403,20 @@ export default function ReceiptScannerModal({
                 )}
 
                 {error && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-sm font-medium">
-                    <XCircle className="w-4 h-4 shrink-0" />
-                    {error}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-sm font-medium">
+                      <XCircle className="w-4 h-4 shrink-0" />
+                      {error}
+                    </div>
+                    {mode === 'camera' && (
+                      <button
+                        onClick={handleReset}
+                        className="w-full h-12 rounded-2xl font-bold text-sm bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        {t('pos.scanner.scanAgain', 'Yana skanerlash')}
+                      </button>
+                    )}
                   </div>
                 )}
               </>

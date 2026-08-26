@@ -250,14 +250,67 @@ export async function processBulkPayment(data: BulkPaymentRequest): Promise<Bulk
 /**
  * GET /api/v1/payments/cashier-log
  *
- * Returns the caller's personal paginated payment audit log and today's total.
- * Requires `pos:read` permission on the caller's admin role.
+ * The SHARED cashier log — payments processed by every cashier, not just the
+ * caller's own. That is deliberate and is why `pos:read` is enough to read it:
+ * a cashier starting a transaction has to be able to see that a colleague has
+ * already taken the money (payments_pos.py:360-368). Each row carries
+ * `cashier_id` / `cashier_name` so the caller can tell whose entry it is.
+ *
+ * Returns today's total alongside the page. Requires `pos:read`.
  */
 export async function getCashierLog(params: CashierLogParams = {}): Promise<CashierLogResponse> {
   const res = await apiClient.get<CashierLogResponse>('/api/v1/payments/cashier-log', {
     params,
     headers: getAdminHeaders(),
   });
+  return res.data;
+}
+
+/** One hour or one day of takings, split by provider. */
+export interface ProviderSeriesBucket {
+  /** Tashkent-local bucket start, ISO 8601. */
+  period: string;
+  /** Provider -> amount. Every provider is present, zero included. */
+  providers: Record<string, number>;
+  total: number;
+}
+
+export interface ProviderSeriesResponse {
+  granularity: 'hour' | 'day';
+  start: string;
+  end: string;
+  buckets: ProviderSeriesBucket[];
+  /** Provider -> amount over the whole window. */
+  totals: Record<string, number>;
+  grand_total: number;
+}
+
+export interface ProviderSeriesParams {
+  date_from: string;
+  date_to: string;
+  /** `auto` picks hourly for a window of 48 hours or less. */
+  granularity?: 'auto' | 'hour' | 'day';
+  payment_source?: CashierLogSource;
+  cashier_id?: number;
+}
+
+/**
+ * GET /api/v1/payments/cashier-log/series
+ *
+ * Takings per time bucket per provider — the cashier screen's cards and their
+ * sparklines. Both read this one response, so the number on a card and the bars
+ * under it come from the same query and cannot disagree.
+ *
+ * Empty buckets come back as zeros rather than missing, so a quiet hour draws
+ * as a gap instead of a line straight over it.
+ */
+export async function getCashierLogSeries(
+  params: ProviderSeriesParams,
+): Promise<ProviderSeriesResponse> {
+  const res = await apiClient.get<ProviderSeriesResponse>(
+    '/api/v1/payments/cashier-log/series',
+    { params, headers: getAdminHeaders() },
+  );
   return res.data;
 }
 

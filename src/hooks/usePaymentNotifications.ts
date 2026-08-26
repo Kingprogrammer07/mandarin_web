@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -28,6 +28,8 @@ export interface UsePaymentNotificationsReturn {
   unreadCount: number;
   /** Active filter state */
   filters: NotificationFilters;
+  /** The window this screen started with, for telling "changed" from "default". */
+  defaultFilters: NotificationFilters;
   /** Setters */
   setPage: (p: number) => void;
   setFilters: (f: NotificationFilters | ((prev: NotificationFilters) => NotificationFilters)) => void;
@@ -38,6 +40,14 @@ export interface UsePaymentNotificationsReturn {
   readIds: Set<number>;
   isLoading: boolean;
   isRefetching: boolean;
+  /**
+   * A failed fetch used to be indistinguishable from an empty queue: the list
+   * falls back to `[]`, so a 500 or an expired token read to the cashier as
+   * "no receipts to confirm" while clients waited on payments already made.
+   */
+  isError: boolean;
+  /** Refetch the current page — `setPage(1)` is a no-op when page is 1. */
+  refetch: () => void;
 }
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
@@ -81,6 +91,19 @@ function todayFilterRange(): { date_from: string; date_to: string } {
   return { date_from: today.dateFrom, date_to: today.dateTo };
 }
 
+/**
+ * Yesterday through today.
+ *
+ * A receipt sent at 23:50 is still waiting at 00:10, and a window that starts
+ * at midnight drops it out of sight at exactly the moment nobody is watching.
+ */
+function sinceYesterdayRange(): { date_from: string; date_to: string } {
+  const presets = buildDatePresets();
+  const yesterday = presets[1]; // "Kecha"
+  const today = presets[0];
+  return { date_from: yesterday.dateFrom, date_to: today.dateTo };
+}
+
 const DEFAULT_FILTERS: NotificationFilters = {
   sort: "created_desc",
   source: "flight",
@@ -89,14 +112,39 @@ const DEFAULT_FILTERS: NotificationFilters = {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function usePaymentNotifications(): UsePaymentNotificationsReturn {
+export interface PaymentNotificationOptions {
+  /**
+   * Rows per page. Defaults to 20 — what the old `/pos` console has always
+   * used, and what it must keep using.
+   */
+  perPage?: number;
+  /**
+   * Start the window at yesterday rather than at midnight today. Off by
+   * default, again so `/pos` is unchanged.
+   */
+  sinceYesterday?: boolean;
+}
+
+export function usePaymentNotifications(
+  options: PaymentNotificationOptions = {},
+): UsePaymentNotificationsReturn {
+  const { perPage = 20, sinceYesterday = false } = options;
   const queryClient = useQueryClient();
   // Any cashier console, not the literal "/pos". An exact-match check here made
   // a console at any other path fetch nothing and render an empty list — a
   // silent failure that looks like "no notifications today".
   const isOnPosRoute = isPosPath(window.location.pathname);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<NotificationFilters>(DEFAULT_FILTERS);
+  /**
+   * Read once, at mount. The window is a starting point the cashier can change,
+   * not something to recompute underneath them mid-shift.
+   */
+  const [defaultFilters] = useState<NotificationFilters>(() =>
+    sinceYesterday
+      ? { ...DEFAULT_FILTERS, ...sinceYesterdayRange() }
+      : DEFAULT_FILTERS,
+  );
+  const [filters, setFilters] = useState<NotificationFilters>(defaultFilters);
   const [readIds, setReadIds] = useState<Set<number>>(loadReadIds);
   const seenBroadcastIdsRef = useRef<Set<string>>(new Set());
 
@@ -105,9 +153,11 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
     data,
     isLoading,
     isFetching,
+    isError,
+    refetch,
   } = useQuery({
-    queryKey: ["pos-notifications", page, filters],
-    queryFn: () => posNotificationService.getNotifications(page, 20, filters),
+    queryKey: ["pos-notifications", page, perPage, filters],
+    queryFn: () => posNotificationService.getNotifications(page, perPage, filters),
     enabled: isOnPosRoute,
     staleTime: 20_000,
     // SSE (useEventSource) + the 5s broadcast debounce are the primary freshness
@@ -123,7 +173,10 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
     refetchIntervalInBackground: false,
   });
 
-  const notifications = data?.items ?? [];
+  // `?? []` minted a new array every render, so `markAllRead` (which closes
+  // over it) changed identity every render and re-rendered every consumer that
+  // takes it as a prop.
+  const notifications = useMemo(() => data?.items ?? [], [data?.items]);
   const total = data?.total ?? 0;
 
   // ── BroadcastChannel: real-time updates from other devices ─────────────────
@@ -192,17 +245,20 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
   }, [notifications]);
 
   const resetFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
+    // Back to the window this screen STARTED with, not the module default —
+    // otherwise a reset on the cashier console silently narrows it to today.
+    setFilters(defaultFilters);
     setPage(1);
-  }, []);
+  }, [defaultFilters]);
 
   return {
     notifications,
     total,
     page,
-    perPage: 20,
+    perPage,
     unreadCount,
     filters,
+    defaultFilters,
     setPage,
     setFilters,
     resetFilters,
@@ -210,5 +266,12 @@ export function usePaymentNotifications(): UsePaymentNotificationsReturn {
     readIds,
     isLoading,
     isRefetching: isFetching && !isLoading,
+    /**
+     * A failed fetch used to be indistinguishable from an empty queue: `items`
+     * falls back to `[]`, so a 500 or an expired token read to the cashier as
+     * "no receipts to confirm" while clients waited on unconfirmed payments.
+     */
+    isError,
+    refetch,
   };
 }

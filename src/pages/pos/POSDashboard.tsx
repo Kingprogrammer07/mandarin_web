@@ -14,6 +14,7 @@ import {
   Package,
   X,
   ArrowLeft,
+  Sparkles,
   Sun,
   Moon,
   Lock,
@@ -1161,6 +1162,19 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
             <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
               POS Kassa
             </span>
+
+            {/* The way across to the rebuilt console. Sits beside the title
+                rather than among the icon buttons on the right: those are
+                per-session tools, this changes which console you work in. */}
+            <button
+              onClick={() => onNavigate("kassa")}
+              title="Yangi kassir oynasiga o'tish"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-[11px] font-bold text-orange-600 transition-colors hover:bg-orange-100 dark:border-orange-500/25 dark:bg-orange-500/10 dark:text-orange-400 dark:hover:bg-orange-500/20"
+            >
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={2.2} />
+              <span className="hidden sm:inline">Yangi versiyaga o'tish</span>
+              <span className="sm:hidden">Yangi</span>
+            </button>
           </div>
           <div className="flex items-center gap-1">
             {/* Dismiss all active warehouse notifications */}
