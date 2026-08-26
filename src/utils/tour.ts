@@ -9,6 +9,8 @@ import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './tour.css';
 
+import { BackPriority, pushBackHandler } from '@/lib/backStack';
+
 /**
  * Bump when tour content changes and every user should see the new version
  * once more. Old flags (`tour_done_<id>_v1`) stay dormant.
@@ -86,6 +88,22 @@ interface RunTourOptions {
  * Run a tour once. No-op when already seen, when there are no steps, or when
  * the first step's target is not in the DOM (e.g. a modal that isn't open).
  */
+/** The tour currently on screen, so a host that unmounts can take it with it. */
+let activeTour: { destroy: () => void } | null = null;
+
+/**
+ * Tear down whatever tour is running.
+ *
+ * `useGuideTour`'s cleanup only cleared the pre-launch timer, so a tour that had
+ * already started outlived the screen it was explaining — and its back handler
+ * outlived it too, swallowing presses on whatever replaced it.
+ */
+export function stopActiveTour(): void {
+  const instance = activeTour;
+  activeTour = null;
+  instance?.destroy();
+}
+
 export function runTourOnce(opts: RunTourOptions): void {
   if (!opts.force && hasSeenTour(opts.id)) return;
   if (opts.steps.length === 0) return;
@@ -94,6 +112,11 @@ export function runTourOnce(opts: RunTourOptions): void {
   const first = opts.steps[0]?.element;
   if (typeof first === 'string' && !document.querySelector(first)) return;
   if (first === undefined) return;
+
+  // Only one tour may be on screen. MakePaymentModal registers two with the
+  // same enabling condition and the same delay; without this the second
+  // overwrote `activeTour` and the first's back handler was never released.
+  stopActiveTour();
 
   const instance = driver({
     showProgress: true,
@@ -106,8 +129,39 @@ export function runTourOnce(opts: RunTourOptions): void {
     doneBtnText: opts.doneBtnText,
     steps: opts.steps,
     // Fires on finish AND on early close — "once" means once, even if skipped.
-    onDestroyed: () => markTourSeen(opts.id),
+    onDestroyed: () => {
+      activeTour = null;
+      markTourSeen(opts.id);
+      releaseBack?.();
+      releaseBack = undefined;
+    },
   });
 
+  /**
+   * The system back button closes the tour, not what is underneath it.
+   *
+   * A tour usually runs on top of something that has its own back handler —
+   * MakePaymentModal, the card-binding page — and without this the press went
+   * straight past the tour and dismissed that instead, leaving driver.js
+   * highlighting an element that had just been unmounted.
+   *
+   * OVERLAY priority and registered last, so it sits above every modal and
+   * lightbox. Released from `onDestroyed`, which driver.js calls on finish and
+   * on early close alike.
+   */
+  let releaseBack: (() => void) | undefined = pushBackHandler(() => {
+    // Released HERE, before destroy, not only from `onDestroyed`: driver.js
+    // does not call that synchronously, so a handler that waited for it stayed
+    // on the stack and swallowed the NEXT press too — the back button went
+    // dead for one tap after every tour. Unregistering is idempotent, so the
+    // `onDestroyed` release still covers Escape, the overlay and "Tugadi".
+    releaseBack?.();
+    releaseBack = undefined;
+    instance.destroy();
+    return true;
+  }, BackPriority.OVERLAY);
+
   instance.drive();
+
+  activeTour = instance;
 }

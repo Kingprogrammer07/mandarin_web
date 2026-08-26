@@ -22,9 +22,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LogOut, RefreshCw, UserCog } from 'lucide-react';
 import { useState, useCallback, lazy, Suspense, memo, useTransition, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { DriveStep } from 'driver.js';
-import { useGuideTour } from '@/hooks/useGuideTour';
-import { pickVisible } from '@/utils/tour';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WalletModal } from '@/components/wallet/WalletModal';
 import { CardsManagerModal } from '@/components/wallet/CardsManagerModal';
@@ -195,32 +192,6 @@ const UserPage = ({
       refetch();
    }, [refetch]);
 
-   // One-time onboarding tour for the profile page. Quick actions render twice
-   // (mobile + desktop) — pickVisible highlights whichever copy is on screen.
-   const buildProfileTour = useCallback((): DriveStep[] => [
-      {
-         element: '[data-tour="profile-hero"]',
-         popover: {
-            title: t('tour.profile.hero.title'),
-            description: t('tour.profile.hero.desc'),
-         },
-      },
-      {
-         element: pickVisible('[data-tour="profile-actions"]') ?? '[data-tour="profile-actions"]',
-         popover: {
-            title: t('tour.profile.actions.title'),
-            description: t('tour.profile.actions.desc'),
-         },
-      },
-      {
-         element: '[data-tour="profile-personal"]',
-         popover: {
-            title: t('tour.profile.personal.title'),
-            description: t('tour.profile.personal.desc'),
-         },
-      },
-   ], [t]);
-   useGuideTour('profile', buildProfileTour, !isLoading && !isError && !!user);
 
    if (isLoading) {
       return <ProfileSkeleton />;

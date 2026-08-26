@@ -8,7 +8,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DriveStep } from 'driver.js';
-import { runTourOnce } from '@/utils/tour';
+import { runTourOnce, stopActiveTour } from '@/utils/tour';
 
 /** Delay before launching so mount/route animations finish first. */
 const DEFAULT_DELAY_MS = 750;
@@ -42,6 +42,12 @@ export function useGuideTour(
       });
     }, delayMs);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      // Not just the pending timer: a tour that already started must go with the
+      // screen it was explaining, or its back handler keeps swallowing presses
+      // on whatever replaced it.
+      stopActiveTour();
+    };
   }, [id, enabled, delayMs, t]);
 }
