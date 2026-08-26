@@ -40,6 +40,7 @@ import {
   type FlightDashboardItem,
 } from '@/api/services/flightSchedule';
 import { FlightBoardCards } from '@/components/admin/flights/FlightBoardCards';
+import RoleSwitcher from '@/components/admin/RoleSwitcher';
 import { FlightBoardTable } from '@/components/admin/flights/FlightBoardTable';
 import {
   FlightUploadSection,
@@ -439,9 +440,14 @@ export default function FlightsPage({
               Reys qo‘shish
             </button>
           )}
-          {/* Only when the shell is absent. AdminLayout carries logout in its
-              account menu; a worker gets this page and nothing else, so without
-              it there is no way out of the app at all. */}
+          {/* Both of these only when the shell is absent. AdminLayout carries
+              role switching and logout in its account menu; a worker opens this
+              page and nothing else, so without them there is no way to change
+              role and no way out of the app at all.
+
+              RoleSwitcher renders nothing when the account holds a single role,
+              so this costs a worker with one role exactly nothing. */}
+          {!embedded && <RoleSwitcher />}
           {!embedded && onLogout && (
             <button
               type="button"
