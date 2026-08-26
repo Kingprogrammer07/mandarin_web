@@ -21,10 +21,58 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 
 type AppEvent = { type: string; [key: string]: unknown };
 
+/**
+ * Whether an admin JWT has already expired, read from its own `exp` claim.
+ *
+ * `EventSource` exposes no status code on failure, so a 401 is indistinguishable
+ * from the network being down — the browser reports both as a bare "connection
+ * failed", and Firefox dresses it up as a CORS error with a null status. Without
+ * this check a stale token produced ten silent reconnects against a server that
+ * was never going to accept it, while the real cause (log in again) was invisible.
+ *
+ * Returns false when the token cannot be parsed: an unreadable token is the
+ * server's business, not ours, and refusing to connect would be worse than
+ * letting it answer 401 once.
+ */
+function isJwtExpired(token: string): boolean {
+  try {
+    const [, payloadB64] = token.split('.');
+    const payload = JSON.parse(
+      atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')),
+    ) as { exp?: number };
+    if (typeof payload.exp !== 'number') return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clear a dead admin session once, and say so.
+ *
+ * Deliberately NOT called from `buildStreamUrl`. This hook listens for
+ * `auth:logout` itself and reconnects on it, so raising the event from inside
+ * the URL builder recursed — dispatch is synchronous, the listener called
+ * `connect()`, which called the builder again, which dispatched again. Removing
+ * the token first is what makes it terminate: the expired branch cannot be
+ * taken twice.
+ */
+function discardExpiredAdminSession(): void {
+  const token = localStorage.getItem('access_token');
+  if (!token || !isJwtExpired(token)) return;
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('admin_role');
+  window.dispatchEvent(new CustomEvent('auth:logout'));
+}
+
+/** Pure — no side effects, so it is safe to call from the reconnect path. */
 function buildStreamUrl(): string | null {
   const base = API_BASE_URL.replace(/\/$/, '');
   const adminToken = localStorage.getItem('access_token');
   if (adminToken) {
+    // An expired token would be refused with a 401 that `EventSource` reports
+    // as an unreadable connection failure, so it is not worth opening.
+    if (isJwtExpired(adminToken)) return null;
     return `${base}/api/v1/events/stream?access_token=${encodeURIComponent(adminToken)}`;
   }
   const userToken = sessionStorage.getItem('access_token');
@@ -32,6 +80,15 @@ function buildStreamUrl(): string | null {
     return `${base}/api/v1/events/stream?token=${encodeURIComponent(userToken)}`;
   }
   return null;
+}
+
+/**
+ * The admin landing dashboard aggregates counts that several of these events
+ * already invalidate elsewhere. Refreshing it from the same signals keeps it
+ * live without adding a polling timer to the most-opened admin screen.
+ */
+function refreshAdminDashboard(qc: QueryClient): void {
+  qc.invalidateQueries({ queryKey: ['admin-dashboard'], refetchType: 'active' });
 }
 
 function dispatchEvent(evt: AppEvent, qc: QueryClient): void {
@@ -47,12 +104,14 @@ function dispatchEvent(evt: AppEvent, qc: QueryClient): void {
     case 'queue.changed':
       qc.invalidateQueries({ queryKey: ['pickup_queue'], refetchType: 'active' });
       qc.invalidateQueries({ queryKey: ['pos_pickup_queue'], refetchType: 'active' });
+      refreshAdminDashboard(qc);
       break;
 
     case 'pos_notification.changed':
       qc.invalidateQueries({ queryKey: ['pos-notifications'], refetchType: 'active' });
       qc.invalidateQueries({ queryKey: ['pos-tab-counts'], refetchType: 'active' });
       qc.invalidateQueries({ queryKey: ['cashier-log'], refetchType: 'active' });
+      refreshAdminDashboard(qc);
       break;
 
     case 'maintenance.toggled': {
@@ -68,11 +127,20 @@ function dispatchEvent(evt: AppEvent, qc: QueryClient): void {
       // wrongly cover the app whenever an admin merely enabled maintenance.
       qc.invalidateQueries({ queryKey: ['maintenance-status'], refetchType: 'active' });
       qc.invalidateQueries({ queryKey: ['system-maintenance'], refetchType: 'active' });
+      refreshAdminDashboard(qc);
       break;
     }
 
     case 'nbu.status.changed':
       qc.invalidateQueries({ queryKey: ['system-nbu'], refetchType: 'active' });
+      refreshAdminDashboard(qc);
+      break;
+
+    // Published by the backend since the WebApp-only switch shipped
+    // (routers/system.py), but nothing listened — the bot-mode chip would have
+    // stayed stale until a manual refresh.
+    case 'bot.mode.changed':
+      refreshAdminDashboard(qc);
       break;
 
     default:
@@ -143,6 +211,10 @@ export function useGlobalEvents(): void {
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('auth:logout', handleAuthChange);
 
+    // Before the first connection, not inside the URL builder. A stale admin
+    // token left in storage cannot be recovered from, and this is the one place
+    // that can say so exactly once.
+    discardExpiredAdminSession();
     connect();
 
     return () => {

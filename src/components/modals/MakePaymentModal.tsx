@@ -269,7 +269,8 @@ const BottomDrawer = ({ open, onClose, children }: BottomDrawerProps) => (
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed bottom-0 left-0 right-0 z-[10010] bg-mc-surface rounded-t-[22px] max-h-[85dvh] flex flex-col shadow-2xl"
+          // min-h so that a sheet with one row still rises past the middle of the screen. Height was content-driven, so a single flight left the panel clinging to the bottom edge — it read as a toast, not as a sheet, and the grab handle sat within a thumb's width of the home indicator.
+          className="fixed bottom-0 left-0 right-0 z-[10010] bg-mc-surface rounded-t-[22px] max-h-[85dvh] min-h-[58dvh] flex flex-col shadow-2xl"
         >
           <div className="w-12 h-1.5 bg-mc-surface-2 dark:bg-white/20 rounded-full mx-auto mt-4 mb-2 flex-shrink-0" />
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-10">
@@ -1966,7 +1967,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             className={`fixed z-[10000] bg-mc-surface
               ${
                 isMobile
-                  ? 'bottom-0 left-0 right-0 rounded-t-[22px] max-h-[92dvh]'
+                  ? 'bottom-0 left-0 right-0 rounded-t-[22px] max-h-[92dvh] min-h-[58dvh]'
                   : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-mc-xl max-h-[90dvh]'
               }
               overflow-hidden shadow-2xl border border-mc-border

@@ -8,6 +8,7 @@ import {
     Copy,
     Download,
     FileText,
+    ImageOff,
     Loader2,
     MapPin,
     PackageCheck,
@@ -90,6 +91,27 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
     const [data, setData] = useState<ChinaAddressData | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [imageLoaded, setImageLoaded] = useState<Record<number, boolean>>({});
+    const [imageFailed, setImageFailed] = useState<Record<number, boolean>>({});
+
+    /**
+     * Mark an image loaded from the element itself.
+     *
+     * `onLoad` only fires for a load that starts after React attaches the
+     * handler. A cached image is already `complete` by then, so the event never
+     * comes and the placeholder spinner runs for ever — which is exactly what
+     * happened after `handleRetry` cleared the map for images the browser had
+     * already decoded. Returning `prev` unchanged makes React bail out, so this
+     * cannot loop.
+     */
+    const markLoadedIfComplete = useCallback(
+        (index: number) => (node: HTMLImageElement | null) => {
+            if (!node) return;
+            if (node.complete && node.naturalWidth > 0) {
+                setImageLoaded((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
+            }
+        },
+        [],
+    );
     const [copied, setCopied] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
     const [activeTab, setActiveTab] = useState(0);
@@ -141,6 +163,7 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
         setError(null);
         setData(null);
         setImageLoaded({});
+        setImageFailed({});
         setActiveTab(0);
     }, []);
 
@@ -363,9 +386,23 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                                                     className="relative aspect-[4/3] w-full overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface-2"
                                                     onClick={() => openPreview(safeTab)}
                                                 >
-                                                    {!imageLoaded[safeTab] && (
+                                                    {!imageLoaded[safeTab] && !imageFailed[safeTab] && (
                                                         <div className="absolute inset-0 grid place-items-center">
                                                             <Loader2 className="h-6 w-6 animate-spin text-mc-brand" />
+                                                        </div>
+                                                    )}
+                                                    {imageFailed[safeTab] && (
+                                                        // Without this the spinner ran for ever on a failed
+                                                        // load, which reads as "still working" rather than
+                                                        // "this did not arrive".
+                                                        <div className="absolute inset-0 grid place-items-center gap-1 px-4 text-center">
+                                                            <ImageOff
+                                                                className="mx-auto h-6 w-6 text-mc-text-3"
+                                                                strokeWidth={1.8}
+                                                            />
+                                                            <p className="text-[11px] font-semibold text-mc-text-3">
+                                                                {t('chinaAddress.imageFailed')}
+                                                            </p>
                                                         </div>
                                                     )}
                                                     <AnimatePresence mode="wait">
@@ -378,7 +415,23 @@ const ChinaAddressModal = ({ isOpen, onClose }: ChinaAddressModalProps) => {
                                                             src={data.images[safeTab]}
                                                             alt={getTabLabel(data.images[safeTab], safeTab)}
                                                             className="h-full w-full object-contain"
-                                                            onLoad={() => setImageLoaded((prev) => ({ ...prev, [safeTab]: true }))}
+                                                            // A cached image finishes loading before React can
+                                                            // attach `onLoad`, so the event never fires and the
+                                                            // spinner never clears. `handleRetry` resetting the
+                                                            // map put every already-decoded image in that state.
+                                                            // The ref reads the real state of the element instead
+                                                            // of waiting for an event that has already happened.
+                                                            ref={markLoadedIfComplete(safeTab)}
+                                                            onLoad={() =>
+                                                                setImageLoaded((prev) =>
+                                                                    prev[safeTab] ? prev : { ...prev, [safeTab]: true },
+                                                                )
+                                                            }
+                                                            onError={() =>
+                                                                setImageFailed((prev) =>
+                                                                    prev[safeTab] ? prev : { ...prev, [safeTab]: true },
+                                                                )
+                                                            }
                                                         />
                                                     </AnimatePresence>
                                                     <span className="pointer-events-none absolute bottom-2.5 right-2.5 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md">
