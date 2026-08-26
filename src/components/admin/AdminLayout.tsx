@@ -245,10 +245,17 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
                 className={`h-[21px] w-[21px] ${isActive ? 'text-mc-brand' : 'text-mc-text-3'}`}
                 strokeWidth={isActive ? 2.2 : 1.8}
               />
-              {/* `short` where the full label does not fit 64px. A tooltip
-                  would be the usual answer and is useless on a touch screen. */}
+              {/* `short` where the full label does not fit. A tooltip would be
+                  the usual answer and is useless on a touch screen.
+
+                  `px-0.5`, not `px-1`: five columns on a 320px screen give each
+                  label a 64px box, and "Sozlamalar" measures 54px at 10px bold
+                  Manrope. 4px of side padding left 2px of slack — inside the
+                  rounding error of a webfont that has not swapped in yet. 2px
+                  of padding keeps the same optical gutter (the neighbouring
+                  labels are centred and far narrower) with 6px of slack. */}
               <span
-                className={`w-full truncate px-1 text-center text-[10px] font-bold ${
+                className={`w-full truncate px-0.5 text-center text-[10px] font-bold ${
                   isActive ? 'text-mc-brand' : 'text-mc-text-3'
                 }`}
               >
@@ -270,7 +277,7 @@ export default function AdminLayout({ children, currentPage, onNavigate, onLogou
             strokeWidth={isSheetOpen ? 2.2 : 1.8}
           />
           <span
-            className={`w-full truncate px-1 text-center text-[10px] font-bold ${
+            className={`w-full truncate px-0.5 text-center text-[10px] font-bold ${
               isSheetOpen ? 'text-mc-brand' : 'text-mc-text-3'
             }`}
           >

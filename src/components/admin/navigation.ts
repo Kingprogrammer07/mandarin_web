@@ -50,15 +50,27 @@ export interface AdminNavItem {
   description: string;
   icon: LucideIcon;
   shell: AdminNavShell;
-  /** Shown in the mobile bottom bar. Capped at four — the fifth slot is "Barchasi". */
+  /**
+   * Shown in the mobile bottom bar. Capped at four — the fifth slot is "Barchasi".
+   *
+   * The bar is the super-admin's surface, so it carries the account-level
+   * screens (Adminlar, Rollar, Sozlamalar) rather than the operational ones.
+   * Zayavka and Xarajatlar used to sit here and were demoted on the owner's
+   * call: day-to-day work happens in the standalone consoles, and both are
+   * still one tap away inside "Barchasi".
+   *
+   * Slot order is the order of `ADMIN_NAV`, not the order the flags were
+   * added — moving an entry in the list moves its tab.
+   */
   primary?: boolean;
   /**
    * Label for the mobile bottom bar only.
    *
-   * That bar gives each of five items 72px on a 360px screen, ~64px inside the
-   * padding. "Boshqaruv paneli" needs about 80px at 10px bold, so it was
-   * clipped on the very tab a user lands on first — and a tooltip is no help
-   * on a phone. Set this only where the full label does not fit.
+   * Five equal columns leave 64px per item on a 320px screen and 60px inside
+   * the label padding — the tightest case the bar has to survive. "Boshqaruv
+   * paneli" measures ~118px at 10px bold Manrope, so it was clipped on the very
+   * tab a user lands on first, and a tooltip is no help on a phone. Set this
+   * only where the full label does not fit; "Sozlamalar" (54px) still does.
    */
   short?: string;
 }
@@ -142,7 +154,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         description: 'Yetkazib berish so‘rovlari',
         icon: Truck,
         shell: 'shell',
-        primary: true,
       },
       {
         id: 'pickup-tv',
@@ -172,6 +183,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         description: 'Huquqlar tizimi',
         icon: Shield,
         shell: 'shell',
+        primary: true,
       },
       {
         id: 'admin-audit',
@@ -183,11 +195,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       {
         id: 'admin-expenses',
         label: 'Xarajatlar',
-        short: 'Xarajat',
         description: 'Chiqimlar hisoboti',
         icon: TrendingDown,
         shell: 'shell',
-        primary: true,
       },
       {
         id: 'admin-carousel',
@@ -215,6 +225,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         description: 'Tizim va Redis',
         icon: Settings,
         shell: 'shell',
+        primary: true,
       },
       {
         id: 'admin-profile',
@@ -229,8 +240,17 @@ export const ADMIN_NAV: AdminNavGroup[] = [
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = ADMIN_NAV.flatMap((group) => group.items);
 
-/** Bottom-bar slots. Four plus the "Barchasi" trigger keeps it inside the five-item limit. */
-export const ADMIN_NAV_PRIMARY: AdminNavItem[] = ADMIN_NAV_ITEMS.filter((item) => item.primary);
+/**
+ * Bottom-bar slots: Boshqaruv paneli · Adminlar · Rollar · Sozlamalar.
+ *
+ * Sliced rather than trusted: a fifth `primary` flag would push the bar to six
+ * columns and squeeze every label past its 64px, so the documented cap is
+ * enforced here. An overflowing entry is still reachable through "Barchasi",
+ * which renders `ADMIN_NAV` whole.
+ */
+export const ADMIN_NAV_PRIMARY: AdminNavItem[] = ADMIN_NAV_ITEMS.filter(
+  (item) => item.primary,
+).slice(0, 4);
 
 /** Lookup for the header title. `App.tsx` only mounts this shell for pages listed above. */
 export function findAdminNavItem(pageId: string): AdminNavItem | null {
