@@ -1,6 +1,16 @@
 /**
- * The Tashkent warehouse: how much of the busiest open flight has reached its
- * clients.
+ * The Tashkent warehouse: how much of one open flight has reached its clients.
+ *
+ * WHICH flight is the operator's choice, because the two useful answers differ
+ * and the panel cannot show both. "Eng ko'p qolgan" ranks by how much is still
+ * to hand over; "Oxirgi reys" follows the flight that landed last, the same
+ * `last_arrived` the KPI row above states, so the two never disagree.
+ *
+ * The default stays "eng ko'p qolgan". Worth knowing when reading the numbers:
+ * the backend orders `remaining_desc` by remaining CARGO COUNT first and only
+ * then by weight, while this card displays weight — so the figure on screen is
+ * not the figure the ranking used. M260-M261 (499 cargos, 222 kg left) outranks
+ * M262-M263 (316 cargos, 316 kg left), which reads as a bug until you know.
  *
  * Three columns — the flight's identity, the ring, and its legend — so the
  * numbers read left to right without the donut having to carry labels. Below a
@@ -13,14 +23,42 @@
  * permanently empty, which reads as a broken panel rather than an unused one.
  */
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Info, RotateCw } from 'lucide-react';
 
+import { getFlightVolumeSummary } from '@/api/services/adminDashboard';
 import { getFlightsDashboard } from '@/api/services/flightSchedule';
 import { formatTashkentDateTime, formatWeightKg } from '@/lib/format';
 
 import { EmptyNote, SectionCard, TileSkeleton } from './DashboardPrimitives';
 import { FlightProgressDonut } from './FlightProgressDonut';
+
+type PanelMode = 'busiest' | 'latest';
+
+const MODE_KEY = 'admin_warehouse_panel_mode';
+
+const MODES: { value: PanelMode; label: string }[] = [
+  { value: 'busiest', label: "Eng ko‘p qolgan" },
+  { value: 'latest', label: 'Oxirgi reys' },
+];
+
+/** Anything unreadable or unrecognised means the default. */
+function loadMode(): PanelMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'latest' ? 'latest' : 'busiest';
+  } catch {
+    return 'busiest';
+  }
+}
+
+function saveMode(mode: PanelMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // A private window is not a reason to break the panel.
+  }
+}
 
 export function WarehousePanel({
   onNavigate,
@@ -46,16 +84,40 @@ export function WarehousePanel({
 
   // Only a flight with transactions behind it can carry a handed-over ratio;
   // the manifest-only ones would render a fabricated 0%.
-  const items = (flights.data?.items ?? [])
-    .filter((flight) => (flight.stats.transaction_count ?? 0) > 0)
-    .slice(0, 3);
-  const [busiest, ...rest] = items;
+  // Same query key as AdminDashboardPage's, so this shares its cache entry and
+  // costs no extra request. Only `last_arrived.flight_name` is read.
+  const volume = useQuery({
+    queryKey: ['admin-dashboard', 'flight-volume'],
+    queryFn: getFlightVolumeSummary,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const [mode, setMode] = useState<PanelMode>(loadMode);
+
+  const ranked = (flights.data?.items ?? []).filter(
+    (flight) => (flight.stats.transaction_count ?? 0) > 0,
+  );
+
+  const latestName = volume.data?.last_arrived?.flight_name?.trim().toUpperCase();
+  const latest = latestName
+    ? ranked.find((flight) => flight.name.trim().toUpperCase() === latestName)
+    : undefined;
+
+  // The last-arrived flight can be missing from this list — it is filtered to
+  // open flights that carry transactions, and a freshly landed one may have
+  // neither yet. Fall back rather than empty the panel, and say so below.
+  const selected = mode === 'latest' ? (latest ?? ranked[0]) : ranked[0];
+  const latestUnavailable = mode === 'latest' && !latest;
+  const rest = ranked.filter((flight) => flight !== selected).slice(0, 2);
 
   return (
     <SectionCard
       title="Toshkent ombori"
       subtitle={
-        flights.data ? `Yuki bor reyslar: ${items.length} ta` : 'Eng ko‘p yuk bor reys'
+        flights.data
+          ? `Yuki bor reyslar: ${ranked.length} ta`
+          : 'Eng ko‘p yuk bor reys'
       }
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-medium text-mc-text-3">
@@ -86,36 +148,78 @@ export function WarehousePanel({
             Qayta urinish
           </button>
         </div>
-      ) : !busiest ? (
+      ) : !selected ? (
         <EmptyNote text="Ochiq reys yo‘q" />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] sm:items-center">
+          {/* Which flight this panel is about. Two answers are both correct
+              and they disagree, so the operator picks. */}
+          <div
+            role="group"
+            aria-label="Qaysi reys ko‘rsatilsin"
+            className="mb-3 flex w-full gap-1 rounded-mc-md bg-mc-surface-2 p-1"
+          >
+            {MODES.map((option) => {
+              const isActive = mode === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => {
+                    setMode(option.value);
+                    saveMode(option.value);
+                  }}
+                  className={`min-h-[36px] flex-1 rounded-mc-sm px-2 text-[11px] font-bold transition-colors ${
+                    isActive
+                      ? 'bg-mc-surface text-mc-text shadow-[var(--mc-shadow-card)]'
+                      : 'text-mc-text-3'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {latestUnavailable && (
+            <p className="mb-3 text-[11px] font-medium text-mc-text-3">
+              Oxirgi kelgan reysda hali tortilgan yuk yo‘q — eng ko‘p qolgani
+              ko‘rsatilmoqda.
+            </p>
+          )}
+
+          {/* `grid-cols-1` below `sm`, not an implicit `auto` column: the ring
+              and its legend cannot wrap, so an auto column took their combined
+              min-content (~380px) and hung the panel off the side of a phone. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] sm:items-center">
             <dl className="min-w-0 space-y-2">
               <div>
-                <dt className="text-[11px] font-medium text-mc-text-3">Faol reys</dt>
+                <dt className="text-[11px] font-medium text-mc-text-3">
+                  {mode === 'latest' && latest ? 'Oxirgi kelgan reys' : 'Faol reys'}
+                </dt>
                 {/* The identity column is ~150px in the half-width card; a
                     warehouse tab name like "M214-M215 QOSHIMCHA" does not fit. */}
                 <dd
                   className="truncate text-[19px] font-extrabold leading-tight text-mc-text"
-                  title={busiest.name}
+                  title={selected.name}
                 >
-                  {busiest.name}
+                  {selected.name}
                 </dd>
               </div>
               <div>
                 <dt className="text-[11px] font-medium text-mc-text-3">Umumiy hajm</dt>
                 <dd className="text-[16px] font-extrabold tabular-nums text-mc-text">
-                  {formatWeightKg(busiest.stats.total_weight_kg)}
+                  {formatWeightKg(selected.stats.total_weight_kg)}
                 </dd>
               </div>
               <div>
                 <dt className="text-[11px] font-medium text-mc-text-3">Mijozlar</dt>
                 <dd className="text-[14px] font-bold tabular-nums text-mc-text-2">
-                  {busiest.stats.client_count} ta
+                  {selected.stats.client_count} ta
                 </dd>
               </div>
-              {busiest.last_activity_at && (
+              {selected.last_activity_at && (
                 <div>
                   {/* The mockup labels this row "Reys kelgan sana". The API has
                       no arrival date — `/flights/dashboard` returns only
@@ -126,13 +230,13 @@ export function WarehousePanel({
                     Oxirgi harakat
                   </dt>
                   <dd className="truncate text-[13px] font-bold tabular-nums text-mc-text-2">
-                    {formatTashkentDateTime(busiest.last_activity_at, language)}
+                    {formatTashkentDateTime(selected.last_activity_at, language)}
                   </dd>
                 </div>
               )}
             </dl>
 
-            <FlightProgressDonut flight={busiest} />
+            <FlightProgressDonut flight={selected} />
           </div>
 
           {rest.length > 0 && (
