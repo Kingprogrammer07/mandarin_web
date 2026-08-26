@@ -182,15 +182,19 @@ export function ActivityPanel({
 
                 <span className="min-w-0 flex-1">
                   {/* A payment sentence runs to ~50 characters and the row has
-                      ~33 on a phone, so the sentence is the first thing lost. */}
+                      ~33 on a phone, so the sentence is the first thing lost —
+                      and with it the amount, or the flight, or the client code
+                      the row exists to report. Under 24rem of panel width both
+                      lines wrap rather than truncate; the `title` fallback is
+                      no fallback at all on a touch screen. */}
                   <span
-                    className="block truncate text-[12px] font-bold text-mc-text"
+                    className="block break-words text-[12px] font-bold text-mc-text @[24rem]:truncate"
                     title={sentence}
                   >
                     {sentence}
                   </span>
                   <span
-                    className="block truncate text-[11px] font-medium text-mc-text-3"
+                    className="block break-words text-[11px] font-medium text-mc-text-3 @[24rem]:truncate"
                     title={meta_line}
                   >
                     {meta_line}

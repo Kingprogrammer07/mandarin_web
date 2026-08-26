@@ -218,7 +218,12 @@ export function ReceiptFilters({
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* One per row on a phone. A native date field has a fixed
+                  intrinsic width (~139px) that no CSS shrinks, and half of this
+                  panel at 320px is 116px — the field would render its own
+                  dd.mm.yyyy clipped. Two columns again from `sm`, where the
+                  queue is wide enough for them. */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label>
                   <span className={LABEL}>Sanadan</span>
                   <input
@@ -253,7 +258,11 @@ export function ReceiptFilters({
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* Stacked with their dates on a phone, for the same reason: a
+                  time field's intrinsic width depends on the browser locale
+                  (a 12-hour one adds an AM/PM segment) and it too cannot be
+                  shrunk below it. */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {/*
                   Disabled until the matching date is set, because that is what
                   the API actually does: the router reads `time_from` only

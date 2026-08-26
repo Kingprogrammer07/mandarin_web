@@ -1148,9 +1148,17 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
   return (
     <>
       <div className="px-3 sm:px-4 pb-6 bg-[#f5f3ef] dark:bg-[#0c0c0c] min-h-screen">
-        {/* Dashboard header */}
-        <div className="flex items-center justify-between py-3 mb-1">
-          <div className="flex items-center gap-2">
+        {/* Dashboard header.
+
+            Wraps rather than clips. The row carries a back button, the title,
+            the console switch and eight icon buttons (nine while warehouse
+            notifications are up) — 83px more than a 320px phone has, and
+            nothing here scrolled sideways, so the last controls were simply
+            unreachable. `flex-wrap` is what lets the icon cluster below take a
+            line of its own; a flex line that fits is laid out exactly as it was
+            before, so from `sm` up nothing moves. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-3 mb-1">
+          <div className="flex min-w-0 items-center gap-2">
             {/* Back button */}
             <button
               onClick={() => onNavigate("verification-search")}
@@ -1176,7 +1184,13 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
               <span className="sm:hidden">Yangi</span>
             </button>
           </div>
-          <div className="flex items-center gap-1">
+          {/* `w-full` below `sm` puts the cluster on its own line by size, not
+              by hoping the wrap decision goes that way — a `flex-1` item can
+              legally stay on the first line and re-wrap its own buttons into
+              three ragged rows instead. Its own `flex-wrap` is the second net,
+              for the narrowest phones where nine 32px buttons do not fit even
+              across the full width. `sm:` restores exactly what was here. */}
+          <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:ml-auto sm:w-auto sm:flex-nowrap">
             {/* Dismiss all active warehouse notifications */}
             {notifCount > 0 && (
               <button

@@ -128,6 +128,55 @@ The client is a Telegram Mini App; the majority of it is opened inside
    `touch-action: manipulation`, `appearance: none`) live in `@layer base` of
    `src/index.css` — do not repeat them per component.
 
+### 320px is the floor — every screen, admin included
+
+**Every screen must work down to 320px CSS width.** Not "degrade acceptably" —
+work: no content clipped, no control unreadable, no horizontal page scroll.
+320px is an iPhone SE 1, 360px is the common Android, 390px a current iPhone.
+Check all three before calling a screen done.
+
+This applies to the **admin panel and the staff consoles too**, not just the
+client Mini App. Staff open `/flights` and `/kassa` on their phones, and a flight
+name that is cut off is a broken control, not a cosmetic complaint.
+
+**Checking for horizontal overflow does not find these bugs.** An ancestor
+usually clips the content, so `document.documentElement.scrollWidth` matches the
+viewport and the page looks fine to any "does it scroll sideways" test. The
+signal that actually finds it is, for every element:
+
+```js
+const cs = getComputedStyle(el)
+el.scrollWidth > el.clientWidth + 1          // content is wider than the box
+&& !['auto', 'scroll'].includes(cs.overflowX)  // and it is not a scroller
+// …but a WORKING ellipsis truncate reports exactly the same thing — that is how
+// text-overflow draws the "…". Only count it when the box has been squeezed so
+// hard the label stops being readable:
+&& !(cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap' && el.clientWidth >= 56)
+```
+
+That last clause matters. Without it the probe flags every healthy truncate and
+buries the real defects: a first pass on `/admin/dashboard` reported 33 hits, of
+which 32 were ellipses doing their job and **one** was a genuine clip.
+
+The failure that actually hurts is a `truncate` **flexed to near-zero width**.
+On `/flights` the board row packed 348px of fixed columns — grip, status chip,
+track count, reorder, switch — into the 236px a 320px phone gives it, so the
+flight name (`flex-1 min-w-0 truncate`) resolved to width **0** and the label of
+the visibility switch rendered as nothing at all. The owner's report was literal:
+"reys nomlari ko'rinmagan, qaysini faol qilishni hech kim bilmaydi". Adding
+`min-w-0` further down cannot fix that — the fixed siblings have to wrap or
+shrink first.
+
+The other recurring cause is a **native control with an intrinsic minimum**:
+`<input type="date">` renders ~139px wide and will not go smaller, so two of
+them side by side need 342px and cannot fit a phone at any font size that
+respects the 16px input floor. Change the layout (stack them, or collapse the
+range into one control) rather than fighting the widget.
+
+Never truncate a **number or an identifier**: a clipped `245 915 810,91 so'm`
+reads as a different, wrong amount. Wrap it, scale it responsively, or abbreviate
+with the full value in `title` — but never show a partial figure as if whole.
+
 ### Path Alias
 
 `@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.app.json`).

@@ -81,7 +81,14 @@ export function FlightProgressDonut({ flight }: { flight: FlightDashboardItem })
   const centre: Segment | null = active;
 
   return (
-    <div className="flex items-center gap-4">
+    // The ring is a fixed 124px, so the legend beside it needs ~24rem of panel
+    // before "Ostatka (to‘lamagan, olib ketmagan)" fits on its line — under
+    // that it collapses toward ~40px and every row reads "To‘l…". Below 24rem
+    // the ring goes above and the legend takes the full width. Measured against
+    // the PANEL (`@container` on the card body), never the viewport: this card
+    // is a half column on a wide screen, where the viewport says nothing about
+    // how much room it actually has.
+    <div className="flex min-w-0 flex-col gap-3 @[24rem]:flex-row @[24rem]:items-center @[24rem]:gap-4">
       <div className="relative h-[124px] w-[124px] shrink-0">
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden="true">
           <circle
@@ -180,7 +187,10 @@ export function FlightProgressDonut({ flight }: { flight: FlightDashboardItem })
               onBlur={() => setActive(null)}
               onClick={() => setActive((current) => (current === segment ? null : segment))}
               aria-pressed={active === segment}
-              className={`flex min-h-[36px] w-full items-center gap-2 rounded-mc-sm px-1.5 text-left transition-colors ${
+              // 44px while the legend is stacked and finger-sized; back to the
+              // mockup's 36px rows once it sits beside the ring, where it is a
+              // caption next to a chart rather than a list of controls.
+              className={`flex min-h-[44px] w-full items-center gap-2 rounded-mc-sm px-1.5 text-left transition-colors @[24rem]:min-h-[36px] ${
                 active === segment ? 'bg-mc-surface-2' : ''
               }`}
             >

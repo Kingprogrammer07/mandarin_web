@@ -85,11 +85,20 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
+    // `min-w-0`: every consumer puts this card in a grid whose narrow-width
+    // track is `auto`, and a grid item's automatic minimum size is its
+    // min-content — here the header's `truncate` title, which cannot wrap and
+    // so reports its full width. The card was sized to that instead of to the
+    // column, and everything inside it hung past the right edge of a phone
+    // with no way to scroll to it.
+    <section className="flex min-w-0 flex-col rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
       <div className="flex items-start justify-between gap-3 px-4 pt-3.5">
         <div className="min-w-0">
+          {/* One line from `sm` up, as the mockup has it. Below that the header
+              is ~156px wide next to the action link and a title like "Kunlik
+              hisoblangan summa" would lose its last third, so it wraps. */}
           <h2
-            className="truncate text-[15px] font-extrabold tracking-tight text-mc-text"
+            className="text-[15px] font-extrabold tracking-tight text-mc-text sm:truncate"
             title={title}
           >
             {title}
@@ -165,16 +174,19 @@ export function MetricRow({
   label,
   value,
   tone = 'quiet',
+  title,
 }: {
   label: string;
   value: string;
   tone?: Tone;
+  /** The unabbreviated text, when `label` had to be shortened to fit the row. */
+  title?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span
         className="min-w-0 truncate text-[12px] font-medium text-mc-text-2"
-        title={label}
+        title={title ?? label}
       >
         {label}
       </span>

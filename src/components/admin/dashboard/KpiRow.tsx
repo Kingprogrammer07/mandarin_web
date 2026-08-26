@@ -63,7 +63,11 @@ function KpiCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-[148px] flex-col rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
+    // `min-w-0`: at one column the row's track is `auto`, whose minimum is this
+    // card's min-content — and the flight-name and footer lines cannot wrap, so
+    // a long tab name would size the card past the phone rather than ellipsing
+    // inside it.
+    <div className="flex min-h-[148px] min-w-0 flex-col rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
       <div className="flex flex-1 flex-col px-3.5 pt-3.5">
         <div className="mb-2.5 flex items-start gap-2.5">
           <span
@@ -157,13 +161,22 @@ function TillTile({
         </span>
       </span>
       {/* An eight-digit till total — a normal cash day — is wider than the
-          tile in the 2x2 grid. */}
+          tile in the 2x2 grid. It ellipses from `sm` up, where the card is wide
+          enough that only a freak number overflows; below that the tile is
+          ~103px and the unit was being eaten off the end of every amount, so
+          the line wraps instead. Truncating a sum of money is the one place a
+          `title` fallback is worth nothing on a phone. */}
       <p
-        className="mt-1 truncate text-[15px] font-extrabold leading-tight tabular-nums text-mc-text"
+        className="mt-1 break-words text-[15px] font-extrabold leading-tight tabular-nums text-mc-text sm:truncate"
         title={`${label}: ${formatUzs(value)}`}
       >
         {formatUzsAmount(value)}
-        <span className="ml-1 text-[10px] font-semibold text-mc-text-3">so‘m</span>
+        {/* `nowrap` on the unit alone: the wrap above may drop it to its own
+            line, but Chrome will otherwise take the break opportunity the
+            typographic apostrophe offers and print "so" over "m". */}
+        <span className="ml-1 whitespace-nowrap text-[10px] font-semibold text-mc-text-3">
+          so‘m
+        </span>
       </p>
     </div>
   );
@@ -201,7 +214,7 @@ export function KpiRow({
   return (
     // Four equal columns plus a wider fifth: the till card holds a 2x2 grid and
     // would crush its amounts at the same width as the others.
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[repeat(4,minmax(0,1fr))_1.4fr]">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[repeat(4,minmax(0,1fr))_1.4fr]">
       <KpiCard
         label="Bugun ro‘yxatdan o‘tganlar"
         Icon={UserPlus}
@@ -320,7 +333,7 @@ export function KpiRow({
         )}
       </KpiCard>
 
-      <div className="flex min-h-[148px] flex-col rounded-mc-lg border border-mc-border bg-mc-surface px-3.5 py-3.5 shadow-[var(--mc-shadow-card)] sm:col-span-2 xl:col-span-3 2xl:col-span-1">
+      <div className="flex min-h-[148px] min-w-0 flex-col rounded-mc-lg border border-mc-border bg-mc-surface px-3.5 py-3.5 shadow-[var(--mc-shadow-card)] sm:col-span-2 xl:col-span-3 2xl:col-span-1">
         <h3 className="mb-2.5 text-[13px] font-extrabold tracking-tight text-mc-text">
           Kassa — bugungi kun
         </h3>

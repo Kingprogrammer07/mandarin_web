@@ -60,17 +60,27 @@ function VisibilityToggle({
         triggerSoftHaptic();
         onToggle();
       }}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-150 disabled:opacity-50 ${
-        isOn ? 'bg-mc-brand' : 'bg-mc-surface-2 border border-mc-border'
-      }`}
+      /*
+        The switch draws 44×24 everywhere; the BUTTON is 44×44 on a phone and
+        collapses back to the track's own height from `sm:` up. Hit area, not
+        looks: a 24px-tall target misses under a thumb, while growing the
+        desktop row for a mouse pointer buys nothing.
+      */
+      className="flex h-11 w-11 shrink-0 items-center justify-center disabled:opacity-50 sm:h-6"
     >
       <span
-        className={`inline-block h-4.5 w-4.5 rounded-full bg-white shadow transition-transform duration-150 ${
-          isOn ? 'translate-x-[22px]' : 'translate-x-[3px]'
+        className={`relative flex h-6 w-11 items-center rounded-full transition-colors duration-150 ${
+          isOn ? 'bg-mc-brand' : 'bg-mc-surface-2 border border-mc-border'
         }`}
-        style={{ height: 18, width: 18 }}
         aria-hidden="true"
-      />
+      >
+        <span
+          className={`inline-block h-4.5 w-4.5 rounded-full bg-white shadow transition-transform duration-150 ${
+            isOn ? 'translate-x-[22px]' : 'translate-x-[3px]'
+          }`}
+          style={{ height: 18, width: 18 }}
+        />
+      </span>
     </button>
   );
 }
@@ -118,6 +128,17 @@ export function FlightBoardTable({
   const [dragging, setDragging] = useState<string | null>(null);
 
   const names = flights.map((f) => f.name);
+
+  /*
+    The right-hand controls own ONE 92px column in the desktop row — the header
+    calls it "Ko‘rsatish". Reorder and switch are separate flex items now, so
+    that a phone can put them on different lines; from `sm:` up they split that
+    column back into 44 + 44 with the 4px gutter the old single cell had, which
+    is what the negative margin cancels out of the row's 8px gap. Without
+    reorder rights the switch keeps the column to itself, where the header
+    label already points.
+  */
+  const switchCellClass = canManage ? 'sm:-ml-1 sm:w-11' : 'sm:w-[92px]';
 
   // Page-local index in, global index out: the board is paginated but its order
   // is not, so moving row 1 of page 2 must land at position 13, not 1.
@@ -302,8 +323,16 @@ export function FlightBoardTable({
                     descendant, which is exactly the bug that broke the admin
                     overlays. The other rows dim so the moving one is the only
                     thing at full contrast.
+
+                    **Wraps below `sm:`.** Four fixed columns (24 + 110 + 90 +
+                    92 plus gaps) need 348px of row before the name gets a
+                    single pixel; a 320px phone offers 236, so the name — the
+                    one thing the switch is labelled by — truncated to nothing
+                    and nobody could tell which flight they were turning on.
+                    Name and switch keep the first line, the secondary column
+                    contents fall to a second one.
                   */
-                  className={`relative flex items-center gap-2 rounded-mc-md border px-2 py-2 transition-[background-color,border-color,box-shadow,opacity] duration-150 ${
+                  className={`relative flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-mc-md border px-2 py-2 transition-[background-color,border-color,box-shadow,opacity] duration-150 sm:flex-nowrap ${
                     dragging === flight.name
                       ? 'z-10 border-mc-brand bg-mc-brand-soft shadow-[var(--mc-shadow-cta)] ring-2 ring-mc-brand/30'
                       : dragging
@@ -314,7 +343,7 @@ export function FlightBoardTable({
                   {canManage && (
                     <span
                       onPointerDown={(event) => startDrag(event, index)}
-                      className={`flex h-9 w-6 shrink-0 touch-none items-center justify-center transition-colors ${
+                      className={`flex h-11 w-8 shrink-0 touch-none items-center justify-center transition-colors sm:h-9 sm:w-6 ${
                         dragging === flight.name
                           ? 'cursor-grabbing text-mc-brand'
                           : 'cursor-grab text-mc-text-3 hover:text-mc-text-2'
@@ -335,28 +364,46 @@ export function FlightBoardTable({
                     {flight.name}
                   </span>
 
-                  <span className="w-[110px] shrink-0">
-                    <span
-                      className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${meta.chip}`}
-                    >
-                      {meta.label}
+                  {/* Stays beside the name it switches, on every width. */}
+                  <span
+                    className={`flex shrink-0 items-center justify-end sm:order-last ${switchCellClass}`}
+                  >
+                    <VisibilityToggle
+                      flightName={flight.name}
+                      isOn={Boolean(flight.is_visible)}
+                      isBusy={!canManage || pendingFlight === flight.name}
+                      onToggle={() => onToggleVisibility(flight)}
+                    />
+                  </span>
+
+                  {/*
+                    Status, count and reorder: a full-width second line on a
+                    phone, which is what forces the break above it. `sm:contents`
+                    dissolves this wrapper from the small breakpoint up, so the
+                    desktop row is the same four flex cells it always was.
+                  */}
+                  <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 sm:contents">
+                    <span className="shrink-0 sm:w-[110px]">
+                      <span
+                        className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${meta.chip}`}
+                      >
+                        {meta.label}
+                      </span>
                     </span>
-                  </span>
 
-                  <span className="w-[90px] shrink-0 text-right text-[11px] font-semibold tabular-nums text-mc-text-2">
-                    {trackCount} trek
-                  </span>
+                    <span className="shrink-0 text-right text-[11px] font-semibold tabular-nums text-mc-text-2 sm:w-[90px]">
+                      {trackCount} trek
+                    </span>
 
-                  <span className="flex w-[92px] shrink-0 items-center justify-end gap-1">
                     {canManage && (
-                      <span className="flex flex-col">
+                      <span className="ml-auto flex shrink-0 items-center gap-2 sm:ml-0 sm:w-11 sm:flex-col sm:items-end sm:gap-0">
                         {/* Drag is invisible to a keyboard; these are not. */}
                         <button
                           type="button"
                           onClick={() => move(index, index - 1)}
                           disabled={index === 0}
                           aria-label={`${flight.name} — yuqoriga`}
-                          className="flex h-5 w-5 items-center justify-center text-mc-text-3 disabled:opacity-30"
+                          className="flex h-11 w-11 items-center justify-center text-mc-text-3 disabled:opacity-30 sm:h-5 sm:w-5"
                         >
                           <ChevronUp className="h-3.5 w-3.5" strokeWidth={2.4} />
                         </button>
@@ -365,18 +412,12 @@ export function FlightBoardTable({
                           onClick={() => move(index, index + 1)}
                           disabled={index === flights.length - 1}
                           aria-label={`${flight.name} — pastga`}
-                          className="flex h-5 w-5 items-center justify-center text-mc-text-3 disabled:opacity-30"
+                          className="flex h-11 w-11 items-center justify-center text-mc-text-3 disabled:opacity-30 sm:h-5 sm:w-5"
                         >
                           <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.4} />
                         </button>
                       </span>
                     )}
-                    <VisibilityToggle
-                      flightName={flight.name}
-                      isOn={Boolean(flight.is_visible)}
-                      isBusy={!canManage || pendingFlight === flight.name}
-                      onToggle={() => onToggleVisibility(flight)}
-                    />
                   </span>
                 </li>
               );

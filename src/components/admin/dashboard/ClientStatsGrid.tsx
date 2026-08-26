@@ -135,7 +135,7 @@ export function ClientStatsGrid({
 }) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-2.5 @[30rem]:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2.5 @[26rem]:grid-cols-2 @[30rem]:grid-cols-4">
         {Array.from({ length: 8 }, (_, i) => (
           <TileSkeleton key={i} />
         ))}
@@ -163,7 +163,13 @@ export function ClientStatsGrid({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2.5 @[30rem]:grid-cols-4">
+      {/* One column under 26rem of PANEL width. Two columns there give a 100px
+          tile, and these labels are sentences — "Uzoq vaqt yuk yubormaganlar",
+          "Ro‘yxatdan o‘tgan, lekin hali yuk yubormagan" — so the tile showed
+          about the first third of each and hid the rest behind a `title` that
+          a phone cannot open. Full width fits both lines whole. The 2- and
+          4-column steps are unchanged, so nothing moves from ~482px up. */}
+      <div className="grid grid-cols-1 gap-2.5 @[26rem]:grid-cols-2 @[30rem]:grid-cols-4">
       <Tile
         label="Jami mijozlar"
         value={overview.total_clients}

@@ -924,7 +924,10 @@ export default function CashierPage({ onNavigate, onLogout }: CashierPageProps) 
             >
               <Bell className="h-4 w-4" strokeWidth={2} />
               {pendingTotal > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-mc-brand px-1 text-[9px] font-extrabold tabular-nums text-mc-on-brand">
+                /* Tucked inside the button's own box on a phone: hung outside
+                   it, the badge put 4px of layout overflow on the last control
+                   of an already-tight header row. Unchanged from `sm` up. */
+                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-mc-brand px-1 text-[9px] font-extrabold tabular-nums text-mc-on-brand sm:-right-1 sm:-top-1">
                   {pendingTotal > 99 ? '99+' : pendingTotal}
                 </span>
               )}

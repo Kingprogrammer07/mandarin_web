@@ -87,15 +87,18 @@ export function QuickAccess({ onNavigate }: { onNavigate: (page: string) => void
               <Icon className="h-5 w-5" strokeWidth={1.9} />
             </span>
             {/* Both lines truncate in a 140px card, so both carry the full
-                text on hover. */}
+                text on hover — but a phone has no hover, and under 20rem of
+                panel width the card is ~98px, where "Xodimlar amallari tarixi"
+                loses its last two words. Below that width they wrap instead;
+                the card is `min-h`, not a fixed height, so it just grows. */}
             <span
-              className="block w-full truncate text-[13px] font-extrabold text-mc-text"
+              className="block w-full break-words text-[13px] font-extrabold text-mc-text @[20rem]:truncate"
               title={label}
             >
               {label}
             </span>
             <span
-              className="block w-full truncate text-[11px] font-medium text-mc-text-3"
+              className="block w-full break-words text-[11px] font-medium text-mc-text-3 @[20rem]:truncate"
               title={hint}
             >
               {hint}

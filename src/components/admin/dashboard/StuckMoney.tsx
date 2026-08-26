@@ -40,6 +40,18 @@ function backlogLabel(total: number | undefined, count: number): string {
   return real > count ? `${real} (${count} ko‘rsatilmoqda)` : String(real);
 }
 
+/**
+ * NBU order ids are `uuid4()` (see `payments_nbu.py`), and 36 characters have
+ * never fitted this row at any width — the desktop layout loses the last 146px
+ * of it. An ellipsed UUID identifies nothing, so only the first block is shown:
+ * enough to match the row against the full list on the Tizim screen the header
+ * link opens. The whole id stays in `title` for a pointer.
+ */
+function shortOrderId(orderId: string): string {
+  const head = orderId.split('-')[0];
+  return head.length < orderId.length ? `${head}…` : orderId;
+}
+
 export function StuckMoney({ onNavigate }: { onNavigate: (page: string) => void }) {
   const nbu = useQuery({
     queryKey: ['admin-dashboard', 'nbu-pending'],
@@ -64,7 +76,12 @@ export function StuckMoney({ onNavigate }: { onNavigate: (page: string) => void 
       subtitle="Pul olingan, jarayon tugamagan"
       action={{ label: 'Tizim →', onClick: () => onNavigate('system-settings') }}
     >
-      <div className="grid gap-3 lg:grid-cols-2">
+      {/* `grid-cols-1`, not an implicit `auto` column. Each tile holds a row
+          whose label is a 36-character UUID on one unbreakable line, so an auto
+          column took ~420px of min-content and pushed the right-hand tile off
+          the screen — the "layoutdan chiqib ketgan" the owner reported. It only
+          shows with rows present; the empty state fits anywhere. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 text-[12px] font-bold text-mc-text">
@@ -88,7 +105,8 @@ export function StuckMoney({ onNavigate }: { onNavigate: (page: string) => void 
             nbu.data?.rows.slice(0, 3).map((row) => (
               <MetricRow
                 key={row.id}
-                label={`${row.order_id} · ${ageLabel(row.age_seconds)}`}
+                label={`${shortOrderId(row.order_id)} · ${ageLabel(row.age_seconds)}`}
+                title={`${row.order_id} · ${ageLabel(row.age_seconds)}`}
                 value={formatUzs(row.amount_uzs)}
                 tone={(row.age_seconds ?? 0) > 3600 ? 'danger' : 'quiet'}
               />

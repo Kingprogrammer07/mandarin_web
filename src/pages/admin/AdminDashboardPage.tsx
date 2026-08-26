@@ -169,8 +169,16 @@ export default function AdminDashboardPage({
        * A wrapper grid is applied only when BOTH halves will render. An admin
        * without `statistics:read` would otherwise get the warehouse stranded in
        * a half column beside an empty one, which reads as a panel that failed
-       * to load. */}
-      <div className={canReadStatistics ? 'grid gap-4 xl:grid-cols-2' : ''}>
+       * to load.
+       *
+       * `grid-cols-1` is spelled out on every row below, and is not decoration:
+       * it is `repeat(1, minmax(0, 1fr))`, whereas leaving it off gives an
+       * implicit `auto` column sized to the widest min-content inside it. A
+       * panel holding one `truncate` line — which cannot wrap and therefore
+       * reports its full text width — dragged that column ~110px past a 320px
+       * phone, and the shell clips rather than scrolls, so the overflow was
+       * simply unreachable. */}
+      <div className={canReadStatistics ? 'grid grid-cols-1 gap-4 xl:grid-cols-2' : ''}>
         <WarehousePanel onNavigate={onNavigate} language={language} />
 
         {canReadStatistics && (
@@ -191,7 +199,7 @@ export default function AdminDashboardPage({
       </div>
 
       {/* Mockup row 3. Both halves are always rendered, so the grid is static. */}
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ActivityPanel onNavigate={onNavigate} language={language} />
         <QuickAccess onNavigate={onNavigate} />
       </div>
@@ -203,7 +211,9 @@ export default function AdminDashboardPage({
        * a second set of links to them was a duplicate, not a summary. */}
       {(isSuperAdmin || canReadStatistics) && (
         <div
-          className={isSuperAdmin && canReadStatistics ? 'grid gap-4 xl:grid-cols-2' : ''}
+          className={
+            isSuperAdmin && canReadStatistics ? 'grid grid-cols-1 gap-4 xl:grid-cols-2' : ''
+          }
         >
           {isSuperAdmin && <StuckMoney onNavigate={onNavigate} />}
 
