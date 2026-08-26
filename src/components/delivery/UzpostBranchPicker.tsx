@@ -53,6 +53,21 @@ interface BranchWithDistance extends UzpostBranch {
 }
 
 const DEFAULT_CENTER: [number, number] = [41.311081, 69.240562];
+/**
+ * How many branches the LIST shows at once.
+ *
+ * The map markers were already capped; the list underneath was not, so with no
+ * search term it rendered every one of the ~1,590 branches — roughly 1,590
+ * buttons, each with an icon, a name, an address and a distance. That is the
+ * weight the client feels when the picker opens, and 1,570 of those rows are
+ * for towns they will never post to.
+ *
+ * Twenty is enough to cover "the ones near me" once geolocation is on, and the
+ * search box reaches the rest. The count that is being hidden is stated on
+ * screen so the list never looks like the whole set.
+ */
+const VISIBLE_LIST_LIMIT = 20;
+
 const DEFAULT_VISIBLE_MARKER_LIMIT = 36;
 const SEARCH_VISIBLE_MARKER_LIMIT = 48;
 const NEARBY_VISIBLE_MARKER_LIMIT = 40;
@@ -213,10 +228,10 @@ function SelectedBranchDetails({
     return (
       <div className={cn(theme.selectedPanelClassName, 'text-center')}>
         <MapPinned className="mx-auto mb-3 h-10 w-10 text-mc-brand" />
-        <p className={cn('text-sm font-bold', theme.primaryTextClassName)}>
+        <p className={cn('text-[13px] font-bold', theme.primaryTextClassName)}>
           {t('deliveryRequest.branchPicker.emptyTitle')}
         </p>
-        <p className={cn('mt-1 text-xs', theme.mutedTextClassName)}>
+        <p className={cn('mt-1 text-[11px]', theme.mutedTextClassName)}>
           {t('deliveryRequest.branchPicker.emptyDescription')}
         </p>
       </div>
@@ -260,13 +275,13 @@ function SelectedBranchDetails({
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className={cn('text-xs font-bold uppercase', theme.mutedTextClassName)}>
+          <p className={cn('text-[11px] font-bold uppercase', theme.mutedTextClassName)}>
             {t('deliveryRequest.branchPicker.selectedLabel')}
           </p>
-          <h3 className={cn('mt-0.5 text-base font-extrabold leading-tight', theme.primaryTextClassName)}>
+          <h3 className={cn('mt-0.5 text-[15px] font-extrabold leading-tight', theme.primaryTextClassName)}>
             {branch.name}
           </h3>
-          <p className={cn('mt-1 text-sm leading-snug', theme.mutedTextClassName)}>
+          <p className={cn('mt-1 text-[13px] leading-snug', theme.mutedTextClassName)}>
             {branch.address}
           </p>
         </div>
@@ -278,10 +293,10 @@ function SelectedBranchDetails({
             key={row.label}
             className="flex items-start justify-between gap-3 rounded-mc-md bg-mc-surface-2 px-3 py-2 dark:bg-white/[0.04]"
           >
-            <span className={cn('shrink-0 text-xs font-semibold', theme.mutedTextClassName)}>
+            <span className={cn('shrink-0 text-[11px] font-semibold', theme.mutedTextClassName)}>
               {row.label}
             </span>
-            <span className={cn('text-right text-xs font-bold leading-snug', theme.primaryTextClassName)}>
+            <span className={cn('text-right text-[11px] font-bold leading-snug', theme.primaryTextClassName)}>
               {row.value}
             </span>
           </div>
@@ -291,7 +306,7 @@ function SelectedBranchDetails({
       <button
         type="button"
         onClick={() => setIsExpanded((current) => !current)}
-        className="mt-3 flex w-full items-center justify-between gap-3 rounded-mc-md border border-dashed border-mc-brand/20 bg-mc-brand-soft px-3 py-2 text-left text-xs font-bold text-mc-brand transition active:scale-[0.99] dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
+        className="mt-3 flex w-full items-center justify-between gap-3 rounded-mc-md border border-dashed border-mc-brand/20 bg-mc-brand-soft px-3 py-2 text-left text-[11px] font-bold text-mc-brand transition active:scale-[0.99] dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
       >
         <span>{t('deliveryRequest.branchPicker.expandDetails')}</span>
         <ChevronDown
@@ -306,10 +321,10 @@ function SelectedBranchDetails({
               key={row.label}
               className="flex items-start justify-between gap-3 rounded-mc-md bg-mc-surface-2 px-3 py-2 dark:bg-white/[0.04]"
             >
-              <span className={cn('shrink-0 text-xs font-semibold', theme.mutedTextClassName)}>
+              <span className={cn('shrink-0 text-[11px] font-semibold', theme.mutedTextClassName)}>
                 {row.label}
               </span>
-              <span className={cn('text-right text-xs font-bold leading-snug', theme.primaryTextClassName)}>
+              <span className={cn('text-right text-[11px] font-bold leading-snug', theme.primaryTextClassName)}>
                 {row.value}
               </span>
             </div>
@@ -345,16 +360,16 @@ function SelectedBranchPreview({
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={cn('text-xs font-bold uppercase', theme.mutedTextClassName)}>
+          <p className={cn('text-[11px] font-bold uppercase', theme.mutedTextClassName)}>
             {t('deliveryRequest.branchPicker.selectedLabel')}
           </p>
-          <h3 className={cn('mt-0.5 text-base font-extrabold leading-tight', theme.primaryTextClassName)}>
+          <h3 className={cn('mt-0.5 text-[15px] font-extrabold leading-tight', theme.primaryTextClassName)}>
             {branch.index} - {branch.name}
           </h3>
-          <p className={cn('mt-1 line-clamp-2 text-sm leading-snug', theme.mutedTextClassName)}>
+          <p className={cn('mt-1 line-clamp-2 text-[13px] leading-snug', theme.mutedTextClassName)}>
             {branch.address}
           </p>
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-mc-md bg-mc-brand-soft px-3 py-1.5 text-xs font-bold text-mc-brand dark:bg-mc-brand/10 dark:text-mc-brand">
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-mc-md bg-mc-brand-soft px-3 py-1.5 text-[11px] font-bold text-mc-brand dark:bg-mc-brand/10 dark:text-mc-brand">
             <ChevronDown className="-rotate-90 h-3.5 w-3.5" />
             {t('deliveryRequest.branchPicker.changeSelection')}
           </p>
@@ -384,16 +399,16 @@ function SuggestedBranchCard({
           <MapPinned className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className={cn('text-xs font-bold uppercase', theme.mutedTextClassName)}>
+          <p className={cn('text-[11px] font-bold uppercase', theme.mutedTextClassName)}>
             {t('deliveryRequest.branchPicker.savedSuggestionLabel')}
           </p>
-          <h3 className={cn('mt-0.5 text-base font-extrabold leading-tight', theme.primaryTextClassName)}>
+          <h3 className={cn('mt-0.5 text-[15px] font-extrabold leading-tight', theme.primaryTextClassName)}>
             {branch.index} - {branch.name}
           </h3>
-          <p className={cn('mt-1 line-clamp-2 text-sm leading-snug', theme.mutedTextClassName)}>
+          <p className={cn('mt-1 line-clamp-2 text-[13px] leading-snug', theme.mutedTextClassName)}>
             {branch.address}
           </p>
-          <p className="mt-2 text-xs font-semibold text-mc-brand">
+          <p className="mt-2 text-[11px] font-semibold text-mc-brand">
             {t('deliveryRequest.branchPicker.savedSuggestionHint')}
           </p>
         </div>
@@ -403,14 +418,14 @@ function SuggestedBranchCard({
         <button
           type="button"
           onClick={onUse}
-          className="h-11 rounded-mc-lg bg-mc-success px-3 text-xs font-extrabold text-white shadow-lg shadow-emerald-500/20 transition active:scale-95"
+          className="h-11 rounded-mc-lg bg-mc-success px-3 text-[11px] font-extrabold text-white shadow-lg shadow-emerald-500/20 transition active:scale-95"
         >
           {t('deliveryRequest.branchPicker.useSavedBranch')}
         </button>
         <button
           type="button"
           onClick={onChooseOther}
-          className="h-11 rounded-mc-lg border border-mc-brand/20 bg-mc-brand-soft px-3 text-xs font-extrabold text-mc-brand transition active:scale-95 dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
+          className="h-11 rounded-mc-lg border border-mc-brand/20 bg-mc-brand-soft px-3 text-[11px] font-extrabold text-mc-brand transition active:scale-95 dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
         >
           {t('deliveryRequest.branchPicker.chooseOtherBranch')}
         </button>
@@ -464,30 +479,49 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
       });
   }, [branches, userLocation]);
 
-  const filteredBranches = useMemo<BranchWithDistance[]>(() => {
+  const matchingBranches = useMemo<BranchWithDistance[]>(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     if (!normalizedQuery) {
       return branchesWithDistance;
     }
 
-    return branchesWithDistance
-      .filter((branch) => {
-        const searchableText = `${branch.name} ${branch.index} ${branch.address}`.toLowerCase();
-        return searchableText.includes(normalizedQuery);
-      })
-      .slice(0, 10);
-  }, [branchesWithDistance, searchQuery, userLocation]);
+    return branchesWithDistance.filter((branch) => {
+      const searchableText = `${branch.name} ${branch.index} ${branch.address}`.toLowerCase();
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [branchesWithDistance, searchQuery]);
+
+  /** What is drawn. `matchingBranches` is what the count below refers to. */
+  const filteredBranches = useMemo<BranchWithDistance[]>(
+    () => matchingBranches.slice(0, VISIBLE_LIST_LIMIT),
+    [matchingBranches],
+  );
+
+  const hiddenBranchCount = matchingBranches.length - filteredBranches.length;
+
+  /**
+   * While a search is running, fold away the quick actions and give the room to
+   * the results.
+   *
+   * Keyed off the QUERY, not off focus. A focus trigger has to un-hide on blur,
+   * and on iOS blur fires at `mousedown` when a result is tapped: the row moves
+   * out from under the finger between mousedown and mouseup and the tap dies.
+   * Keying off the query also means the collapse lands on the first keystroke
+   * instead of racing the keyboard's viewport animation, and "Menga yaqin
+   * punktlar" stays reachable for someone who focused the field and changed
+   * their mind.
+   *
+   * `isSelectionSettling` is included so the block does not slam back in during
+   * the 520ms between picking a branch (which clears the query) and the picker
+   * collapsing.
+   */
+  const isSearching = searchQuery.trim().length > 0 || isSelectionSettling;
 
   const visibleMapBranches = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
-    const candidateBranches = normalizedQuery
-      ? branchesWithDistance.filter((branch) => {
-          const searchableText = `${branch.name} ${branch.index} ${branch.address}`.toLowerCase();
-          return searchableText.includes(normalizedQuery);
-        })
-      : branchesWithDistance;
+    const candidateBranches = matchingBranches;
 
     const markerLimit = normalizedQuery
       ? SEARCH_VISIBLE_MARKER_LIMIT
@@ -501,7 +535,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     }
 
     return visibleBranches;
-  }, [branchesWithDistance, searchQuery, selectedBranch, userLocation]);
+  }, [matchingBranches, searchQuery, selectedBranch, userLocation]);
 
   const handleBranchSelect = useCallback(
     (branch: UzpostBranch) => {
@@ -588,7 +622,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
       <div className={cn(theme.shellClassName, 'flex min-h-[280px] items-center justify-center')}>
         <div className="text-center">
           <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-mc-brand" />
-          <p className={cn('text-sm font-bold', theme.primaryTextClassName)}>
+          <p className={cn('text-[13px] font-bold', theme.primaryTextClassName)}>
             {t('deliveryRequest.branchPicker.loading')}
           </p>
         </div>
@@ -600,13 +634,13 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     return (
       <div className={cn(theme.shellClassName, 'text-center')}>
         <AlertCircle className="mx-auto mb-3 h-10 w-10 text-mc-danger" />
-        <p className={cn('text-sm font-bold', theme.primaryTextClassName)}>
+        <p className={cn('text-[13px] font-bold', theme.primaryTextClassName)}>
           {t('deliveryRequest.branchPicker.loadError')}
         </p>
         <button
           type="button"
           onClick={onRetry}
-          className="mx-auto mt-4 flex h-11 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/20 active:scale-95"
+          className="mx-auto mt-4 flex h-11 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-5 text-[13px] font-bold text-white shadow-lg shadow-orange-500/20 active:scale-95"
         >
           <RefreshCw className="h-4 w-4" />
           {t('deliveryRequest.branchPicker.retry')}
@@ -660,16 +694,16 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
       <div className="mb-3">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h3 className={cn('text-lg font-extrabold', theme.primaryTextClassName)}>
+            <h3 className={cn('text-[15px] font-extrabold', theme.primaryTextClassName)}>
               {t('deliveryRequest.branchPicker.title')}
             </h3>
-            <p className={cn('text-xs font-medium', theme.mutedTextClassName)}>
+            <p className={cn('text-[11px] font-medium', theme.mutedTextClassName)}>
               {t('deliveryRequest.branchPicker.subtitle', {
                 count: branches.length,
               })}
             </p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-mc-surface px-3 py-1.5 text-xs font-bold text-mc-brand shadow-sm dark:bg-white/10 dark:text-mc-brand">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-mc-surface px-3 py-1.5 text-[11px] font-bold text-mc-brand shadow-sm dark:bg-white/10 dark:text-mc-brand">
             <MapPin className="h-3.5 w-3.5" />
             {visibleMapBranches.length}/{branches.length}
           </span>
@@ -685,12 +719,25 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           />
         </div>
 
+        {/* Animating grid-template-rows is a layout animation and a deliberate
+            exception to the transform/opacity rule: no transform removes an
+            element's height from normal flow, and the animated subtree here is
+            two buttons and a line of text. `inert` keeps the collapsed controls
+            off the keyboard tab order. The "Xaritadan tanlash" CTA below stays
+            visible throughout, so the map is never unreachable. */}
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+            isSearching ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
+          )}
+        >
+          <div className="overflow-hidden" inert={isSearching || undefined}>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={handleLocateUser}
             disabled={isLocating}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 text-xs font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 text-[11px] font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
           >
             {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
             {t('deliveryRequest.branchPicker.locateButton')}
@@ -698,7 +745,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           <button
             type="button"
             onClick={() => setIsMapExpanded((current) => !current)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-surface px-4 text-xs font-bold text-mc-text shadow-sm transition active:scale-95 dark:bg-white/10 dark:text-mc-text"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-surface px-4 text-[11px] font-bold text-mc-text shadow-sm transition active:scale-95 dark:bg-white/10 dark:text-mc-text"
           >
             {isMapExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             {isMapExpanded
@@ -708,8 +755,10 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         </div>
 
         {locationError && (
-          <p className="mt-2 text-xs font-semibold text-mc-danger">{locationError}</p>
+          <p className="mt-2 text-[11px] font-semibold text-mc-danger">{locationError}</p>
         )}
+          </div>
+        </div>
       </div>
 
       {/* Open map button */}
@@ -717,7 +766,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         <button
           type="button"
           onClick={() => setIsMapExpanded(true)}
-          className="w-full h-12 rounded-mc-lg bg-mc-surface border border-mc-brand/20 dark:border-mc-brand/20 text-sm font-bold text-mc-brand flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          className="w-full h-12 rounded-mc-lg bg-mc-surface border border-mc-brand/20 dark:border-mc-brand/20 text-[13px] font-bold text-mc-brand flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
         >
           <MapPin className="h-4 w-4" />
           {t('deliveryRequest.branchPicker.openMap')}
@@ -785,9 +834,9 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                 >
                   <Popup>
                     <div className="min-w-48">
-                      <p className="text-sm font-bold">{branch.name}</p>
-                      <p className="mt-1 text-xs text-mc-text-2">{branch.address}</p>
-                      <p className="mt-2 text-xs font-semibold text-mc-brand">
+                      <p className="text-[13px] font-bold">{branch.name}</p>
+                      <p className="mt-1 text-[11px] text-mc-text-2">{branch.address}</p>
+                      <p className="mt-2 text-[11px] font-semibold text-mc-brand">
                         {t('deliveryRequest.branchPicker.fields.index')}: {branch.index}
                       </p>
                     </div>
@@ -801,7 +850,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           <button
             type="button"
             onClick={() => setIsMapExpanded(false)}
-            className="absolute top-2 right-2 z-[1000] inline-flex items-center gap-1.5 rounded-mc-md bg-white/95 dark:bg-mc-cardface/95 px-3 py-2 text-xs font-bold text-mc-text shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md active:scale-95 transition-all"
+            className="absolute top-2 right-2 z-[1000] inline-flex items-center gap-1.5 rounded-mc-md bg-white/95 dark:bg-mc-cardface/95 px-3 py-2 text-[11px] font-bold text-mc-text shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md active:scale-95 transition-all"
           >
             <Minimize2 className="h-3.5 w-3.5 text-mc-brand" />
             {t('deliveryRequest.branchPicker.closeMap')}
@@ -809,7 +858,33 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         </div>
       )}
 
-      <div className="mt-3 grid gap-2 max-h-60 overflow-y-auto">
+      {hiddenBranchCount > 0 && (
+        <p className="mt-2 text-[11px] font-medium text-mc-text-2">
+          {t(
+            'deliveryRequest.branchPicker.truncated',
+            'Yaqin {{shown}} ta filial ko‘rsatildi, yana {{hidden}} ta bor — qidiruvdan foydalaning',
+            { shown: filteredBranches.length, hidden: hiddenBranchCount },
+          )}
+        </p>
+      )}
+
+      <div
+        className={cn(
+          'mt-3 grid gap-2 overflow-y-auto overscroll-contain transition-[max-height] duration-200 ease-out motion-reduce:transition-none',
+          // dvh, not vh: on iOS `vh` is the height with the browser chrome
+          // hidden, which is not the height the keyboard leaves behind.
+          isSearching ? 'max-h-[46dvh]' : 'max-h-60',
+        )}
+      >
+        {matchingBranches.length === 0 && (
+          // Without this the list simply renders nothing, which reads as "the
+          // search is still running" rather than "no branch matches".
+          <p className="py-6 text-center text-[12px] font-medium text-mc-text-2">
+            {t('deliveryRequest.branchPicker.noResults', {
+              query: searchQuery.trim(),
+            })}
+          </p>
+        )}
         {filteredBranches.map((branch) => {
           const isSelected = selectedBranch?.id === branch.id;
           const distanceLabel = formatDistance(branch.distanceKm);
@@ -830,20 +905,20 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                     <Hash className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className={cn('text-sm font-extrabold leading-tight', theme.primaryTextClassName)}>
+                    <p className={cn('text-[13px] font-extrabold leading-tight', theme.primaryTextClassName)}>
                       {branch.index} - {branch.name}
                     </p>
-                    <p className={cn('mt-1 line-clamp-2 text-xs leading-snug', theme.mutedTextClassName)}>
+                    <p className={cn('mt-1 line-clamp-2 text-[11px] leading-snug', theme.mutedTextClassName)}>
                       {branch.address}
                     </p>
                     {branch.workdays && (
-                      <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-mc-success">
+                      <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-mc-success">
                         <CalendarDays className="h-3.5 w-3.5" />
                         {branch.workdays}
                       </span>
                     )}
                     {distanceLabel && (
-                      <span className="mt-2 ml-2 inline-flex items-center gap-1 text-xs font-semibold text-mc-brand">
+                      <span className="mt-2 ml-2 inline-flex items-center gap-1 text-[11px] font-semibold text-mc-brand">
                         <MapPin className="h-3.5 w-3.5" />
                         {distanceLabel}
                       </span>

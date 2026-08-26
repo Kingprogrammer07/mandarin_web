@@ -16,7 +16,7 @@ export const UZPOST_BRANCH_PICKER_THEME: UzpostBranchPickerTheme = {
     'rounded-3xl border border-orange-200 bg-orange-50/80 p-3 shadow-sm shadow-orange-500/5 dark:border-orange-500/20 dark:bg-orange-500/5',
   mapClassName: 'h-[220px] w-full overflow-hidden rounded-2xl border border-white/70 dark:border-white/10',
   searchClassName:
-    'h-12 w-full rounded-2xl border border-orange-200 bg-white pl-11 pr-4 text-sm font-semibold text-gray-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 dark:border-orange-500/20 dark:bg-white/10 dark:text-white',
+    'h-12 w-full rounded-2xl border border-orange-200 bg-white pl-11 pr-4 text-[16px] font-semibold text-gray-900 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 dark:border-orange-500/20 dark:bg-white/10 dark:text-white',
   selectedPanelClassName:
     'rounded-2xl border border-orange-200 bg-white p-4 shadow-sm dark:border-orange-500/20 dark:bg-white/5',
   resultButtonClassName:

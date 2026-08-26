@@ -112,7 +112,9 @@ export async function submitStandardDelivery(
    */
   latitude: number | null,
   longitude: number | null,
-  includeAddress: boolean = false
+  includeAddress: boolean = false,
+  /** Null keeps the profile name — the backend falls back on its own. */
+  recipientName: string | null = null
 ): Promise<DeliverySuccessResponse> {
   const response = await apiClient.post<DeliverySuccessResponse>(
     '/api/user/delivery/request/standard',
@@ -120,6 +122,7 @@ export async function submitStandardDelivery(
       delivery_type: deliveryType,
       flight_names: flightNames,
       phone_number: phoneNumber,
+      recipient_name: recipientName,
       caption,
       latitude,
       longitude,
@@ -172,7 +175,9 @@ export async function submitUzpostDelivery(
   walletUsed: number,
   receiptFile?: File | null,
   selectedBranch?: UzpostBranch | null,
-  phoneNumber?: string | null
+  phoneNumber?: string | null,
+  /** Omitted keeps the profile name — the backend falls back on its own. */
+  recipientName?: string | null
 ): Promise<DeliverySuccessResponse> {
   const formData = new FormData();
   formData.append('flight_names', JSON.stringify(flightNames));
@@ -184,6 +189,10 @@ export async function submitUzpostDelivery(
 
   if (phoneNumber) {
     formData.append('phone_number', phoneNumber);
+  }
+
+  if (recipientName) {
+    formData.append('recipient_name', recipientName);
   }
 
   if (receiptFile) {

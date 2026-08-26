@@ -1204,7 +1204,8 @@
       "copied": "Manzil nusxalandi!",
       "downloading": "Rasm yuklab olinmoqda...",
       "downloadFailed": "Yuklab bo'lmadi. Rasm yangi oynada ochildi."
-    }
+    },
+    "imageFailed": "Rasm yuklanmadi"
   },
   "flightSchedule": {
     "title": "Reyslar Jadvali",
@@ -1259,6 +1260,14 @@
     "headerTitle": "Zayavka qoldirish",
     "headerTitleShort": "Zayavka",
     "historyButton": "Tarix",
+    "recipient": {
+      "label": "Qabul qiluvchi",
+      "useProfile": "Profildagi ism",
+      "useOther": "Boshqa ism",
+      "placeholder": "Kim olib ketadi?",
+      "hintOther": "Kuryer shu ismni so‘raydi. Bo‘sh qoldirilsa profildagi ism ishlatiladi.",
+      "empty": "—"
+    },
     "branchPicker": {
       "title": "UzPost punktini tanlang",
       "subtitle": "{{count}} ta filialdan eng moslari ko'rsatilgan",
@@ -1297,7 +1306,9 @@
         "otherScheduleNotes": "Qo'shimcha jadval",
         "latitude": "Latitude",
         "longitude": "Longitude"
-      }
+      },
+      "truncated": "Yaqin {{shown}} ta filial ko‘rsatildi, yana {{hidden}} ta bor — qidiruvdan foydalaning",
+      "noResults": "«{{query}}» bo‘yicha punkt topilmadi"
     },
     "adminModal": {
       "addressGate": {

@@ -104,7 +104,7 @@ const StatusBadge = memo(({ status }: { status: string }) => {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${c.cls}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${c.cls}`}
     >
       {c.icon}
       {c.label}
@@ -150,10 +150,10 @@ const EmptyState = memo(() => {
     <div className="w-20 h-20 rounded-full bg-mc-surface-2 flex items-center justify-center mb-5">
       <PackageOpen className="w-10 h-10 text-mc-text-3 dark:text-white/15" />
     </div>
-    <h3 className="text-lg font-bold text-mc-text-2 mb-1">
+    <h3 className="text-[15px] font-bold text-mc-text-2 mb-1">
       {t('deliveryHistory.emptyState.title')}
     </h3>
-    <p className="text-sm text-mc-text-3 text-center max-w-xs">
+    <p className="text-[13px] text-mc-text-3 text-center max-w-xs">
       {t('deliveryHistory.emptyState.desc')}
     </p>
   </div>
@@ -246,7 +246,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
             <Truck className="w-4.5 h-4.5" />
           </div>
           <div>
-            <span className={`inline-block px-2 py-0.5 rounded-mc-sm text-xs font-bold ${typeColor}`}>
+            <span className={`inline-block px-2 py-0.5 rounded-mc-sm text-[11px] font-bold ${typeColor}`}>
               {typeLabel}
             </span>
             <p className="text-[10px] text-mc-text-3 mt-0.5 font-medium">
@@ -262,7 +262,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
         {item.flight_names.map((f) => (
           <span
             key={f}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-mc-md bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand text-xs font-semibold"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-mc-md bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand text-[11px] font-semibold"
           >
             <Plane className="w-3 h-3" />
             {f}
@@ -272,7 +272,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
 
       {/* Phone */}
       {item.phone && (
-        <div className="flex items-center gap-2 text-xs text-mc-text-2 mt-2">
+        <div className="flex items-center gap-2 text-[11px] text-mc-text-2 mt-2">
           <Phone className="w-3.5 h-3.5 shrink-0" />
           <span className="font-medium">{item.phone}</span>
         </div>
@@ -280,7 +280,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
 
       {/* Address */}
       {addressText && (
-        <div className="flex items-start gap-2 text-xs text-mc-text-2 mt-2">
+        <div className="flex items-start gap-2 text-[11px] text-mc-text-2 mt-2">
           <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span className="line-clamp-2">
             {addressText}
@@ -294,7 +294,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
           <p className="text-[10px] font-bold text-mc-text-3 uppercase tracking-wide mb-1">
             {t('deliveryHistory.card.caption')}
           </p>
-          <p className="text-xs text-mc-text leading-relaxed">
+          <p className="text-[11px] text-mc-text leading-relaxed">
             {item.caption}
           </p>
         </div>
@@ -306,7 +306,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
           href={item.location_url}
           target="_blank"
           rel="noreferrer"
-          className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-mc-brand underline-offset-2 dark:text-mc-brand"
+          className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-mc-brand underline-offset-2 dark:text-mc-brand"
         >
           <MapPin className="w-3.5 h-3.5" />
           {t('deliveryHistory.card.openInMap')}
@@ -314,7 +314,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
       )}
 
       {item.delivery_type === 'uzpost' && (item.uzpost_order_number || uzpostTrackingStatus || item.uzpost_label_pdf_url) && (
-        <div className="mt-3 rounded-mc-md border border-mc-brand/25 bg-mc-brand-soft p-3 text-xs dark:border-mc-brand/20 dark:bg-mc-brand/10">
+        <div className="mt-3 rounded-mc-md border border-mc-brand/25 bg-mc-brand-soft p-3 text-[11px] dark:border-mc-brand/20 dark:bg-mc-brand/10">
           <div className="flex flex-wrap items-center gap-2">
             {item.uzpost_order_number && (
               <span className="rounded-mc-sm bg-white px-2 py-1 font-bold text-mc-brand dark:bg-white/10 dark:text-mc-brand">
@@ -347,7 +347,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
 
       {/* Payment receipt (our generated check) + card that paid */}
       {(item.payment_receipt_order_id || item.payment_card_masked) && (
-        <div className="mt-3 rounded-mc-md border border-mc-success/25 bg-mc-success/12 p-3 text-xs dark:border-mc-success/20 dark:bg-mc-success/10">
+        <div className="mt-3 rounded-mc-md border border-mc-success/25 bg-mc-success/12 p-3 text-[11px] dark:border-mc-success/20 dark:bg-mc-success/10">
           <div className="flex flex-wrap items-center gap-2">
             {item.payment_card_masked && (
               <span className="inline-flex items-center gap-1.5 rounded-mc-sm bg-white px-2 py-1 font-mono font-bold text-mc-success dark:bg-white/10 dark:text-mc-success">
@@ -412,21 +412,21 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
                 value={editPhone}
                 onChange={(e) => setEditPhone(e.target.value)}
                 placeholder={t('deliveryHistory.card.editPhonePlaceholder')}
-                className="w-full rounded-mc-sm border border-mc-border bg-mc-surface px-3 py-2 text-sm outline-none focus:border-mc-brand"
+                className="w-full rounded-mc-sm border border-mc-border bg-mc-surface px-3 py-2 text-[16px] outline-none focus:border-mc-brand"
               />
               <textarea
                 value={editCaption}
                 onChange={(e) => setEditCaption(e.target.value)}
                 placeholder={t('deliveryHistory.card.editCaptionPlaceholder')}
                 rows={2}
-                className="w-full rounded-mc-sm border border-mc-border bg-mc-surface px-3 py-2 text-sm outline-none focus:border-mc-brand resize-none"
+                className="w-full rounded-mc-sm border border-mc-border bg-mc-surface px-3 py-2 text-[16px] outline-none focus:border-mc-brand resize-none"
               />
               <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={busy}
                   onClick={handleSaveEdit}
-                  className="flex-1 rounded-mc-sm bg-mc-brand text-mc-on-brand text-sm font-bold py-2 disabled:opacity-60"
+                  className="flex-1 rounded-mc-sm bg-mc-brand text-mc-on-brand text-[13px] font-bold py-2 disabled:opacity-60"
                 >
                   {busy ? '…' : t('deliveryHistory.card.save')}
                 </button>
@@ -434,7 +434,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
                   type="button"
                   disabled={busy}
                   onClick={() => setEditing(false)}
-                  className="rounded-mc-sm border border-mc-border text-sm font-semibold px-4 py-2"
+                  className="rounded-mc-sm border border-mc-border text-[13px] font-semibold px-4 py-2"
                 >
                   {t('deliveryHistory.card.cancelEdit')}
                 </button>
@@ -446,7 +446,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
                 type="button"
                 disabled={busy}
                 onClick={() => setEditing(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-mc-md border border-mc-border text-sm font-semibold py-2 text-mc-text disabled:opacity-60"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-mc-md border border-mc-border text-[13px] font-semibold py-2 text-mc-text disabled:opacity-60"
               >
                 <Pencil className="w-3.5 h-3.5" /> {t('deliveryHistory.card.edit')}
               </button>
@@ -454,7 +454,7 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
                 type="button"
                 disabled={busy}
                 onClick={handleCancel}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-mc-md border border-mc-danger/25 dark:border-mc-danger/30 text-sm font-semibold py-2 text-mc-danger disabled:opacity-60"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-mc-md border border-mc-danger/25 dark:border-mc-danger/30 text-[13px] font-semibold py-2 text-mc-danger disabled:opacity-60"
               >
                 <Trash2 className="w-3.5 h-3.5" /> {t('deliveryHistory.card.cancel')}
               </button>
@@ -468,10 +468,10 @@ const RequestCard = memo(({ item, onChanged }: { item: DeliveryRequestHistoryIte
         <div className="mt-3 rounded-mc-md bg-mc-danger-soft border border-mc-danger/25 p-3 flex items-start gap-2.5">
           <AlertTriangle className="w-4 h-4 text-mc-danger shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs font-bold text-mc-danger mb-0.5">
+            <p className="text-[11px] font-bold text-mc-danger mb-0.5">
               {t('deliveryHistory.card.rejectedReason')}
             </p>
-            <p className="text-xs text-mc-danger dark:text-mc-danger">
+            <p className="text-[11px] text-mc-danger dark:text-mc-danger">
               {item.admin_comment}
             </p>
           </div>
@@ -575,7 +575,7 @@ export default function DeliveryHistoryPage({ onBack }: Props) {
           <p className="text-mc-danger font-semibold mb-1">{error}</p>
           <button
             onClick={() => { setPage(1); }}
-            className="mt-3 px-5 py-2.5 rounded-mc-md bg-mc-surface-2 text-sm font-bold active:scale-95 transition-transform"
+            className="mt-3 px-5 py-2.5 rounded-mc-md bg-mc-surface-2 text-[13px] font-bold active:scale-95 transition-transform"
           >
             {t('deliveryHistory.error.retry')}
           </button>
@@ -602,7 +602,7 @@ export default function DeliveryHistoryPage({ onBack }: Props) {
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={isLoadingMore}
-                className="px-6 py-2.5 rounded-full bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand font-semibold text-sm transition-transform active:scale-95 disabled:opacity-50"
+                className="px-6 py-2.5 rounded-full bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand font-semibold text-[13px] transition-transform active:scale-95 disabled:opacity-50"
               >
                 {isLoadingMore ? t('deliveryHistory.loadingMore') : t('deliveryHistory.loadMore')}
               </button>

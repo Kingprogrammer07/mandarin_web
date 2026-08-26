@@ -1204,7 +1204,8 @@
       "copied": "Адрес скопирован!",
       "downloading": "Загрузка изображения...",
       "downloadFailed": "Не удалось скачать. Изображение открыто в новом окне."
-    }
+    },
+    "imageFailed": "Изображение не загрузилось"
   },
   "flightSchedule": {
     "title": "Расписание рейсов",
@@ -1259,6 +1260,14 @@
     "headerTitle": "Оставить заявку",
     "headerTitleShort": "Заявка",
     "historyButton": "История",
+    "recipient": {
+      "label": "Получатель",
+      "useProfile": "Имя из профиля",
+      "useOther": "Другое имя",
+      "placeholder": "Кто заберёт посылку?",
+      "hintOther": "Курьер спросит это имя. Если оставить пустым, будет использовано имя из профиля.",
+      "empty": "—"
+    },
     "branchPicker": {
       "title": "Выберите пункт UzPost",
       "subtitle": "Показаны самые подходящие из {{count}} филиалов",
@@ -1297,7 +1306,9 @@
         "otherScheduleNotes": "Дополнительный график",
         "latitude": "Latitude",
         "longitude": "Longitude"
-      }
+      },
+      "truncated": "Показано {{shown}} ближайших отделений, ещё {{hidden}} — воспользуйтесь поиском",
+      "noResults": "По запросу «{{query}}» отделений не найдено"
     },
     "adminModal": {
       "addressGate": {

@@ -67,6 +67,8 @@ export interface NbuDeliveryInitRequest {
   flight_names: string[];
   location_id: number;
   phone_number?: string | null;
+  /** Who collects the parcel, when that is not the account holder. */
+  recipient_name?: string | null;
   wallet_used?: number;
 }
 
@@ -87,6 +89,8 @@ export interface NbuDeliveryChargeRequest {
   flight_names: string[];
   location_id: number;
   phone_number?: string | null;
+  /** Who collects the parcel, when that is not the account holder. */
+  recipient_name?: string | null;
   wallet_used?: number;
 }
 

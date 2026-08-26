@@ -37,6 +37,9 @@ import {
 import { useProfile } from '@/hooks/useProfile';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { DeliveryMapPickerLazy } from '@/components/delivery/DeliveryMapPickerLazy';
+import { RecipientNameField } from '@/components/delivery/RecipientNameField';
+import { useBackHandler } from '@/hooks/useBackHandler';
+import { BackPriority } from '@/lib/backStack';
 import { useUzpostBranches } from '@/hooks/useUzpostBranches';
 import type { UzpostBranch } from '@/types/uzpostBranch';
 import {
@@ -69,7 +72,6 @@ interface DeliveryOption {
   label: string;
   descKey: string;
   icon: React.ReactNode;
-  gradient: string;
   iconBg: string;
 }
 
@@ -89,32 +91,28 @@ const DELIVERY_OPTIONS: DeliveryOption[] = [
     id: 'uzpost',
     label: 'UzPost',
     descKey: 'deliveryRequest.options.uzpost',
-    icon: <Mail className="w-8 h-8" />,
-    gradient: 'from-mc-brand to-mc-brand-strong',
+    icon: <Mail className="w-6 h-6" />,
     iconBg: 'bg-mc-brand-soft text-mc-brand',
   },
   {
     id: 'yandex',
     label: 'Yandex',
     descKey: 'deliveryRequest.options.yandex',
-    icon: <Zap className="w-8 h-8" />,
-    gradient: 'from-mc-danger to-mc-danger',
+    icon: <Zap className="w-6 h-6" />,
     iconBg: 'bg-mc-danger-soft text-mc-danger',
   },
   {
     id: 'mandarin',
     label: 'Mandarin Dostavka',
     descKey: 'deliveryRequest.options.mandarin',
-    icon: <Package className="w-8 h-8" />,
-    gradient: 'from-mc-success to-mc-success',
+    icon: <Package className="w-6 h-6" />,
     iconBg: 'bg-mc-success/12 text-mc-success',
   },
   {
     id: 'bts',
     label: 'BTS',
     descKey: 'deliveryRequest.options.bts',
-    icon: <Truck className="w-8 h-8" />,
-    gradient: 'from-mc-brand to-mc-brand-strong',
+    icon: <Truck className="w-6 h-6" />,
     iconBg: 'bg-mc-brand-soft text-mc-brand',
   },
 ];
@@ -229,8 +227,8 @@ const StepTypeSelection = memo(
     const { t } = useTranslation();
     return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
-      <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.type.title')}</h2>
-      <p className="text-mc-text-2 text-sm mb-6">
+      <h2 className="text-[17px] font-extrabold mb-1">{t('deliveryRequest.steps.type.title')}</h2>
+      <p className="text-mc-text-2 text-[13px] mb-4">
         {t('deliveryRequest.steps.type.subtitle')}
       </p>
 
@@ -240,32 +238,24 @@ const StepTypeSelection = memo(
             key={opt.id}
             onClick={() => onSelect(opt.id)}
             className="
-              relative overflow-hidden rounded-mc-lg p-5 text-left
+              relative overflow-hidden rounded-mc-lg p-4 text-left
               bg-mc-surface border-2 border-transparent
               active:scale-[0.96] transition-all duration-200
               shadow-sm group
               backdrop-blur-md
             "
           >
-            {/* Gradient glow on hover */}
-            <div
-              className={`
-                absolute inset-0 opacity-0 transition-opacity duration-300
-                bg-gradient-to-br ${opt.gradient}
-              `}
-            />
-
             <div className="relative z-10">
               <div
                 className={`
-                  w-14 h-14 rounded-mc-lg flex items-center justify-center mb-4
+                  w-11 h-11 rounded-mc-md flex items-center justify-center mb-2.5
                   ${opt.iconBg}
                 `}
               >
                 {opt.icon}
               </div>
-              <h3 className="font-bold text-lg leading-tight mb-0.5">{opt.label}</h3>
-              <p className="text-xs text-mc-text-2">{t(opt.descKey)}</p>
+              <h3 className="font-bold text-[15px] leading-tight mb-0.5">{opt.label}</h3>
+              <p className="text-[11px] text-mc-text-2">{t(opt.descKey)}</p>
             </div>
 
             <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-mc-text-3 dark:text-white/15 transition-colors" />
@@ -298,24 +288,24 @@ const StepFlightSelection = memo(
     const { t } = useTranslation();
     return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
-      <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.flight.title')}</h2>
-      <p className="text-mc-text-2 text-sm mb-6">
+      <h2 className="text-[17px] font-extrabold mb-1">{t('deliveryRequest.steps.flight.title')}</h2>
+      <p className="text-mc-text-2 text-[13px] mb-4">
         {t('deliveryRequest.steps.flight.subtitle')}
       </p>
       {deliveryType === 'mandarin' && (
-        <span className="inline-flex items-center gap-1 text-xs text-mc-success mb-4 font-medium">
+        <span className="inline-flex items-center gap-1 text-[11px] text-mc-success mb-4 font-medium">
           <Wallet className="w-4 h-4 text-mc-success dark:text-mc-success inline-block mr-1" />
           {t('deliveryRequest.steps.flight.mandarinNote')}
         </span>
       )}
       {deliveryType === 'yandex' && (
-        <span className="inline-flex items-center gap-1 text-xs text-mc-brand mb-4 font-medium">
+        <span className="inline-flex items-center gap-1 text-[11px] text-mc-brand mb-4 font-medium">
           <Clock className="w-4 h-4 text-mc-brand dark:text-mc-brand inline-block mr-1" />
           {t('deliveryRequest.steps.flight.yandexNote')}
         </span>
       )}
       {deliveryType === 'bts' && (
-        <span className="inline-flex items-center gap-1 text-xs text-mc-brand mb-4 font-medium">
+        <span className="inline-flex items-center gap-1 text-[11px] text-mc-brand mb-4 font-medium">
           <Clock className="w-4 h-4 text-mc-brand dark:text-mc-brand inline-block mr-1" />
           {t('deliveryRequest.steps.flight.btsNote')}
         </span>
@@ -328,13 +318,13 @@ const StepFlightSelection = memo(
            the payment flow instead of an empty plane icon. */
         <div className="text-center py-16">
           <Plane className="w-16 h-16 mx-auto text-mc-text-3 dark:text-white/15 mb-4" />
-          <p className="text-mc-text-2 font-semibold text-lg">
+          <p className="text-mc-text-2 font-semibold text-[15px]">
             {t('deliveryRequest.steps.flight.empty')}
           </p>
-          <p className="text-mc-text-3 text-sm mt-1 max-w-xs mx-auto">
+          <p className="text-mc-text-3 text-[13px] mt-1 max-w-xs mx-auto">
             {t('deliveryRequest.steps.flight.emptyDesc')}
           </p>
-          <p className="text-mc-text-3 text-sm mt-3 max-w-xs mx-auto">
+          <p className="text-mc-text-3 text-[13px] mt-3 max-w-xs mx-auto">
             {t('deliveryRequest.steps.flight.emptyHint', "Zayavka qoldirish uchun avval yuk to'lovini amalga oshiring.")}
           </p>
           {onGoToPayment && (
@@ -385,8 +375,8 @@ const StepFlightSelection = memo(
 
                 {/* Flight Info */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-base">{f.flight_name}</h3>
-                  <p className="text-xs text-mc-text-2">{t('deliveryRequest.steps.flight.flightLabel')}</p>
+                  <h3 className="font-bold text-[15px]">{f.flight_name}</h3>
+                  <p className="text-[11px] text-mc-text-2">{t('deliveryRequest.steps.flight.flightLabel')}</p>
                 </div>
 
                 <Plane className="w-5 h-5 text-mc-text-3 dark:text-white/15 shrink-0" />
@@ -413,7 +403,7 @@ const StepFlightSelection = memo(
           onClick={onContinue}
           disabled={selected.length === 0}
           className={`
-            flex-1 h-14 rounded-mc-lg font-bold text-base
+            flex-1 h-14 rounded-mc-lg font-bold text-[15px]
             flex items-center justify-center gap-2
             transition-all duration-200 active:scale-[0.98]
             ${
@@ -460,6 +450,9 @@ interface StepStandardProps {
   onBack: () => void;
   phoneNumber: string;
   onPhoneChange: (value: string) => void;
+  profileName: string;
+  recipientName: string | null;
+  onRecipientNameChange: (value: string | null) => void;
   caption: string;
   onCaptionChange: (value: string) => void;
   mapLocation: { latitude: number; longitude: number } | null;
@@ -478,6 +471,9 @@ const StepStandardConfirm = memo(
     onBack,
     phoneNumber,
     onPhoneChange,
+    profileName,
+    recipientName,
+    onRecipientNameChange,
     caption,
     onCaptionChange,
     mapLocation,
@@ -492,14 +488,22 @@ const StepStandardConfirm = memo(
 
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
-        <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.confirm.title')}</h2>
-        <p className="text-mc-text-2 text-sm mb-6">
+        <h2 className="text-[17px] font-extrabold mb-1">{t('deliveryRequest.steps.confirm.title')}</h2>
+        <p className="text-mc-text-2 text-[13px] mb-4">
           {t('deliveryRequest.steps.confirm.subtitle')}
         </p>
 
+        <div className="mb-4">
+          <RecipientNameField
+            profileName={profileName}
+            value={recipientName}
+            onChange={onRecipientNameChange}
+          />
+        </div>
+
         {/* Phone Number */}
         <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-          <label className="flex items-center gap-2 text-xs font-bold text-mc-text-2 mb-2">
+          <label className="flex items-center gap-2 text-[11px] font-bold text-mc-text-2 mb-2">
             <Phone className="w-3.5 h-3.5" />
             {t('deliveryRequest.steps.confirm.phoneLabel')}
           </label>
@@ -508,7 +512,7 @@ const StepStandardConfirm = memo(
             value={phoneNumber}
             onChange={(e) => onPhoneChange(e.target.value)}
             placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
-            className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
+            className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-[16px] font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
           />
           <p className="mt-1.5 text-[11px] text-mc-text-3">
             {t('deliveryRequest.steps.confirm.phoneHint')}
@@ -525,7 +529,7 @@ const StepStandardConfirm = memo(
           <span className="flex items-center gap-2 min-w-0">
             <MapPin className="w-4 h-4 text-mc-brand shrink-0" />
             <span className="min-w-0">
-              <span className="block text-sm font-bold text-mc-text dark:text-mc-text">
+              <span className="block text-[13px] font-bold text-mc-text dark:text-mc-text">
                 {t('deliveryRequest.steps.confirm.includeAddressLabel')}
               </span>
               <span className="block text-[11px] text-mc-text-3">
@@ -548,7 +552,7 @@ const StepStandardConfirm = memo(
 
         {/* Caption / Courier Note */}
         <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-          <label className="flex items-center gap-2 text-xs font-bold text-mc-text-2 mb-2">
+          <label className="flex items-center gap-2 text-[11px] font-bold text-mc-text-2 mb-2">
             <MapPin className="w-3.5 h-3.5" />
             {t('deliveryRequest.steps.confirm.captionLabel')}
           </label>
@@ -557,7 +561,7 @@ const StepStandardConfirm = memo(
             onChange={(e) => onCaptionChange(e.target.value)}
             placeholder={t('deliveryRequest.steps.confirm.captionPlaceholder')}
             rows={4}
-            className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition resize-none"
+            className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-[16px] font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition resize-none"
           />
           <p className="mt-1.5 text-[11px] text-mc-text-3">
             {t('deliveryRequest.steps.confirm.captionHint')}
@@ -566,7 +570,7 @@ const StepStandardConfirm = memo(
 
         {/* Map Picker — lazy loaded */}
         <div className="mb-4">
-          <p className="text-xs font-bold text-mc-text-2 mb-2">
+          <p className="text-[11px] font-bold text-mc-text-2 mb-2">
             {t('deliveryRequest.steps.confirm.mapLabel')}
           </p>
           <DeliveryMapPickerLazy
@@ -584,20 +588,20 @@ const StepStandardConfirm = memo(
               <Truck className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-mc-text-2">{t('deliveryRequest.steps.confirm.deliveryType')}</p>
-              <h3 className="font-bold text-lg">{typeLabel}</h3>
+              <p className="text-[11px] text-mc-text-2">{t('deliveryRequest.steps.confirm.deliveryType')}</p>
+              <h3 className="font-bold text-[15px]">{typeLabel}</h3>
             </div>
           </div>
 
           <div className="border-t border-mc-border pt-4">
-            <p className="text-xs text-mc-text-2 mb-2 font-medium">
+            <p className="text-[11px] text-mc-text-2 mb-2 font-medium">
               {t('deliveryRequest.steps.confirm.selectedFlights')}
             </p>
             <div className="flex flex-wrap gap-2">
               {selectedFlights.map((f) => (
                 <span
                   key={f}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-mc-md bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand text-sm font-semibold"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-mc-md bg-mc-brand-soft dark:bg-mc-brand/10 text-mc-brand text-[13px] font-semibold"
                 >
                   <Plane className="w-3.5 h-3.5" />
                   {f}
@@ -609,7 +613,7 @@ const StepStandardConfirm = memo(
 
         {/* Info box */}
         <div className="rounded-mc-lg bg-mc-warn-soft dark:bg-mc-brand/5 border border-mc-warn/25 p-4 mb-6">
-          <p className="text-sm text-mc-warn font-medium">
+          <p className="text-[13px] text-mc-warn font-medium">
             <Trans
               i18nKey="deliveryRequest.steps.confirm.infoMessage"
               values={{ type: typeLabel, flights: selectedFlights.join(', ') }}
@@ -634,7 +638,7 @@ const StepStandardConfirm = memo(
             onClick={onSubmit}
             disabled={!canSubmit}
             className={`
-              flex-1 h-14 rounded-mc-lg font-bold text-base
+              flex-1 h-14 rounded-mc-lg font-bold text-[15px]
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
@@ -679,6 +683,9 @@ interface StepUzpostProps {
   onBack: () => void;
   phoneNumber: string;
   onPhoneChange: (value: string) => void;
+  profileName: string;
+  recipientName: string | null;
+  onRecipientNameChange: (value: string | null) => void;
   nbuEnabled: boolean;
   savedCards: SavedCardItem[];
   onPayOnline: (walletUsed: number, phoneNumber: string) => void;
@@ -701,6 +708,9 @@ function StepUzpostPayment({
   onBack,
   phoneNumber,
   onPhoneChange,
+  profileName,
+  recipientName,
+  onRecipientNameChange,
   nbuEnabled,
   savedCards,
   onPayOnline,
@@ -925,8 +935,8 @@ function StepUzpostPayment({
   if (loading) {
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
-        <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.calcTitle')}</h2>
-        <p className="text-mc-text-2 text-sm mb-6">{t('deliveryRequest.steps.uzpost.calcDesc')}</p>
+        <h2 className="text-[17px] font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.calcTitle')}</h2>
+        <p className="text-mc-text-2 text-[13px] mb-4">{t('deliveryRequest.steps.uzpost.calcDesc')}</p>
         <CalcSkeleton />
       </div>
     );
@@ -936,20 +946,20 @@ function StepUzpostPayment({
   if (calcData?.warning) {
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
-        <h2 className="text-2xl font-extrabold mb-4">{t('deliveryRequest.steps.uzpost.warningTitle')}</h2>
+        <h2 className="text-[17px] font-extrabold mb-4">{t('deliveryRequest.steps.uzpost.warningTitle')}</h2>
 
         <div className="rounded-mc-lg bg-mc-danger-soft border-2 border-mc-danger/25 dark:border-mc-danger/30 p-6 text-center mb-6">
           <AlertTriangle className="w-16 h-16 mx-auto text-mc-danger mb-4" />
-          <p className="text-mc-danger font-bold text-lg mb-2">
+          <p className="text-mc-danger font-bold text-[15px] mb-2">
             {t('deliveryRequest.steps.uzpost.weightExceeded')}
           </p>
-          <p className="text-mc-danger text-sm">{calcData.warning}</p>
+          <p className="text-mc-danger text-[13px]">{calcData.warning}</p>
         </div>
 
         <button
           onClick={onBack}
           className="
-            w-full h-14 rounded-mc-lg font-bold text-base
+            w-full h-14 rounded-mc-lg font-bold text-[15px]
             flex items-center justify-center gap-2
             bg-mc-surface-2 text-mc-text
             active:scale-[0.98] transition-all
@@ -984,7 +994,7 @@ function StepUzpostPayment({
                 <div className="absolute inset-0 flex items-center justify-center bg-black/55">
                   <div className="text-center">
                     <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-white" />
-                    <p className="text-sm font-semibold text-white">{t('camera.preparingCamera')}</p>
+                    <p className="text-[13px] font-semibold text-white">{t('camera.preparingCamera')}</p>
                   </div>
                 </div>
               )}
@@ -1024,14 +1034,22 @@ function StepUzpostPayment({
     <div className="animate-in fade-in slide-in-from-right-4 duration-400">
       {cameraOverlay}
 
-      <h2 className="text-2xl font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.paymentTitle')}</h2>
-      <p className="text-mc-text-2 text-sm mb-4">
+      <h2 className="text-[17px] font-extrabold mb-1">{t('deliveryRequest.steps.uzpost.paymentTitle')}</h2>
+      <p className="text-mc-text-2 text-[13px] mb-4">
         {t('deliveryRequest.steps.uzpost.flightsFor', { flights: selectedFlights.join(', ') })}
       </p>
 
+      <div className="mb-4">
+        <RecipientNameField
+          profileName={profileName}
+          value={recipientName}
+          onChange={onRecipientNameChange}
+        />
+      </div>
+
       {/* Optional phone number */}
       <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-        <label className="flex items-center gap-2 text-xs font-bold text-mc-text-2 mb-2">
+        <label className="flex items-center gap-2 text-[11px] font-bold text-mc-text-2 mb-2">
           <Phone className="w-3.5 h-3.5" />
           {t('deliveryRequest.steps.confirm.phoneLabel')}
         </label>
@@ -1040,7 +1058,7 @@ function StepUzpostPayment({
           value={phoneNumber}
           onChange={(e) => onPhoneChange(e.target.value)}
           placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
-          className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-sm font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
+          className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-[16px] font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
         />
         <p className="mt-1.5 text-[11px] text-mc-text-3">
           {t('deliveryRequest.steps.uzpost.phoneHint')}
@@ -1072,12 +1090,12 @@ function StepUzpostPayment({
       {calcData && (
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 backdrop-blur-md">
-            <p className="text-xs text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
-            <p className="text-xl font-extrabold">{calcData.total_weight} kg</p>
+            <p className="text-[11px] text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
+            <p className="text-[16px] font-extrabold">{calcData.total_weight} kg</p>
           </div>
           <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 backdrop-blur-md">
-            <p className="text-xs text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
-            <p className="text-xl font-extrabold text-mc-warn">
+            <p className="text-[11px] text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
+            <p className="text-[16px] font-extrabold text-mc-warn">
               {calcData.total_amount.toLocaleString()} so'm
             </p>
           </div>
@@ -1088,7 +1106,7 @@ function StepUzpostPayment({
       {calcData?.fallback && (
         <div className="flex items-start gap-2 rounded-mc-lg bg-mc-warn-soft border border-mc-warn/25 dark:border-mc-brand/30 p-3 mb-4">
           <AlertTriangle className="w-4 h-4 text-mc-brand shrink-0 mt-0.5" />
-          <p className="text-mc-warn text-xs">
+          <p className="text-mc-warn text-[11px]">
             {t('deliveryRequest.steps.uzpost.estimateNote')}
           </p>
         </div>
@@ -1103,8 +1121,8 @@ function StepUzpostPayment({
                 <Wallet className="w-5 h-5" />
               </div>
               <div>
-                <p className="font-bold text-sm">{t('deliveryRequest.steps.uzpost.walletPay')}</p>
-                <p className="text-xs text-mc-text-2">
+                <p className="font-bold text-[13px]">{t('deliveryRequest.steps.uzpost.walletPay')}</p>
+                <p className="text-[11px] text-mc-text-2">
                   {t('deliveryRequest.steps.uzpost.walletBalance', { balance: calcData.wallet_balance.toLocaleString() })}
                 </p>
               </div>
@@ -1130,15 +1148,15 @@ function StepUzpostPayment({
 
           {useWallet && (
             <div className="mt-3 pt-3 border-t border-mc-border space-y-1">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-[13px]">
                 <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
                 <span className="font-bold text-mc-success">
                   -{formatUzs(walletApplied)}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-[13px]">
                 <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
-                <span className="font-extrabold text-lg">
+                <span className="font-extrabold text-[15px]">
                   {formatUzs(remaining)}
                 </span>
               </div>
@@ -1153,7 +1171,7 @@ function StepUzpostPayment({
           <button
             type="button"
             onClick={() => setPayMethod('online')}
-            className={`h-12 rounded-mc-lg text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+            className={`h-12 rounded-mc-lg text-[13px] font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
               payMethod === 'online'
                 ? 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
                 : 'bg-mc-surface-2 text-mc-text-2'
@@ -1165,7 +1183,7 @@ function StepUzpostPayment({
           <button
             type="button"
             onClick={() => setPayMethod('manual')}
-            className={`h-12 rounded-mc-lg text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+            className={`h-12 rounded-mc-lg text-[13px] font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
               payMethod === 'manual'
                 ? 'bg-mc-brand text-mc-on-brand shadow-lg shadow-amber-500/25'
                 : 'bg-mc-surface-2 text-mc-text-2'
@@ -1181,15 +1199,15 @@ function StepUzpostPayment({
       {onlineMode && (
         <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-mc-text-2">
+            <span className="text-[13px] text-mc-text-2">
               {t('deliveryRequest.steps.uzpost.remainingPayment')}
             </span>
-            <span className="font-extrabold text-lg">{formatUzs(remaining)}</span>
+            <span className="font-extrabold text-[15px]">{formatUzs(remaining)}</span>
           </div>
 
           {savedCards.length > 0 && (
             <div className="space-y-2 mb-3">
-              <p className="text-xs text-mc-text-2 font-medium">
+              <p className="text-[11px] text-mc-text-2 font-medium">
                 {t('deliveryRequest.steps.uzpost.savedCards')}
               </p>
               {savedCards.map((card) => (
@@ -1198,7 +1216,7 @@ function StepUzpostPayment({
                   type="button"
                   disabled={submitting}
                   onClick={() => onChargeCard(card.id, walletApplied, phoneNumber)}
-                  className="w-full h-12 rounded-mc-lg bg-mc-surface-2 border border-mc-border flex items-center justify-between px-4 text-sm font-semibold active:scale-[0.98] transition disabled:opacity-50"
+                  className="w-full h-12 rounded-mc-lg bg-mc-surface-2 border border-mc-border flex items-center justify-between px-4 text-[13px] font-semibold active:scale-[0.98] transition disabled:opacity-50"
                 >
                   <span className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-mc-success" />
@@ -1212,7 +1230,7 @@ function StepUzpostPayment({
             </div>
           )}
 
-          <p className="text-xs text-mc-text-3">
+          <p className="text-[11px] text-mc-text-3">
             {t('deliveryRequest.steps.uzpost.nbuPaymentDescription')}
           </p>
         </div>
@@ -1221,15 +1239,15 @@ function StepUzpostPayment({
       {/* Card Info (manual transfer only) */}
       {!onlineMode && calcData && !fullyCoveredByWallet && calcData.card && (
         <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-          <p className="text-xs text-mc-text-2 mb-2 font-medium">
+          <p className="text-[11px] text-mc-text-2 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.paymentCard')}
           </p>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-mono font-bold text-lg tracking-wider">
+              <p className="font-mono font-bold text-[16px] tracking-wider">
                 {calcData.card.card_number}
               </p>
-              <p className="text-xs text-mc-text-2">
+              <p className="text-[11px] text-mc-text-2">
                 {calcData.card.card_owner}
               </p>
             </div>
@@ -1250,7 +1268,7 @@ function StepUzpostPayment({
       {/* File Upload (manual transfer only, when payment remains) */}
       {!onlineMode && !fullyCoveredByWallet && (
         <div className="mb-6">
-          <p className="text-xs text-mc-text-2 mb-2 font-medium">
+          <p className="text-[11px] text-mc-text-2 mb-2 font-medium">
             {t('deliveryRequest.steps.uzpost.uploadReceipt')}
           </p>
 
@@ -1276,10 +1294,10 @@ function StepUzpostPayment({
                   <div className="flex items-center gap-3">
                     <FileText className="w-8 h-8 text-mc-success" />
                     <div>
-                      <p className="font-semibold text-sm truncate max-w-[200px]">
+                      <p className="font-semibold text-[13px] truncate max-w-[200px]">
                         {receiptFile.name}
                       </p>
-                      <p className="text-xs text-mc-text-3">
+                      <p className="text-[11px] text-mc-text-3">
                         {(receiptFile.size / 1024).toFixed(0)} KB
                       </p>
                     </div>
@@ -1297,7 +1315,7 @@ function StepUzpostPayment({
           ) : receiptProcessing ? (
             <div className="w-full rounded-mc-lg border-2 border-dashed border-mc-warn/30 bg-mc-warn-soft dark:bg-mc-brand/[0.06] p-8 flex flex-col items-center justify-center gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-mc-brand" />
-              <p className="font-bold text-sm text-mc-warn">
+              <p className="font-bold text-[13px] text-mc-warn">
                 {t('deliveryRequest.steps.uzpost.compressingReceipt')}
               </p>
             </div>
@@ -1314,10 +1332,10 @@ function StepUzpostPayment({
                 <div className="w-14 h-14 mx-auto rounded-mc-lg bg-mc-warn-soft flex items-center justify-center text-mc-brand mb-3">
                   <Upload className="w-7 h-7" />
                 </div>
-                <p className="font-bold text-sm text-mc-text">
+                <p className="font-bold text-[13px] text-mc-text">
                   {t('deliveryRequest.steps.uzpost.uploadButton')}
                 </p>
-                <p className="text-xs text-mc-text-3 mt-0.5">
+                <p className="text-[11px] text-mc-text-3 mt-0.5">
                   {t('deliveryRequest.steps.uzpost.uploadHint')}
                 </p>
               </div>
@@ -1326,7 +1344,7 @@ function StepUzpostPayment({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-12 rounded-mc-lg bg-white dark:bg-white/10 border border-mc-border text-sm font-bold text-mc-text flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                  className="h-12 rounded-mc-lg bg-white dark:bg-white/10 border border-mc-border text-[13px] font-bold text-mc-text flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
                   <Upload className="w-4 h-4 text-mc-brand" />
                   {t('deliveryRequest.steps.uzpost.uploadGalleryButton')}
@@ -1334,7 +1352,7 @@ function StepUzpostPayment({
                 <button
                   type="button"
                   onClick={openReceiptCamera}
-                  className="h-12 rounded-mc-lg bg-mc-brand text-mc-on-brand text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-500/20"
+                  className="h-12 rounded-mc-lg bg-mc-brand text-mc-on-brand text-[13px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-500/20"
                 >
                   <Camera className="w-4 h-4" />
                   {t('deliveryRequest.steps.uzpost.uploadCameraButton')}
@@ -1371,7 +1389,7 @@ function StepUzpostPayment({
             onClick={() => onPayOnline(walletApplied, phoneNumber)}
             disabled={submitting || !selectedBranch || !calcData}
             className={`
-              flex-1 h-14 rounded-mc-lg font-bold text-base
+              flex-1 h-14 rounded-mc-lg font-bold text-[15px]
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
@@ -1395,7 +1413,7 @@ function StepUzpostPayment({
             onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
             disabled={submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)}
             className={`
-              flex-1 h-14 rounded-mc-lg font-bold text-base
+              flex-1 h-14 rounded-mc-lg font-bold text-[15px]
               flex items-center justify-center gap-2
               transition-all duration-200 active:scale-[0.98]
               ${
@@ -1431,15 +1449,15 @@ const StepSuccess = memo(({ onGoHome }: { onGoHome: () => void }) => {
     <div className="w-24 h-24 mx-auto rounded-full bg-mc-success/12 flex items-center justify-center mb-6">
       <CheckCircle2 className="w-14 h-14 text-mc-success" />
     </div>
-    <h2 className="text-2xl font-extrabold mb-2">{t('deliveryRequest.steps.success.title')}</h2>
-    <p className="text-mc-text-2 text-sm max-w-xs mx-auto mb-8">
+    <h2 className="text-[17px] font-extrabold mb-2">{t('deliveryRequest.steps.success.title')}</h2>
+    <p className="text-mc-text-2 text-[13px] max-w-xs mx-auto mb-8">
       {t('deliveryRequest.steps.success.desc')}
     </p>
 
     <button
       onClick={onGoHome}
       className="
-        w-full max-w-xs mx-auto h-14 rounded-mc-lg font-bold text-base text-mc-on-brand
+        w-full max-w-xs mx-auto h-14 rounded-mc-lg font-bold text-[15px] text-mc-on-brand
         flex items-center justify-center gap-2
         bg-mc-brand active:scale-[0.98]
         shadow-lg shadow-amber-500/25 transition-all duration-200
@@ -1463,20 +1481,20 @@ const ProfileIncompleteAlert = memo(
       <div className="w-20 h-20 mx-auto rounded-full bg-mc-danger-soft flex items-center justify-center mb-5">
         <UserCog className="w-10 h-10 text-mc-danger" />
       </div>
-      <h2 className="text-xl font-extrabold mb-2">{t('deliveryRequest.profile.title')}</h2>
-      <p className="text-mc-text-2 text-sm max-w-xs mx-auto mb-2">
+      <h2 className="text-[16px] font-extrabold mb-2">{t('deliveryRequest.profile.title')}</h2>
+      <p className="text-mc-text-2 text-[13px] max-w-xs mx-auto mb-2">
         {t('deliveryRequest.profile.desc')}
       </p>
 
       {missingFields.length > 0 && (
         <div className="max-w-xs mx-auto mb-6">
           <div className="rounded-mc-md bg-mc-danger-soft border border-mc-danger/25 p-3 text-left">
-            <p className="text-xs font-bold text-mc-danger dark:text-mc-danger mb-1.5">
+            <p className="text-[11px] font-bold text-mc-danger dark:text-mc-danger mb-1.5">
               Quyidagi maydonlar to'ldirilmagan:
             </p>
             <ul className="space-y-1">
               {missingFields.map((field) => (
-                <li key={field} className="flex items-center gap-1.5 text-xs text-mc-danger dark:text-mc-danger">
+                <li key={field} className="flex items-center gap-1.5 text-[11px] text-mc-danger dark:text-mc-danger">
                   <span className="w-1.5 h-1.5 rounded-full bg-mc-danger shrink-0" />
                   {field}
                 </li>
@@ -1491,7 +1509,7 @@ const ProfileIncompleteAlert = memo(
           <button
             onClick={onGoProfile}
             className="
-              w-full h-14 rounded-mc-lg font-bold text-base text-mc-on-brand
+              w-full h-14 rounded-mc-lg font-bold text-[15px] text-mc-on-brand
               flex items-center justify-center gap-2
               bg-mc-brand active:scale-[0.98]
               shadow-lg shadow-blue-500/25 transition-all duration-200
@@ -1504,7 +1522,7 @@ const ProfileIncompleteAlert = memo(
         <button
           onClick={onBack}
           className="
-            w-full h-14 rounded-mc-lg font-bold text-base
+            w-full h-14 rounded-mc-lg font-bold text-[15px]
             flex items-center justify-center gap-2
             bg-mc-surface-2 text-mc-text
             active:scale-[0.98] transition-all
@@ -1539,12 +1557,19 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
 
   // Standard delivery form state
   const [standardPhone, setStandardPhone] = useState('');
+  /**
+   * Who collects the parcel. `null` means "the profile name" — the field is not
+   * pre-filled with it, so an untouched form still follows the account even if
+   * the user edits their profile between opening this screen and submitting.
+   */
+  const [standardRecipient, setStandardRecipient] = useState<string | null>(null);
   const [standardCaption, setStandardCaption] = useState('');
   const [standardMapLocation, setStandardMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [includeAddress, setIncludeAddress] = useState(false);
 
   // UzPost phone state
   const [uzpostPhone, setUzpostPhone] = useState('');
+  const [uzpostRecipient, setUzpostRecipient] = useState<string | null>(null);
 
   // NBU online payment (UzPost delivery fee) — feature flag + saved cards
   const [nbuEnabled, setNbuEnabled] = useState(false);
@@ -1657,9 +1682,11 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     setCalcData(null);
     setProfileIncomplete(false);
     setStandardPhone(userProfile?.phone ?? '');
+    setStandardRecipient(null);
     setStandardCaption('');
     setStandardMapLocation(null);
     setUzpostPhone(userProfile?.phone ?? '');
+    setUzpostRecipient(null);
     setCurrentStep(2);
 
     // Try cache first
@@ -1729,7 +1756,8 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         // reader downstream turned into a route link for the courier.
         standardMapLocation?.latitude ?? null,
         standardMapLocation?.longitude ?? null,
-        includeAddress
+        includeAddress,
+        standardRecipient?.trim() || null
       );
       setCurrentStep(4);
     } catch (err: unknown) {
@@ -1749,7 +1777,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     } finally {
       setSubmitting(false);
     }
-  }, [deliveryType, selectedFlights, standardPhone, standardCaption, standardMapLocation, includeAddress, t, refetchProfile]);
+  }, [deliveryType, selectedFlights, standardPhone, standardRecipient, standardCaption, standardMapLocation, includeAddress, t, refetchProfile]);
 
   const handleUzpostSubmit = useCallback(
     async (walletUsed: number, file: File | null, phoneNumber: string) => {
@@ -1761,7 +1789,14 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
       setSubmitting(true);
       try {
         const phoneToSend = phoneNumber.trim() || null;
-        await submitUzpostDelivery(selectedFlights, walletUsed, file, selectedUzpostBranch, phoneToSend);
+        await submitUzpostDelivery(
+          selectedFlights,
+          walletUsed,
+          file,
+          selectedUzpostBranch,
+          phoneToSend,
+          uzpostRecipient?.trim() || null
+        );
         saveUzpostBranchPreference(selectedUzpostBranch);
         setSavedUzpostBranchId(selectedUzpostBranch.id);
         setCurrentStep(4);
@@ -1781,7 +1816,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         setSubmitting(false);
       }
     },
-    [selectedFlights, selectedUzpostBranch, t]
+    [selectedFlights, selectedUzpostBranch, uzpostRecipient, t]
   );
 
   // Shared error surfacing for UzPost online (NBU) payment calls. NBU 422 errors
@@ -1836,6 +1871,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           flight_names: selectedFlights,
           location_id: selectedUzpostBranch.id,
           phone_number: phoneNumber.trim() || null,
+          recipient_name: uzpostRecipient?.trim() || null,
           wallet_used: walletUsed,
         });
         saveUzpostBranchPreference(selectedUzpostBranch);
@@ -1857,7 +1893,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         setSubmitting(false);
       }
     },
-    [selectedFlights, selectedUzpostBranch, showUzpostApiError]
+    [selectedFlights, selectedUzpostBranch, uzpostRecipient, showUzpostApiError]
   );
 
   // Synchronous saved-card charge for the UzPost delivery fee.
@@ -1874,6 +1910,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           flight_names: selectedFlights,
           location_id: selectedUzpostBranch.id,
           phone_number: phoneNumber.trim() || null,
+          recipient_name: uzpostRecipient?.trim() || null,
           wallet_used: walletUsed,
         });
         if (res.status === 'SUCCESS') {
@@ -1896,7 +1933,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         setSubmitting(false);
       }
     },
-    [selectedFlights, selectedUzpostBranch, showUzpostApiError]
+    [selectedFlights, selectedUzpostBranch, uzpostRecipient, showUzpostApiError]
   );
 
   const goBackStep = useCallback(() => {
@@ -1907,6 +1944,36 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
       onBack();
     }
   }, [currentStep, onBack]);
+
+  /**
+   * The system back button walks the wizard the same way the header arrow does:
+   * step 4 -> 3 -> 2 -> 1, then out of the screen. Without this a press in the
+   * middle of a half-filled request jumped straight out (or closed the app),
+   * losing everything the user had entered.
+   *
+   * The profile-incomplete overlay and the edit-profile modal sit above the
+   * wizard and are dismissed first.
+   */
+  useBackHandler(isEditProfileOpen, () => {
+    setIsEditProfileOpen(false);
+    return true;
+  }, BackPriority.OVERLAY);
+
+  useBackHandler(profileIncomplete, () => {
+    setProfileIncomplete(false);
+    return true;
+  }, BackPriority.MODAL);
+
+  // Step 4 is the success screen — there is nothing to go back INTO, so it
+  // leaves the wizard rather than reopening the form the user just submitted.
+  useBackHandler(true, () => {
+    if (currentStep === 4) {
+      onBack();
+      return true;
+    }
+    goBackStep();
+    return true;
+  }, BackPriority.VIEW);
 
   // ---- Render ----
 
@@ -1922,7 +1989,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold">{t('deliveryRequest.headerTitleShort')}</h1>
+          <h1 className="text-[15px] font-bold">{t('deliveryRequest.headerTitleShort')}</h1>
         </div>
         <ProfileIncompleteAlert
           onGoProfile={() => setIsEditProfileOpen(true)}
@@ -2013,6 +2080,9 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           onBack={goBackStep}
           phoneNumber={uzpostPhone}
           onPhoneChange={setUzpostPhone}
+          profileName={userProfile?.full_name ?? ''}
+          recipientName={uzpostRecipient}
+          onRecipientNameChange={setUzpostRecipient}
           nbuEnabled={nbuEnabled}
           savedCards={savedCards}
           onPayOnline={handleUzpostPayOnline}
@@ -2029,6 +2099,9 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           onBack={goBackStep}
           phoneNumber={standardPhone}
           onPhoneChange={setStandardPhone}
+          profileName={userProfile?.full_name ?? ''}
+          recipientName={standardRecipient}
+          onRecipientNameChange={setStandardRecipient}
           caption={standardCaption}
           onCaptionChange={setStandardCaption}
           mapLocation={standardMapLocation}
