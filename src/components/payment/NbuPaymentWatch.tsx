@@ -28,14 +28,14 @@ import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Loader2, X } from 'lucide-react';
+import { ExternalLink, Loader2, X } from 'lucide-react';
 
 import {
   nbuPaymentService,
   type PublicNbuPaymentStatus,
 } from '@/api/services/nbuPaymentService';
 import { usePendingNbuOrders } from '@/hooks/usePendingNbuOrders';
-import { removePendingExternalOrder } from '@/utils/nbuReturnContext';
+import { removePendingExternalOrder, reopenNbuUrl } from '@/utils/nbuReturnContext';
 import { triggerSoftHaptic, triggerSuccessHaptic } from '@/utils/haptics';
 
 /** Same ladder the success page uses: 2s, doubling, capped at 10s. */
@@ -73,8 +73,10 @@ export function NbuPaymentWatch() {
   // Note this ignores `hidden` — dismissing must not stop the POLLING, only the
   // strip. Stopping the poll meant the payment never settled: no toast, no
   // refresh, and the lock held until its TTL instead of until the outcome.
-  const orderId = pending[0]?.orderId ?? null;
+  const current = pending[0] ?? null;
+  const orderId = current?.orderId ?? null;
   const isHidden = orderId !== null && hidden.includes(orderId);
+  const canResume = Boolean(current?.paymentUrl);
 
   const [info, setInfo] = useState<PublicNbuPaymentStatus | null>(null);
   const [exhausted, setExhausted] = useState(false);
@@ -189,6 +191,20 @@ export function NbuPaymentWatch() {
     setPollKey((k) => k + 1);
   }, []);
 
+  /**
+   * Back into the bank page they walked away from.
+   *
+   * 60% of gateway sessions end EXPIRED — the user taps Pay, lands in Safari or
+   * Telegram's browser, closes it, and has no way back in. This reopens the
+   * SAME session rather than starting a new one, so there is never a second
+   * payable session for the same debt.
+   */
+  const resume = useCallback(() => {
+    if (!orderId) return;
+    triggerSoftHaptic();
+    reopenNbuUrl(orderId);
+  }, [orderId]);
+
   if (!orderId || isHidden) return null;
 
   const amount = info && info.amount_uzs > 0 ? formatUzs(info.amount_uzs) : null;
@@ -226,15 +242,27 @@ export function NbuPaymentWatch() {
                 : t('nbuWatch.waitHint', 'Bank oynasida yakunlang')}
           </p>
 
-          {exhausted && (
-            <button
-              type="button"
-              onClick={retry}
-              className="mt-1 inline-flex min-h-[44px] items-center text-[12px] font-bold text-mc-brand active:scale-95"
-            >
-              {t('nbuWatch.retry', 'Tekshirish')}
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-x-4">
+            {canResume && (
+              <button
+                type="button"
+                onClick={resume}
+                className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-[12px] font-bold text-mc-brand active:scale-95"
+              >
+                <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+                {t('nbuWatch.resume', 'Bankka qaytish')}
+              </button>
+            )}
+            {exhausted && (
+              <button
+                type="button"
+                onClick={retry}
+                className="mt-1 inline-flex min-h-[44px] items-center text-[12px] font-bold text-mc-text-2 active:scale-95"
+              >
+                {t('nbuWatch.retry', 'Tekshirish')}
+              </button>
+            )}
+          </div>
         </div>
 
         <button

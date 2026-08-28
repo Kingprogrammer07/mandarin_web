@@ -90,6 +90,15 @@ export interface PendingNbuOrder {
   kind: NbuReturnKind;
   /** When the gateway was opened, for the client-side release below. */
   openedAt: number;
+  /**
+   * The gateway URL, so the SAME session can be reopened.
+   *
+   * 60% of sessions end EXPIRED: the user taps Pay, lands in the bank page,
+   * leaves, and wants back in. Reopening this URL continues the session they
+   * already have — starting a fresh one would leave two payable sessions for
+   * the same debt, which is the only way to actually get charged twice.
+   */
+  paymentUrl?: string;
 }
 
 /**
@@ -112,10 +121,17 @@ function readPending(): PendingNbuOrder[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.flatMap((entry): PendingNbuOrder[] => {
       if (typeof entry !== 'object' || entry === null) return [];
-      const { orderId, kind, openedAt } = entry as Partial<PendingNbuOrder>;
+      const { orderId, kind, openedAt, paymentUrl } = entry as Partial<PendingNbuOrder>;
       if (typeof orderId !== 'string' || !orderId) return [];
       if (kind !== 'payment' && kind !== 'card_binding') return [];
-      return [{ orderId, kind, openedAt: typeof openedAt === 'number' ? openedAt : 0 }];
+      return [
+        {
+          orderId,
+          kind,
+          openedAt: typeof openedAt === 'number' ? openedAt : 0,
+          paymentUrl: typeof paymentUrl === 'string' ? paymentUrl : undefined,
+        },
+      ];
     });
   } catch {
     return [];
@@ -193,7 +209,12 @@ export function openNbuUrl(input: SaveNbuReturnContextInput): NbuOpenMode {
     if (!pending.some((entry) => entry.orderId === input.orderId)) {
       writePending([
         ...pending,
-        { orderId: input.orderId, kind: input.kind, openedAt: Date.now() },
+        {
+          orderId: input.orderId,
+          kind: input.kind,
+          openedAt: Date.now(),
+          paymentUrl: input.paymentUrl,
+        },
       ]);
     }
     webApp.openLink(input.paymentUrl, { try_instant_view: false });
@@ -240,6 +261,31 @@ export function removePendingExternalOrder(orderId: string): void {
 
 export function clearPendingExternalOrders(): void {
   writePending([]);
+}
+
+/**
+ * Reopen a gateway session the user walked away from.
+ *
+ * Same URL, same order — NBU keeps the session payable for its whole timeout,
+ * so this resumes rather than duplicates. Returns false when there is nothing
+ * to reopen (an older pending entry saved before the URL was recorded).
+ */
+export function reopenNbuUrl(orderId: string): boolean {
+  const entry = readPending().find((candidate) => candidate.orderId === orderId);
+  const webApp = window.Telegram?.WebApp;
+  if (!entry?.paymentUrl) return false;
+
+  if (
+    Boolean(webApp?.initData) &&
+    typeof webApp?.openLink === 'function' &&
+    webApp.isVersionAtLeast?.('6.1') !== false
+  ) {
+    webApp.openLink(entry.paymentUrl, { try_instant_view: false });
+    return true;
+  }
+
+  window.location.assign(entry.paymentUrl);
+  return true;
 }
 
 /**

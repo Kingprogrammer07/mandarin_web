@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
 import { openNbuUrl } from '@/utils/nbuReturnContext';
-import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 import { useGuideTour } from '@/hooks/useGuideTour';
 
 interface SavedCardsPageProps {
@@ -64,12 +63,6 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
     },
   });
 
-    /**
-     * A gateway session is already open in the in-app browser. The app is no
-     * longer replaced by the gateway, so this button stayed live while the user
-     * was at the bank — a second tap starts a second binding for the same card.
-     */
-    const paymentPending = useNbuSessionOpen('card_binding');
 
   const bindMutation = useMutation({
     mutationFn: () => nbuPaymentService.bindCard(),
@@ -150,7 +143,7 @@ export default function SavedCardsPage({ onBack }: SavedCardsPageProps) {
           data-tour="card-bind"
           whileTap={{ scale: 0.97 }}
           onClick={handleBind}
-          disabled={bindMutation.isPending || paymentPending}
+          disabled={bindMutation.isPending}
           className="w-full flex items-center justify-center gap-2 h-14 rounded-mc-lg font-bold text-base
             bg-mc-surface
             border border-dashed border-mc-border dark:border-white/15

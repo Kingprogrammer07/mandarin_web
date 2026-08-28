@@ -2174,6 +2174,7 @@
     "boundToast": "Karta muvaffaqiyatli ulandi",
     "failedToast": "To‘lov amalga oshmadi",
     "refundedToast": "To‘lov qaytarildi",
-    "expiredToast": "To‘lov muddati tugadi"
+    "expiredToast": "To‘lov muddati tugadi",
+    "resume": "Bankka qaytish"
   }
 }
