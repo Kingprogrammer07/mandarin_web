@@ -167,11 +167,25 @@ the visibility switch rendered as nothing at all. The owner's report was literal
 `min-w-0` further down cannot fix that — the fixed siblings have to wrap or
 shrink first.
 
-The other recurring cause is a **native control with an intrinsic minimum**:
-`<input type="date">` renders ~139px wide and will not go smaller, so two of
-them side by side need 342px and cannot fit a phone at any font size that
-respects the 16px input floor. Change the layout (stack them, or collapse the
-range into one control) rather than fighting the widget.
+The other recurring cause is a **native control with an intrinsic minimum**.
+Measured in this app's Chromium at the 16px input floor with `px-3` padding:
+
+| control | natural width | narrowest before it clips its own value |
+|---|---|---|
+| `<input type="date">` | 171px | 171px — it does not compress |
+| `<input type="time">` | 137px | ~100px |
+
+So two date fields side by side need 350px and cannot fit a phone at any font
+size that respects the 16px floor, and a row of `day label + two time fields +
+a checkbox` needs 429px against the 214px a 320px screen leaves inside a card.
+Change the layout — stack the row, or drop to `px-2` below `sm` when the
+shortfall is only a handful of pixels — rather than fighting the widget.
+
+Note that `min-w-0` on such an input "fixes" the overflow probe while breaking
+the control: the box shrinks and the widget silently clips its own value. The
+probe below skips `input`/`textarea`/`select` for exactly that reason (they
+scroll their content by design), so a squeezed native control reads as clean.
+Check those by width, not by the probe.
 
 Never truncate a **number or an identifier**: a clipped `245 915 810,91 so'm`
 reads as a different, wrong amount. Wrap it, scale it responsively, or abbreviate
