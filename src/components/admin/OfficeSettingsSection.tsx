@@ -55,8 +55,15 @@ function toForm(office: OfficeInfo): OfficeForm {
   };
 }
 
+/**
+ * `px-2` below `sm` is not a style choice — it is what makes the holiday field
+ * fit. `input type="date"` has an intrinsic minimum and renders at 171px with
+ * px-3; a 320px phone gives this card 214px and the delete button beside it
+ * takes 42px. Trimming 4px of padding on each side is what keeps the widget
+ * showing its own value instead of clipping it.
+ */
 const inputClass =
-  'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-orange-400 dark:border-white/10 dark:bg-white/5 dark:text-white';
+  'w-full rounded-xl border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 outline-none focus:border-orange-400 sm:px-3 dark:border-white/10 dark:bg-white/5 dark:text-white';
 
 function parseTimeToMinutes(value: string): number | null {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
@@ -164,8 +171,8 @@ function OfficeEditor({ office }: { office: OfficeInfo }) {
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-black text-gray-900 dark:text-white">
             <MapPin className="h-4 w-4 text-orange-500" />
             Ofis ma'lumotlari
@@ -260,7 +267,7 @@ function OfficeEditor({ office }: { office: OfficeInfo }) {
                 <button
                   type="button"
                   onClick={() => patch({ phones: form.phones.filter((_, i) => i !== index) })}
-                  className="shrink-0 rounded-xl border border-gray-200 px-3 text-gray-400 hover:text-red-500 dark:border-white/10"
+                  className="shrink-0 rounded-xl border border-gray-200 px-2 text-gray-400 hover:text-red-500 sm:px-3 dark:border-white/10"
                   aria-label="O'chirish"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -309,25 +316,22 @@ function OfficeEditor({ office }: { office: OfficeInfo }) {
             {WEEKDAY_ORDER.map((day) => {
               const cfg = form.working_hours[day];
               return (
-                <div key={day} className="flex items-center gap-2">
+                /*
+                 * Two lines on a phone, one from `sm` up.
+                 *
+                 * On one line this row needs 96px of day name + two 112px time
+                 * inputs + an 85px checkbox + gaps = 429px, and a 320px phone
+                 * gives the card 214px. Squeezing the inputs is not a way out:
+                 * an `input type="time"` renders its own value cleanly down to
+                 * about 100px and clips below that, so the layout has to change
+                 * instead. Splitting them across two lines leaves each input
+                 * 103px at 320px — inside that floor.
+                 */
+                <div key={day} className="flex flex-wrap items-center gap-2">
                   <span className="w-24 shrink-0 text-xs font-semibold text-gray-600 dark:text-white/55">
                     {WEEKDAY_LABELS[day]}
                   </span>
-                  <input
-                    type="time"
-                    className={`${inputClass} w-28`}
-                    value={cfg.open}
-                    disabled={cfg.closed}
-                    onChange={(e) => patchDay(day, { open: e.target.value })}
-                  />
-                  <input
-                    type="time"
-                    className={`${inputClass} w-28`}
-                    value={cfg.close}
-                    disabled={cfg.closed}
-                    onChange={(e) => patchDay(day, { close: e.target.value })}
-                  />
-                  <label className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-white/45">
+                  <label className="ml-auto flex shrink-0 items-center gap-1.5 text-xs font-semibold text-gray-500 sm:order-last sm:ml-0 dark:text-white/45">
                     <input
                       type="checkbox"
                       checked={cfg.closed}
@@ -335,6 +339,22 @@ function OfficeEditor({ office }: { office: OfficeInfo }) {
                     />
                     Dam olish
                   </label>
+                  <div className="grid w-full grid-cols-2 gap-2 sm:order-2 sm:flex sm:w-auto">
+                    <input
+                      type="time"
+                      className={`${inputClass} sm:w-28`}
+                      value={cfg.open}
+                      disabled={cfg.closed}
+                      onChange={(e) => patchDay(day, { open: e.target.value })}
+                    />
+                    <input
+                      type="time"
+                      className={`${inputClass} sm:w-28`}
+                      value={cfg.close}
+                      disabled={cfg.closed}
+                      onChange={(e) => patchDay(day, { close: e.target.value })}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -361,7 +381,7 @@ function OfficeEditor({ office }: { office: OfficeInfo }) {
                 <button
                   type="button"
                   onClick={() => patch({ holidays: form.holidays.filter((_, i) => i !== index) })}
-                  className="shrink-0 rounded-xl border border-gray-200 px-3 text-gray-400 hover:text-red-500 dark:border-white/10"
+                  className="shrink-0 rounded-xl border border-gray-200 px-2 text-gray-400 hover:text-red-500 sm:px-3 dark:border-white/10"
                   aria-label="O'chirish"
                 >
                   <Trash2 className="h-4 w-4" />

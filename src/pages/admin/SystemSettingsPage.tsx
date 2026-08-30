@@ -525,13 +525,13 @@ export default function SystemSettingsPage() {
       <>
       {/* Maintenance Toggle */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isMaintenanceOn ? 'bg-amber-100 dark:bg-amber-500/15' : 'bg-gray-100 dark:bg-white/5'}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${isMaintenanceOn ? 'bg-amber-100 dark:bg-amber-500/15' : 'bg-gray-100 dark:bg-white/5'}`}>
               <Wrench className={`w-5 h-5 ${isMaintenanceOn ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`} />
             </div>
-            <div>
-              <p className="font-bold text-base text-gray-900 dark:text-white">Maintenance mode</p>
+            <div className="min-w-0">
+              <p className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Maintenance mode</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {isMaintenanceOn ? 'Yoqilgan — faqat adminlar kiradi' : 'O\'chiq — barcha foydalanuvchilar'}
               </p>
@@ -540,7 +540,7 @@ export default function SystemSettingsPage() {
           <button
             onClick={handleToggleMaintenance}
             disabled={maintenanceLoading || maintenanceMutation.isPending}
-            className={`relative w-14 h-8 rounded-full transition-colors duration-200 ${isMaintenanceOn ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/20'} disabled:opacity-60`}
+            className={`relative w-14 h-8 shrink-0 rounded-full transition-colors duration-200 ${isMaintenanceOn ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/20'} disabled:opacity-60`}
           >
             <motion.div
               className="absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm"
@@ -557,13 +557,13 @@ export default function SystemSettingsPage() {
       <>
       {/* NBU Toggle */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isNbuOn ? 'bg-sky-100 dark:bg-sky-500/15' : 'bg-gray-100 dark:bg-white/5'}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${isNbuOn ? 'bg-sky-100 dark:bg-sky-500/15' : 'bg-gray-100 dark:bg-white/5'}`}>
               <CreditCard className={`w-5 h-5 ${isNbuOn ? 'text-sky-600 dark:text-sky-400' : 'text-gray-500 dark:text-gray-400'}`} />
             </div>
-            <div>
-              <p className="font-bold text-base text-gray-900 dark:text-white">NBU onlayn to'lov</p>
+            <div className="min-w-0">
+              <p className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">NBU onlayn to'lov</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {isNbuOn ? 'Yoqilgan — kartali to\'lov ishlayapti' : 'O\'chiq — faqat manual to\'lov'}
               </p>
@@ -572,7 +572,7 @@ export default function SystemSettingsPage() {
           <button
             onClick={handleToggleNbu}
             disabled={nbuLoading || nbuMutation.isPending}
-            className={`relative w-14 h-8 rounded-full transition-colors duration-200 ${isNbuOn ? 'bg-sky-500' : 'bg-gray-300 dark:bg-white/20'} disabled:opacity-60`}
+            className={`relative w-14 h-8 shrink-0 rounded-full transition-colors duration-200 ${isNbuOn ? 'bg-sky-500' : 'bg-gray-300 dark:bg-white/20'} disabled:opacity-60`}
           >
             <motion.div
               className="absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm"
@@ -893,7 +893,10 @@ export default function SystemSettingsPage() {
                                 {row.callback_received_at && ' · callback ✓'}
                               </p>
                             </div>
-                            <div className="flex gap-2">
+                            {/* Stacked on a phone: "Reconcile" + "Expire" side
+                                by side need 199px of unbreakable text and a
+                                320px screen leaves this row 164px. */}
+                            <div className="flex flex-col gap-2 sm:flex-row">
                               <button
                                 onClick={() => reconcileMutation.mutate(row.transaction_id)}
                                 disabled={isBusy || reconcileMutation.isPending}
@@ -1119,7 +1122,8 @@ export default function SystemSettingsPage() {
                                     {row.nbu_order_id && ` - ${row.nbu_order_id}`}
                                   </p>
                                 </div>
-                                <div className="flex gap-2">
+                                {/* Same as the NBU pair above. */}
+                                <div className="flex flex-col gap-2 sm:flex-row">
                                   <button
                                     onClick={() =>
                                       uzpostReconcileMutation.mutate(

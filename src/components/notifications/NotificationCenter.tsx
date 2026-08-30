@@ -535,7 +535,7 @@ export default function NotificationCenter() {
     const renderContent = () => (
         <div className="flex h-full max-h-[85dvh] flex-col overflow-hidden bg-mc-surface sm:max-h-[520px]">
             {/* Header */}
-            <div className="sticky top-0 z-10 shrink-0 border-b border-mc-border bg-white/85 p-4 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 shrink-0 border-b border-mc-border bg-mc-surface/85 p-4 backdrop-blur-xl">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -727,7 +727,7 @@ export default function NotificationCenter() {
                 {!isMobile && (
                     <PopoverContent
                         align="end"
-                        className="w-[370px] overflow-hidden rounded-mc-xl border border-mc-border bg-white/95 p-0 shadow-2xl backdrop-blur-xl"
+                        className="w-[370px] overflow-hidden rounded-mc-xl border border-mc-border bg-mc-surface/95 p-0 shadow-2xl backdrop-blur-xl"
                     >
                         {renderContent()}
                     </PopoverContent>
