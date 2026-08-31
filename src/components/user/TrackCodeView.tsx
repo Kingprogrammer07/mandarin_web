@@ -6,8 +6,6 @@ import { triggerSoftHaptic } from '@/utils/haptics';
 const TrackCodeTab = lazy(() => import('@/pages/dashboard/TrackCodeTab'));
 
 interface TrackCodeViewProps {
-  /** 'search' looks a code up; 'history' is "Yuklar Tarixi". */
-  initialView: 'search' | 'history';
   /** Pre-filled and searched immediately — the code typed on the home screen. */
   initialCode?: string;
   onBack: () => void;
@@ -22,11 +20,10 @@ interface TrackCodeViewProps {
  * ran the lookup.
  *
  * Deliberately thin: a back control and the horizontal padding the tab's old
- * container used to supply, nothing else. The tab draws its own title and its
- * own search/history toggle (TrackCodeTab.tsx:136-163), so anything more here
- * would show the client two titles and two back buttons.
+ * container used to supply, nothing else. The tab draws its own title, so
+ * anything more here would show the client two titles and two back buttons.
  */
-export function TrackCodeView({ initialView, initialCode, onBack }: TrackCodeViewProps) {
+export function TrackCodeView({ initialCode, onBack }: TrackCodeViewProps) {
   const { t } = useTranslation();
 
   return (
@@ -51,7 +48,7 @@ export function TrackCodeView({ initialView, initialCode, onBack }: TrackCodeVie
           dashboard's container. */}
       <div className="px-4">
         <Suspense fallback={null}>
-          <TrackCodeTab initialView={initialView} initialCode={initialCode} />
+          <TrackCodeTab initialCode={initialCode} />
         </Suspense>
       </div>
       </div>

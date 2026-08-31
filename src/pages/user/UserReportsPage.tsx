@@ -1,10 +1,11 @@
 import { useState, useCallback, lazy, Suspense, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/hooks/useProfile';
+import { reportService } from '@/api/services/reportService';
 import {
-    reportService,
-    type ReportFlightSummary,
-} from '@/api/services/reportService';
+    shipmentService,
+    type ShipmentView,
+} from '@/api/services/shipmentService';
 import { HomeHeader } from '@/components/user/HomeHeader';
 import { InfoNote } from '@/components/user/InfoNote';
 import { SegmentedTabs } from '@/components/user/SegmentedTabs';
@@ -23,6 +24,9 @@ import {
     XCircle,
     RefreshCw,
     Search,
+    CreditCard,
+    History,
+    X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -31,10 +35,23 @@ const NotificationCenter = lazy(
     () => import('@/components/notifications/NotificationCenter'),
 );
 
-/** Which half of the list is on screen. Archived === taken away. */
-type ShipmentTab = 'active' | 'archive';
+/**
+ * Which list is on screen.
+ *
+ * The three tabs are a partition of the client's current cargo — `active` is in
+ * the Tashkent warehouse AND priced, `transit` is everything still moving,
+ * `archive` is collected. `history` is not a tab but the full list behind its
+ * own button: it also holds the pre-scanner flights (79 of them, M214-M226)
+ * that the tabs deliberately leave out.
+ */
+type ShipmentTab = ShipmentView;
+
+/** Below this the search field is dead weight on a 320px screen: the median
+ *  client has 3 flights and only 14.8% have more than ten. */
+const SEARCH_THRESHOLD = 10;
 import { useTranslation } from 'react-i18next';
 import { clearNbuReturnParams } from '@/utils/nbuReturnContext';
+import { triggerSoftHaptic } from '@/utils/haptics';
 
 const PAGE_SIZE = 10;
 
@@ -133,6 +150,7 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
     // State
     const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<ShipmentTab>('active');
+    const [search, setSearch] = useState('');
     const view: ViewState = selectedFlight ? 'detail' : 'list';
 
     // Track Drawer State
@@ -158,15 +176,17 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
 
     // 1. Fetch Flights
     const {
-        data: flights = [],
+        data: shipments,
         isLoading: isLoadingFlights,
         isFetching: isFetchingMoreFlights,
         refetch: refetchFlights,
         isRefetching: isRefetchingFlights
     } = useQuery({
-        queryKey: ['webFlights', user?.client_code, flightsFetchSize],
-        queryFn: () => reportService.getWebFlights(user!.client_code, 1, flightsFetchSize),
-        enabled: !!user?.client_code,
+        // No client_code in the key: the server scopes to the session's own
+        // codes, and a client with two of them would otherwise cache twice.
+        queryKey: ['shipments', activeTab, search, flightsFetchSize],
+        queryFn: () => shipmentService.list(activeTab, 1, flightsFetchSize, search),
+        enabled: !!user,
         staleTime: 5 * 60 * 1000,
     });
 
@@ -188,26 +208,25 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
     // total, so counting the loaded page would under-report any client with
     // more flights than one page.
     const { data: flightCounts } = useQuery({
-        queryKey: ['webFlightCounts', user?.client_code],
-        queryFn: () => reportService.getFlightCounts(user!.client_code!),
-        enabled: Boolean(user?.client_code),
+        queryKey: ['shipmentCounts'],
+        queryFn: () => shipmentService.counts(),
+        enabled: Boolean(user),
         staleTime: 60_000,
     });
 
-    // Archived === collected. Payment is not part of it: 44% of collected
-    // flights in production still carry a balance, and gating on payment left
-    // them under "Faol" months after the client had picked them up. The debt
-    // is not lost — ShipmentCard shows a "To'lanmagan" chip wherever it sits.
-    // Must stay identical to ReportService._is_archived, which produces the tab
-    // counters; a counter that disagrees with the list under it is worse than
-    // no counter at all.
-    const isArchived = (f: ReportFlightSummary) => f.is_taken_away;
+    // The server decides which tab a shipment is in and returns only that
+    // tab's rows: the rule reads four tables and a second copy of it here would
+    // drift from the counters.
+    const visibleFlights = shipments?.items ?? [];
+    const tabTotal = shipments?.total ?? 0;
 
-    const visibleFlights = flights.filter((f) =>
-        activeTab === 'archive' ? isArchived(f) : !isArchived(f),
-    );
+    // Shown once the list is long enough to be worth searching, or while a
+    // search is running — otherwise the field would vanish under the user as
+    // soon as it narrowed the list past the threshold.
+    const showSearch =
+        search.length > 0 || (flightCounts?.history ?? 0) > SEARCH_THRESHOLD;
 
-    const hasMoreFlights = flights.length === flightsFetchSize;
+    const hasMoreFlights = visibleFlights.length < tabTotal;
     const hasMoreHistory = history.length === historyFetchSize;
     const isLoadingMoreFlights = isFetchingMoreFlights && !isLoadingFlights;
     const isLoadingMoreHistory = isFetchingMoreHistory && !isLoadingHistory;
@@ -225,6 +244,17 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
     };
 
     const handleLoadMoreFlights = () => setFlightsFetchSize(s => s + PAGE_SIZE);
+
+    // A new tab or a new search starts at the first page; without this the
+    // previously grown page size would fetch a long list the user did not ask
+    // for.
+    useEffect(() => { setFlightsFetchSize(PAGE_SIZE); }, [activeTab, search]);
+
+    const openPaymentPicker = useCallback(() => {
+        triggerSoftHaptic();
+        setPaymentFlightName(null);
+        setIsPaymentOpen(true);
+    }, []);
     const handleLoadMoreHistory = () => setHistoryFetchSize(s => s + PAGE_SIZE);
 
     const isRefreshing = isRefetchingFlights || isRefetchingHistory;
@@ -315,16 +345,64 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                             }
                         />
 
-                        <div className="px-4 pt-3">
-                            <h1 className="text-[19px] font-extrabold leading-tight tracking-tight text-mc-text">
-                                {t('reports.title')}
-                            </h1>
-                            <p className="mt-0.5 text-[12px] font-medium text-mc-text-2">
-                                {t('reports.subtitle')}
-                            </p>
+                        <div className="flex items-start justify-between gap-3 px-4 pt-3">
+                            <div className="min-w-0">
+                                <h1 className="text-[19px] font-extrabold leading-tight tracking-tight text-mc-text">
+                                    {t('reports.title')}
+                                </h1>
+                                <p className="mt-0.5 text-[12px] font-medium text-mc-text-2">
+                                    {t('reports.subtitle')}
+                                </p>
+                            </div>
+
+                            {/* Beside the title, not in the tab row: three tabs
+                                plus two 48px buttons want 400px and a 320px
+                                screen leaves that row 288. */}
+                            <div className="flex shrink-0 items-center gap-2">
+                            <button
+                                    type="button"
+                                    onClick={() => {
+                                        triggerSoftHaptic();
+                                        setActiveTab((tab) =>
+                                            tab === 'history' ? 'active' : 'history',
+                                        );
+                                    }}
+                                    aria-pressed={activeTab === 'history'}
+                                    className={`flex w-12 shrink-0 items-center justify-center rounded-mc-lg
+                                               border transition-transform duration-150 active:scale-95 ${
+                                                   activeTab === 'history'
+                                                       ? 'border-mc-brand bg-mc-brand-soft text-mc-brand'
+                                                       : 'border-mc-border bg-mc-surface text-mc-text-2'
+                                               }`}
+                                    aria-label={t('tracking.historyTitle', 'Yuklar tarixi')}
+                                >
+                                    {/* The three tabs cover current cargo; 79 older
+                                        flights exist only in the full list. */}
+                                    <History className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleRefresh}
+                                    disabled={isRefreshing}
+                                    className="flex w-12 shrink-0 items-center justify-center rounded-mc-lg
+                                               border border-mc-border bg-mc-surface text-mc-brand
+                                               transition-transform duration-150 active:scale-95"
+                                    aria-label={t('reports.retry')}
+                                >
+                                    {/* The design puts a filter control here. Until the
+                                        filter sheet exists this button refreshes, so the
+                                        icon says refresh — a funnel that reloads the list
+                                        would be a lie about what tapping it does. */}
+                                    <RefreshCw
+                                        className={`h-[18px] w-[18px] ${isRefreshing ? 'animate-spin' : ''}`}
+                                        strokeWidth={2}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="mt-3 flex items-stretch gap-2 px-4">
+                        <div className="mt-3 px-4">
                             <SegmentedTabs<ShipmentTab>
                                 label={t('reports.title')}
                                 value={activeTab}
@@ -336,32 +414,54 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                         count: flightCounts?.active,
                                     },
                                     {
+                                        id: 'transit',
+                                        label: t('reports.tabTransit', "Yo'ldagi"),
+                                        count: flightCounts?.transit,
+                                    },
+                                    {
                                         id: 'archive',
                                         label: t('reports.tabArchive', 'Arxiv'),
-                                        count: flightCounts?.archived,
+                                        count: flightCounts?.archive,
                                     },
                                 ]}
                             />
-                            <button
-                                type="button"
-                                onClick={handleRefresh}
-                                disabled={isRefreshing}
-                                className="flex w-12 shrink-0 items-center justify-center rounded-mc-lg
-                                           border border-mc-border bg-mc-surface text-mc-brand
-                                           transition-transform duration-150 active:scale-95"
-                                aria-label={t('reports.retry')}
-                            >
-                                {/* The design puts a filter control here. Until the
-                                    filter sheet exists this button refreshes, so the
-                                    icon says refresh — a funnel that reloads the list
-                                    would be a lie about what tapping it does. */}
-                                <RefreshCw
-                                    className={`h-[18px] w-[18px] ${isRefreshing ? 'animate-spin' : ''}`}
-                                    strokeWidth={2}
-                                    aria-hidden="true"
-                                />
-                            </button>
                         </div>
+
+                        {showSearch && (
+                            <div className="mt-2 px-4">
+                                <div className="relative">
+                                    <Search
+                                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4
+                                                   -translate-y-1/2 text-mc-text-3"
+                                        aria-hidden="true"
+                                    />
+                                    {/* 16px: anything smaller makes iOS Safari zoom
+                                        the page on focus and never zoom back. */}
+                                    <input
+                                        type="search"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder={t('shipments.searchPlaceholder', 'Reys raqami')}
+                                        aria-label={t('shipments.searchLabel', 'Reys bo‘yicha qidirish')}
+                                        className="h-11 w-full rounded-mc-lg border border-mc-border
+                                                   bg-mc-surface pl-9 pr-10 text-[16px] font-semibold
+                                                   text-mc-text outline-none placeholder:font-medium
+                                                   placeholder:text-mc-text-3 focus:border-mc-brand"
+                                    />
+                                    {search && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSearch('')}
+                                            aria-label={t('shipments.searchClear', 'Tozalash')}
+                                            className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2
+                                                       items-center justify-center text-mc-text-3 active:scale-95"
+                                        >
+                                            <X className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
 
@@ -409,11 +509,11 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                 </div>
                             ) : visibleFlights.length > 0 ? (
                                 <div className="space-y-2.5">
-                                    {visibleFlights.map(flight => (
+                                    {visibleFlights.map(shipment => (
                                         <ShipmentCard
-                                            key={flight.flight_name}
-                                            flight={flight}
-                                            onOpen={() => setSelectedFlight(flight.flight_name)}
+                                            key={shipment.flight_name}
+                                            shipment={shipment}
+                                            onOpen={() => setSelectedFlight(shipment.flight_name)}
                                         />
                                     ))}
                                     {hasMoreFlights && (
@@ -567,6 +667,29 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
             </div>
 
             {/* Payment Modal — lazy chunk loads only when first opened */}
+            {/* Always on screen, on every tab.
+                Deliberately below `NbuPaymentWatch` (z-10050), which occupies
+                this same corner while a gateway session is open: covering the
+                pay button for the seconds a payment is settling is better than
+                offering a second one on top of it.
+                The offset clears the bottom tab bar and the home indicator. */}
+            {view === 'list' && (
+                <button
+                    type="button"
+                    onClick={openPaymentPicker}
+                    className="fixed right-4 z-30 flex h-14 items-center gap-2 rounded-full
+                               bg-mc-brand px-5 text-mc-on-brand
+                               shadow-[var(--mc-shadow-cta)] transition-transform
+                               duration-150 active:scale-95
+                               bottom-[calc(var(--mc-nav-h,0px)+env(safe-area-inset-bottom)+1rem)]"
+                >
+                    <CreditCard className="h-5 w-5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                    <span className="text-[14px] font-extrabold">
+                        {t('dashboard.actions.payment.label', "To'lov qilish")}
+                    </span>
+                </button>
+            )}
+
             {isPaymentOpen && (
                 <Suspense fallback={null}>
                     <MakePaymentModal

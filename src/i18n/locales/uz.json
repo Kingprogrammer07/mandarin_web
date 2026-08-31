@@ -1059,7 +1059,8 @@
     "detailsSubtitle": "Yukingiz haqida batafsil ma‘lumot",
     "noTrackCode": "Trek-kod hali biriktirilmagan",
     "paymentInfo": "To‘lov ma‘lumotlari",
-    "paidAmountShort": "To‘langan"
+    "paidAmountShort": "To‘langan",
+    "tabTransit": "Yo'ldagi"
   },
   "dashboard": {
     "tabs": {
@@ -2176,5 +2177,16 @@
     "refundedToast": "To‘lov qaytarildi",
     "expiredToast": "To‘lov muddati tugadi",
     "resume": "Bankka qaytish"
+  },
+  "shipments": {
+    "stageTransit": "Yo'lda",
+    "stageWarehouse": "Toshkent omborida",
+    "stageCollected": "Olib ketilgan",
+    "manifestName": "Xitoyda: {{name}}",
+    "parcels": "Yuklar",
+    "pcs": "ta",
+    "searchPlaceholder": "Reys raqami",
+    "searchLabel": "Reys bo'yicha qidirish",
+    "searchClear": "Tozalash"
   }
 }

@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft, History, History as HistoryIcon, Loader2, Search, X } from "lucide-react";
+import { AlertCircle, History, Loader2, Search, X } from "lucide-react";
 import { trackCargo } from "@/api/services/cargo";
 import { TrackResultCard } from "./components/TrackResultCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import ClientCargoHistory from "../../components/history/ClientCargoHistory";
 import { useTranslation } from 'react-i18next';
 
 const HISTORY_KEY = "track_code_history_v2"; // Changed key to avoid conflict with old string-only history
@@ -17,7 +16,6 @@ interface HistoryItem {
 }
 
 interface TrackCodeTabProps {
-    initialView?: 'search' | 'history';
     autoFocus?: boolean;
     onFocusConsumed?: () => void;
     /**
@@ -28,7 +26,7 @@ interface TrackCodeTabProps {
     initialCode?: string;
 }
 
-export default function TrackCodeTab({ initialView = 'search', autoFocus=false, onFocusConsumed, initialCode }: TrackCodeTabProps) {
+export default function TrackCodeTab({ autoFocus=false, onFocusConsumed, initialCode }: TrackCodeTabProps) {
     const { t } = useTranslation();
     // Seeded from the initial state rather than an effect: the query below is
     // enabled by `activeSearch`, so setting it after mount would render one
@@ -39,7 +37,6 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
     const [activeSearch, setActiveSearch] = useState<string | null>(
         seeded.length >= 3 ? seeded : null,
     );
-    const [showHistory, setShowHistory] = useState(initialView === 'history');
     const inputRef = useRef<HTMLInputElement>(null);
     // Load history
     useEffect(() => {
@@ -133,46 +130,16 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
     return (
         <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-5">
 
-            {/* Title & History Toggle */}
-            <div className="flex items-center justify-between gap-2">
-                <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-extrabold text-mc-text">
-                    <span className="inline-block h-4 w-1 shrink-0 rounded-full bg-mc-brand" />
-                    <span className="truncate">
-                        {showHistory ? t('tracking.historyTitle') : t('tracking.title')}
-                    </span>
-                </h2>
+            {/* Title. The cargo history used to hang off a toggle here; it now
+                lives in "Mening yuklarim", joined with the billing rather than
+                standing beside it as a second list under a different flight
+                name for the same parcel. */}
+            <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-extrabold text-mc-text">
+                <span className="inline-block h-4 w-1 shrink-0 rounded-full bg-mc-brand" />
+                <span className="truncate">{t('tracking.title')}</span>
+            </h2>
 
-                <button
-                    onClick={() => setShowHistory(!showHistory)}
-                    className="
-                        flex shrink-0 items-center gap-1.5 rounded-full border border-mc-border
-                        bg-mc-surface-2 px-2.5 py-1.5 text-[12px] font-extrabold text-mc-text-2
-                        transition-transform duration-150 active:scale-95
-                    "
-                >
-                    {showHistory ? (
-                        <>
-                            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-                            <span>{t('tracking.back')}</span>
-                        </>
-                    ) : (
-                        <>
-                            <HistoryIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                            <span>{t('tracking.myCargo')}</span>
-                        </>
-                    )}
-                </button>
-            </div>
-
-            {showHistory ? (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                    <ClientCargoHistory />
-                </div>
-            ) : (
-                <>
-
-                    {/* Search Input */}
-{/* Search Input */}
+            {/* Search Input */}
 <form onSubmit={handleSearch} className="space-y-2">
     {/* Input — 18px is above the 16px floor, so focusing it does not make iOS
         Safari zoom the page. */}
@@ -304,8 +271,6 @@ export default function TrackCodeTab({ initialView = 'search', autoFocus=false, 
                             </AnimatePresence>
                         )}
                     </div>
-                </>
-            )}
 
         </div>
     );

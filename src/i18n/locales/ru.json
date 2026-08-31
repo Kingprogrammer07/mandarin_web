@@ -1059,7 +1059,8 @@
     "detailsSubtitle": "Подробная информация о вашем грузе",
     "noTrackCode": "Трек-код ещё не привязан",
     "paymentInfo": "Информация об оплате",
-    "paidAmountShort": "Оплачено"
+    "paidAmountShort": "Оплачено",
+    "tabTransit": "В пути"
   },
   "dashboard": {
     "tabs": {
@@ -2176,5 +2177,16 @@
     "refundedToast": "Платёж возвращён",
     "expiredToast": "Срок платежа истёк",
     "resume": "Вернуться к оплате"
+  },
+  "shipments": {
+    "stageTransit": "В пути",
+    "stageWarehouse": "На складе в Ташкенте",
+    "stageCollected": "Забрано",
+    "manifestName": "В Китае: {{name}}",
+    "parcels": "Грузы",
+    "pcs": "шт",
+    "searchPlaceholder": "Номер рейса",
+    "searchLabel": "Поиск по рейсу",
+    "searchClear": "Очистить"
   }
 }

@@ -184,12 +184,11 @@ export default function UserHome({
     );
   }
 
-  if (fullView === 'track' || fullView === 'cargo-history') {
+  if (fullView === 'track') {
     return (
       <Suspense fallback={null}>
         <TrackCodeView
-          initialView={fullView === 'cargo-history' ? 'history' : 'search'}
-          initialCode={fullView === 'track' ? trackCode : undefined}
+          initialCode={trackCode}
           onBack={() => setFullView(null)}
         />
       </Suspense>
@@ -206,7 +205,10 @@ export default function UserHome({
         onOpenCalculator={() => setIsCalculatorOpen(true)}
         onOpenFlightSchedule={() => setFullView('schedule')}
         onOpenOffice={() => setIsAddressOpen(true)}
-        onOpenCargoHistory={() => setFullView('cargo-history')}
+        // The history is no longer a screen of its own: it is the full list
+        // inside "Mening yuklarim", where each flight carries its billing and
+        // its stage instead of appearing twice under two names.
+        onOpenCargoHistory={() => onNavigate?.('user-reports')}
         onOpenDeliveryHistory={() => setFullView('delivery-history')}
         notificationSlot={
           // Mounted in the header, not in the page flow. NotificationCenter has
