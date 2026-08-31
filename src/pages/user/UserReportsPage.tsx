@@ -332,7 +332,11 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
         <div className="min-h-dvh bg-mc-bg text-mc-text">
             {/* pt-24 used to clear the top NavigationBar, which client pages no
                 longer render; App.tsx already pads for the bottom bar. */}
-            <div className="mx-auto max-w-lg">
+            {/* The list reserves the FAB's own height on top of what App.tsx
+                already pads for the tab bar. Without it the button sits over
+                the last row and that row cannot be read or tapped at all —
+                a fixed element takes no space in the flow. */}
+            <div className={`mx-auto max-w-lg ${view === 'list' ? 'pb-[4.5rem]' : ''}`}>
                 {view === 'list' && (
                     <>
                         <HomeHeader
@@ -677,14 +681,14 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                 <button
                     type="button"
                     onClick={openPaymentPicker}
-                    className="fixed right-4 z-30 flex h-14 items-center gap-2 rounded-full
-                               bg-mc-brand px-5 text-mc-on-brand
+                    className="fixed right-4 z-30 flex h-11 items-center gap-1.5 rounded-full
+                               bg-mc-brand px-4 text-mc-on-brand
                                shadow-[var(--mc-shadow-cta)] transition-transform
                                duration-150 active:scale-95
                                bottom-[calc(var(--mc-nav-h,0px)+env(safe-area-inset-bottom)+1rem)]"
                 >
-                    <CreditCard className="h-5 w-5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-                    <span className="text-[14px] font-extrabold">
+                    <CreditCard className="h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                    <span className="text-[13px] font-extrabold">
                         {t('dashboard.actions.payment.label', "To'lov qilish")}
                     </span>
                 </button>
