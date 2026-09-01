@@ -12,7 +12,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { pickSession, type StoredSessions } from './session';
+import {
+  credentialForPath,
+  isClientPath,
+  pickSession,
+  type StoredSessions,
+} from './session';
 
 const NONE: StoredSessions = { adminToken: null, adminRole: null, userToken: null };
 const STAFF: StoredSessions = { adminToken: 'jwt', adminRole: 'super-admin', userToken: null };
@@ -68,13 +73,61 @@ describe('a client route', () => {
     expect(pickSession(NONE, USER_ROUTE)).toEqual({ kind: 'guest' });
   });
 
-  it('CURRENTLY hands the route to the staff session when both exist', () => {
-    // The trap the owner reported, asserted as it behaves today so that the
-    // commit which changes it shows the change in a diff.
-    expect(pickSession(BOTH, USER_ROUTE)).toEqual({ kind: 'admin', role: 'super-admin' });
+  it('is served by the client session even when a staff session exists', () => {
+    // The reported trap. Previously the staff session took this route and
+    // `checkAccess` rewrote the URL to the admin dashboard, so a staff member
+    // who opened the panel once inside Telegram could not get back to the
+    // client app from that WebView at all.
+    expect(pickSession(BOTH, USER_ROUTE)).toEqual({ kind: 'client' });
   });
 
-  it('CURRENTLY does the same with a staff token and no client token', () => {
-    expect(pickSession(STAFF, USER_ROUTE)).toEqual({ kind: 'admin', role: 'super-admin' });
+  it('sends a staff member with no client session to the client login', () => {
+    // Not the admin dashboard: they asked for a client page, and the honest
+    // answer is that they are not signed in as a customer.
+    expect(pickSession(STAFF, USER_ROUTE)).toEqual({ kind: 'guest' });
+  });
+
+  it('leaves staff routes alone', () => {
+    expect(pickSession(BOTH, STAFF_ROUTE)).toEqual({ kind: 'admin', role: 'super-admin' });
+  });
+});
+
+describe('route classification', () => {
+  it.each(['/user/home', '/user/reports', '/user/profile', '/payment/nbu/cards'])(
+    '%s is the client app',
+    (path) => {
+      expect(isClientPath(path)).toBe(true);
+    },
+  );
+
+  it.each(['/admin/dashboard', '/kassa', '/flights'])('%s is not the client app', (path) => {
+    expect(isClientPath(path)).toBe(false);
+  });
+});
+
+describe('which credential a request carries', () => {
+  const both = { adminToken: 'jwt', userToken: 'tok' };
+
+  it('sends the client token from a client page even when a staff JWT is stored', () => {
+    // The staff JWT used to win unconditionally, so a client screen's requests
+    // went out with no client credential and came back 401 — which then logged
+    // the staff member out of the admin panel too.
+    expect(credentialForPath('/user/home', both)).toBe('client');
+  });
+
+  it('sends nothing from a client page when there is no client token', () => {
+    expect(credentialForPath('/user/home', { adminToken: 'jwt', userToken: null })).toBe(null);
+  });
+
+  it('sends the staff JWT from a staff console', () => {
+    expect(credentialForPath('/admin/dashboard', both)).toBe('admin');
+  });
+
+  it('falls back to the client token on a staff console with no staff JWT', () => {
+    expect(credentialForPath('/kassa', { adminToken: null, userToken: 'tok' })).toBe('client');
+  });
+
+  it('sends nothing when nothing is stored', () => {
+    expect(credentialForPath('/admin/dashboard', { adminToken: null, userToken: null })).toBe(null);
   });
 });

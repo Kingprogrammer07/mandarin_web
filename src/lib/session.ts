@@ -48,9 +48,17 @@ export type SessionChoice =
  * Order matters and is the whole point:
  *
  * 1. A public route needs nothing, so it never rejects anyone.
- * 2. A staff session takes the route when one is stored.
- * 3. Otherwise a client token is used, once verified by the caller.
- * 4. Otherwise the visitor is a guest.
+ * 2. A `/user/*` route is the client app and is served by the client session
+ *    ALONE, even when a staff session is also stored. It used to be taken by
+ *    the staff session, and `checkAccess` would then find the page missing from
+ *    that role's allow-list and rewrite the URL to the admin dashboard — so a
+ *    staff member who opened the panel once inside Telegram could never reach
+ *    the client app again from that WebView, where both sessions share one
+ *    storage context. Being a staff member is not a reason to stop being a
+ *    customer.
+ * 3. Otherwise a staff session takes the route when one is stored.
+ * 4. Otherwise a client token is used, once verified by the caller.
+ * 5. Otherwise the visitor is a guest.
  */
 export function pickSession(
   sessions: StoredSessions,
@@ -63,6 +71,10 @@ export function pickSession(
     return { kind: 'public', role: hasAdmin ? (adminRole as string) : null };
   }
 
+  if (route.isUserPage) {
+    return userToken ? { kind: 'client' } : { kind: 'guest' };
+  }
+
   if (hasAdmin) {
     return { kind: 'admin', role: adminRole as string };
   }
@@ -72,4 +84,45 @@ export function pickSession(
   }
 
   return { kind: 'guest' };
+}
+
+/**
+ * URL prefixes that belong to the client app.
+ *
+ * Needed outside the router too: the axios interceptor has to pick WHICH
+ * credential to send, and it only knows the URL. It used to attach the staff
+ * JWT whenever one was stored, so a client screen's requests went out with
+ * `X-Admin-Authorization` and no client credential at all — a 401, and then a
+ * logout, for a staff member simply looking at their own parcels.
+ *
+ * `/payment/nbu/cards` is the saved-cards screen; it is a client page despite
+ * living outside `/user`.
+ */
+const CLIENT_PATH_PREFIXES = ['/user/', '/payment/nbu/cards'] as const;
+
+/** Is this URL path part of the client app rather than a staff console? */
+export function isClientPath(pathname: string): boolean {
+  return CLIENT_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix),
+  );
+}
+
+/**
+ * Which stored credential a request from this page should carry.
+ *
+ * Same rule as {@link pickSession}, applied to a request rather than a route:
+ * a client page uses the client token, everything else prefers the staff JWT.
+ * Returning `null` means send neither — the request goes out unauthenticated
+ * and the server decides.
+ */
+export function credentialForPath(
+  pathname: string,
+  sessions: Pick<StoredSessions, 'adminToken' | 'userToken'>,
+): 'admin' | 'client' | null {
+  const { adminToken, userToken } = sessions;
+  if (isClientPath(pathname)) {
+    return userToken ? 'client' : null;
+  }
+  if (adminToken) return 'admin';
+  return userToken ? 'client' : null;
 }

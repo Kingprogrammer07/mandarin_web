@@ -3,6 +3,7 @@ import { API_BASE_URL } from '@/config/config';
 import i18n from '@/i18n/config';
 import { logFrontendError } from '@/api/services/frontendErrors';
 import { isOperationalPath } from '@/lib/posRoutes';
+import { credentialForPath } from '@/lib/session';
 import { useMaintenanceStore } from '@/store/useMaintenanceStore';
 
 // Status codes that reliably mean the backend is down (gateway / proxy errors).
@@ -132,13 +133,24 @@ apiClient.interceptors.request.use(
 
     // Mutually exclusive auth headers — sending both causes the user-auth
     // middleware to intercept the admin JWT and reject it with 401.
+    //
+    // WHICH one is decided by the page, not by "whichever is stored". A staff
+    // member is often also a customer, and inside Telegram's WebView both
+    // sessions share one storage context, so preferring the staff JWT
+    // unconditionally sent a client screen's requests with no client
+    // credential at all.
     const adminToken = localStorage.getItem('access_token');
     const userToken  = sessionStorage.getItem('access_token');
-    if (adminToken) {
+    const credential = credentialForPath(window.location.pathname, {
+      adminToken,
+      userToken,
+    });
+    if (credential === 'admin') {
       config.headers['X-Admin-Authorization'] = `Bearer ${adminToken}`;
       delete config.headers['Authorization'];
-    } else if (userToken) {
+    } else if (credential === 'client') {
       config.headers['Authorization'] = `Bearer ${userToken}`;
+      delete config.headers['X-Admin-Authorization'];
     }
 
     config.headers['Accept-Language'] = i18n.language || 'uz';
@@ -165,10 +177,19 @@ apiClient.interceptors.response.use(
         // Public-read endpoints that should never trigger logout on 401 —
         // the backend permission gate is stricter than needed for read access.
         if (!isSilentUnauthorized(requestUrl, requestMethod)) {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('admin_role');
-          sessionStorage.removeItem('access_token');
-          window.dispatchEvent(new CustomEvent('auth:logout'));
+          // Clear only the session whose credential was rejected. Wiping both
+          // meant one expired client token also signed the staff member out of
+          // the admin panel, and the other way round.
+          const scope = error.config?.headers?.['X-Admin-Authorization']
+            ? 'admin'
+            : 'client';
+          if (scope === 'admin') {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('admin_role');
+          } else {
+            sessionStorage.removeItem('access_token');
+          }
+          window.dispatchEvent(new CustomEvent('auth:logout', { detail: { scope } }));
         }
         return Promise.reject(error);
       }
@@ -296,13 +317,24 @@ apiClientFormData.interceptors.request.use(
       config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
     }
 
+    //
+    // WHICH one is decided by the page, not by "whichever is stored". A staff
+    // member is often also a customer, and inside Telegram's WebView both
+    // sessions share one storage context, so preferring the staff JWT
+    // unconditionally sent a client screen's requests with no client
+    // credential at all.
     const adminToken = localStorage.getItem('access_token');
     const userToken  = sessionStorage.getItem('access_token');
-    if (adminToken) {
+    const credential = credentialForPath(window.location.pathname, {
+      adminToken,
+      userToken,
+    });
+    if (credential === 'admin') {
       config.headers['X-Admin-Authorization'] = `Bearer ${adminToken}`;
       delete config.headers['Authorization'];
-    } else if (userToken) {
+    } else if (credential === 'client') {
       config.headers['Authorization'] = `Bearer ${userToken}`;
+      delete config.headers['X-Admin-Authorization'];
     }
 
     config.headers['Accept-Language'] = i18n.language || 'uz';
@@ -324,10 +356,19 @@ apiClientFormData.interceptors.response.use(
         const requestUrl: string = error.config?.url ?? '';
         const requestMethod: string = error.config?.method ?? '';
         if (!isSilentUnauthorized(requestUrl, requestMethod)) {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('admin_role');
-          sessionStorage.removeItem('access_token');
-          window.dispatchEvent(new CustomEvent('auth:logout'));
+          // Clear only the session whose credential was rejected. Wiping both
+          // meant one expired client token also signed the staff member out of
+          // the admin panel, and the other way round.
+          const scope = error.config?.headers?.['X-Admin-Authorization']
+            ? 'admin'
+            : 'client';
+          if (scope === 'admin') {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('admin_role');
+          } else {
+            sessionStorage.removeItem('access_token');
+          }
+          window.dispatchEvent(new CustomEvent('auth:logout', { detail: { scope } }));
         }
         return Promise.reject(error);
       }

@@ -490,10 +490,19 @@ function AppContent() {
     // startTransition is stable — safe to omit from deps
     [],
   );
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("admin_role");
-    sessionStorage.removeItem("access_token");
+  const handleLogout = useCallback((event?: Event) => {
+    // `scope` says which credential was rejected. Clearing both meant one
+    // expired client token also signed a staff member out of the admin panel.
+    // No scope (an unscoped dispatch) still clears everything.
+    const scope = (event as CustomEvent<{ scope?: "admin" | "client" }> | undefined)
+      ?.detail?.scope;
+    if (scope !== "client") {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("admin_role");
+    }
+    if (scope !== "admin") {
+      sessionStorage.removeItem("access_token");
+    }
     setUserRole(null);
 
     const currentRouteInfo = resolvePageFromPath(window.location.pathname);

@@ -62,7 +62,9 @@ function discardExpiredAdminSession(): void {
   if (!token || !isJwtExpired(token)) return;
   localStorage.removeItem('access_token');
   localStorage.removeItem('admin_role');
-  window.dispatchEvent(new CustomEvent('auth:logout'));
+  // Scoped: this only ever discards the ADMIN session, and an unscoped event
+  // would take the client's session down with it.
+  window.dispatchEvent(new CustomEvent('auth:logout', { detail: { scope: 'admin' } }));
 }
 
 /** Pure — no side effects, so it is safe to call from the reconnect path. */
