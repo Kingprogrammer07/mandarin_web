@@ -126,3 +126,31 @@ export function credentialForPath(
   if (adminToken) return 'admin';
   return userToken ? 'client' : null;
 }
+
+/**
+ * URL prefixes that belong to a staff console.
+ *
+ * Most of them are NOT under `/admin`, which is the trap: a prefix test on
+ * `/admin` leaves a cashier on `/kassa`, an operator on `/import` and anyone
+ * editing a client behind the Telegram Mini App guard, while their
+ * `/admin/...` twins pass. `/warehouse` is a second URL for the same page as
+ * `/admin/warehouse`.
+ */
+const STAFF_PATH_PREFIXES = [
+  '/admin',
+  '/flights',
+  '/statistics',
+  '/import',
+  '/client/add',
+  '/client/edit/',
+  '/warehouse',
+  '/pos',
+  '/kassa',
+] as const;
+
+/** Is this URL path a staff console rather than the client app? */
+export function isStaffPath(pathname: string): boolean {
+  return STAFF_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`) || pathname.startsWith(prefix),
+  );
+}

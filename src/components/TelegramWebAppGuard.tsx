@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, Package, WifiOff, RefreshCw } from 'lucide-react';
 import { getTelegramWebAppData, validateInitData, telegramAutoLogin } from '@/api/services/auth';
 import { TopProgressBar } from '@/components/ui/TopProgressBar';
-import { isPosPath } from '@/lib/posRoutes';
+import { isStaffPath } from '@/lib/session';
 
 interface TelegramWebAppGuardProps {
   children: React.ReactNode;
@@ -204,11 +204,14 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
   const shouldRedirectRoot =
     window.location.pathname === '/' && !window.Telegram?.WebApp?.initData;
 
+  // Staff routes never go through Telegram validation. Note that most of them
+  // do NOT live under `/admin` — a prefix test silently locks a cashier out of
+  // `/kassa` and an operator out of `/import`, which is how `/import`,
+  // `/client/add`, `/client/edit/:id` and the bare `/warehouse` alias came to
+  // sit behind the Mini App guard while their `/admin/...` twins did not.
   const isBrowserRoute =
-    window.location.pathname.startsWith('/admin') ||
-    isPosPath(window.location.pathname) ||
-    window.location.pathname.startsWith('/flights') ||
-    window.location.pathname.startsWith('/statistics') ||
+    isStaffPath(window.location.pathname) ||
+    // Public routes: the pickup-queue display and the pages the bank returns to.
     window.location.pathname === '/pickup-tv' ||
     window.location.pathname.startsWith('/payment/nbu');
 

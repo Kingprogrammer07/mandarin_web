@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   credentialForPath,
   isClientPath,
+  isStaffPath,
   pickSession,
   type StoredSessions,
 } from './session';
@@ -93,6 +94,30 @@ describe('a client route', () => {
 });
 
 describe('route classification', () => {
+  it.each([
+    '/admin/dashboard',
+    '/admin/system-settings',
+    '/flights',
+    '/flights/M264/photos',
+    '/statistics',
+    '/import',
+    '/client/add',
+    '/client/edit/42',
+    '/warehouse',
+    '/admin/warehouse',
+    '/pos',
+    '/kassa',
+  ])('%s is a staff console', (path) => {
+    expect(isStaffPath(path)).toBe(true);
+  });
+
+  it.each(['/user/home', '/user/reports', '/payment/nbu/cards', '/pickup-tv', '/'])(
+    '%s is not a staff console',
+    (path) => {
+      expect(isStaffPath(path)).toBe(false);
+    },
+  );
+
   it.each(['/user/home', '/user/reports', '/user/profile', '/payment/nbu/cards'])(
     '%s is the client app',
     (path) => {
