@@ -372,7 +372,7 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                         );
                                     }}
                                     aria-pressed={activeTab === 'history'}
-                                    className={`flex w-12 shrink-0 items-center justify-center rounded-mc-lg
+                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg
                                                border transition-transform duration-150 active:scale-95 ${
                                                    activeTab === 'history'
                                                        ? 'border-mc-brand bg-mc-brand-soft text-mc-brand'
@@ -388,9 +388,10 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                     type="button"
                                     onClick={handleRefresh}
                                     disabled={isRefreshing}
-                                    className="flex w-12 shrink-0 items-center justify-center rounded-mc-lg
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg
                                                border border-mc-border bg-mc-surface text-mc-brand
-                                               transition-transform duration-150 active:scale-95"
+                                               transition-transform duration-150 active:scale-95
+                                               disabled:opacity-60"
                                     aria-label={t('reports.retry')}
                                 >
                                     {/* The design puts a filter control here. Until the

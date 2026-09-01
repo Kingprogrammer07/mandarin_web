@@ -22,7 +22,9 @@ export interface ShipmentItem {
   flight_name: string;
   /** The manifest label when it differs — `M257` against a billed `M257-M258`. */
   manifest_flight_name: string | null;
-  tab: ShipmentTab;
+  /** `ShipmentView`, not `ShipmentTab`: the history list carries rows the three
+   *  tabs leave out, and those come back tagged `history`. */
+  tab: ShipmentView;
 
   total_count: number;
   total_weight: number;
