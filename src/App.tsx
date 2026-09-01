@@ -20,6 +20,7 @@ import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
 import { isPosPath } from "@/lib/posRoutes";
+import { pickSession } from "@/lib/session";
 import { setRouterDepth } from "@/lib/backStack";
 import { TelegramBackBridge } from "@/components/TelegramBackBridge";
 import { NbuPaymentWatch } from "@/components/payment/NbuPaymentWatch";
@@ -553,12 +554,22 @@ function AppContent() {
       const adminRole = localStorage.getItem("admin_role");
       const userToken = sessionStorage.getItem("access_token");
       const currentRouteInfo = resolvePageFromPath(window.location.pathname);
-      if (isPublicPage(currentRouteInfo.page)) {
+
+      // Which of the two stored sessions serves this route. The rule is a table
+      // rather than a chain of early returns — see `lib/session.ts`.
+      const choice = pickSession(
+        { adminToken, adminRole, userToken },
+        {
+          isPublic: isPublicPage(currentRouteInfo.page),
+          isUserPage: USER_PAGES.includes(currentRouteInfo.page),
+        },
+      );
+
+      if (choice.kind === "public") {
         if (!cancelled) {
-          const publicRouteRole = adminToken && adminRole ? adminRole : null;
-          setUserRole(publicRouteRole);
+          setUserRole(choice.role);
           setIsCheckingAuth(false);
-          applyRoute(currentRouteInfo, publicRouteRole, "replace");
+          applyRoute(currentRouteInfo, choice.role, "replace");
         }
         return;
       }
@@ -568,25 +579,27 @@ function AppContent() {
       // by /auth/me. Calling it would always return 401 and log the admin out.
       // Token validity is instead proven on every real API call via
       // X-Admin-Authorization; a 401 there dispatches auth:logout automatically.
-      // Any admin with a stored token is considered authenticated — the token's
-      // validity is proven on every API call via X-Admin-Authorization.
       // Restricting by role name here locked out custom roles (e.g. "cashier").
-      if (adminToken && adminRole) {
+      if (choice.kind === "admin") {
         if (!cancelled) {
-          setUserRole(adminRole);
+          setUserRole(choice.role);
           setIsCheckingAuth(false);
           // On a guest/login page → send to the admin default; otherwise honour URL
           if (isGuestPage(currentRouteInfo.page)) {
-            applyRoute({ page: getDefaultPageForRole(adminRole) }, adminRole, "replace");
+            applyRoute(
+              { page: getDefaultPageForRole(choice.role) },
+              choice.role,
+              "replace",
+            );
           } else {
-            applyRoute(currentRouteInfo, adminRole, "replace");
+            applyRoute(currentRouteInfo, choice.role, "replace");
           }
         }
         return;
       }
 
-      // ── 2. No user token either → guest ──────────────────────────────────
-      if (!userToken) {
+      // ── 2. No usable session → guest ─────────────────────────────────────
+      if (choice.kind === "guest") {
         if (!cancelled) {
           setUserRole(null);
           setIsCheckingAuth(false);
