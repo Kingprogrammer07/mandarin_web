@@ -9,6 +9,7 @@ import { BottomNav, type BottomNavPage } from "./components/user/BottomNav";
 import { Toaster } from "sonner";
 import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
 import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
+import { AstatkaPage } from "./pages/worker/AstatkaPage";
 import { logoutAdmin } from "./api/services/adminAuth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
 import { TopProgressBar } from "./components/ui/TopProgressBar";
@@ -81,6 +82,7 @@ type Page =
   | "client-add"
   | "client-edit"
   | "flights"
+  | "astatka"
   | "cargo-list"
   | "cargo-add"
   | "statistics"
@@ -126,7 +128,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   },
   worker: {
     default: "flights",
-    allowed: ["flights", "cargo-list", "cargo-add", "passkey-page", "expected-cargo", "admin-flight-notifications"],
+    allowed: ["flights", "astatka", "cargo-list", "cargo-add", "passkey-page", "expected-cargo", "admin-flight-notifications"],
   },
   accountant: {
     default: "pos-dashboard",
@@ -148,6 +150,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "client-add",
       "client-edit",
       "flights",
+      "astatka",
       "cargo-list",
       "cargo-add",
       "statistics",
@@ -187,6 +190,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "client-add",
       "client-edit",
       "flights",
+      "astatka",
       "cargo-list",
       "cargo-add",
       "statistics",
@@ -313,6 +317,7 @@ function getPathForPage(
   if (page === "client-add") return "/client/add";
   if (page === "client-edit" && clientId) return `/client/edit/${clientId}`;
   if (page === "flights") return "/flights";
+  if (page === "astatka") return "/astatka";
   if (page === "statistics") return "/statistics";
   if (page === "cargo-list" && flightName)
     return `/flights/${encodeURIComponent(flightName)}/photos`;
@@ -370,6 +375,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path.startsWith("/client/edit/") && clientEditId)
     return { page: "client-edit", clientId: clientEditId };
   if (path === "/flights") return { page: "flights" };
+  if (path === "/astatka") return { page: "astatka" };
   if (path === "/statistics") return { page: "statistics" };
   if (flightName && path.includes("/notifications"))
     return { page: "admin-flight-notifications", flightName };
@@ -1126,6 +1132,9 @@ function AppContent() {
               onLogout={handleSignOut}
               onNavigate={(page) => navigateToPage(page as Page)}
             />
+          )}
+          {currentPage === "astatka" && (
+            <AstatkaPage onBack={() => navigateToPage("flights")} />
           )}
         </>
       ) : isManagerPage && canAccessManagerPage ? (

@@ -97,6 +97,9 @@ describe('route classification', () => {
   it.each([
     '/admin/dashboard',
     '/admin/system-settings',
+    // The stock-take scanner. A worker opens it in a browser on the warehouse
+    // floor, so leaving it out puts it behind the Telegram-only guard.
+    '/astatka',
     '/flights',
     '/flights/M264/photos',
     '/statistics',

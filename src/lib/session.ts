@@ -138,6 +138,7 @@ export function credentialForPath(
  */
 const STAFF_PATH_PREFIXES = [
   '/admin',
+  '/astatka',
   '/flights',
   '/statistics',
   '/import',

@@ -25,6 +25,7 @@ import {
   Plus,
   ShieldAlert,
   Users,
+  ClipboardList,
   Weight,
   X,
 } from 'lucide-react';
@@ -427,6 +428,18 @@ export default function FlightsPage({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Astatka — the stock-take of what is still on the shelf after a
+              flight has been distributed. It lives here because the worker who
+              runs it is already on this board, and its scope is chosen from the
+              same flights. */}
+          <button
+            type="button"
+            onClick={() => onNavigate?.('astatka')}
+            className="inline-flex h-11 items-center gap-1.5 rounded-mc-md border border-mc-border bg-mc-surface px-3 text-[13px] font-bold text-mc-text transition-transform active:scale-95"
+          >
+            <ClipboardList className="h-4 w-4" strokeWidth={2.2} />
+            Astatka
+          </button>
           {canManage && (
             <button
               type="button"
