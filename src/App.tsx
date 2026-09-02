@@ -1085,6 +1085,13 @@ function AppContent() {
               onNavigate={(page) => navigateToPage(page as Page)}
             />
           )}
+          {/* Also rendered in the standalone branch below, for roles without
+              the admin shell. `flights` is declared twice for the same reason;
+              a page reachable by both kinds of role needs a render in both, or
+              it silently comes out blank for one of them. */}
+          {currentPage === "astatka" && (
+            <AstatkaPage onBack={() => navigateToPage("flights")} />
+          )}
           {currentPage === "admin-accounts" && <AdminAccountsPage />}
           {currentPage === "admin-roles" && <AdminRolesPage />}
           {currentPage === "admin-audit" && <AdminAuditLogsPage />}
