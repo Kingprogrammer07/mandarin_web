@@ -29,7 +29,16 @@ CHANGED=$(echo "$CHANGED" | sort -u | grep -v '^$' | while read -r f; do [ -f "$
 
 if [ -n "$CHANGED" ]; then
   echo "[check] eslint — $(echo "$CHANGED" | wc -l) changed file(s)"
-  echo "$CHANGED" | xargs npx eslint
+  # Batched, and newline-delimited. Two failure modes this avoids, both of
+  # which produce a result that looks like something else:
+  #   * A bare `xargs npx eslint` puts every path on one command line, and
+  #     on Windows that overruns the command-length limit and fails with
+  #     "The syntax of the command is incorrect" — which reads as a shell
+  #     bug rather than a lint result.
+  #   * With empty input, xargs still runs `npx eslint` with no file
+  #     arguments, which lints the WHOLE project and reports pre-existing
+  #     problems in files this push never touched. -r stops that.
+  echo "$CHANGED" | xargs -d '\n' -r -n 40 npx eslint
 else
   echo "[check] eslint — no changed files"
 fi
