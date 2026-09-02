@@ -110,6 +110,18 @@ export async function syncAstatka(astatkaId: number): Promise<SyncOutcome> {
       const payload = batch.map((item) => toInput(item, []));
       const result = await submitAstatkaItems(astatkaId, payload);
 
+      // A 200 is not proof. A proxy or a captive portal can answer 200 with a
+      // body that is not ours, and taking that as success would mark parcels
+      // saved that never reached the server — the same lost work as a dropped
+      // request, but silent, and with the local copy discarded. So the shape is
+      // checked before anything is marked done.
+      if (
+        typeof result?.accepted !== 'number' ||
+        typeof result?.duplicates !== 'number'
+      ) {
+        throw new Error('unexpected-response-shape');
+      }
+
       outcome.sent += result.accepted;
       outcome.duplicates += result.duplicates;
 

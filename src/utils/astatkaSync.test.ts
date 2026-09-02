@@ -226,3 +226,43 @@ describe("backoff", () => {
     expect(Number.isFinite(backoffFor(9999))).toBe(true);
   });
 });
+
+describe('a 200 that is not our response', () => {
+  beforeEach(() => {
+    rows.clear();
+    submitAstatkaItems.mockReset();
+  });
+
+  it('does not mark parcels saved on a body that is not ours', async () => {
+    // Found by a real browser probe: a stub answering 200 with `{}` made the
+    // queue mark every parcel saved. A captive portal or a proxy error page
+    // does exactly that, and the result would be worse than a failed send —
+    // the parcels would be dropped from the queue having never arrived.
+    rows.set('a', queued('a'));
+    submitAstatkaItems.mockResolvedValue({});
+
+    const outcome = await syncAstatka(1);
+
+    expect(rows.get('a')!.status).toBe('pending');
+    expect(outcome.failed).toBe(1);
+    expect(outcome.sent).toBe(0);
+  });
+
+  it('does not mark parcels saved on an HTML error page', async () => {
+    rows.set('a', queued('a'));
+    submitAstatkaItems.mockResolvedValue('<html>502 Bad Gateway</html>');
+
+    await syncAstatka(1);
+
+    expect(rows.get('a')!.status).toBe('pending');
+  });
+
+  it('still accepts a well-formed response', async () => {
+    rows.set('a', queued('a'));
+    submitAstatkaItems.mockResolvedValue({ accepted: 1, duplicates: 0, items: [] });
+
+    await syncAstatka(1);
+
+    expect(rows.get('a')!.status).toBe('saved');
+  });
+});

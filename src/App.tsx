@@ -879,6 +879,10 @@ function AppContent() {
     // The Reyslar board moved into the admin shell. Worker roles still reach it
     // without a sidebar — see the `isStandaloneAdminSubpage` branch below.
     "flights",
+    // Reached from that board and run by the same worker, so it takes the same
+    // standalone route. Leaving it out means the render branch never runs and
+    // the router falls through to the customer login.
+    "astatka",
     "admin-accounts",
     "admin-roles",
     "admin-audit",
