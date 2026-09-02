@@ -99,8 +99,34 @@ export async function loginAdminPin(system_username: string, pin: string, device
   return response.data;
 }
 
-export async function logoutAdmin(): Promise<void> {
-  await apiClient.post('/admin/auth/logout');
+/**
+ * Revoke the current staff JWT server-side.
+ *
+ * The endpoint drops the token's `jti` into the Redis blocklist that
+ * `get_admin_from_jwt` consults on every staff request, and writes a LOGOUT
+ * audit row. Until this was wired up, "Chiqish" only cleared `localStorage`:
+ * the token stayed valid for the rest of `API_JWT_EXPIRE_MINUTES` (8h in
+ * production), so anyone who had copied it — or picked it out of the nginx
+ * access log, where the SSE streams put it — kept full staff access after the
+ * cashier had signed off the shared till.
+ *
+ * The body is not optional in practice. `AdminLogoutRequest` is a required body
+ * parameter (admin_auth.py:202), so a bodiless POST is rejected 422 — which is
+ * the second reason this call could never have worked as it was written.
+ * `device_info` also fills the audit row.
+ *
+ * The 5s timeout is deliberate: the client default is 30s, and a cashier on a
+ * flaky link must not be held on a dead "Chiqish" button. The caller signs them
+ * out locally regardless of what happens here.
+ */
+export async function logoutAdmin(
+  deviceInfo: string = navigator.userAgent,
+): Promise<void> {
+  await apiClient.post(
+    '/admin/auth/logout',
+    { device_info: deviceInfo },
+    { timeout: 5000 },
+  );
 }
 
 export interface RefreshTokenResponse {

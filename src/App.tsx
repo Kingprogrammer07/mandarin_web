@@ -9,6 +9,7 @@ import { BottomNav, type BottomNavPage } from "./components/user/BottomNav";
 import { Toaster } from "sonner";
 import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
 import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
+import { logoutAdmin } from "./api/services/adminAuth";
 import { getAdminJwtClaims } from "./api/services/adminManagement";
 import { TopProgressBar } from "./components/ui/TopProgressBar";
 import StatusAnimation from "./components/StatusAnimation";
@@ -522,6 +523,41 @@ function AppContent() {
       "replace",
     );
   }, [applyRoute]);
+
+  /**
+   * The staff "Chiqish" button — a deliberate sign-out, not a rejected token.
+   *
+   * `handleLogout` only clears storage. That leaves the JWT valid server-side
+   * for the rest of `API_JWT_EXPIRE_MINUTES` (8h in production), so signing off
+   * a shared till handed the next person — or anyone holding a copy of the
+   * token — a working staff session. `logoutAdmin` drops its `jti` into the
+   * Redis blocklist that every staff request is checked against.
+   *
+   * Awaited, not fired and forgotten, and that ordering is load-bearing: the
+   * axios interceptor attaches `X-Admin-Authorization` by reading
+   * `localStorage` (client.ts, via `credentialForPath`). Clearing storage first
+   * would send the revoke request with no credential, it would 401, and the
+   * token would stay valid — a sign-out that looks like it worked and does
+   * nothing, which is what we are fixing.
+   *
+   * The `finally` matters just as much. A failed or timed-out revoke must never
+   * trap someone on the till screen; they are signed out locally either way and
+   * the token then expires on its own schedule, exactly as it does today.
+   */
+  const handleSignOut = useCallback(async () => {
+    try {
+      if (localStorage.getItem("access_token")) {
+        await logoutAdmin();
+      }
+    } catch (error) {
+      // Best effort. Nothing to show the user: they asked to leave, and they
+      // are about to.
+      console.warn("Staff session could not be revoked server-side", error);
+    } finally {
+      handleLogout();
+    }
+  }, [handleLogout]);
+
   // ── Initial auth check (runs once on mount) ──────────────────────────────
   useEffect(() => {
     window.addEventListener("auth:logout", handleLogout);
@@ -1027,7 +1063,7 @@ function AppContent() {
         <AdminLayout
           currentPage={currentPage}
           onNavigate={(page, flightName) => navigateToPage(page as Page, flightName)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         >
           {currentPage === "admin-dashboard" && (
             <AdminDashboardPage onNavigate={(page) => navigateToPage(page as Page)} />
@@ -1052,12 +1088,12 @@ function AppContent() {
       ) : currentPage === "kassa" ? (
         <CashierPage
           onNavigate={(page) => navigateToPage(page as Page)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         />
       ) : isPOSPage ? (
         <POSDashboard
           onNavigate={(page) => navigateToPage(page as Page)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         />
       ) : isStandaloneAdminSubpage ? (
         // Non-admin roles on admin-* pages — render standalone without AdminLayout sidebar.
@@ -1087,7 +1123,7 @@ function AppContent() {
           {currentPage === "flights" && (
             <FlightsPage
               onSelectFlight={(flightName) => navigateToPage("cargo-list", flightName)}
-              onLogout={handleLogout}
+              onLogout={handleSignOut}
               onNavigate={(page) => navigateToPage(page as Page)}
             />
           )}
@@ -1095,22 +1131,22 @@ function AppContent() {
       ) : isManagerPage && canAccessManagerPage ? (
         <ManagerPage
           onNavigate={(page) => navigateToPage(page as Page)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         />
       ) : isPasskeyPage ? (
         <PasskeyPage
           onNavigate={(page) => navigateToPage(page as Page)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         />
       ) : isWarehousePage && canAccessWarehouse ? (
         <WarehousePage
           onNavigate={(page) => navigateToPage(page as Page)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         />
       ) : isExpectedCargoPage && canAccessExpectedCargo ? (
         <ExpectedCargoPage
           onNavigate={(page) => navigateToPage(page as Page)}
-          onLogout={handleLogout}
+          onLogout={handleSignOut}
         />
       ) : currentPage === "pickup-tv" ? (
         <PickupQueueTVPage />
@@ -1171,7 +1207,7 @@ function AppContent() {
               onNavigateToNotifications={() =>
                 navigateToPage("admin-flight-notifications", selectedFlightName)
               }
-              onLogout={handleLogout}
+              onLogout={handleSignOut}
             />
           )}
 
@@ -1196,7 +1232,7 @@ function AppContent() {
 
           {currentPage === "user-profile" && (
             <UserPage
-              onLogout={handleLogout}
+              onLogout={handleSignOut}
               onNavigateToReferral={() => navigateToPage("user-referral")}
             />
           )}
