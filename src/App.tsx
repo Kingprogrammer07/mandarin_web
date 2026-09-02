@@ -1090,7 +1090,7 @@ function AppContent() {
               a page reachable by both kinds of role needs a render in both, or
               it silently comes out blank for one of them. */}
           {currentPage === "astatka" && (
-            <AstatkaPage onBack={() => navigateToPage("flights")} />
+            <AstatkaPage embedded onBack={() => navigateToPage("flights")} />
           )}
           {currentPage === "admin-accounts" && <AdminAccountsPage />}
           {currentPage === "admin-roles" && <AdminRolesPage />}

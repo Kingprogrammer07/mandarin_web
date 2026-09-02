@@ -22,9 +22,17 @@ import { astatkaStore, type QueuedItem } from "@/utils/astatkaStore";
 
 interface Props {
   onBack: () => void;
+  /**
+   * True when rendered inside AdminLayout, which already supplies a header, a
+   * bottom navigation bar and its own floating button. A page that also brings
+   * `min-h-dvh`, a sticky header and a fixed FAB then fights all three: two
+   * headers stack, the FAB lands underneath the nav bar, and the content sits
+   * in a tall empty column. Same reason FlightsPage takes this prop.
+   */
+  embedded?: boolean;
 }
 
-export function AstatkaPage({ onBack }: Props) {
+export function AstatkaPage({ onBack, embedded = false }: Props) {
   const [list, setList] = useState<Astatka[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -123,8 +131,12 @@ export function AstatkaPage({ onBack }: Props) {
   );
 
   if (active) {
+    // Full screen even when embedded. The scan field has to own the viewport —
+    // it must stay under the thumb and keep focus for hundreds of parcels, and
+    // a shell header plus a bottom nav bar around it would cost both. The till
+    // screens take over the same way and for the same reason.
     return (
-      <>
+      <div className={embedded ? 'fixed inset-0 z-50 bg-mc-bg' : undefined}>
         <AstatkaScanner
           key={active.id}
           astatka={active}
@@ -143,27 +155,60 @@ export function AstatkaPage({ onBack }: Props) {
           onSaved={() => setRefreshToken((value) => value + 1)}
           key={`sheet-${editItem?.id ?? "none"}-${refreshToken}`}
         />
-      </>
+      </div>
     );
   }
 
-  return (
-    <div className="flex min-h-dvh flex-col bg-mc-bg">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-mc-border bg-mc-surface px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Orqaga"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm text-mc-text-2"
-        >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2.2} />
-        </button>
-        <h1 className="min-w-0 flex-1 truncate text-[16px] font-extrabold text-mc-text">
-          Astatka
-        </h1>
-      </header>
+  const newButton = (
+    <button
+      type="button"
+      onClick={openCreate}
+      className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-mc-md bg-mc-brand px-3 text-[13px] font-extrabold text-mc-on-brand active:scale-95"
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.6} />
+      Yangi astatka
+    </button>
+  );
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+  return (
+    <div
+      className={
+        embedded ? "space-y-3" : "flex min-h-dvh flex-col bg-mc-bg"
+      }
+    >
+      {/* Embedded, the shell already provides a header and a back path, so this
+          is a plain title row with the action beside it. Standalone, it is the
+          page's own sticky chrome. */}
+      {embedded ? (
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="min-w-0 truncate text-[16px] font-extrabold text-mc-text">
+            Astatka
+          </h1>
+          {newButton}
+        </div>
+      ) : (
+        <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-mc-border bg-mc-surface px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Orqaga"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm text-mc-text-2"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-[16px] font-extrabold text-mc-text">
+            Astatka
+          </h1>
+        </header>
+      )}
+
+      <main
+        className={
+          embedded
+            ? ""
+            : "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(6rem+env(safe-area-inset-bottom))]"
+        }
+      >
         {isLoading && (
           <div className="mt-3 space-y-2">
             {[0, 1, 2].map((row) => (
@@ -247,15 +292,19 @@ export function AstatkaPage({ onBack }: Props) {
         </ul>
       </main>
 
-      {/* Reachable by thumb, clear of the home indicator. */}
-      <button
-        type="button"
-        onClick={openCreate}
-        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-12 items-center gap-1.5 rounded-full bg-mc-brand px-4 text-[13px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] active:scale-[0.98]"
-      >
-        <Plus className="h-4 w-4" strokeWidth={2.6} />
-        Yangi astatka
-      </button>
+      {/* Standalone only. Inside the shell a fixed button lands underneath the
+          bottom navigation bar and behind AdminLayout's own floating button —
+          which is exactly how this shipped and why it was unusable. */}
+      {!embedded && (
+        <button
+          type="button"
+          onClick={openCreate}
+          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-12 items-center gap-1.5 rounded-full bg-mc-brand px-4 text-[13px] font-extrabold text-mc-on-brand shadow-[var(--mc-shadow-cta)] active:scale-[0.98]"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.6} />
+          Yangi astatka
+        </button>
+      )}
 
       <AstatkaCreateSheet
         open={createOpen}

@@ -15,7 +15,7 @@
  * So this reads App.tsx and checks the invariant directly.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +48,39 @@ function roleAllowances(): Record<string, string[]> {
       : [];
   }
   return roles;
+}
+
+/**
+ * The source of each render site for a page, so its props can be inspected.
+ *
+ * Crude on purpose: a fixed window after the match is enough to see whether
+ * `embedded` was passed, and parsing JSX properly here would be a worse trade.
+ */
+function componentsAcceptingEmbedded(root: string): Set<string> {
+  const names = new Set<string>();
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith(".tsx")) {
+        const text = readFileSync(full, "utf8");
+        if (!/embedded\?:\s*boolean/.test(text)) continue;
+        for (const m of text.matchAll(/export function (\w+)/g)) names.add(m[1]);
+      }
+    }
+  };
+  walk(root);
+  return names;
+}
+
+function renderBlocks(page: string): string[] {
+  const pattern = new RegExp(`currentPage === "${page}" &&`, 'g');
+  const blocks: string[] = [];
+  for (const match of source.matchAll(pattern)) {
+    blocks.push(source.slice(match.index ?? 0, (match.index ?? 0) + 400));
+  }
+  return blocks;
 }
 
 /** How many times a page has a `currentPage === "x"` render site. */
@@ -104,6 +137,47 @@ describe("pages render for every role allowed to open them", () => {
           "site(s) in App.tsx and needs one in each branch — otherwise it comes " +
           "out blank for one kind of role, with no error anywhere.",
       ).toBeGreaterThanOrEqual(2);
+    },
+  );
+
+  const embeddable = componentsAcceptingEmbedded(
+    resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+  );
+
+  /**
+   * Only pages whose component actually takes an `embedded` prop. A page that
+   * does not is a plain content block already and needs nothing.
+   */
+  const dualBranchEmbeddables = needsBothBranches.filter((page) =>
+    renderBlocks(page).some((block) =>
+      [...embeddable].some((name) => block.includes(`<${name}`)),
+    ),
+  );
+
+  it("finds the components that take an embedded prop", () => {
+    expect(embeddable.size).toBeGreaterThan(0);
+    expect(dualBranchEmbeddables).toContain("flights");
+    expect(dualBranchEmbeddables).toContain("astatka");
+  });
+
+  it.each(dualBranchEmbeddables)(
+    "%s is rendered as embedded in the shell and full-page standalone",
+    (page) => {
+      // The second half of the same lesson. `astatka` was rendered in both
+      // branches but WITHOUT `embedded` in the shell one, so it brought its own
+      // header, a min-h-dvh column and a fixed floating button into a layout
+      // that already had all three: two stacked headers, the button underneath
+      // the bottom navigation bar, and the content stranded in a tall empty
+      // space. It rendered, and it was unusable.
+      const embeddedRenders = renderBlocks(page).filter((block) =>
+        block.includes("embedded"),
+      );
+      expect(
+        embeddedRenders.length,
+        `"${page}" renders in both branches, so exactly one of those render ` +
+          "sites should pass `embedded` — the one inside AdminLayout. Found " +
+          `${embeddedRenders.length}.`,
+      ).toBe(1);
     },
   );
 
