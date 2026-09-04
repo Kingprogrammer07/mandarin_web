@@ -7,6 +7,7 @@ import OfficeSettingsSection from '@/components/admin/OfficeSettingsSection';
 import TemplateEditorSection from '@/components/admin/TemplateEditorSection';
 import BroadcastComposer from '@/components/admin/BroadcastComposer';
 import SmsSettingsSection from '@/components/admin/SmsSettingsSection';
+import BackupSettingsSection from '@/components/admin/BackupSettingsSection';
 import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
@@ -511,6 +512,11 @@ export default function SystemSettingsPage() {
       {/* Gateway config sits with the messaging tools, not under infrastructure:
           whoever sends the SMS is the one who needs to turn it on. */}
       <SmsSettingsSection />
+
+      {/* Backups sit here rather than under the messaging tools: the person who
+          needs to move the channel or take one now is the owner, and until now
+          that meant editing .env on the server and restarting. */}
+      <BackupSettingsSection />
 
       {/* Video guide links — the bot offers each one at its own moment. */}
       <VideoGuidesSection />

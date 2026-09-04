@@ -126,6 +126,46 @@ export interface SmsSettingsUpdate {
   request_timeout_seconds?: number;
 }
 
+/** Where the nightly database dump goes, and how the last attempt went. */
+export interface BackupSettings {
+  /** The panel's choice. `null` means the server falls back to its env value. */
+  channel_id: number | null;
+  /** What the scheduler will actually use once that fallback is applied. */
+  effective_channel_id: number | null;
+  daily_enabled: boolean;
+  /** Hour of day in Asia/Tashkent. */
+  hour: number;
+  last_at: string | null;
+  /** `null` when no backup has run on this deployment yet. */
+  last_ok: boolean | null;
+  last_size: number | null;
+  last_error: string | null;
+  /** Telegram's document ceiling, so the screen can warn before it is hit. */
+  size_limit: number;
+}
+
+export interface BackupSettingsUpdate {
+  channel_id: number | null;
+  daily_enabled: boolean;
+  hour: number;
+}
+
+export interface BackupCheckResult {
+  ok: boolean;
+  chat_id: number;
+  title: string | null;
+  chat_type: string | null;
+  can_send: boolean;
+  detail: string;
+}
+
+export interface BackupRunResult {
+  ok: boolean;
+  size_bytes: number | null;
+  chat_id: number | null;
+  error: string | null;
+}
+
 export interface MaintenanceStatusResponse {
   maintenance: boolean;
   is_admin: boolean;
@@ -446,6 +486,31 @@ export const systemService = {
       '/api/v1/system/sms-settings',
       body,
     );
+    return data;
+  },
+
+  async getBackupSettings(): Promise<BackupSettings> {
+    const { data } = await apiClient.get<BackupSettings>('/api/v1/system/backup');
+    return data;
+  },
+
+  async updateBackupSettings(body: BackupSettingsUpdate): Promise<BackupSettings> {
+    const { data } = await apiClient.put<BackupSettings>('/api/v1/system/backup', body);
+    return data;
+  },
+
+  /** Ask Telegram whether a backup could actually reach this chat. */
+  async checkBackupChannel(chatId: number): Promise<BackupCheckResult> {
+    const { data } = await apiClient.post<BackupCheckResult>(
+      '/api/v1/system/backup/check',
+      { chat_id: chatId },
+    );
+    return data;
+  },
+
+  /** Take a backup now. Slow by nature — a dump plus an upload of tens of MB. */
+  async runBackupNow(): Promise<BackupRunResult> {
+    const { data } = await apiClient.post<BackupRunResult>('/api/v1/system/backup/run');
     return data;
   },
 };
