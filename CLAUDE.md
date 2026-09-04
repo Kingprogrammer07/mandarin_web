@@ -82,8 +82,9 @@ for light, `.dark` for dark — exposed to Tailwind through `@theme inline`.
 
 - Colour: `bg-mc-surface`, `bg-mc-surface-2`, `bg-mc-bg`, `border-mc-border`,
   `text-mc-text` / `-text-2` / `-text-3`, `mc-brand` / `-strong` / `-soft`,
-  `mc-danger` / `mc-warn` / `mc-success` (+ `-soft`), `mc-cardface` (a bank-card
-  graphic: fixed dark in both themes).
+  `mc-danger` / `mc-warn` (+ `-soft`), `mc-success` (**no** `-soft` variant
+  exists — tint it `bg-mc-success/12`, which is what the dashboard already
+  does), `mc-cardface` (a bank-card graphic: fixed dark in both themes).
 - Radius: `rounded-mc-sm|md|lg|xl` (10 / 14 / 18 / 22px). **Nothing else** — an
   arbitrary `rounded-[22px]` is a mistake, the scale already has it.
 - Elevation: `shadow-[var(--mc-shadow-card)]`, `shadow-[var(--mc-shadow-cta)]`.

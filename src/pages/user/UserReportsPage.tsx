@@ -14,6 +14,7 @@ import { FlightReportCard } from '@/components/user/FlightReportCard';
 import { PaymentSummaryCard } from '@/components/user/PaymentSummaryCard';
 import { ShipmentCard } from '@/components/user/ShipmentCard';
 import { TrackCodeList } from '@/components/user/TrackCodeList';
+import { ShipmentManifestPanel } from '@/components/user/ShipmentManifestPanel';
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { Button } from '@/components/ui/button';
@@ -644,9 +645,17 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                     <div className="h-20" aria-hidden="true" />
                                 </div>
                             ) : (
-                                <div className="px-4 py-16 text-center text-[13px] font-medium text-mc-text-3">
-                                    {t('reports.notFound')}
-                                </div>
+                                /* The billing table has nothing for this flight. That is the
+                                   normal state for cargo still in the air, and it also happens
+                                   to arrived flights whose report was never sent — 19 of them.
+                                   Both used to render a bare "Ma'lumot topilmadi"; the parcels
+                                   were in the China manifest the whole time. */
+                                selectedFlight && (
+                                    <ShipmentManifestPanel
+                                        flightName={selectedFlight}
+                                        onTrackClick={handleTrackClick}
+                                    />
+                                )
                             )}
 
                             {!isLoadingHistory && history.length > 0 && (

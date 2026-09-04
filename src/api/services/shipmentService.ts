@@ -58,6 +58,28 @@ export interface ShipmentCounts {
   history: number;
 }
 
+/** One parcel as the China manifest listed it, before billing exists. */
+export interface ManifestParcel {
+  track_code: string;
+  /** As the manifest named it — Russian where both languages are present. */
+  item_name: string | null;
+  /** Kilograms. `0` when the manifest cell was blank or unparseable. */
+  weight: number;
+  /** The Tashkent warehouse has physically seen this parcel. */
+  is_scanned: boolean;
+  scanned_at: string | null;
+}
+
+export interface ShipmentManifest {
+  flight_name: string;
+  /** Every label that turned out to be this same flight. */
+  flight_names: string[];
+  items: ManifestParcel[];
+  total_count: number;
+  total_weight: number;
+  scanned_count: number;
+}
+
 const BASE = '/api/v1/shipments';
 
 export const shipmentService = {
@@ -80,6 +102,24 @@ export const shipmentService = {
 
   async counts(): Promise<ShipmentCounts> {
     const { data } = await apiClient.get<ShipmentCounts>(`${BASE}/counts`);
+    return data;
+  },
+
+  /**
+   * What the client has on one flight, read from the China manifest.
+   *
+   * The detail screen's own source is the billing table, which only has a row
+   * once the flight has arrived and its report was sent. Before that it returns
+   * nothing and the screen said "Ma'lumot topilmadi" — so this answers the same
+   * question from the table that does know: `cargo_items`.
+   *
+   * The flight goes in a query parameter, not the path: real labels carry dots
+   * and dashes (`A-11.07.2026`).
+   */
+  async manifest(flight: string): Promise<ShipmentManifest> {
+    const { data } = await apiClient.get<ShipmentManifest>(`${BASE}/manifest`, {
+      params: { flight },
+    });
     return data;
   },
 };

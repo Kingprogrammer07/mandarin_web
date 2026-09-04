@@ -1060,7 +1060,21 @@
     "noTrackCode": "Трек-код ещё не привязан",
     "paymentInfo": "Информация об оплате",
     "paidAmountShort": "Оплачено",
-    "tabTransit": "В пути"
+    "tabTransit": "В пути",
+    "manifestError": "Не удалось загрузить данные о грузе.",
+    "manifestEmptyTitle": "На этом рейсе груз не найден",
+    "manifestEmptyHint": "Если ваш груз должен быть на этом рейсе, свяжитесь с оператором.",
+    "stageInTransitTitle": "Груз в пути",
+    "stageInTransitText": "Ваш груз зарегистрирован в Китае и находится в пути. После прибытия на склад в Ташкенте его отсканируют, и расчёт появится здесь.",
+    "stagePartlyTitle": "Груз прибыл частично",
+    "stagePartlyText": "Из {{total}} мест на склад прибыло {{scanned}}. Остальные в пути — обычно приходят в течение нескольких дней.",
+    "stageArrivedTitle": "Груз прибыл на склад",
+    "stageArrivedText": "Ваши места на складе. Расчёт готовится — когда он будет готов, здесь появятся сумма и кнопка оплаты.",
+    "manifestCount": "Мест",
+    "manifestWeight": "Вес",
+    "manifestArrived": "На складе",
+    "parcelArrived": "На складе",
+    "parcelInTransit": "В пути"
   },
   "dashboard": {
     "tabs": {

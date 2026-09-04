@@ -1060,7 +1060,21 @@
     "noTrackCode": "Trek-kod hali biriktirilmagan",
     "paymentInfo": "To‘lov ma‘lumotlari",
     "paidAmountShort": "To‘langan",
-    "tabTransit": "Yo'ldagi"
+    "tabTransit": "Yo'ldagi",
+    "manifestError": "Yuk ma‘lumotini olib bo‘lmadi.",
+    "manifestEmptyTitle": "Bu reysda yuk topilmadi",
+    "manifestEmptyHint": "Agar yukingiz shu reysda bo‘lishi kerak bo‘lsa, operator bilan bog‘laning.",
+    "stageInTransitTitle": "Yuk yo‘lda",
+    "stageInTransitText": "Yukingiz Xitoyda ro‘yxatga olingan va yo‘lda. Toshkent omboriga yetib kelgach, skanerlanadi va hisob-kitob shu yerda paydo bo‘ladi.",
+    "stagePartlyTitle": "Yukingiz qisman yetib keldi",
+    "stagePartlyText": "{{total}} ta yukdan {{scanned}} tasi omborga yetib keldi. Qolganlari yo‘lda — odatda bir necha kun ichida yetib keladi.",
+    "stageArrivedTitle": "Yuk omborga yetib keldi",
+    "stageArrivedText": "Yuklaringiz omborda. Hisob-kitob tayyorlanmoqda — tayyor bo‘lgach shu yerda summa va to‘lov tugmasi paydo bo‘ladi.",
+    "manifestCount": "Yuklar",
+    "manifestWeight": "Og‘irlik",
+    "manifestArrived": "Omborda",
+    "parcelArrived": "Omborda",
+    "parcelInTransit": "Yo‘lda"
   },
   "dashboard": {
     "tabs": {
