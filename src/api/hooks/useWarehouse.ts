@@ -11,6 +11,8 @@ import {
   searchTransactions,
   searchTransactionsGrouped,
   undoTakeaway,
+  getUzPostLabelSettings,
+  updateUzPostLabelSettings,
 } from "../services/warehouse";
 import type { GetFlightTransactionsParams, SearchTransactionsParams, UzPostFailuresParams, UzPostOrdersParams, WarehouseActivityQueryParams } from "../services/warehouse";
 import { pickupQueueKeys } from "./usePickupQueue";
@@ -33,6 +35,7 @@ export const warehouseKeys = {
     ["warehouse_uzpost_orders", params] as const,
   uzpostFailures: (params: UzPostFailuresParams) =>
     ["warehouse_uzpost_failures", params] as const,
+  uzpostLabelSettings: () => ["warehouse_uzpost_label_settings"] as const,
 };
 
 /** Fetches the list of recent warehouse flights for the flight selector. */
@@ -201,5 +204,32 @@ export const useUzPostOrderFailures = (params: UzPostFailuresParams) => {
     queryKey: warehouseKeys.uzpostFailures(params),
     queryFn: () => getUzPostOrderFailures(params),
     placeholderData: (previousData) => previousData,
+  });
+};
+
+/**
+ * The saved UzPost label copy count, and whether this admin may change it.
+ *
+ * It changes about once, ever, so the app-wide five-minute staleness is fine.
+ * A 403 is not retried: it is an answer (this account cannot see the setting),
+ * not a hiccup.
+ */
+export const useUzPostLabelSettings = () => {
+  return useQuery({
+    queryKey: warehouseKeys.uzpostLabelSettings(),
+    queryFn: getUzPostLabelSettings,
+    retry: (failureCount, error) =>
+      (error as { status?: number }).status !== 403 && failureCount < 1,
+  });
+};
+
+/** Saves a new copy count; every screen reading the setting sees it at once. */
+export const useUpdateUzPostLabelSettings = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateUzPostLabelSettings,
+    onSuccess: (settings) => {
+      queryClient.setQueryData(warehouseKeys.uzpostLabelSettings(), settings);
+    },
   });
 };

@@ -622,6 +622,33 @@ export async function reprintUzPostOrder(requestId: number): Promise<UzPostRepri
   return response.data;
 }
 
+// ── UzPost label copies ────────────────────────────────────────────────────
+
+/** How many copies of every UzPost label print: one number for the business. */
+export interface UzPostLabelSettings {
+  /** Null until someone chooses; the print agent then uses its own setting. */
+  copies: number | null;
+  /** Whether the signed-in admin may change it, as decided by the server. */
+  can_configure: boolean;
+  min_copies: number;
+  max_copies: number;
+}
+
+export async function getUzPostLabelSettings(): Promise<UzPostLabelSettings> {
+  const response = await apiClient.get<UzPostLabelSettings>(
+    '/api/v1/warehouse/uzpost/label-settings',
+  );
+  return response.data;
+}
+
+export async function updateUzPostLabelSettings(copies: number): Promise<UzPostLabelSettings> {
+  const response = await apiClient.put<UzPostLabelSettings>(
+    '/api/v1/warehouse/uzpost/label-settings',
+    { copies },
+  );
+  return response.data;
+}
+
 export async function getUzPostOrderFailures(
   params: UzPostFailuresParams = {},
 ): Promise<UzPostOrderFailuresResponse> {

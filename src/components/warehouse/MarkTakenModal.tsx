@@ -9,6 +9,8 @@ import type { MarkTakenFormValues } from "../../schemas/warehouseSchemas";
 import { useWarehouseQueueStore } from "../../store/useWarehouseQueueStore";
 import type { DeliveryMethodOption } from "../../api/services/warehouse";
 import MultiPhotoUpload from "../MultiPhotoUpload";
+import { useUzPostLabelCopiesGate } from "../../hooks/useUzPostLabelCopiesGate";
+import UzPostLabelCopiesDialog from "./UzPostLabelCopiesDialog";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,8 @@ export default function MarkTakenModal({
   onClose,
 }: MarkTakenModalProps) {
   const enqueue = useWarehouseQueueStore((s) => s.enqueue);
+  const { guard: guardLabelCopies, dialog: labelCopiesDialog } =
+    useUzPostLabelCopiesGate();
 
   const {
     control,
@@ -79,26 +83,36 @@ export default function MarkTakenModal({
         (method) => method.value === data.delivery_method,
       );
 
-      reset();
-      onClose();
+      const submit = async () => {
+        reset();
+        onClose();
 
-      await enqueue({
-        transactionIds,
-        clientCode,
-        flightName,
-        deliveryMethod: data.delivery_method,
-        deliveryMethodLabel: selectedDeliveryMethod?.label,
-        comment: data.comment,
-        photos: data.photos,
-        force: isRedelivery,
-      });
+        await enqueue({
+          transactionIds,
+          clientCode,
+          flightName,
+          deliveryMethod: data.delivery_method,
+          deliveryMethodLabel: selectedDeliveryMethod?.label,
+          comment: data.comment,
+          photos: data.photos,
+          force: isRedelivery,
+        });
 
-      toast.success(`${clientCode} - navbatga qo'shildi`, {
-        description: `${transactionIds.length} ta yuk orqa fonda yuborilmoqda`,
-        duration: 3000,
-      });
+        toast.success(`${clientCode} - navbatga qo'shildi`, {
+          description: `${transactionIds.length} ta yuk orqa fonda yuborilmoqda`,
+          duration: 3000,
+        });
+      };
+
+      // A UzPost hand-over prints a label. The one person who decides how many
+      // copies that is gets asked first, once; everyone else goes straight on.
+      if (data.delivery_method === "uzpost") {
+        guardLabelCopies(() => void submit());
+        return;
+      }
+      await submit();
     },
-    [reset, onClose, enqueue, transactionIds, clientCode, flightName, deliveryMethods, isRedelivery],
+    [reset, onClose, enqueue, transactionIds, clientCode, flightName, deliveryMethods, isRedelivery, guardLabelCopies],
   );
 
   const hasDeliveryMethods = deliveryMethods.length > 0;
@@ -282,6 +296,12 @@ export default function MarkTakenModal({
                 </motion.button>
               </div>
             </form>
+
+            {/* Portalled to <body>, yet React still bubbles its clicks up
+                this tree. Rendered inside the panel that stops propagation,
+                a tap in the dialog never reaches the backdrop, which would
+                close this form and lose its photos. */}
+            <UzPostLabelCopiesDialog mode="ask" {...labelCopiesDialog} />
           </motion.div>
         </motion.div>
       )}

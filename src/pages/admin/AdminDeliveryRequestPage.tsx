@@ -10,10 +10,12 @@ import CargoPreviewList from "@/components/admin/delivery/CargoPreviewList";
 import DeliveryTypeSelector from "@/components/admin/delivery/DeliveryTypeSelector";
 import StandardDeliveryForm from "@/components/admin/delivery/StandardDeliveryForm";
 import UzpostDeliveryForm from "@/components/admin/delivery/UzpostDeliveryForm";
+import UzPostLabelCopiesDialog from "@/components/warehouse/UzPostLabelCopiesDialog";
 import {
   useAdminCreateStandardDelivery,
   useAdminCreateUzpostDelivery,
 } from "@/api/hooks/useAdminDelivery";
+import { useUzPostLabelCopiesGate } from "@/hooks/useUzPostLabelCopiesGate";
 
 import type { AdminDeliverySuccessResponse } from "@/api/services/adminDeliveryService";
 import type { ClientGroup } from "@/api/services/warehouse";
@@ -69,6 +71,8 @@ export default function AdminDeliveryRequestPage() {
 
   const standardMutation = useAdminCreateStandardDelivery();
   const uzpostMutation = useAdminCreateUzpostDelivery();
+  const { guard: guardLabelCopies, dialog: labelCopiesDialog } =
+    useUzPostLabelCopiesGate();
 
   const isSubmitting = standardMutation.isPending || uzpostMutation.isPending;
 
@@ -158,13 +162,17 @@ export default function AdminDeliveryRequestPage() {
       }
       formData.append("phone_number", uzpostPhone.trim() || selectedClient.phone || "");
 
-      uzpostMutation.mutate(formData, {
-        onSuccess: (res) => {
-          setDeliveryRequestId(res.delivery_request_id);
-          setReleaseResult(res);
-          setStep("success");
-        },
-      });
+      // Filing can print the label straight away, so the one person who decides
+      // the copy count is asked first, once. Everyone else files as before.
+      guardLabelCopies(() =>
+        uzpostMutation.mutate(formData, {
+          onSuccess: (res) => {
+            setDeliveryRequestId(res.delivery_request_id);
+            setReleaseResult(res);
+            setStep("success");
+          },
+        }),
+      );
     }
   }, [
     selectedClient,
@@ -179,6 +187,7 @@ export default function AdminDeliveryRequestPage() {
     uzpostBranch,
     standardMutation,
     uzpostMutation,
+    guardLabelCopies,
   ]);
 
   const handleReset = useCallback(() => {
@@ -522,6 +531,8 @@ export default function AdminDeliveryRequestPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <UzPostLabelCopiesDialog mode="ask" {...labelCopiesDialog} />
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
   type UzPostOrdersParams,
 } from "../../api/services/warehouse";
 import { formatTashkentDateTime } from "../../lib/format";
+import UzPostLabelCopiesCard from "./UzPostLabelCopiesCard";
 
 const PAGE_SIZE = 20;
 
@@ -422,7 +423,13 @@ export default function UzPostOrdersPanel() {
     setBusyRequestId(order.delivery_request_id);
     try {
       const res = await reprintUzPostOrder(order.delivery_request_id);
-      toast.success(`${res.order_number} printerga yuborildi`);
+      // The backend fails loudly when nothing would print, so reaching here
+      // means the label really is back in the printer's queue.
+      toast.success(`${res.order_number} qayta chop etishga yuborildi`, {
+        description: res.printer_status
+          ? `Printer: ${PRINTER_STATUS_LABELS[res.printer_status] ?? res.printer_status}`
+          : undefined,
+      });
       await invalidateOrders();
     } catch (error: unknown) {
       toast.error((error as { message?: string }).message ?? "Printerga yuborishda xatolik");
@@ -468,6 +475,8 @@ export default function UzPostOrdersPanel() {
 
   return (
     <div className="space-y-4">
+      <UzPostLabelCopiesCard />
+
       <div className="flex items-center gap-2">
         <button
           type="button"
