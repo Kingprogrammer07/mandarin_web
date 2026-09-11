@@ -3,6 +3,7 @@ import { Shield, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { getAdminJwtClaims } from "../../api/services/adminManagement";
 import { switchAdminRole } from "../../api/services/adminAuth";
+import { switchableRoles } from "../../lib/adminRoles";
 
 interface RoleSwitcherProps {
   // Kept for call-site compatibility; navigation is now driven by App via the
@@ -21,7 +22,9 @@ export default function RoleSwitcher({ dropUp = false, menuAlign = "right" }: Ro
   const [claims, setClaims] = useState(() => getAdminJwtClaims());
   const ref = useRef<HTMLDivElement>(null);
 
-  const roleNames = claims.role_names;
+  // Permission-only roles (the UzPost label right) stay in the token for the
+  // server's permission check, but have no screen and are never a choice.
+  const roleNames = switchableRoles(claims.role_names);
   const currentRole = claims.role_name;
 
   // Close dropdown on outside click

@@ -37,6 +37,17 @@ import type {
   AdminAccountListResponse,
   RoleResponse,
 } from '../../api/services/adminManagement';
+import { isCapabilityRole } from '../../lib/adminRoles';
+
+/**
+ * The role the backend stores as primary: the first picked role that has a
+ * screen. A permission-only role (the UzPost label right) is never primary,
+ * so the "Asosiy" badge must not land on it just because it was ticked last.
+ */
+function primaryRoleId(ids: number[], roles: RoleResponse[]): number | undefined {
+  const names = new Map(roles.map((role) => [role.id, role.name]));
+  return ids.find((id) => !isCapabilityRole(names.get(id) ?? ''));
+}
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
@@ -329,8 +340,9 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
       toast.success("Admin muvaffaqiyatli yaratildi");
       onSuccess();
     },
-    onError: () => {
-      toast.error("Admin yaratishda xatolik yuz berdi");
+    onError: (err: unknown) => {
+      // Keep the server's reason, e.g. an account needs a role with a screen.
+      toast.error((err as { message?: string }).message || "Admin yaratishda xatolik yuz berdi");
     },
   });
 
@@ -513,7 +525,7 @@ const CreateAdminForm = memo(({ roles, onSuccess, onClose }: CreateAdminFormProp
                       }}
                     />
                     <span className="flex-1">{r.name}</span>
-                    {checked && field.value[0] === r.id && (
+                    {checked && primaryRoleId(field.value, roles) === r.id && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500 text-white">
                         Asosiy
                       </span>
@@ -720,8 +732,8 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
       queryClient.invalidateQueries({ queryKey: ['admin-accounts'] });
       toast.success("Ma'lumotlar yangilandi");
     },
-    onError: () => {
-      toast.error("Yangilashda xatolik yuz berdi");
+    onError: (err: unknown) => {
+      toast.error((err as { message?: string }).message || "Yangilashda xatolik yuz berdi");
     },
   });
 
@@ -893,7 +905,7 @@ const AdminDetailSheet = memo(({ admin, roles, isOpen, onClose }: AdminDetailShe
                                 }}
                               />
                               <span className="flex-1">{r.name}</span>
-                              {checked && field.value[0] === r.id && (
+                              {checked && primaryRoleId(field.value, roles) === r.id && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500 text-white">
                                   Asosiy
                                 </span>

@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import NavigationBar from "./components/NavigationBar";
 import TelegramWebAppGuard from "./components/TelegramWebAppGuard";
 import { BottomNav, type BottomNavPage } from "./components/user/BottomNav";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { installGlobalErrorHandlers } from "./api/services/frontendErrors";
 import { fetchAuthMe, isRequestCanceled } from "./api/services/auth";
 import { AstatkaPage } from "./pages/worker/AstatkaPage";
@@ -23,6 +23,7 @@ import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
 import { isPosPath } from "@/lib/posRoutes";
 import { pickSession } from "@/lib/session";
+import { discardAdminSession } from "@/lib/adminSession";
 import { setRouterDepth } from "@/lib/backStack";
 import { TelegramBackBridge } from "@/components/TelegramBackBridge";
 import { NbuPaymentWatch } from "@/components/payment/NbuPaymentWatch";
@@ -621,6 +622,22 @@ function AppContent() {
           setUserRole(choice.role);
           setIsCheckingAuth(false);
           applyRoute(currentRouteInfo, choice.role, "replace");
+        }
+        return;
+      }
+
+      // A stored staff role that only grants a permission and has no screen.
+      // Serving it reopened the same blank page on every load, with no switcher
+      // and no sign-out on screen, so the staff session is dropped once and the
+      // visitor signs in again. The route is then judged as for a guest: a staff
+      // page goes to the staff login, while a client entry URL such as the bot's
+      // /auth/login keeps the client login rather than the staff PIN screen.
+      if (choice.kind === "discard-admin") {
+        if (!cancelled) {
+          setIsCheckingAuth(false);
+          discardAdminSession({ adminToken, userToken });
+          applyRoute(currentRouteInfo, null, "replace");
+          toast.info("Sessiya yangilandi. Iltimos, qaytadan kiring.");
         }
         return;
       }

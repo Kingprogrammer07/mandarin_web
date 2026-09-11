@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
 import { switchAdminRole } from '@/api/services/adminAuth';
+import { switchableRoles } from '@/lib/adminRoles';
 import { triggerSoftHaptic } from '@/utils/haptics';
 
 /** Two letters from the role name, e.g. "super-admin" → "SA". */
@@ -78,7 +79,10 @@ export function AdminAccountMenu({ onLogout }: { onLogout: () => void }) {
   );
 
   const roleLabel = claims.role_name || 'Admin';
-  const canSwitch = claims.role_names.length > 1;
+  // Permission-only roles stay in the token for the server's permission check,
+  // but have no screen to switch into.
+  const switchable = switchableRoles(claims.role_names);
+  const canSwitch = switchable.length > 1;
 
   return (
     <div ref={rootRef} className="relative">
@@ -120,7 +124,7 @@ export function AdminAccountMenu({ onLogout }: { onLogout: () => void }) {
               <p className="px-3 pb-1 pt-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-mc-text-3">
                 Rolni almashtirish
               </p>
-              {claims.role_names.map((role) => (
+              {switchable.map((role) => (
                 <button
                   key={role}
                   type="button"

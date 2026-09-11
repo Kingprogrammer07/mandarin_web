@@ -16,6 +16,8 @@
  * staff JWT by the next call carrying `X-Admin-Authorization`.
  */
 
+import { isCapabilityRole } from './adminRoles';
+
 export interface StoredSessions {
   /** Staff JWT from `localStorage`. */
   adminToken: string | null;
@@ -40,7 +42,13 @@ export type SessionChoice =
   /** A client token exists but has not been proven — the caller must verify it. */
   | { kind: 'client' }
   /** Nothing usable for this route. */
-  | { kind: 'guest' };
+  | { kind: 'guest' }
+  /**
+   * A staff session is stored, but its active role only grants a permission
+   * and has no screen. It cannot be served; the caller signs the staff
+   * session out.
+   */
+  | { kind: 'discard-admin' };
 
 /**
  * Pick the session for a route.
@@ -56,7 +64,9 @@ export type SessionChoice =
  *    the client app again from that WebView, where both sessions share one
  *    storage context. Being a staff member is not a reason to stop being a
  *    customer.
- * 3. Otherwise a staff session takes the route when one is stored.
+ * 3. Otherwise a staff session takes the route when one is stored — unless
+ *    its active role only grants a permission and has no screen. That
+ *    session is discarded: serving it reopened a blank page on every load.
  * 4. Otherwise a client token is used, once verified by the caller.
  * 5. Otherwise the visitor is a guest.
  */
@@ -68,7 +78,11 @@ export function pickSession(
   const hasAdmin = Boolean(adminToken && adminRole);
 
   if (route.isPublic) {
-    return { kind: 'public', role: hasAdmin ? (adminRole as string) : null };
+    // A permission-only role is not reported: App routes later in-app
+    // navigation with this role, and it has no page to land on.
+    const displayRole =
+      hasAdmin && !isCapabilityRole(adminRole as string) ? (adminRole as string) : null;
+    return { kind: 'public', role: displayRole };
   }
 
   if (route.isUserPage) {
@@ -76,6 +90,7 @@ export function pickSession(
   }
 
   if (hasAdmin) {
+    if (isCapabilityRole(adminRole as string)) return { kind: 'discard-admin' };
     return { kind: 'admin', role: adminRole as string };
   }
 

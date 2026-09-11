@@ -93,6 +93,46 @@ describe('a client route', () => {
   });
 });
 
+describe('a staff session whose active role has no screen', () => {
+  // `uzpost-label-config` only grants a permission. A browser that was switched
+  // into it kept `admin_role` in localStorage and reopened the same blank page on
+  // every load, with no switcher and no sign-out on screen.
+  const GRANT: StoredSessions = {
+    adminToken: 'jwt',
+    adminRole: 'uzpost-label-config',
+    userToken: null,
+  };
+
+  it('is discarded on a staff route', () => {
+    expect(pickSession(GRANT, STAFF_ROUTE)).toEqual({ kind: 'discard-admin' });
+  });
+
+  it('is discarded even when a client session is stored too', () => {
+    expect(pickSession({ ...GRANT, userToken: 'tok' }, STAFF_ROUTE)).toEqual({
+      kind: 'discard-admin',
+    });
+  });
+
+  it('leaves the client app to the client session', () => {
+    expect(pickSession({ ...GRANT, userToken: 'tok' }, USER_ROUTE)).toEqual({ kind: 'client' });
+  });
+
+  it('is not reported as the role on a public route', () => {
+    // App routes later in-app navigation with this role; reporting it would lead
+    // back to the same blank page from /pickup-tv or an NBU return page.
+    expect(pickSession(GRANT, PUBLIC_ROUTE)).toEqual({ kind: 'public', role: null });
+  });
+
+  it.each(['worker', 'manager', 'warehouse', 'accountant', 'super-admin'])(
+    'keeps serving %s',
+    (role) => {
+      expect(
+        pickSession({ adminToken: 'jwt', adminRole: role, userToken: null }, STAFF_ROUTE),
+      ).toEqual({ kind: 'admin', role });
+    },
+  );
+});
+
 describe('route classification', () => {
   it.each([
     '/admin/dashboard',
