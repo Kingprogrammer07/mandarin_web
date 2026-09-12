@@ -2,19 +2,15 @@ import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Phone, Search, MapPin, Check, PackageCheck, Sparkles } from "lucide-react";
+import { Search, MapPin, Check, PackageCheck, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  getBranchSuggestions,
-  getClientDeliveryContext,
-} from "@/api/services/adminDeliveryService";
+import { useClientDeliveryContext } from "@/api/hooks/useAdminDelivery";
+import { getBranchSuggestions } from "@/api/services/adminDeliveryService";
 import { useUzpostBranches } from "@/hooks/useUzpostBranches";
 import type { UzpostBranch } from "@/types/uzpostBranch";
 
 interface UzpostDeliveryFormProps {
-  phone: string;
-  onPhoneChange: (v: string) => void;
   selectedBranch: UzpostBranch | null;
   onBranchChange: (branch: UzpostBranch | null) => void;
   /** Whose request this is. Used only to look up whether this filer's
@@ -22,9 +18,9 @@ interface UzpostDeliveryFormProps {
   clientCode: string | null;
 }
 
+/** The UzPost branch for the parcel. The recipient's name and phone sit above
+ *  it in RecipientFields, shared with the courier types. */
 export default function UzpostDeliveryForm({
-  phone,
-  onPhoneChange,
   selectedBranch,
   onBranchChange,
   clientCode,
@@ -33,14 +29,9 @@ export default function UzpostDeliveryForm({
   const [query, setQuery] = useState("");
   const { data: branches, isLoading, isError } = useUzpostBranches();
 
-  // Same key as ClientDeliveryHistory, so this reads the cached context rather
-  // than issuing a second request for the same client.
-  const { data: deliveryContext } = useQuery({
-    queryKey: ["admin-delivery-context", clientCode],
-    queryFn: () => getClientDeliveryContext(clientCode as string),
-    enabled: Boolean(clientCode),
-    staleTime: 30_000,
-  });
+  // Same key as the page and ClientDeliveryHistory, so this reads the cached
+  // context rather than issuing a second request for the same client.
+  const { data: deliveryContext } = useClientDeliveryContext(clientCode);
 
   // Branches near the district the client's code was issued for. STCH3 is
   // Chilonzor, so the picker can lead with the few offices there instead of
@@ -111,21 +102,6 @@ export default function UzpostDeliveryForm({
           </div>
         </div>
       )}
-
-      {/* Phone */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          <Phone className="w-4 h-4 text-gray-400" />
-          {t("adminDeliveryRequest.uzpostForm.phoneLabel", "Qabul qiluvchi telefon")}
-        </Label>
-        <Input
-          type="tel"
-          placeholder="+998901234567"
-          value={phone}
-          onChange={(e) => onPhoneChange(e.target.value)}
-          className="h-12 rounded-xl"
-        />
-      </div>
 
       {/* Branch search */}
       <div className="space-y-2">

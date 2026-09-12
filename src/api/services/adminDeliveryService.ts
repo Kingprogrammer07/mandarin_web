@@ -5,6 +5,8 @@ export interface AdminStandardDeliveryRequest {
   delivery_type: "self_pickup" | "yandex" | "mandarin" | "bts";
   flight_names: string[];
   phone_number?: string;
+  /** The recipient's name when it is not the account holder's; omitted otherwise. */
+  recipient_name?: string;
   caption?: string;
   latitude?: number | null;
   longitude?: number | null;
@@ -44,6 +46,29 @@ export interface AdminDeliverySuccessResponse {
   release_warning?: string | null;
 }
 
+/** One ledger row of a flight: what the warehouse hands over. */
+export interface DeliveryFlightRow {
+  id: number;
+  qator_raqami: number;
+  vazn: string | null;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  payment_status: string;
+  is_taken_away: boolean;
+}
+
+/** A pending or approved request that already covers a flight. */
+export interface ActiveDeliveryRequestRef {
+  id: number;
+  status: string;
+  delivery_type: string;
+  /** "user" | "admin" | null, as on the history list. */
+  created_via: string | null;
+  recipient_name: string;
+  phone: string;
+}
+
 /** One flight of a client's, with the two facts that decide whether to file. */
 export interface DeliveryFlightState {
   flight: string;
@@ -53,6 +78,10 @@ export interface DeliveryFlightState {
   payment_status: "paid" | "partial" | "pending";
   is_taken_away: boolean;
   taken_count: number;
+  /** Every row of the flight, in row order. Not capped, unlike the warehouse search. */
+  rows: DeliveryFlightRow[];
+  /** Pending or approved requests already covering the flight, newest first. */
+  active_requests: ActiveDeliveryRequestRef[];
 }
 
 export interface DeliveryHistoryEntry {
@@ -69,6 +98,10 @@ export interface DeliveryHistoryEntry {
 
 export interface ClientDeliveryContext {
   client_code: string;
+  /** Profile name, read at request time; the recipient form starts from it. */
+  full_name: string;
+  /** Profile phone, read at request time; the recipient form starts from it. */
+  phone: string | null;
   /** Whether the signed-in admin may file regardless of cargo state. */
   may_override: boolean;
   flights: DeliveryFlightState[];
@@ -89,10 +122,40 @@ export interface ClientDeliveryContext {
 export async function getClientDeliveryContext(
   clientCode: string,
 ): Promise<ClientDeliveryContext> {
-  const response = await apiClient.get<ClientDeliveryContext>(
+  const response = await apiClient.get<ClientDeliveryContextWire>(
     `/api/v1/admin/delivery-requests/context/${encodeURIComponent(clientCode)}`,
   );
-  return response.data;
+  return normalizeDeliveryContext(response.data);
+}
+
+/** The context as a backend from before the recipient feature sends it. */
+type ClientDeliveryContextWire = Omit<ClientDeliveryContext, "full_name" | "phone" | "flights"> & {
+  full_name?: string;
+  phone?: string | null;
+  flights: Array<
+    Omit<DeliveryFlightState, "rows" | "active_requests"> & {
+      rows?: DeliveryFlightRow[];
+      active_requests?: ActiveDeliveryRequestRef[];
+    }
+  >;
+};
+
+/**
+ * Fills in what an older backend does not send, so a frontend deployed first or
+ * a backend rolled back shows flights without rows or request badges instead of
+ * crashing the page on `rows.map`.
+ */
+function normalizeDeliveryContext(context: ClientDeliveryContextWire): ClientDeliveryContext {
+  return {
+    ...context,
+    full_name: context.full_name ?? "",
+    phone: context.phone ?? null,
+    flights: context.flights.map((flight) => ({
+      ...flight,
+      rows: flight.rows ?? [],
+      active_requests: flight.active_requests ?? [],
+    })),
+  };
 }
 
 export interface SuggestedBranch {

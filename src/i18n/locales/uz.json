@@ -1807,19 +1807,37 @@
       "placeholder": "Mijoz kodini kiriting (masalan: M123)",
       "button": "Qidirish",
       "loading": "Qidirilmoqda...",
-      "noResults": "Mijoz topilmadi"
+      "noResults": "Mijoz topilmadi",
+      "recent": "Oxirgi qidiruvlar",
+      "clearRecent": "Oxirgi qidiruvlarni tozalash"
     },
     "flights": {
       "title": "Reyslarni tanlang",
       "flightLabel": "reys",
       "selectAll": "Barchasini tanlash",
-      "deselectAll": "Barchasini bekor qilish"
+      "deselectAll": "Barchasini bekor qilish",
+      "loading": "Reyslar yuklanmoqda…",
+      "refreshing": "Yangilanmoqda…",
+      "loadError": "Reyslarni yuklab bo'lmadi",
+      "retry": "Qayta urinish",
+      "empty": "Mijozda reys topilmadi",
+      "activeRequests": "Shu reys bo'yicha zayavkalar",
+      "requestStatus": {
+        "pending": "Kutilmoqda",
+        "approved": "Tasdiqlangan"
+      }
     },
     "cargoPreview": {
       "title": "Yuklarni ko'rish",
       "cargoLabel": "yuk",
       "weight": "Vazn",
-      "amount": "Summa"
+      "amount": "Summa",
+      "taken": "Olib ketilgan",
+      "paid": "To'langan",
+      "partial": "Qisman",
+      "unpaid": "To'lanmagan",
+      "debt": "qarz",
+      "debtAmount": "{{amount}} so'm qarz"
     },
     "deliveryType": {
       "title": "Yetkazish turini tanlang",
@@ -1844,10 +1862,32 @@
       "walletLabel": "Hamyon balansidan foydalanish",
       "receiptLabel": "To'lov cheki (ixtiyoriy)",
       "uploadReceipt": "Chekni yuklash",
-      "branchRequired": "Yuborish uchun UzPost filialini tanlang"
+      "branchRequired": "Yuborish uchun UzPost filialini tanlang",
+      "branchSearchPlaceholder": "Filial nomi, manzil yoki indeks...",
+      "noBranches": "Filial topilmadi"
+    },
+    "recipient": {
+      "title": "Qabul qiluvchi",
+      "nameLabel": "Ism",
+      "useOther": "Boshqa ism",
+      "useProfile": "Profildagi ism",
+      "namePlaceholder": "Qabul qiluvchining ism-familiyasi",
+      "profileEmpty": "Profilda ism yo'q — \"Boshqa ism\" ni bosing",
+      "nameMissing": "Qabul qiluvchi ismini kiriting",
+      "nameTooLong": "Ism juda uzun: ko'pi bilan {{max}} belgi",
+      "nameFormula": "Ism \"=\" belgisi bilan boshlanmasin",
+      "phoneLabel": "Telefon",
+      "phoneHint": "Mijoz profilidagi raqam qo'yildi. Boshqa odamga ketsa, uning raqamini yozing.",
+      "phoneMissing": "Qabul qiluvchi telefonini kiriting",
+      "phoneTooLong": "Telefon juda uzun: ko'pi bilan {{max}} belgi"
     },
     "form": {
-      "title": "Zayavka ma'lumotlari"
+      "title": "Zayavka ma'lumotlari",
+      "noFlights": "Tanlangan reyslar endi mijozda yo'q — reyslarni qayta tanlang"
+    },
+    "unpaidWarning": {
+      "title": "To'lanmagan yuklar mavjud",
+      "description": "Zayavka yaratiladi. To'lov yetkazib berishda undiriladi."
     },
     "submit": {
       "button": "Zayavkani yuborish",
@@ -1856,11 +1896,14 @@
       "error": "Zayavka yuborishda xatolik",
       "successTitle": "Zayavka yuborildi!",
       "successDesc": "Mijoz nomidan yetkazib berish so'rovi muvaffaqiyatli yaratildi.",
-      "newRequest": "Yangi zayavka"
+      "newRequest": "Yangi zayavka",
+      "anotherRecipient": "Boshqa qabul qiluvchi uchun yana zayavka",
+      "fixRecipient": "Qabul qiluvchi ma'lumotlarini to'ldiring"
     },
     "actions": {
       "continue": "Davom etish",
-      "changeClient": "Boshqa mijoz"
+      "changeClient": "Boshqa mijoz",
+      "back": "Orqaga"
     }
   },
   "system": {

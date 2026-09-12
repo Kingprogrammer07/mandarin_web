@@ -1,21 +1,40 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import {
   adminCreateStandardDelivery,
   adminCreateUzpostDelivery,
+  getClientDeliveryContext,
   type AdminDeliverySuccessResponse,
   type AdminStandardDeliveryRequest,
 } from "../services/adminDeliveryService";
 
-/** Error shape rejected by the apiClient interceptor (client.ts). */
-type DeliveryError = { message?: string; data?: { detail?: string } };
+/** Query keys for the manager's delivery-request page. */
+export const adminDeliveryKeys = {
+  contexts: ["admin-delivery-context"] as const,
+  context: (clientCode: string | null) =>
+    ["admin-delivery-context", clientCode] as const,
+};
 
-/** Prefer the backend's specific `detail` (clear Uzbek) over the interceptor's
- *  generic fallback — e.g. a 404 collapses to "Ma'lumot topilmadi." otherwise. */
-function deliveryErrorText(err: unknown, fallback: string): string {
-  const e = err as DeliveryError;
-  return e?.data?.detail || e?.message || fallback;
+/** Prefix of the warehouse search the client lookup runs (useWarehouse.ts). */
+const GROUPED_SEARCH_PREFIX = ["warehouse_grouped_transaction_search"] as const;
+
+/** Error shape rejected by the apiClient interceptor (client.ts). */
+type DeliveryError = { message?: string; data?: { detail?: unknown } };
+
+/**
+ * The message to show for a failed submission.
+ *
+ * Prefers the backend's specific `detail` (clear Uzbek) over the interceptor's
+ * generic fallback — e.g. a 404 collapses to "Ma'lumot topilmadi." otherwise.
+ * Only a string detail qualifies: a validation error carries an array, and a
+ * toast given an array shows nothing the manager can act on.
+ */
+export function deliveryErrorText(err: unknown, fallback: string): string {
+  const e = err as DeliveryError | null;
+  const detail = e?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  return e?.message || fallback;
 }
 
 /**
@@ -50,12 +69,47 @@ function reportDeliveryResult(
   });
 }
 
+/**
+ * A client's flights with their rows, the requests already covering them, and
+ * the profile name and phone: what the manager page files from.
+ *
+ * The page, the history panel and the UzPost form share this key, so they share
+ * one request. The flights step reads it fresh (`staleTime` 0); the side panels
+ * accept a copy up to 30 seconds old.
+ */
+export function useClientDeliveryContext(
+  clientCode: string | null,
+  staleTime = 30_000,
+) {
+  return useQuery({
+    queryKey: adminDeliveryKeys.context(clientCode),
+    queryFn: () => getClientDeliveryContext(clientCode as string),
+    enabled: Boolean(clientCode),
+    staleTime,
+  });
+}
+
+/**
+ * What the page shows after a filing must include it: the flights step marks
+ * flights already on their way, so the cached context and search results are
+ * refetched rather than trusted.
+ */
+function useRefreshAfterFiling(): () => void {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: adminDeliveryKeys.contexts });
+    void queryClient.invalidateQueries({ queryKey: GROUPED_SEARCH_PREFIX });
+  };
+}
+
 export const useAdminCreateStandardDelivery = () => {
   const { t } = useTranslation();
+  const refreshAfterFiling = useRefreshAfterFiling();
   return useMutation({
     mutationFn: (data: AdminStandardDeliveryRequest) =>
       adminCreateStandardDelivery(data),
     onSuccess: (res) => {
+      refreshAfterFiling();
       reportDeliveryResult(
         res,
         t("adminDeliveryRequest.submit.success", "Zayavka muvaffaqiyatli yuborildi!"),
@@ -74,9 +128,11 @@ export const useAdminCreateStandardDelivery = () => {
 
 export const useAdminCreateUzpostDelivery = () => {
   const { t } = useTranslation();
+  const refreshAfterFiling = useRefreshAfterFiling();
   return useMutation({
     mutationFn: (formData: FormData) => adminCreateUzpostDelivery(formData),
     onSuccess: (res) => {
+      refreshAfterFiling();
       // The uzpost path never spawns a queue, so it reports queue_created=false
       // with no warning — reportDeliveryResult only warns when there is a
       // reason to, which keeps this path's toast green as before. For a filer

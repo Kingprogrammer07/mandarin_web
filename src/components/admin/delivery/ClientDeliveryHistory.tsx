@@ -9,10 +9,9 @@
  * as a fact.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, History, Loader2, ShieldAlert, User, UserCog } from "lucide-react";
 
-import { getClientDeliveryContext } from "@/api/services/adminDeliveryService";
+import { useClientDeliveryContext } from "@/api/hooks/useAdminDelivery";
 import { Badge } from "@/components/ui/badge";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -27,12 +26,7 @@ interface Props {
 }
 
 export function ClientDeliveryHistory({ clientCode }: Props) {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["admin-delivery-context", clientCode],
-    queryFn: () => getClientDeliveryContext(clientCode as string),
-    enabled: Boolean(clientCode),
-    staleTime: 30_000,
-  });
+  const { data, isLoading, error } = useClientDeliveryContext(clientCode);
 
   if (!clientCode) return null;
 
@@ -106,9 +100,12 @@ export function ClientDeliveryHistory({ clientCode }: Props) {
 
       <div className="space-y-1 max-h-40 overflow-y-auto">
         {data.recent.map((entry) => (
+          // Wraps rather than truncating: on a 320px phone the fixed columns
+          // left the flight names a few pixels, so the list said which requests
+          // exist but not for which flights — the one thing it is read for.
           <div
             key={entry.id}
-            className="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-400 py-1 border-t border-gray-50 dark:border-white/[0.04] first:border-t-0"
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600 dark:text-gray-400 py-1 border-t border-gray-50 dark:border-white/[0.04] first:border-t-0"
           >
             <span className="font-mono text-gray-400 shrink-0">#{entry.id}</span>
             <span className="shrink-0">
@@ -119,7 +116,9 @@ export function ClientDeliveryHistory({ clientCode }: Props) {
               })}
             </span>
             <span className="font-semibold shrink-0">{entry.delivery_type}</span>
-            <span className="truncate flex-1">{entry.flight_names.join(", ")}</span>
+            <span className="min-w-[8rem] flex-1 break-words">
+              {entry.flight_names.join(", ")}
+            </span>
             {entry.state_overridden && (
               <ShieldAlert
                 className="w-3 h-3 text-amber-500 shrink-0"
