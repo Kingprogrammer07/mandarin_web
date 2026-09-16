@@ -1699,6 +1699,7 @@
     "resultLabel": "Trek kod",
     "checkinDate": "Qabul",
     "arrivalDate": "Kelgan",
+    "stepsLegend": "Yuk bosqichlari",
     "stepStatus": {
       "completed": "Yakunlangan",
       "active": "Jarayonda",
@@ -1707,9 +1708,9 @@
     "steps": {
       "step1": "Xitoy omborida",
       "step2": "Yo'lda",
-      "step3": "Bojxona navbatida",
-      "step4": "Saralash bosqichida",
-      "step5": "Yetkazishga tayyor",
+      "step3": "Bojxonada",
+      "step4": "Toshkent omborida",
+      "step5": "Fotohisobot jo'natilgan",
       "step6": "Olib ketilgan"
     }
   },

@@ -169,7 +169,7 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
         <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3">
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-extrabold text-mc-text">
+              <p className="break-words text-[13px] font-extrabold leading-snug text-mc-text">
                 {getStepTitle(activeStep, t)}
               </p>
               <p className="mt-0.5 text-[11px] font-medium text-mc-text-2">
@@ -181,7 +181,11 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
             </span>
           </div>
 
-          <div className="relative grid grid-cols-6 gap-1">
+          {/* The icons alone never said which stage is which. The names cannot
+              sit under the icons: on a 320px phone a column is as wide as its
+              icon, so each icon carries its number and the names are listed
+              below. */}
+          <div aria-hidden="true" data-testid="tracking-step-icons" className="relative grid grid-cols-6 gap-1">
             <div className="absolute left-[8%] right-[8%] top-3.5 h-1 rounded-full bg-mc-border" />
             <div
               className="absolute left-[8%] top-3.5 h-1 max-w-[84%] rounded-full bg-gradient-to-r from-mc-brand to-mc-brand-strong transition-all"
@@ -193,7 +197,7 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
               const isActive = step.visualStatus === "active";
 
               return (
-                <div key={step.step} className="relative z-10 flex justify-center">
+                <div key={step.step} className="relative z-10 flex flex-col items-center gap-1">
                   <span
                     className={[
                       "flex h-8 w-8 items-center justify-center rounded-mc-sm border transition-colors",
@@ -206,10 +210,28 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
                   >
                     {isCompleted ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} /> : <Icon className="h-4 w-4" strokeWidth={2} />}
                   </span>
+                  <span className={`text-[10px] font-extrabold tabular-nums ${isActive ? "text-mc-brand" : "text-mc-text-3"}`}>
+                    {step.step}
+                  </span>
                 </div>
               );
             })}
           </div>
+
+          <ol
+            aria-label={t("tracking.stepsLegend")}
+            className="mt-2.5 grid grid-flow-col grid-cols-2 grid-rows-[repeat(3,auto)] gap-x-3 gap-y-1.5 border-t border-mc-border pt-2.5"
+          >
+            {visualSteps.map((step) => (
+              <StepLegendItem
+                key={step.step}
+                number={step.step}
+                title={getStepTitle(step, t)}
+                status={step.visualStatus}
+                statusLabel={getStatusLabel(step.visualStatus, t)}
+              />
+            ))}
+          </ol>
         </div>
       </div>
 
@@ -232,6 +254,48 @@ export function TrackResultCard({ data }: TrackResultCardProps) {
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+function StepLegendItem({
+  number,
+  title,
+  status,
+  statusLabel,
+}: {
+  number: number;
+  title: string;
+  status: VisualStepStatus;
+  statusLabel: string;
+}) {
+  const badgeClass =
+    status === "completed"
+      ? "bg-mc-success text-mc-on-success"
+      : status === "active"
+        ? "bg-mc-brand text-mc-on-brand"
+        : "border border-mc-border text-mc-text-2";
+  // Stages still ahead are most of the list for most parcels, so they stay at
+  // the secondary tone: text-3 is under 3:1 on this inset background.
+  const titleClass =
+    status === "active"
+      ? "font-extrabold text-mc-text"
+      : status === "completed"
+        ? "font-semibold text-mc-text"
+        : "font-medium text-mc-text-2";
+
+  return (
+    <li className="flex min-w-0 items-start gap-1.5">
+      <span
+        aria-hidden="true"
+        className={`mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold tabular-nums ${badgeClass}`}
+      >
+        {number}
+      </span>
+      <span className={`min-w-0 break-words text-[11px] leading-snug ${titleClass}`}>
+        {title}
+        <span className="sr-only"> — {statusLabel}</span>
+      </span>
+    </li>
   );
 }
 
