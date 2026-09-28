@@ -8,6 +8,7 @@ import TemplateEditorSection from '@/components/admin/TemplateEditorSection';
 import BroadcastComposer from '@/components/admin/BroadcastComposer';
 import SmsSettingsSection from '@/components/admin/SmsSettingsSection';
 import BackupSettingsSection from '@/components/admin/BackupSettingsSection';
+import ManagerDeliveryChannelSection from '@/components/admin/ManagerDeliveryChannelSection';
 import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
@@ -946,6 +947,8 @@ export default function SystemSettingsPage() {
 
       {tab === 'delivery' && (
       <>
+      <ManagerDeliveryChannelSection />
+
       {/* UzPost Pending Requests */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm overflow-hidden">
         <button

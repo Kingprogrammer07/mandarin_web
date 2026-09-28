@@ -1,10 +1,10 @@
 /**
  * A role that only grants a permission is never offered as a role to switch into.
  *
- * `uzpost-label-config` carries one right — changing how many copies of a UzPost
- * label print. The manager holding it saw it in his role menu, chose it, and got
- * a blank page with no way back. It stays in the token's `roles` claim (the
- * server reads permissions from role names); it just must not be a choice.
+ * Capability roles carry one right each. A manager holding one saw it in his
+ * role menu, chose it, and got a blank page with no way back. They stay in the
+ * token's `roles` claim (the server reads permissions from role names); they
+ * just must not be a choice.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,9 +16,15 @@ import { describe, expect, it } from 'vitest';
 import { isCapabilityRole, switchableRoles } from './adminRoles';
 
 describe('switchableRoles', () => {
-  it('drops the label permission role and keeps token order', () => {
+  it('drops permission roles and keeps token order', () => {
     expect(
-      switchableRoles(['worker', 'manager', 'warehouse', 'uzpost-label-config']),
+      switchableRoles([
+        'worker',
+        'manager',
+        'delivery-override',
+        'warehouse',
+        'uzpost-label-config',
+      ]),
     ).toEqual(['worker', 'manager', 'warehouse']);
   });
 
@@ -38,6 +44,7 @@ describe('switchableRoles', () => {
 
   it('leaves one role when the other one is the grant', () => {
     expect(switchableRoles(['warehouse', 'uzpost-label-config'])).toEqual(['warehouse']);
+    expect(switchableRoles(['warehouse', 'delivery-override'])).toEqual(['warehouse']);
   });
 
   it('handles an empty list', () => {
@@ -46,9 +53,12 @@ describe('switchableRoles', () => {
 });
 
 describe('isCapabilityRole', () => {
-  it('is true for the label permission role', () => {
-    expect(isCapabilityRole('uzpost-label-config')).toBe(true);
-  });
+  it.each(['uzpost-label-config', 'delivery-override'])(
+    'is true for the permission-only role %j',
+    (role) => {
+      expect(isCapabilityRole(role)).toBe(true);
+    },
+  );
 
   it.each(['super-admin', 'worker', 'accountant', 'manager', 'warehouse', ''])(
     'is false for %j',

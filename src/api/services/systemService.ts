@@ -166,6 +166,28 @@ export interface BackupRunResult {
   error: string | null;
 }
 
+export interface ManagerDeliveryChannelSettings {
+  /** The panel's override. `null` means existing per-delivery-type channels. */
+  channel_id: number | null;
+  /** Current UzPost fallback from server config, shown for orientation. */
+  fallback_channel_id: number | null;
+  /** What manager-created UzPost notices use after fallback. */
+  effective_channel_id: number | null;
+}
+
+export interface ManagerDeliveryChannelUpdate {
+  channel_id: number | null;
+}
+
+export interface ManagerDeliveryChannelCheckResult {
+  ok: boolean;
+  chat_id: number;
+  title: string | null;
+  chat_type: string | null;
+  can_send: boolean;
+  detail: string;
+}
+
 export interface MaintenanceStatusResponse {
   maintenance: boolean;
   is_admin: boolean;
@@ -511,6 +533,33 @@ export const systemService = {
   /** Take a backup now. Slow by nature — a dump plus an upload of tens of MB. */
   async runBackupNow(): Promise<BackupRunResult> {
     const { data } = await apiClient.post<BackupRunResult>('/api/v1/system/backup/run');
+    return data;
+  },
+
+  async getManagerDeliveryChannel(): Promise<ManagerDeliveryChannelSettings> {
+    const { data } = await apiClient.get<ManagerDeliveryChannelSettings>(
+      '/api/v1/system/manager-delivery-channel',
+    );
+    return data;
+  },
+
+  async updateManagerDeliveryChannel(
+    body: ManagerDeliveryChannelUpdate,
+  ): Promise<ManagerDeliveryChannelSettings> {
+    const { data } = await apiClient.put<ManagerDeliveryChannelSettings>(
+      '/api/v1/system/manager-delivery-channel',
+      body,
+    );
+    return data;
+  },
+
+  async checkManagerDeliveryChannel(
+    chatId: number,
+  ): Promise<ManagerDeliveryChannelCheckResult> {
+    const { data } = await apiClient.post<ManagerDeliveryChannelCheckResult>(
+      '/api/v1/system/manager-delivery-channel/check',
+      { chat_id: chatId },
+    );
     return data;
   },
 };
