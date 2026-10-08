@@ -210,12 +210,21 @@ export async function adminCreateStandardDelivery(
   return response.data;
 }
 
+/**
+ * How long to wait for a UzPost filing. For a manager with the override it
+ * creates a UzPost order, a label and a print job per bag, and UzPost alone can
+ * take over 12 s an order, so the 60 s upload default cut a split parcel off
+ * while the server was still working.
+ */
+const UZPOST_FILING_TIMEOUT_MS = 180_000;
+
 export async function adminCreateUzpostDelivery(
   formData: FormData,
 ): Promise<AdminDeliverySuccessResponse> {
   const response = await apiClientFormData.post<AdminDeliverySuccessResponse>(
     "/api/v1/admin/delivery-requests/uzpost",
     formData,
+    { timeout: UZPOST_FILING_TIMEOUT_MS },
   );
   return response.data;
 }

@@ -132,6 +132,27 @@ function paidFlight(
   };
 }
 
+/** One flight carrying several cargo rows, some possibly already collected. */
+function flightWithRows(
+  name: string,
+  rows: Array<{ id: number; weight: string; taken?: boolean }>,
+): DeliveryFlightState {
+  const flight = paidFlight(name, rows[0].id);
+  return {
+    ...flight,
+    cargo_count: rows.length,
+    taken_count: rows.filter((row) => row.taken).length,
+    rows: rows.map((row) => ({
+      ...flight.rows[0],
+      id: row.id,
+      qator_raqami: row.id,
+      vazn: row.weight,
+      weight_kg: Number(row.weight),
+      is_taken_away: Boolean(row.taken),
+    })),
+  };
+}
+
 function contextData(
   flights = [paidFlight("M249", 1), paidFlight("M250", 2)],
   mayOverride = true,
@@ -233,7 +254,6 @@ describe("AdminDeliveryRequestPage", () => {
   });
 
   it("builds the UzPost request with the branch, the phone and the typed recipient", () => {
-    state.context.data = contextData(undefined, false);
     openFormFor("M250", /^UzPost/);
 
     fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
@@ -244,32 +264,74 @@ describe("AdminDeliveryRequestPage", () => {
     submit();
 
     expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
-    const form = sentUzpostForm();
-    expect(Object.fromEntries(form.entries())).toEqual({
+    const { submission_id: submissionId, ...fields } = Object.fromEntries(
+      sentUzpostForm().entries(),
+    );
+    // 2.5 kg: one parcel, so no bags even for a manager with the override.
+    expect(fields).toEqual({
       client_code: "STCH330",
       flight_names: JSON.stringify(["M250"]),
       location_id: "77",
       phone_number: "+998901112233",
       recipient_name: "Vali Aliyev",
     });
+    expect(String(submissionId).length).toBeGreaterThan(8);
   });
 
-  it("auto-splits a 40 kg UzPost row into two 20 kg bags", () => {
-    state.context.data = contextData([paidFlight("M300", 30, "40")]);
+  it("splits a parcel over 20 kg into the fewest even bags", () => {
+    state.context.data = contextData([paidFlight("M300", 30, "45")]);
     openFormFor("M300", /^UzPost/);
 
     fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
     submit();
 
     expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
-    const form = sentUzpostForm();
-    expect(JSON.parse(String(form.get("bags")))).toEqual([
-      { transaction_id: 30, sequence_no: 1, weight_kg: 20 },
-      { transaction_id: 30, sequence_no: 2, weight_kg: 20 },
+    expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
+      { sequence_no: 1, weight_kg: 15 },
+      { sequence_no: 2, weight_kg: 15 },
+      { sequence_no: 3, weight_kg: 15 },
     ]);
   });
 
-  it("blocks submit when edited bag weights no longer match the source row", () => {
+  it("files several small items as one parcel, not one bag each", () => {
+    state.context.data = contextData([
+      flightWithRows("M300", [
+        { id: 31, weight: "0.3" },
+        { id: 32, weight: "0.4" },
+        { id: 33, weight: "1.2" },
+      ]),
+    ]);
+    openFormFor("M300", /^UzPost/);
+
+    expect(screen.queryByText("Qoplarga ajratish")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    submit();
+
+    expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
+    expect(sentUzpostForm().has("bags")).toBe(false);
+  });
+
+  it("leaves cargo that was already collected out of the bags", () => {
+    state.context.data = contextData([
+      flightWithRows("M300", [
+        { id: 31, weight: "30", taken: true },
+        { id: 32, weight: "15" },
+        { id: 33, weight: "10" },
+      ]),
+    ]);
+    openFormFor("M300", /^UzPost/);
+
+    expect(screen.getByText(/Yuk 25\.00 kg/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    submit();
+
+    expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
+      { sequence_no: 1, weight_kg: 12.5 },
+      { sequence_no: 2, weight_kg: 12.5 },
+    ]);
+  });
+
+  it("blocks submit when edited bag weights no longer add up to the parcel", () => {
     state.context.data = contextData([paidFlight("M300", 30, "40")]);
     openFormFor("M300", /^UzPost/);
 
@@ -278,9 +340,36 @@ describe("AdminDeliveryRequestPage", () => {
       target: { value: "19" },
     });
 
+    expect(screen.getByText(/qoldi 1\.00 kg/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Zayavkani yuborish/ })).toBeDisabled();
     submit();
     expect(state.uzpostMutate).not.toHaveBeenCalled();
+
+    // A new bag takes the unbagged kilogram, and the request can go.
+    fireEvent.click(screen.getByRole("button", { name: "Qop qo'shish" }));
+    submit();
+    expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
+      { sequence_no: 1, weight_kg: 19 },
+      { sequence_no: 2, weight_kg: 20 },
+      { sequence_no: 3, weight_kg: 1 },
+    ]);
+  });
+
+  it("sends the same filing id again for the same request, and a new one once it changes", () => {
+    openFormFor("M250", /^UzPost/);
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+
+    submit();
+    submit();
+    fireEvent.change(screen.getByLabelText("Telefon"), { target: { value: "+998935551122" } });
+    submit();
+
+    const ids = state.uzpostMutate.mock.calls.map((call) =>
+      (call[0] as FormData).get("submission_id"),
+    );
+    expect(ids).toHaveLength(3);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[0]);
   });
 
   it("does not show or send bag split data for non-override admins", () => {

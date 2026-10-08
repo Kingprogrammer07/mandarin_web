@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -20,11 +20,15 @@ import DeliveryTypeSelector from "@/components/admin/delivery/DeliveryTypeSelect
 import RecipientFields from "@/components/admin/delivery/RecipientFields";
 import StandardDeliveryForm from "@/components/admin/delivery/StandardDeliveryForm";
 import UzpostDeliveryForm from "@/components/admin/delivery/UzpostDeliveryForm";
-import UzpostBagSplitPanel, {
-  buildUzpostBagDrafts,
+import UzpostBagSplitPanel from "@/components/admin/delivery/UzpostBagSplitPanel";
+import {
+  needsUzpostBags,
+  roundKg,
+  splitUzpostParcel,
+  uzpostParcelWeightKg,
   validateUzpostBags,
   type UzpostBagDraft,
-} from "@/components/admin/delivery/UzpostBagSplitPanel";
+} from "@/lib/uzpostBagSplit";
 import UzPostLabelCopiesDialog from "@/components/warehouse/UzPostLabelCopiesDialog";
 import {
   useAdminCreateStandardDelivery,
@@ -62,6 +66,14 @@ const DELIVERY_TYPE_FALLBACK: Record<DeliveryType, string> = {
 
 const STEPS_ORDER: Step[] = ["client", "flights", "type", "form"];
 
+/** An id for one UzPost filing, so the server can recognise a re-submit of it. */
+function newSubmissionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export default function AdminDeliveryRequestPage() {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>("client");
@@ -91,7 +103,15 @@ export default function AdminDeliveryRequestPage() {
 
   // Uzpost form state
   const [uzpostBranch, setUzpostBranch] = useState<UzpostBranch | null>(null);
-  const [uzpostBags, setUzpostBags] = useState<UzpostBagDraft[]>([]);
+  const [uzpostBagEdit, setUzpostBagEdit] = useState<{
+    sourceKey: string;
+    bags: UzpostBagDraft[];
+  } | null>(null);
+  // The id sent with a UzPost filing, kept while the same request is sent
+  // again. A browser that stops waiting does not stop the server, which may
+  // still be creating orders; the same id lets it answer with that result
+  // instead of filing again and creating every UzPost order twice.
+  const uzpostSubmissionRef = useRef<{ payload: string; id: string } | null>(null);
 
   // Recent clients: code and name only (see adminDeliveryRecentClients).
   const [searchHistory, setSearchHistory] = useState<RecentDeliveryClient[]>(
@@ -134,7 +154,8 @@ export default function AdminDeliveryRequestPage() {
     setStandardCaption("");
     setStandardLocation(null);
     setUzpostBranch(null);
-    setUzpostBags([]);
+    setUzpostBagEdit(null);
+    uzpostSubmissionRef.current = null;
   }, []);
 
   const handleSelectClient = useCallback(
@@ -189,37 +210,37 @@ export default function AdminDeliveryRequestPage() {
   const isUzpost = deliveryType === "uzpost";
   const canSplitUzpostBags = Boolean(context?.may_override && isUzpost);
 
-  const uzpostSplitSourceKey = useMemo(() => {
-    if (!canSplitUzpostBags) return "";
-    return submittableFlights
-      .map((flightName) => {
-        const flight = flights.find((item) => item.flight === flightName);
-        const rowKey =
-          flight?.rows
-            .filter((row) => row.is_weight_source !== false)
-            .map(
-              (row) =>
-                `${row.id}:${row.weight_kg ?? row.vazn ?? ""}:${
-                  row.is_weight_source
-                }`,
-            )
-            .join("|") ?? "";
-        return `${flightName}:${rowKey}`;
-      })
-      .join("||");
-  }, [canSplitUzpostBags, flights, submittableFlights]);
+  // Only a parcel over 20 kg is split, and only for a filer whose request
+  // creates the orders. Lighter cargo is one parcel and one receipt, as before.
+  const uzpostParcelKg = useMemo(
+    () => (canSplitUzpostBags ? uzpostParcelWeightKg(flights, submittableFlights) : 0),
+    [canSplitUzpostBags, flights, submittableFlights],
+  );
+  const splitsUzpostParcel = canSplitUzpostBags && needsUzpostBags(uzpostParcelKg);
 
-  useEffect(() => {
-    if (!canSplitUzpostBags) {
-      setUzpostBags([]);
-      return;
-    }
-    setUzpostBags(buildUzpostBagDrafts(flights, submittableFlights));
-  }, [canSplitUzpostBags, flights, submittableFlights, uzpostSplitSourceKey]);
+  // Edits survive until what they were made for changes: other flights or a
+  // refetch that moved the weight bring back a fresh split.
+  const uzpostSplitSourceKey = splitsUzpostParcel
+    ? `${submittableFlights.join("|")}:${roundKg(uzpostParcelKg)}`
+    : "";
+  const suggestedUzpostBags = useMemo(
+    () => (splitsUzpostParcel ? splitUzpostParcel(uzpostParcelKg) : []),
+    [splitsUzpostParcel, uzpostParcelKg],
+  );
+  const uzpostBags =
+    splitsUzpostParcel && uzpostBagEdit?.sourceKey === uzpostSplitSourceKey
+      ? uzpostBagEdit.bags
+      : suggestedUzpostBags;
+  const setUzpostBags = useCallback(
+    (bags: UzpostBagDraft[]) => {
+      setUzpostBagEdit({ sourceKey: uzpostSplitSourceKey, bags });
+    },
+    [uzpostSplitSourceKey],
+  );
 
   const uzpostBagErrors = useMemo(
-    () => (canSplitUzpostBags ? validateUzpostBags(uzpostBags) : []),
-    [canSplitUzpostBags, uzpostBags],
+    () => (splitsUzpostParcel ? validateUzpostBags(uzpostBags, uzpostParcelKg) : []),
+    [splitsUzpostParcel, uzpostBags, uzpostParcelKg],
   );
 
   const recipientDraft = useMemo<RecipientDraft>(
@@ -238,7 +259,7 @@ export default function AdminDeliveryRequestPage() {
     Boolean(context) &&
     submittableFlights.length > 0 &&
     (isUzpost ? Boolean(uzpostBranch) : Boolean(deliveryType)) &&
-    (!canSplitUzpostBags || uzpostBagErrors.length === 0);
+    (!splitsUzpostParcel || uzpostBagErrors.length === 0);
 
   const handleSubmit = useCallback(() => {
     if (!selectedClient || !deliveryType || submittableFlights.length === 0) return;
@@ -279,18 +300,23 @@ export default function AdminDeliveryRequestPage() {
       if (recipient.recipient_name) {
         formData.append("recipient_name", recipient.recipient_name);
       }
-      if (context?.may_override) {
+      if (splitsUzpostParcel) {
         formData.append(
           "bags",
           JSON.stringify(
             uzpostBags.map((bag) => ({
-              transaction_id: bag.transaction_id,
               sequence_no: bag.sequence_no,
               weight_kg: bag.weight_kg,
             })),
           ),
         );
       }
+      // Same request sent again keeps its id; anything changed is a new filing.
+      const payload = JSON.stringify(Array.from(formData.entries()));
+      if (uzpostSubmissionRef.current?.payload !== payload) {
+        uzpostSubmissionRef.current = { payload, id: newSubmissionId() };
+      }
+      formData.append("submission_id", uzpostSubmissionRef.current.id);
 
       // Filing can print the label straight away, so the one person who decides
       // the copy count is asked first, once. Everyone else files as before.
@@ -311,7 +337,7 @@ export default function AdminDeliveryRequestPage() {
     standardMutation,
     uzpostMutation,
     guardLabelCopies,
-    context?.may_override,
+    splitsUzpostParcel,
   ]);
 
   /** A different client: back to the search. */
@@ -628,10 +654,9 @@ export default function AdminDeliveryRequestPage() {
                         onBranchChange={setUzpostBranch}
                         clientCode={selectedClient.client_code}
                       />
-                      {canSplitUzpostBags && (
+                      {splitsUzpostParcel && (
                         <UzpostBagSplitPanel
-                          flights={flights}
-                          selectedFlightNames={submittableFlights}
+                          parcelKg={uzpostParcelKg}
                           bags={uzpostBags}
                           onChange={setUzpostBags}
                           disabled={isSubmitting}
@@ -661,7 +686,7 @@ export default function AdminDeliveryRequestPage() {
                       {t("adminDeliveryRequest.submit.fixRecipient", "Qabul qiluvchi ma'lumotlarini to'ldiring")}
                     </p>
                   )}
-                  {canSplitUzpostBags && uzpostBagErrors.length > 0 && (
+                  {splitsUzpostParcel && uzpostBagErrors.length > 0 && (
                     <p role="alert" className="text-[12px] font-medium text-red-600 dark:text-red-400 mb-2 text-center">
                       {t("adminDeliveryRequest.submit.fixBags", "Qop vaznlarini tekshiring")}
                     </p>
