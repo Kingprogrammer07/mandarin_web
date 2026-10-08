@@ -36,8 +36,12 @@ export interface AdminDeliverySuccessResponse {
   /** How many transactions actually changed state. */
   released_count?: number;
   uzpost_order_number?: string | null;
+  uzpost_order_numbers?: string[];
   /** Printer queue job id, when the label was accepted for printing. */
   printer_job_id?: number | null;
+  printer_job_ids?: number[];
+  /** Number of physical bags created for this UzPost request. */
+  bag_count?: number;
   /**
    * Why the release did not go as planned, in Uzbek. Present when the UzPost
    * order failed (cargo deliberately left in the warehouse) or when there was
@@ -51,6 +55,8 @@ export interface DeliveryFlightRow {
   id: number;
   qator_raqami: number;
   vazn: string | null;
+  weight_kg?: number | null;
+  is_weight_source?: boolean;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;

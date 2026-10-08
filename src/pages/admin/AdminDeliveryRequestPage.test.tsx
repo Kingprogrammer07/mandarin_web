@@ -100,7 +100,12 @@ vi.mock("framer-motion", async () => {
 import AdminDeliveryRequestPage from "./AdminDeliveryRequestPage";
 import { RECENT_CLIENTS_STORAGE_KEY } from "@/lib/adminDeliveryRecentClients";
 
-function paidFlight(name: string, rowId: number): DeliveryFlightState {
+function paidFlight(
+  name: string,
+  rowId: number,
+  weight = "2.5",
+  isWeightSource = true,
+): DeliveryFlightState {
   return {
     flight: name,
     cargo_count: 1,
@@ -112,8 +117,10 @@ function paidFlight(name: string, rowId: number): DeliveryFlightState {
     rows: [
       {
         id: rowId,
-        qator_raqami: 0,
-        vazn: "2.5",
+        qator_raqami: rowId,
+        vazn: weight,
+        weight_kg: Number(weight),
+        is_weight_source: isWeightSource,
         total_amount: 50000,
         paid_amount: 50000,
         remaining_amount: 0,
@@ -125,12 +132,15 @@ function paidFlight(name: string, rowId: number): DeliveryFlightState {
   };
 }
 
-function contextData(flights = [paidFlight("M249", 1), paidFlight("M250", 2)]): ClientDeliveryContext {
+function contextData(
+  flights = [paidFlight("M249", 1), paidFlight("M250", 2)],
+  mayOverride = true,
+): ClientDeliveryContext {
   return {
     client_code: "STCH330",
     full_name: "Anvar Mijozov",
     phone: "+998901112233",
-    may_override: true,
+    may_override: mayOverride,
     flights,
     total_requests: 0,
     filed_by_user: 0,
@@ -161,6 +171,10 @@ function submit(): void {
 
 function sentPayload(): AdminStandardDeliveryRequest {
   return state.standardMutate.mock.calls[0][0] as AdminStandardDeliveryRequest;
+}
+
+function sentUzpostForm(): FormData {
+  return state.uzpostMutate.mock.calls[0][0] as FormData;
 }
 
 beforeEach(() => {
@@ -219,6 +233,7 @@ describe("AdminDeliveryRequestPage", () => {
   });
 
   it("builds the UzPost request with the branch, the phone and the typed recipient", () => {
+    state.context.data = contextData(undefined, false);
     openFormFor("M250", /^UzPost/);
 
     fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
@@ -229,7 +244,7 @@ describe("AdminDeliveryRequestPage", () => {
     submit();
 
     expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
-    const form = state.uzpostMutate.mock.calls[0][0] as FormData;
+    const form = sentUzpostForm();
     expect(Object.fromEntries(form.entries())).toEqual({
       client_code: "STCH330",
       flight_names: JSON.stringify(["M250"]),
@@ -237,6 +252,47 @@ describe("AdminDeliveryRequestPage", () => {
       phone_number: "+998901112233",
       recipient_name: "Vali Aliyev",
     });
+  });
+
+  it("auto-splits a 40 kg UzPost row into two 20 kg bags", () => {
+    state.context.data = contextData([paidFlight("M300", 30, "40")]);
+    openFormFor("M300", /^UzPost/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    submit();
+
+    expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
+    const form = sentUzpostForm();
+    expect(JSON.parse(String(form.get("bags")))).toEqual([
+      { transaction_id: 30, sequence_no: 1, weight_kg: 20 },
+      { transaction_id: 30, sequence_no: 2, weight_kg: 20 },
+    ]);
+  });
+
+  it("blocks submit when edited bag weights no longer match the source row", () => {
+    state.context.data = contextData([paidFlight("M300", 30, "40")]);
+    openFormFor("M300", /^UzPost/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    fireEvent.change(screen.getAllByLabelText("Qop vazni")[0], {
+      target: { value: "19" },
+    });
+
+    expect(screen.getByRole("button", { name: /Zayavkani yuborish/ })).toBeDisabled();
+    submit();
+    expect(state.uzpostMutate).not.toHaveBeenCalled();
+  });
+
+  it("does not show or send bag split data for non-override admins", () => {
+    state.context.data = contextData([paidFlight("M300", 30, "40")], false);
+    openFormFor("M300", /^UzPost/);
+
+    expect(screen.queryByText("Qoplarga ajratish")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    submit();
+
+    expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
+    expect(sentUzpostForm().has("bags")).toBe(false);
   });
 
   it("sends the profile phone and no recipient name for the client's own parcel", () => {

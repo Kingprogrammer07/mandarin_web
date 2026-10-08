@@ -1899,7 +1899,8 @@
       "successDesc": "Mijoz nomidan yetkazib berish so'rovi muvaffaqiyatli yaratildi.",
       "newRequest": "Yangi zayavka",
       "anotherRecipient": "Boshqa qabul qiluvchi uchun yana zayavka",
-      "fixRecipient": "Qabul qiluvchi ma'lumotlarini to'ldiring"
+      "fixRecipient": "Qabul qiluvchi ma'lumotlarini to'ldiring",
+      "fixBags": "Qop vaznlarini tekshiring"
     },
     "actions": {
       "continue": "Davom etish",

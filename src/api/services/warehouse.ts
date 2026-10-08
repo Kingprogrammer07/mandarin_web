@@ -54,6 +54,22 @@ export interface UzPostPrinterJobSnapshot {
   submitted_at: string | null;
 }
 
+export interface UzPostBagOrderSnapshot {
+  id: number;
+  source_transaction_id: number | null;
+  sequence_no: number;
+  flight_name: string;
+  row_number: number | null;
+  weight_kg: number;
+  order_id: number | null;
+  order_number: string | null;
+  order_status: string | null;
+  label_pdf_url: string | null;
+  printer: UzPostPrinterJobSnapshot;
+  order_created_at: string | null;
+  order_cancelled_at: string | null;
+}
+
 export interface UzPostOrderItem {
   delivery_request_id: number;
   delivery_request_status: string;
@@ -72,6 +88,7 @@ export interface UzPostOrderItem {
   sender: UzPostPartySnapshot;
   recipient: UzPostPartySnapshot;
   printer: UzPostPrinterJobSnapshot;
+  bags: UzPostBagOrderSnapshot[];
   order_created_at: string | null;
   order_cancelled_at: string | null;
   created_at: string;
@@ -567,6 +584,9 @@ export interface UzPostReprintResponse {
   order_number: string;
   printer_job_id: number | null;
   printer_status: string | null;
+  bag_count: number;
+  order_numbers: string[];
+  printer_job_ids: number[];
 }
 
 export interface UzPostOrderFailureItem {

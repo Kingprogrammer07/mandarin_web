@@ -22,9 +22,19 @@ export function parseWeightKg(vazn: string | null): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/** A row's backend-parsed weight, falling back to the legacy text column. */
+export function rowWeightKg(row: DeliveryFlightRow): number | null {
+  if (typeof row.weight_kg === "number" && Number.isFinite(row.weight_kg)) {
+    return row.weight_kg >= 0 ? row.weight_kg : null;
+  }
+  return parseWeightKg(row.vazn);
+}
+
 /** Sum of the readable row weights of a flight, in kilograms. */
 export function flightWeightKg(rows: DeliveryFlightRow[]): number {
-  return rows.reduce((sum, row) => sum + (parseWeightKg(row.vazn) ?? 0), 0);
+  const sourceRows = rows.filter((row) => row.is_weight_source !== false);
+  const rowsToSum = sourceRows.length > 0 ? sourceRows : rows;
+  return rowsToSum.reduce((sum, row) => sum + (rowWeightKg(row) ?? 0), 0);
 }
 
 /** What is still owed on a flight. Overpaid rows do not offset other rows' debt. */

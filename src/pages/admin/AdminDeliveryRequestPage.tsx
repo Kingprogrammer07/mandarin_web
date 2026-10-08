@@ -20,6 +20,11 @@ import DeliveryTypeSelector from "@/components/admin/delivery/DeliveryTypeSelect
 import RecipientFields from "@/components/admin/delivery/RecipientFields";
 import StandardDeliveryForm from "@/components/admin/delivery/StandardDeliveryForm";
 import UzpostDeliveryForm from "@/components/admin/delivery/UzpostDeliveryForm";
+import UzpostBagSplitPanel, {
+  buildUzpostBagDrafts,
+  validateUzpostBags,
+  type UzpostBagDraft,
+} from "@/components/admin/delivery/UzpostBagSplitPanel";
 import UzPostLabelCopiesDialog from "@/components/warehouse/UzPostLabelCopiesDialog";
 import {
   useAdminCreateStandardDelivery,
@@ -86,6 +91,7 @@ export default function AdminDeliveryRequestPage() {
 
   // Uzpost form state
   const [uzpostBranch, setUzpostBranch] = useState<UzpostBranch | null>(null);
+  const [uzpostBags, setUzpostBags] = useState<UzpostBagDraft[]>([]);
 
   // Recent clients: code and name only (see adminDeliveryRecentClients).
   const [searchHistory, setSearchHistory] = useState<RecentDeliveryClient[]>(
@@ -128,6 +134,7 @@ export default function AdminDeliveryRequestPage() {
     setStandardCaption("");
     setStandardLocation(null);
     setUzpostBranch(null);
+    setUzpostBags([]);
   }, []);
 
   const handleSelectClient = useCallback(
@@ -180,6 +187,40 @@ export default function AdminDeliveryRequestPage() {
 
   const isStandard = deliveryType !== null && deliveryType !== "uzpost";
   const isUzpost = deliveryType === "uzpost";
+  const canSplitUzpostBags = Boolean(context?.may_override && isUzpost);
+
+  const uzpostSplitSourceKey = useMemo(() => {
+    if (!canSplitUzpostBags) return "";
+    return submittableFlights
+      .map((flightName) => {
+        const flight = flights.find((item) => item.flight === flightName);
+        const rowKey =
+          flight?.rows
+            .filter((row) => row.is_weight_source !== false)
+            .map(
+              (row) =>
+                `${row.id}:${row.weight_kg ?? row.vazn ?? ""}:${
+                  row.is_weight_source
+                }`,
+            )
+            .join("|") ?? "";
+        return `${flightName}:${rowKey}`;
+      })
+      .join("||");
+  }, [canSplitUzpostBags, flights, submittableFlights]);
+
+  useEffect(() => {
+    if (!canSplitUzpostBags) {
+      setUzpostBags([]);
+      return;
+    }
+    setUzpostBags(buildUzpostBagDrafts(flights, submittableFlights));
+  }, [canSplitUzpostBags, flights, submittableFlights, uzpostSplitSourceKey]);
+
+  const uzpostBagErrors = useMemo(
+    () => (canSplitUzpostBags ? validateUzpostBags(uzpostBags) : []),
+    [canSplitUzpostBags, uzpostBags],
+  );
 
   const recipientDraft = useMemo<RecipientDraft>(
     () => ({
@@ -196,7 +237,8 @@ export default function AdminDeliveryRequestPage() {
   const canSubmit =
     Boolean(context) &&
     submittableFlights.length > 0 &&
-    (isUzpost ? Boolean(uzpostBranch) : Boolean(deliveryType));
+    (isUzpost ? Boolean(uzpostBranch) : Boolean(deliveryType)) &&
+    (!canSplitUzpostBags || uzpostBagErrors.length === 0);
 
   const handleSubmit = useCallback(() => {
     if (!selectedClient || !deliveryType || submittableFlights.length === 0) return;
@@ -237,6 +279,18 @@ export default function AdminDeliveryRequestPage() {
       if (recipient.recipient_name) {
         formData.append("recipient_name", recipient.recipient_name);
       }
+      if (context?.may_override) {
+        formData.append(
+          "bags",
+          JSON.stringify(
+            uzpostBags.map((bag) => ({
+              transaction_id: bag.transaction_id,
+              sequence_no: bag.sequence_no,
+              weight_kg: bag.weight_kg,
+            })),
+          ),
+        );
+      }
 
       // Filing can print the label straight away, so the one person who decides
       // the copy count is asked first, once. Everyone else files as before.
@@ -253,9 +307,11 @@ export default function AdminDeliveryRequestPage() {
     standardCaption,
     standardLocation,
     uzpostBranch,
+    uzpostBags,
     standardMutation,
     uzpostMutation,
     guardLabelCopies,
+    context?.may_override,
   ]);
 
   /** A different client: back to the search. */
@@ -566,11 +622,22 @@ export default function AdminDeliveryRequestPage() {
                   )}
 
                   {isUzpost && (
-                    <UzpostDeliveryForm
-                      selectedBranch={uzpostBranch}
-                      onBranchChange={setUzpostBranch}
-                      clientCode={selectedClient.client_code}
-                    />
+                    <>
+                      <UzpostDeliveryForm
+                        selectedBranch={uzpostBranch}
+                        onBranchChange={setUzpostBranch}
+                        clientCode={selectedClient.client_code}
+                      />
+                      {canSplitUzpostBags && (
+                        <UzpostBagSplitPanel
+                          flights={flights}
+                          selectedFlightNames={submittableFlights}
+                          bags={uzpostBags}
+                          onChange={setUzpostBags}
+                          disabled={isSubmitting}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -592,6 +659,11 @@ export default function AdminDeliveryRequestPage() {
                   {showRecipientProblems && problems.length > 0 && (
                     <p role="alert" className="text-[12px] font-medium text-red-600 dark:text-red-400 mb-2 text-center">
                       {t("adminDeliveryRequest.submit.fixRecipient", "Qabul qiluvchi ma'lumotlarini to'ldiring")}
+                    </p>
+                  )}
+                  {canSplitUzpostBags && uzpostBagErrors.length > 0 && (
+                    <p role="alert" className="text-[12px] font-medium text-red-600 dark:text-red-400 mb-2 text-center">
+                      {t("adminDeliveryRequest.submit.fixBags", "Qop vaznlarini tekshiring")}
                     </p>
                   )}
                   <Button
@@ -644,12 +716,17 @@ export default function AdminDeliveryRequestPage() {
                   <div className="mt-4 p-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-left">
                     <p className="text-[12px] font-semibold text-green-800 dark:text-green-300">
                       {releaseResult.released_count} ta yuk ombordan chiqarildi
+                      {releaseResult.bag_count
+                        ? ` · ${releaseResult.bag_count} ta qop`
+                        : ""}
                     </p>
                     <p className="text-[11px] text-green-700/80 dark:text-green-400/80 mt-0.5">
                       Chek printerga yuborildi
-                      {releaseResult.uzpost_order_number
-                        ? ` · ${releaseResult.uzpost_order_number}`
-                        : ""}
+                      {releaseResult.uzpost_order_numbers?.length
+                        ? ` · ${releaseResult.uzpost_order_numbers.join(", ")}`
+                        : releaseResult.uzpost_order_number
+                          ? ` · ${releaseResult.uzpost_order_number}`
+                          : ""}
                     </p>
                   </div>
                 )}

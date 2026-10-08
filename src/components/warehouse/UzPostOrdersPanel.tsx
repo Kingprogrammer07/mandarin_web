@@ -109,6 +109,8 @@ function OrderCard({
   onCancel: (order: UzPostOrderItem) => void;
   isBusy: boolean;
 }) {
+  const bagOrders = order.bags ?? [];
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -181,6 +183,39 @@ function OrderCard({
           </button>
         </div>
       </div>
+
+      {bagOrders.length > 0 && (
+        <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50/70 p-3 dark:border-orange-500/15 dark:bg-orange-500/[0.08]">
+          <div className="mb-2 flex items-center gap-2 text-xs font-black text-orange-800 dark:text-orange-200">
+            <PackageCheck className="h-4 w-4" aria-hidden="true" />
+            {bagOrders.length} ta qop orderi
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {bagOrders.map((bag) => (
+              <div
+                key={bag.id}
+                className="rounded-lg border border-white/80 bg-white px-3 py-2 text-xs shadow-sm dark:border-white/10 dark:bg-black/15"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono font-black text-gray-900 dark:text-white">
+                    {bag.order_number || `qop-${bag.sequence_no}`}
+                  </span>
+                  <span className="font-bold text-gray-500 dark:text-gray-300">
+                    {bag.weight_kg.toFixed(2)} kg
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                  <span>{bag.flight_name}</span>
+                  {bag.row_number !== null && <span>qator {bag.row_number}</span>}
+                  {bag.printer.status && (
+                    <span>Printer: {printerStatusLabel(bag.printer.status)}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {order.label_pdf_url && (
         <a
@@ -425,7 +460,9 @@ export default function UzPostOrdersPanel() {
       const res = await reprintUzPostOrder(order.delivery_request_id);
       // The backend fails loudly when nothing would print, so reaching here
       // means the label really is back in the printer's queue.
-      toast.success(`${res.order_number} qayta chop etishga yuborildi`, {
+      const printedOrders =
+        res.order_numbers?.length > 0 ? res.order_numbers.join(", ") : res.order_number;
+      toast.success(`${printedOrders} qayta chop etishga yuborildi`, {
         description: res.printer_status
           ? `Printer: ${PRINTER_STATUS_LABELS[res.printer_status] ?? res.printer_status}`
           : undefined,
