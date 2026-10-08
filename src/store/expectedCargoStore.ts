@@ -1,12 +1,19 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { buildMergedOrderKeys, clearMergedOrder } from '@/lib/expectedCargoQueueOrder';
 
 // ── Fast Entry Queue ───────────────────────────────────────────────────────────
 
 export interface FastEntryQueueItem {
   /** Locally generated UUID — used as React key and for targeted updates. */
   id: string;
+  /** Real scan time. Sent to the server on save, so merge must never rewrite it. */
   scannedAt?: string;
+  /**
+   * Table position (epoch ms) set when the row's client is merged into one
+   * block; rows without it are placed by `scannedAt`.
+   */
+  orderAt?: number;
   trackCode: string;
   /** Client code resolved via API; empty string means unresolved (user must fill). */
   clientCode: string;
@@ -97,6 +104,8 @@ interface ExpectedCargoState {
    * resolves from a downloaded per-flight index (no per-scan network). Persisted.
    */
   scannerMode: 'online' | 'offline';
+  /** Merge a client's rows into one block whenever the scanner switches owner. Persisted. */
+  isAutoMergeEnabled: boolean;
 
   flightTabOrder: string[];
   entryQueue: FastEntryQueueItem[];
@@ -111,6 +120,7 @@ interface ExpectedCargoState {
   setFastEntryOpen: (open: boolean) => void;
   setClientListHidden: (hidden: boolean) => void;
   setScannerMode: (mode: 'online' | 'offline') => void;
+  setAutoMergeEnabled: (enabled: boolean) => void;
 
   syncFlightTabOrder: (apiFlightNames: string[]) => void;
   setFlightTabOrder: (orderedNames: string[]) => void;
@@ -155,6 +165,8 @@ interface ExpectedCargoState {
   acceptQueueItemConflictOwner: (id: string) => void;
   /** Bring all rows for one client next to each other in the scanner table. */
   mergeClientQueueGroup: (clientCode: string) => void;
+  /** Undo a merge: put the client's rows back where they were scanned. */
+  unmergeClientQueueGroup: (clientCode: string) => void;
   toggleQueueItemReviewed: (id: string) => void;
   setQueueItemClientCode: (id: string, clientCode: string) => void;
   removeLatestQueueItem: () => void;
@@ -179,6 +191,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       isFastEntryOpen: false,
       isClientListHidden: false,
       scannerMode: 'online',
+      isAutoMergeEnabled: false,
       flightTabOrder: [],
       entryQueue: [],
       selectedQueueItemIds: [],
@@ -207,6 +220,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
       setFastEntryOpen: (open) => set({ isFastEntryOpen: open }),
       setClientListHidden: (hidden) => set({ isClientListHidden: hidden }),
       setScannerMode: (mode) => set({ scannerMode: mode }),
+      setAutoMergeEnabled: (enabled) => set({ isAutoMergeEnabled: enabled }),
 
       syncFlightTabOrder: (apiFlightNames) => {
         const currentOrder = get().flightTabOrder;
@@ -393,31 +407,21 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
 
       mergeClientQueueGroup: (clientCode) =>
         set((state) => {
-          const normalized = clientCode.trim().toUpperCase();
-          if (!normalized) return state;
-
-          const baseTime = Date.now();
-          const matchingItems = state.entryQueue
-            .filter((item) => item.clientCode.trim().toUpperCase() === normalized)
-            .sort((a, b) => {
-              const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
-              const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
-              return bTime - aTime;
-            });
-
-          const nextScannedAtById = new Map(
-            matchingItems.map((item, index) => [
-              item.id,
-              new Date(baseTime - index).toISOString(),
-            ]),
-          );
+          const orderKeys = buildMergedOrderKeys(state.entryQueue, clientCode, Date.now());
+          if (orderKeys.size === 0) return state;
 
           return {
             entryQueue: state.entryQueue.map((item) => {
-              const scannedAt = nextScannedAtById.get(item.id);
-              return scannedAt ? { ...item, scannedAt } : item;
+              const orderAt = orderKeys.get(item.id);
+              return orderAt === undefined ? item : { ...item, orderAt };
             }),
           };
+        }),
+
+      unmergeClientQueueGroup: (clientCode) =>
+        set((state) => {
+          const entryQueue = clearMergedOrder(state.entryQueue, clientCode);
+          return entryQueue ? { entryQueue } : state;
         }),
 
       setQueueItemClientCode: (id, clientCode) =>
@@ -498,6 +502,7 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
         flightTabOrder: state.flightTabOrder,
         notifications: state.notifications,
         scannerMode: state.scannerMode,
+        isAutoMergeEnabled: state.isAutoMergeEnabled,
       }),
     },
   ),

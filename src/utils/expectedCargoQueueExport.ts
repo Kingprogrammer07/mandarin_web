@@ -1,4 +1,5 @@
 import type { FastEntryQueueItem } from '@/store/expectedCargoStore';
+import { compareQueueNewestFirst } from '@/lib/expectedCargoQueueOrder';
 
 /**
  * Export the in-memory scanner queue to a CSV file BEFORE it is saved to the
@@ -39,12 +40,8 @@ export function exportQueueToCsv(
   items: FastEntryQueueItem[],
   flightName: string | null,
 ): void {
-  // Newest-first, matching the on-screen order (scannedAt descending).
-  const ordered = [...items].sort((a, b) => {
-    const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
-    const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
-    return bTime - aTime;
-  });
+  // Newest-first, matching the on-screen order (merged clients stay together).
+  const ordered = [...items].sort(compareQueueNewestFirst);
 
   const rows = ordered.map((item) =>
     [

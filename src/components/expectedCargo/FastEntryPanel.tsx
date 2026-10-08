@@ -34,6 +34,11 @@ import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expected
 import { expectedCargoScanStore } from '@/utils/expectedCargoScanStore';
 import { exportQueueToCsv } from '@/utils/expectedCargoQueueExport';
 import {
+  compareQueueNewestFirst,
+  countClientSegments,
+  findMergedClientCodes,
+} from '@/lib/expectedCargoQueueOrder';
+import {
   initializeExpectedCargoSounds,
   playExpectedCargoSound,
 } from '@/utils/expectedCargoSoundManager';
@@ -226,11 +231,14 @@ interface QueueItemRowProps {
   isSelected: boolean;
   clientScanCount: number;
   isSplitGroup: boolean;
+  /** The client's rows were brought together by a merge that can be undone. */
+  isMergedGroup: boolean;
   onToggleSelected: (id: string) => void;
   onRemove: (id: string) => void;
   onSetClientCode: (id: string, code: string) => void;
   onAcceptConflictOwner: (id: string) => void;
   onMergeClientGroup: (clientCode: string) => void;
+  onUnmergeClientGroup: (clientCode: string) => void;
   onPreviewClient: (clientCode: string, trackCode?: string, flightName?: string | null) => void;
   onToggleReviewed: (id: string) => void;
 }
@@ -241,11 +249,13 @@ const QueueItemRow = memo(function QueueItemRow({
   isSelected,
   clientScanCount,
   isSplitGroup,
+  isMergedGroup,
   onToggleSelected,
   onRemove,
   onSetClientCode,
   onAcceptConflictOwner,
   onMergeClientGroup,
+  onUnmergeClientGroup,
   onPreviewClient,
   onToggleReviewed,
 }: QueueItemRowProps) {
@@ -466,6 +476,16 @@ const QueueItemRow = memo(function QueueItemRow({
             Birlashtir
           </button>
         )}
+        {!isSplitGroup && isMergedGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
+          <button
+            type="button"
+            onClick={() => onUnmergeClientGroup(item.clientCode)}
+            className="h-7 rounded-md border border-violet-300 bg-white/70 px-2 text-[11px] font-bold text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:bg-black/20 dark:text-violet-300 dark:hover:bg-violet-950/40"
+            title="Qatorlarni skan qilingan joyiga qaytarish"
+          >
+            Ajratish
+          </button>
+        )}
         {item.clientCode.trim() && (
           <button
             type="button"
@@ -677,7 +697,6 @@ export function FastEntryPanel({
   const [trackCodeInput, setTrackCodeInput] = useState('');
   const [draftRows, setDraftRows] = useState<FastEntryDraftRow[]>(() => [createDraftRow()]);
   const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
-  const [isAutoMergeEnabled, setIsAutoMergeEnabled] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
@@ -733,6 +752,7 @@ export function FastEntryPanel({
     markQueueItemAlreadySent,
     acceptQueueItemConflictOwner,
     mergeClientQueueGroup,
+    unmergeClientQueueGroup,
     toggleQueueItemReviewed,
     setQueueItemClientCode,
     selectedQueueItemIds,
@@ -750,6 +770,8 @@ export function FastEntryPanel({
     addNotification,
     scannerMode,
     setScannerMode,
+    isAutoMergeEnabled,
+    setAutoMergeEnabled,
   } = useExpectedCargoStore();
 
   // ── Offline resolve index (downloaded snapshot for the active flight) ──────
@@ -1004,10 +1026,14 @@ export function FastEntryPanel({
       priorCount,
     );
 
+    // Every change of owner can leave the new owner's rows split (A, B, A), not
+    // only the change after a 2+ run that raises the warning below. Merging a
+    // client that is not split changes nothing, so merge on every change.
+    if (isAutoMergeEnabled && isClientChanged) {
+      requestAnimationFrame(() => mergeClientQueueGroup(resolved.client_code));
+    }
+
     if (isContinuation) {
-      if (isAutoMergeEnabled) {
-        requestAnimationFrame(() => mergeClientQueueGroup(resolved.client_code));
-      }
       void playExpectedCargoSound('warning');
       const totalCount = priorCount + 1;
       toast.warning(`${resolved.client_code} - navbat almashdi, tekshiring`, {
@@ -1186,6 +1212,11 @@ export function FastEntryPanel({
                 { client_code: entry.clientCode, full_name: entry.clientName, client_id: entry.clientId },
                 track,
               );
+            } else if (navigator.onLine) {
+              // The snapshot only knows cargo imported before the last Sync. A
+              // miss is not proof the code is unknown, so let the server decide
+              // while it is reachable; a failed request still ends as not-found.
+              resolveMutation.mutate(track);
             } else {
               applyAutoFillNotFound(track);
             }
@@ -1555,41 +1586,13 @@ export function FastEntryPanel({
     return counts;
   }, [entryQueue]);
   const visibleQueue = useMemo(
-    () =>
-      [...entryQueue].sort((a, b) => {
-        const bTime = b.scannedAt ? Date.parse(b.scannedAt) : 0;
-        const aTime = a.scannedAt ? Date.parse(a.scannedAt) : 0;
-        return bTime - aTime;
-      }),
+    () => [...entryQueue].sort(compareQueueNewestFirst),
     [entryQueue],
   );
-  const splitClientSegments = useMemo(() => {
-    const segments = new Map<string, { segmentCount: number; totalCount: number }>();
-    let previousClientCode: string | null = null;
-
-    for (const item of visibleQueue) {
-      if (item.isWrongClient || item.isAlreadySent || item.notFound) {
-        previousClientCode = null;
-        continue;
-      }
-
-      const clientCode = item.clientCode.trim().toUpperCase();
-      if (!clientCode) {
-        previousClientCode = null;
-        continue;
-      }
-
-      const current = segments.get(clientCode) ?? { segmentCount: 0, totalCount: 0 };
-      current.totalCount += 1;
-      if (clientCode !== previousClientCode) {
-        current.segmentCount += 1;
-      }
-      segments.set(clientCode, current);
-      previousClientCode = clientCode;
-    }
-
-    return segments;
-  }, [visibleQueue]);
+  const splitClientSegments = useMemo(
+    () => countClientSegments(visibleQueue),
+    [visibleQueue],
+  );
   const splitGroupCount = useMemo(
     () => [...splitClientSegments.values()].filter((segment) => segment.segmentCount > 1).length,
     [splitClientSegments],
@@ -1601,16 +1604,24 @@ export function FastEntryPanel({
         .map(([clientCode]) => clientCode),
     [splitClientSegments],
   );
+  const mergedClientCodes = useMemo(() => findMergedClientCodes(entryQueue), [entryQueue]);
   const previousSplitClientCodesRef = useRef<Set<string> | null>(null);
+  // Clients the worker has just un-merged: splitting them was the point, so the
+  // "new split" alert must not sound for them.
+  const unmergedClientCodesRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const currentSplitClients = new Set(splitClientCodes);
     const previousSplitClients = previousSplitClientCodesRef.current;
     previousSplitClientCodesRef.current = currentSplitClients;
+    const unmergedClients = unmergedClientCodesRef.current;
+    unmergedClientCodesRef.current = new Set();
 
     // Initial hydration may restore old split groups from IndexedDB. Only sound
     // when a new split appears during the current working session.
     if (!previousSplitClients) return;
-    if (splitClientCodes.some((clientCode) => !previousSplitClients.has(clientCode))) {
+    if (splitClientCodes.some(
+      (clientCode) => !previousSplitClients.has(clientCode) && !unmergedClients.has(clientCode),
+    )) {
       void playExpectedCargoSound('merge');
     }
   }, [splitClientCodes]);
@@ -1693,6 +1704,21 @@ export function FastEntryPanel({
       toast.success(`${splitClientCodes.length} ta ajralgan guruh birlashtirildi`, { duration: 1800 });
     }
   }, [mergeClientQueueGroup, splitClientCodes]);
+
+  const handleUnmergeClientGroup = useCallback((clientCode: string) => {
+    unmergedClientCodesRef.current.add(clientCode.trim().toUpperCase());
+    unmergeClientQueueGroup(clientCode);
+  }, [unmergeClientQueueGroup]);
+
+  const handleUnmergeAllGroups = useCallback(() => {
+    for (const clientCode of mergedClientCodes) {
+      unmergedClientCodesRef.current.add(clientCode);
+      unmergeClientQueueGroup(clientCode);
+    }
+    if (mergedClientCodes.size > 0) {
+      toast.success(`${mergedClientCodes.size} ta guruh skan tartibiga qaytarildi`, { duration: 1800 });
+    }
+  }, [mergedClientCodes, unmergeClientQueueGroup]);
   const handlePreviewClient = useCallback((
     clientCode: string,
     trackCode?: string,
@@ -1898,7 +1924,7 @@ export function FastEntryPanel({
             <Switch
               size="sm"
               checked={isAutoMergeEnabled}
-              onCheckedChange={setIsAutoMergeEnabled}
+              onCheckedChange={setAutoMergeEnabled}
               className="data-[state=checked]:bg-violet-500"
             />
             <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
@@ -2088,6 +2114,16 @@ export function FastEntryPanel({
                 className="rounded-md bg-violet-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700"
               >
                 Ajralganlarni birlashtir
+              </button>
+            )}
+            {mergedClientCodes.size > 0 && (
+              <button
+                type="button"
+                onClick={handleUnmergeAllGroups}
+                className="rounded-md border border-violet-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-300 dark:hover:bg-violet-950/40"
+                title="Birlashtirilgan barcha mijozlarni skan qilingan tartibiga qaytarish"
+              >
+                Birlashtirishni bekor qilish
               </button>
             )}
             {queueFilterOptions.map((option) => (
@@ -2428,11 +2464,13 @@ export function FastEntryPanel({
                       isSelected={selectedQueueItemIds.includes(item.id)}
                       clientScanCount={clientScanCounts.get(clientCode) ?? 0}
                       isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
+                      isMergedGroup={mergedClientCodes.has(clientCode)}
                       onToggleSelected={toggleQueueItemSelected}
                       onRemove={removeFromQueue}
                       onSetClientCode={setQueueItemClientCode}
                       onAcceptConflictOwner={acceptQueueItemConflictOwner}
                       onMergeClientGroup={handleMergeClientGroup}
+                      onUnmergeClientGroup={handleUnmergeClientGroup}
                       onPreviewClient={handlePreviewClient}
                       onToggleReviewed={toggleQueueItemReviewed}
                     />
