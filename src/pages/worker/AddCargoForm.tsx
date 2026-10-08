@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { offlineStorage } from "@/utils/offlineStorage";
-import { uploadPhoto } from "@/api/services/cargo";
+import { getClientCodeSuggestions, uploadPhoto } from "@/api/services/cargo";
+import type { ClientCodeSuggestionsResponse } from "@/api/services/cargo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MultiPhotoUpload from "@/components/MultiPhotoUpload";
@@ -16,6 +17,8 @@ import {
   X,
   Lock,
   Send,
+  CornerDownLeft,
+  AlertTriangle,
 } from "lucide-react";
 import { regions, DISTRICTS } from "@/lib/validation";
 import { normalizeNumber } from "@/utils/numberFormat";
@@ -24,6 +27,13 @@ import {
   REGION_PREFIXES,
   getRegionAndDistrictFromCode,
 } from "@/lib/aviaCodes";
+import {
+  isRegionOnlyCode,
+  parseClientCodeInput,
+  placeLabelKeyForCode,
+  regionOnlyPrefix,
+  resolveCodeForSubmit,
+} from "@/lib/clientCodeCompletion";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
@@ -53,6 +63,13 @@ interface QueuedUpload {
 interface SelectOption {
   value: string;
   label: string;
+}
+
+/** Result of looking the typed client code up, keyed by what was typed. */
+interface CodeLookupState {
+  query: string;
+  status: "done" | "error";
+  data: ClientCodeSuggestionsResponse | null;
 }
 
 /* ───────────────────────────────────────────
@@ -268,6 +285,16 @@ const MAX_QUEUE_SIZE = 20;
 const MAX_RETRIES = 2;
 /** Delay between retries in ms (doubles each attempt) */
 const RETRY_BASE_DELAY = 2000;
+/** Pause after the last keystroke before the client code is looked up */
+const CODE_LOOKUP_DEBOUNCE_MS = 200;
+/** How long a looked-up completion is reused; new clients get codes all day */
+const CODE_LOOKUP_TTL_MS = 60_000;
+
+const CODE_SUBMIT_ERRORS = {
+  ambiguous: "Bir nechta mijoz mos keldi, pastdan tumanni tanlang.",
+  not_found: "Bunday raqamli mijoz topilmadi.",
+  unavailable: "Kodni tekshirib bo'lmadi. Tuman harflari bilan to'liq yozing (masalan SAAN123).",
+} as const;
 
 /* ───────────────────────────────────────────
    Queue Status (memoised to avoid repainting form)
@@ -362,6 +389,129 @@ const QueueStatus = memo(function QueueStatus({
 });
 
 /* ───────────────────────────────────────────
+   Client code completion hint
+   "SA123" → "SAAN123" outside Tashkent; a district choice for "ST15".
+   ─────────────────────────────────────────── */
+const ClientCodeHint = memo(function ClientCodeHint({
+  clientId,
+  lookup,
+  onPick,
+  t,
+}: {
+  clientId: string;
+  lookup: CodeLookupState | null;
+  onPick: (code: string) => void;
+  t: (k: string) => string;
+}) {
+  if (!parseClientCodeInput(clientId)) return null;
+  const regionOnly = isRegionOnlyCode(clientId);
+  const place = (code: string) => {
+    const key = placeLabelKeyForCode(code);
+    return key ? t(key) : "";
+  };
+  // Keep the code input focused (and the phone keyboard up) while tapping a choice.
+  const keepFocus = (e: React.MouseEvent) => e.preventDefault();
+
+  if (!lookup) {
+    return (
+      <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+        Qidirilmoqda…
+      </p>
+    );
+  }
+
+  if (lookup.status === "error" || !lookup.data) {
+    return (
+      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+        {regionOnly
+          ? "Kodni tekshirib bo'lmadi. Tuman harflari bilan to'liq yozing."
+          : "Kodni tekshirib bo'lmadi."}
+      </p>
+    );
+  }
+
+  const { best, best_reason, items } = lookup.data;
+  if (items.length === 0) {
+    return (
+      <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+        {clientId} bo'yicha mijoz topilmadi
+      </p>
+    );
+  }
+
+  const others = items.filter((item) => item.code !== best);
+  return (
+    <div className="mt-2 space-y-2">
+      {best && best !== clientId && (
+        <button
+          type="button"
+          onMouseDown={keepFocus}
+          onClick={() => onPick(best)}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-left border border-orange-300 dark:border-orange-500/40 bg-orange-50 dark:bg-orange-500/10 active:scale-[0.99] transition-transform"
+        >
+          <span className="font-mono font-black tracking-widest text-orange-600 dark:text-orange-400">
+            {best}
+          </span>
+          <span className="flex-1 min-w-0 truncate text-xs text-gray-500 dark:text-gray-400">
+            {place(best)}
+            {best_reason === "flight" ? " · shu reysda bor" : ""}
+          </span>
+          <span className="flex items-center gap-1 shrink-0 text-[11px] font-semibold text-gray-400">
+            <CornerDownLeft className="w-3.5 h-3.5" />
+            Enter
+          </span>
+        </button>
+      )}
+
+      {best && best === clientId && (
+        <p className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400">
+          <Check className="w-3.5 h-3.5 shrink-0" />
+          {place(best) || "Mijoz topildi"}
+        </p>
+      )}
+
+      {others.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+            {best ? "Yoki:" : regionOnly ? "Qaysi tuman? Tanlang:" : "Mos kodlar:"}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {others.map((item) => (
+              <button
+                key={item.code}
+                type="button"
+                onMouseDown={keepFocus}
+                onClick={() => onPick(item.code)}
+                className={[
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border transition-colors",
+                  "active:bg-orange-100 dark:active:bg-orange-500/20",
+                  item.in_flight
+                    ? "border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-500/10"
+                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5",
+                ].join(" ")}
+              >
+                <span className="font-mono font-bold text-gray-800 dark:text-gray-100">
+                  {item.code}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  · {place(item.code)}
+                </span>
+                {item.in_flight && (
+                  <span className="ml-0.5 px-1 rounded bg-green-100 dark:bg-green-500/20 text-[10px] font-semibold text-green-700 dark:text-green-300">
+                    reysda
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+/* ───────────────────────────────────────────
    Main Form
    ─────────────────────────────────────────── */
 export default function AddCargoForm({
@@ -390,6 +540,22 @@ export default function AddCargoForm({
 
   // ── Upload queue ──
   const [uploadQueue, setUploadQueue] = useState<QueuedUpload[]>([]);
+
+  // ── Client code completion ──
+  const [codeLookup, setCodeLookup] = useState<CodeLookupState | null>(null);
+  const lookupCacheRef = useRef(
+    new Map<string, { data: ClientCodeSuggestionsResponse; at: number }>(),
+  );
+  const lookupInflightRef = useRef(
+    new Map<string, Promise<ClientCodeSuggestionsResponse>>(),
+  );
+  /**
+   * Region letters ("SA") to leave in the field after a fast-mode save, set
+   * when the worker typed only those and the district part was filled in for
+   * them. Without it the next parcel would start from "SAAN".
+   */
+  const regionOnlyKeepRef = useRef<string | null>(null);
+  const submittingRef = useRef(false);
 
   // ── Refs ──
   const clientIdRef = useRef<HTMLInputElement>(null);
@@ -487,15 +653,14 @@ export default function AddCargoForm({
     });
   }, []);
 
-  const handleClientIdChange = useCallback(
-    (value: string) => {
-      const cleaned = value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
-      setClientId(cleaned);
+  /** Put a code in the field and point the region/district selects at it. */
+  const setCodeAndPlace = useCallback(
+    (code: string) => {
+      setClientId(code);
       clearError("client_id");
 
-      if (cleaned.length >= 2) {
-        const { region: r, district: d } =
-          getRegionAndDistrictFromCode(cleaned);
+      if (code.length >= 2) {
+        const { region: r, district: d } = getRegionAndDistrictFromCode(code);
         if (r) setRegion(r);
         if (d) setDistrict(d);
         else setDistrict("");
@@ -506,6 +671,104 @@ export default function AddCargoForm({
     },
     [clearError],
   );
+
+  const handleClientIdChange = useCallback(
+    (value: string) => {
+      regionOnlyKeepRef.current = null;
+      setCodeAndPlace(value.toUpperCase().replace(/[^A-Z0-9-]/g, ""));
+    },
+    [setCodeAndPlace],
+  );
+
+  /** Replace what was typed ("SA123") with a looked-up code ("SAAN123"). */
+  const applyCompletion = useCallback(
+    (typed: string, code: string) => {
+      regionOnlyKeepRef.current = regionOnlyPrefix(typed);
+      setCodeAndPlace(code);
+    },
+    [setCodeAndPlace],
+  );
+
+  /**
+   * Look a typed code up, reusing a fresh answer or one already on its way.
+   * Offline it fails at once: a request would only end in a network error.
+   */
+  const lookupClientCode = useCallback(
+    (query: string): Promise<ClientCodeSuggestionsResponse> => {
+      const cached = lookupCacheRef.current.get(query);
+      if (cached && Date.now() - cached.at < CODE_LOOKUP_TTL_MS) {
+        return Promise.resolve(cached.data);
+      }
+      const pending = lookupInflightRef.current.get(query);
+      if (pending) return pending;
+      if (!navigator.onLine) return Promise.reject(new Error("offline"));
+
+      const request = getClientCodeSuggestions(query, flightName)
+        .then((data) => {
+          lookupCacheRef.current.set(query, { data, at: Date.now() });
+          return data;
+        })
+        .finally(() => {
+          lookupInflightRef.current.delete(query);
+        });
+      lookupInflightRef.current.set(query, request);
+      return request;
+    },
+    [flightName],
+  );
+
+  /** The lookup answer for exactly what is in the field now, if it has arrived. */
+  const activeLookup =
+    codeLookup && codeLookup.query === clientId ? codeLookup : null;
+  const activeLookupData =
+    activeLookup?.status === "done" ? activeLookup.data : null;
+
+  /** Tap on a suggested code: take it and move on to the weight. */
+  const handlePickCode = useCallback(
+    (code: string) => {
+      applyCompletion(clientId, code);
+      requestAnimationFrame(() => weightRef.current?.focus());
+    },
+    [applyCompletion, clientId],
+  );
+
+  /**
+   * Enter in the code field takes the suggested completion, then moves to the
+   * weight. A region-only code with no single answer stays put so the worker
+   * can pick a district from the choices under the field.
+   */
+  const handleClientIdEnter = useCallback(async () => {
+    const typed = clientId;
+    let data = activeLookupData;
+    if (!data && isRegionOnlyCode(typed)) {
+      try {
+        data = await lookupClientCode(typed);
+      } catch {
+        data = null;
+      }
+      // Typed on while the answer was coming: it no longer applies.
+      if (!mountedRef.current || clientIdRef.current?.value !== typed) return;
+    }
+    if (data?.best && !data.exact && data.best !== typed) {
+      applyCompletion(typed, data.best);
+    } else if (resolveCodeForSubmit(typed, data).kind !== "ok") {
+      return;
+    }
+    weightRef.current?.focus();
+  }, [activeLookupData, applyCompletion, clientId, lookupClientCode]);
+
+  /** Leaving a region-only code for the weight fills in its single completion. */
+  const handleWeightFocus = useCallback(() => {
+    const data = activeLookupData;
+    if (
+      isRegionOnlyCode(clientId) &&
+      data?.best &&
+      !data.exact &&
+      data.best !== clientId
+    ) {
+      applyCompletion(clientId, data.best);
+    }
+  }, [activeLookupData, applyCompletion, clientId]);
 
   const updatePrefix = useCallback((newRegion: string, newDistrict: string) => {
     let prefix = "";
@@ -538,6 +801,7 @@ export default function AddCargoForm({
 
   const handleRegionSelect = useCallback(
     (r: string) => {
+      regionOnlyKeepRef.current = null;
       setRegion(r);
       setDistrict("");
       updatePrefix(r, "");
@@ -547,6 +811,7 @@ export default function AddCargoForm({
 
   const handleDistrictSelect = useCallback(
     (d: string) => {
+      regionOnlyKeepRef.current = null;
       setDistrict(d);
       updatePrefix(region, d);
       requestAnimationFrame(() => focusClientIdEnd());
@@ -586,6 +851,7 @@ export default function AddCargoForm({
     setKeepClientRegion(checked);
     // Toggle o'chirilganda darhol tozala
     if (!checked) {
+      regionOnlyKeepRef.current = null;
       setClientId("");
       setRegion("");
       setDistrict("");
@@ -619,8 +885,9 @@ export default function AddCargoForm({
 
   /* ── Submit ── */
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
+      if (submittingRef.current) return;
       if (!validate() || photos.length === 0) return;
 
       // Prevent queue overflow in fast mode
@@ -637,10 +904,37 @@ export default function AddCargoForm({
         return;
       }
 
+      // "SA123" is not a client: swap in its completion before uploading, or
+      // stop here and say why. Full codes are never held up by the lookup.
+      let code = clientId;
+      if (isRegionOnlyCode(code)) {
+        submittingRef.current = true;
+        let data: ClientCodeSuggestionsResponse | null = null;
+        try {
+          data = await lookupClientCode(code);
+        } catch {
+          data = null;
+        } finally {
+          submittingRef.current = false;
+        }
+        if (!mountedRef.current) return;
+        const resolution = resolveCodeForSubmit(code, data);
+        if (resolution.kind !== "ok") {
+          setErrors((prev) => ({
+            ...prev,
+            client_id: CODE_SUBMIT_ERRORS[resolution.kind],
+          }));
+          focusClientIdEnd();
+          return;
+        }
+        if (resolution.code !== code) applyCompletion(code, resolution.code);
+        code = resolution.code;
+      }
+
       const item: QueuedUpload = {
         id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         flightName,
-        clientId,
+        clientId: code,
         photos,
         weightKg: weightKg ? Number(weightKg) : undefined,
         pricePerKg: pricePerKg ? Number(pricePerKg) : undefined,
@@ -653,20 +947,27 @@ export default function AddCargoForm({
 
       if (fastMode) {
         if (keepClientRegion) {
-          // Faqat prefixni saqlаb, raqamli qismini tozala
-          setClientId((prev) => {
-            const { district: d, region: r } = getRegionAndDistrictFromCode(prev);
-            if (d && AVIA_CODES[d] && prev.startsWith(AVIA_CODES[d])) {
-              return AVIA_CODES[d];
+          const keepRegion = regionOnlyKeepRef.current;
+          if (keepRegion && code.startsWith(keepRegion)) {
+            // Faqat viloyat harflari yozilgan edi ("SA") → shularni qoldir,
+            // tumanni keyingi raqam o'zi aniqlaydi.
+            setClientId(keepRegion);
+            setDistrict("");
+          } else {
+            // Faqat prefixni saqlаb, raqamli qismini tozala
+            const { district: d, region: r } = getRegionAndDistrictFromCode(code);
+            if (d && AVIA_CODES[d] && code.startsWith(AVIA_CODES[d])) {
+              setClientId(AVIA_CODES[d]);
+            } else if (r && REGION_PREFIXES[r] && code.startsWith(REGION_PREFIXES[r])) {
+              setClientId(REGION_PREFIXES[r]);
+            } else {
+              setClientId("");
             }
-            if (r && REGION_PREFIXES[r] && prev.startsWith(REGION_PREFIXES[r])) {
-              return REGION_PREFIXES[r];
-            }
-            return "";
-          });
-          // region va district o'zgarishsiz qoladi
+            // region va district o'zgarishsiz qoladi
+          }
         } else {
           // Hammasi tozalanadi
+          regionOnlyKeepRef.current = null;
           setClientId("");
           setRegion("");
           setDistrict("");
@@ -699,8 +1000,33 @@ export default function AddCargoForm({
       safeTimeout,
       toast,
       uploadQueue,
+      lookupClientCode,
+      applyCompletion,
     ],
   );
+
+  /* ── Client code lookup, once typing pauses ── */
+  useEffect(() => {
+    if (!parseClientCodeInput(clientId)) return;
+    let cancelled = false;
+    const delay = lookupCacheRef.current.has(clientId)
+      ? 0
+      : CODE_LOOKUP_DEBOUNCE_MS;
+    const timer = setTimeout(() => {
+      lookupClientCode(clientId).then(
+        (data) => {
+          if (!cancelled) setCodeLookup({ query: clientId, status: "done", data });
+        },
+        () => {
+          if (!cancelled) setCodeLookup({ query: clientId, status: "error", data: null });
+        },
+      );
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [clientId, lookupClientCode]);
 
   /* ── Background queue processor ── */
   useEffect(() => {
@@ -1062,9 +1388,15 @@ export default function AddCargoForm({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      weightRef.current?.focus();
+                      void handleClientIdEnter();
                     }
                   }}
+                />
+                <ClientCodeHint
+                  clientId={clientId}
+                  lookup={activeLookup}
+                  onPick={handlePickCode}
+                  t={t}
                 />
                 {errors.client_id && (
                   <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
@@ -1085,6 +1417,7 @@ export default function AddCargoForm({
                       type="text"
                       inputMode="decimal"
                       value={weightKg}
+                      onFocus={handleWeightFocus}
                       onChange={(e) => handleWeightChange(e.target.value)}
                       placeholder={t("cargo.weightPlaceholder")}
                       className={`${INPUT_CLS} pr-12 caret-orange-500 ${errors.weight_kg ? ERR_CLS : ""}`}

@@ -185,6 +185,39 @@ export const uploadPhoto = async (
   return response.data;
 };
 
+export interface ClientCodeSuggestion {
+  code: string;
+  /** The flight's expected-cargo list has cargo for this client. */
+  in_flight: boolean;
+}
+
+export interface ClientCodeSuggestionsResponse {
+  query: string;
+  /** The typed code itself exists. */
+  exact: boolean;
+  /** The one code safe to fill in automatically; null when the worker must choose. */
+  best: string | null;
+  best_reason: 'exact' | 'unique' | 'flight' | null;
+  items: ClientCodeSuggestion[];
+}
+
+// Complete a partly typed client code: "SA123" -> "SAAN123". Tashkent city
+// numbers repeat per district, so "ST15" returns several codes to choose from.
+export const getClientCodeSuggestions = async (
+  query: string,
+  flightName?: string,
+): Promise<ClientCodeSuggestionsResponse> => {
+  const response = await apiClient.get<ClientCodeSuggestionsResponse>(
+    '/api/v1/flights/client-code-suggestions',
+    {
+      params: { q: query, ...(flightName ? { flight_name: flightName } : {}) },
+      // Typing waits on this; a slow answer is worth less than none.
+      timeout: 8000,
+    },
+  );
+  return response.data;
+};
+
 // Get flight photo statistics
 export const getFlightStats = async (flightName: string): Promise<FlightStatsResponse> => {
   const response = await apiClient.get<FlightStatsResponse>(`/api/v1/flights/${flightName}/stats`);

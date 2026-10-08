@@ -80,17 +80,25 @@ export const REGION_PREFIXES: Record<string, string> = {
 // Helper function to find region and district from a client code prefix
 export const getRegionAndDistrictFromCode = (code: string): { region: string | null, district: string | null } => {
   const upperCode = code.toUpperCase();
-  
-  // Find district by exact matching prefix (up to 4 chars usually)
-  for (const [districtKey, districtCode] of Object.entries(AVIA_CODES)) {
-    if (upperCode.startsWith(districtCode)) {
-      // Find which region this prefix belongs to by checking REGION_PREFIXES
-      // Wait, ALL codes in A_C actually start with the region code (first 2 letters)
-      const regionPrefix = districtCode.substring(0, 2);
-      for (const [regionKey, rCode] of Object.entries(REGION_PREFIXES)) {
-        if (rCode === regionPrefix) {
-          return { region: regionKey, district: districtKey };
-        }
+
+  // Longest matching district prefix wins: city codes such as SAASK (Asaka
+  // shahri) or SNCHR (Chortoq shahri) start with their district's 4-letter
+  // code, and taking the first match in object order picked the district.
+  let districtKey: string | null = null;
+  for (const [key, districtCode] of Object.entries(AVIA_CODES)) {
+    if (
+      upperCode.startsWith(districtCode) &&
+      (!districtKey || districtCode.length > AVIA_CODES[districtKey].length)
+    ) {
+      districtKey = key;
+    }
+  }
+  if (districtKey) {
+    // Every district code starts with its region's two letters.
+    const regionPrefix = AVIA_CODES[districtKey].substring(0, 2);
+    for (const [regionKey, rCode] of Object.entries(REGION_PREFIXES)) {
+      if (rCode === regionPrefix) {
+        return { region: regionKey, district: districtKey };
       }
     }
   }
