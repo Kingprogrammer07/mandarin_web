@@ -188,6 +188,17 @@ export interface ManagerDeliveryChannelCheckResult {
   detail: string;
 }
 
+export interface AdminLoginAlertSettings {
+  /** Telegram group for admin login notices. Kept while `to_group` is off. */
+  chat_id: number | null;
+  /** True: one message to the group. False: each super-admin privately. */
+  to_group: boolean;
+}
+
+export type AdminLoginAlertUpdate = AdminLoginAlertSettings;
+
+export type AdminLoginAlertCheckResult = ManagerDeliveryChannelCheckResult;
+
 export interface MaintenanceStatusResponse {
   maintenance: boolean;
   is_admin: boolean;
@@ -558,6 +569,33 @@ export const systemService = {
   ): Promise<ManagerDeliveryChannelCheckResult> {
     const { data } = await apiClient.post<ManagerDeliveryChannelCheckResult>(
       '/api/v1/system/manager-delivery-channel/check',
+      { chat_id: chatId },
+    );
+    return data;
+  },
+
+  async getAdminLoginAlert(): Promise<AdminLoginAlertSettings> {
+    const { data } = await apiClient.get<AdminLoginAlertSettings>(
+      '/api/v1/system/admin-login-alert',
+    );
+    return data;
+  },
+
+  async updateAdminLoginAlert(
+    body: AdminLoginAlertUpdate,
+  ): Promise<AdminLoginAlertSettings> {
+    const { data } = await apiClient.put<AdminLoginAlertSettings>(
+      '/api/v1/system/admin-login-alert',
+      body,
+    );
+    return data;
+  },
+
+  async checkAdminLoginAlertChat(
+    chatId: number,
+  ): Promise<AdminLoginAlertCheckResult> {
+    const { data } = await apiClient.post<AdminLoginAlertCheckResult>(
+      '/api/v1/system/admin-login-alert/check',
       { chat_id: chatId },
     );
     return data;

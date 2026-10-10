@@ -9,6 +9,7 @@ import BroadcastComposer from '@/components/admin/BroadcastComposer';
 import SmsSettingsSection from '@/components/admin/SmsSettingsSection';
 import BackupSettingsSection from '@/components/admin/BackupSettingsSection';
 import ManagerDeliveryChannelSection from '@/components/admin/ManagerDeliveryChannelSection';
+import AdminLoginAlertSection from '@/components/admin/AdminLoginAlertSection';
 import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
@@ -557,6 +558,9 @@ export default function SystemSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Admin-panel login notices: one group, or each super-admin privately. */}
+      <AdminLoginAlertSection />
       </>
       )}
 
