@@ -13,6 +13,7 @@ import AdminLoginAlertSection from '@/components/admin/AdminLoginAlertSection';
 import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
+import DailyReportSection from '@/components/admin/DailyReportSection';
 import {
   Wrench,
   CreditCard,
@@ -734,6 +735,9 @@ export default function SystemSettingsPage() {
           </p>
         </div>
       </div>
+
+      {/* Daily warehouse-vs-cashier report to chosen super-admins */}
+      <DailyReportSection />
       </>
       )}
 
