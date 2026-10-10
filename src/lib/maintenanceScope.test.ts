@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
 import { isMaintenanceScreenPath } from "./maintenanceScope";
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), "..", "App.tsx");
-const source = readFileSync(APP, "utf8");
+// Windows checkouts get CRLF, and the patterns below anchor on "\n}\n".
+const source = readFileSync(APP, "utf8").replace(/\r\n/g, "\n");
 
 /** Page → URL, from `getPathForPage`, with route params filled with a sample. */
 function pagePaths(): Map<string, string> {
