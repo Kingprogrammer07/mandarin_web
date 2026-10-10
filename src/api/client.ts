@@ -2,27 +2,23 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/config/config';
 import i18n from '@/i18n/config';
 import { logFrontendError } from '@/api/services/frontendErrors';
-import { isOperationalPath } from '@/lib/posRoutes';
+import { isMaintenanceScreenPath } from '@/lib/maintenanceScope';
 import { credentialForPath } from '@/lib/session';
 import { useMaintenanceStore } from '@/store/useMaintenanceStore';
 
 // Status codes that reliably mean the backend is down (gateway / proxy errors).
 const SERVER_DOWN_STATUSES = new Set([502, 503, 504]);
 
-// Operational staff consoles — POS cashier, warehouse scanner, expected-cargo
-// scanner. These pages poll continuously, so a stray 502/503/504 or network
-// blip is expected and must NEVER flip the store-driven full-screen
-// MaintenancePage ("Texnik ishlar ketmoqda") that would cover an operator
-// mid-task. We suppress the trigger at the source here so the store is never
-// even polluted; the admin-toggled maintenance flag is separately exempted for
-// the same routes in App.tsx (`isOperationalConsole`).
-//
-// The path set lives in lib/posRoutes so this file and App.tsx cannot drift
-// apart — an exemption honoured in one and not the other is a maintenance
-// screen that appears only sometimes, which is worse than one that always does.
+// The full-screen MaintenancePage ("Texnik ishlar ketmoqda") is for clients
+// only. Admin and staff pages — the admin panel, cashier consoles, warehouse
+// and expected-cargo scanners, flight screens — poll continuously and must
+// never be covered by it, so the trigger is suppressed at the source there and
+// the store is never even polluted. App.tsx applies the same rule when it
+// renders either maintenance screen; both read lib/maintenanceScope so they
+// cannot drift apart.
 function isOnMaintenanceExemptPage(): boolean {
   if (typeof window === 'undefined') return false;
-  return isOperationalPath(window.location.pathname);
+  return !isMaintenanceScreenPath(window.location.pathname);
 }
 
 function triggerMaintenanceIfServerDown(
@@ -30,7 +26,7 @@ function triggerMaintenanceIfServerDown(
   isNetworkDown: boolean,
   endpointUrl: string,
 ): void {
-  // Operational consoles are never maintenance-gated — see the constant above.
+  // Staff pages are never maintenance-gated — see the function above.
   if (isOnMaintenanceExemptPage()) return;
 
   // Never trigger for silent auth-warmup endpoints — those fail transiently

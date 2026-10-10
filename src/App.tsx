@@ -21,7 +21,7 @@ import { useVersionWatcher } from "./hooks/useVersionWatcher";
 import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
-import { isPosPath } from "@/lib/posRoutes";
+import { isMaintenanceScreenPath } from "@/lib/maintenanceScope";
 import { pickSession } from "@/lib/session";
 import { discardAdminSession } from "@/lib/adminSession";
 import { setRouterDepth } from "@/lib/backStack";
@@ -925,11 +925,7 @@ function AppContent() {
     userRole !== null;
 
   // Both cashier consoles. They share the standalone layout (no AdminLayout, no
-  // NavigationBar) and the maintenance exemption — a spreadsheet buried under a
-  // "Texnik ishlar" screen is as useless as a till buried under one.
-  // Both cashier consoles. `/kassa` is rendered by its own branch above, so
-  // this flag only grants it what the name implies: the maintenance-takeover
-  // exemption a till needs in the middle of taking money.
+  // NavigationBar); `/kassa` is rendered by its own branch above.
   const isPOSPage = currentPage === "pos-dashboard" || currentPage === "kassa";
   const isManagerPage = currentPage === "manager-page";
   const isPasskeyPage = currentPage === "passkey-page";
@@ -958,38 +954,23 @@ function AppContent() {
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  // Operational staff consoles — POS cashier, warehouse scanner, expected-cargo
-  // scanner. Staff work here continuously and must NEVER be interrupted by either
-  // maintenance mechanism: the admin-toggled server flag (`isMaintenance`) OR the
-  // transient server-down signal (502/503/504/network) that flips the store-driven
-  // `isMaintenanceMode`. Resolved from `currentPage` state (reliable) rather than
-  // window.pathname, which can lag behind in the custom history router.
-  const isOperationalConsole = isPOSPage || isWarehousePage || isExpectedCargoPage;
+  // Both "Texnik ishlar" screens — the admin-toggled overlay and the store-driven
+  // server-down MaintenancePage — are for clients only; no admin or staff page
+  // ever shows them (see lib/maintenanceScope). Checked against the page AND the
+  // path: `currentPage` starts as "login" (a client page) until the auth check
+  // resolves, so on its own it would cover a staff URL opened during an outage,
+  // and the path leads `currentPage` by one transition on every navigation.
+  const isMaintenanceScreenAllowed =
+    isClientSurface && isMaintenanceScreenPath(window.location.pathname);
 
-  const isExemptFromMaintenance =
-    isOperationalConsole ||
-    window.location.pathname.startsWith('/admin') ||
-    isPosPath(window.location.pathname) ||
-    window.location.pathname.startsWith('/flights') ||
-    window.location.pathname.startsWith('/statistics') ||
-    window.location.pathname === '/pickup-tv' ||
-    window.location.pathname === '/payment/nbu/success' ||
-    window.location.pathname === '/payment/nbu/failure';
-
-  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && !isExemptFromMaintenance;
-  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && !isExemptFromMaintenance;
-
-  // The store-driven full-screen MaintenancePage ("Texnik ishlar ketmoqda") is
-  // likewise suppressed on operational consoles so a brief backend blip never
-  // covers a cashier/warehouse operator mid-task. `client.ts` already prevents
-  // the store from being flipped on these routes; this is the second layer that
-  // also covers the case where the store was flipped on another page first.
-  const isServerDownMaintenanceExemptPage = isOperationalConsole;
+  const showMaintenanceOverlay = !isCheckingAuth && isMaintenance && !isMaintenanceAdmin && isMaintenanceScreenAllowed;
+  const showAdminMaintenanceBanner = !isCheckingAuth && isMaintenance && isMaintenanceAdmin && isMaintenanceScreenAllowed;
+  const showServerDownPage = isMaintenanceMode && isMaintenanceScreenAllowed;
 
   if (showMaintenanceOverlay) {
     return (
       <>
-        {isMaintenanceMode && !isServerDownMaintenanceExemptPage && <MaintenancePage />}
+        {showServerDownPage && <MaintenancePage />}
         {/* `MaintenancePage` above already fills the screen while the overlay
             chunk loads, so a null fallback shows nothing missing. */}
         <Suspense fallback={null}>
@@ -1002,7 +983,7 @@ function AppContent() {
 
   return (
     <>
-    {isMaintenanceMode && !isServerDownMaintenanceExemptPage && <MaintenancePage />}
+    {showServerDownPage && <MaintenancePage />}
     {showAdminMaintenanceBanner && (
       <div className="fixed top-0 left-0 right-0 z-[9998] h-9 flex items-center justify-center bg-amber-500/90 text-white text-xs font-bold px-4 shadow-md">
         {t('maintenance.adminBanner')}
