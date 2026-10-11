@@ -428,10 +428,10 @@ export default function FlightsPage({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* Astatka — the stock-take of what is still on the shelf after a
-              flight has been distributed. It lives here because the worker who
-              runs it is already on this board, and its scope is chosen from the
-              same flights. */}
+          {/* Astatka — leftover cargo. Astatka flights are ordinary flights
+              named with an "O", so they sit on this board and obey its
+              visibility switch; that page lists all of them whatever the
+              switch says. */}
           <button
             type="button"
             onClick={() => onNavigate?.('astatka')}

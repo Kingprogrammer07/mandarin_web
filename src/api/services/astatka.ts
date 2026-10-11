@@ -116,29 +116,6 @@ export async function getAstatka(id: number): Promise<Astatka> {
   return response.data;
 }
 
-/**
- * Flights a stock-take can cover, newest first.
- *
- * From the China manifest rather than the billing table: it carries 129 flights
- * against 18, and it is what a scan resolves against — so every flight offered
- * is one a scan can actually match.
- */
-export async function listAstatkaFlights(): Promise<string[]> {
-  const response = await apiClient.get<{ flight_names: string[] }>(
-    "/api/v1/astatka/flights",
-  );
-  return response.data.flight_names;
-}
-
-export async function createAstatka(payload: {
-  name: string;
-  flight_names: string[];
-  note?: string | null;
-}): Promise<Astatka> {
-  const response = await apiClient.post<Astatka>("/api/v1/astatka", payload);
-  return response.data;
-}
-
 export async function listAstatkaItems(id: number): Promise<AstatkaItem[]> {
   const response = await apiClient.get<AstatkaItem[]>(
     `/api/v1/astatka/${id}/items`,

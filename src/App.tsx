@@ -66,6 +66,7 @@ const ExpectedCargoPage = lazy(() => import("./pages/admin/ExpectedCargoPage"));
 const PickupQueueTVPage = lazy(() => import("./pages/shared/PickupQueueTVPage"));
 const AdminDeliveryRequestPage = lazy(() => import("./pages/admin/AdminDeliveryRequestPage"));
 const FlightNotificationPage = lazy(() => import("./pages/admin/FlightNotificationPage"));
+const AstatkaWorkspacePage = lazy(() => import("./pages/worker/AstatkaWorkspacePage"));
 const ExpensesPage = lazy(() => import("./pages/admin/ExpensesPage"));
 const PaymentNbuSuccess = lazy(() => import("./pages/payment/PaymentNbuSuccess"));
 const PaymentNbuFailure = lazy(() => import("./pages/payment/PaymentNbuFailure"));
@@ -84,6 +85,8 @@ type Page =
   | "client-edit"
   | "flights"
   | "astatka"
+  | "astatka-workspace"
+  | "astatka-send"
   | "cargo-list"
   | "cargo-add"
   | "statistics"
@@ -129,7 +132,17 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
   },
   worker: {
     default: "flights",
-    allowed: ["flights", "astatka", "cargo-list", "cargo-add", "passkey-page", "expected-cargo", "admin-flight-notifications"],
+    allowed: [
+      "flights",
+      "astatka",
+      "astatka-workspace",
+      "astatka-send",
+      "cargo-list",
+      "cargo-add",
+      "passkey-page",
+      "expected-cargo",
+      "admin-flight-notifications",
+    ],
   },
   accountant: {
     default: "pos-dashboard",
@@ -152,6 +165,8 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "client-edit",
       "flights",
       "astatka",
+      "astatka-workspace",
+      "astatka-send",
       "cargo-list",
       "cargo-add",
       "statistics",
@@ -192,6 +207,8 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "client-edit",
       "flights",
       "astatka",
+      "astatka-workspace",
+      "astatka-send",
       "cargo-list",
       "cargo-add",
       "statistics",
@@ -319,6 +336,10 @@ function getPathForPage(
   if (page === "client-edit" && clientId) return `/client/edit/${clientId}`;
   if (page === "flights") return "/flights";
   if (page === "astatka") return "/astatka";
+  if (page === "astatka-workspace" && flightName)
+    return `/astatka/${encodeURIComponent(flightName)}`;
+  if (page === "astatka-send" && flightName)
+    return `/astatka/${encodeURIComponent(flightName)}/yuborish`;
   if (page === "statistics") return "/statistics";
   if (page === "cargo-list" && flightName)
     return `/flights/${encodeURIComponent(flightName)}/photos`;
@@ -377,6 +398,21 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
     return { page: "client-edit", clientId: clientEditId };
   if (path === "/flights") return { page: "flights" };
   if (path === "/astatka") return { page: "astatka" };
+  const astatkaMatch = path.match(/^\/astatka\/([^/]+)(\/yuborish)?$/);
+  if (astatkaMatch) {
+    // A hand-typed or truncated link can carry a broken %-sequence, which
+    // makes decodeURIComponent throw; the list page is the sane landing.
+    let astatkaFlightName: string;
+    try {
+      astatkaFlightName = decodeURIComponent(astatkaMatch[1]);
+    } catch {
+      return { page: "astatka" };
+    }
+    return {
+      page: astatkaMatch[2] ? "astatka-send" : "astatka-workspace",
+      flightName: astatkaFlightName,
+    };
+  }
   if (path === "/statistics") return { page: "statistics" };
   if (flightName && path.includes("/notifications"))
     return { page: "admin-flight-notifications", flightName };
@@ -931,6 +967,7 @@ function AppContent() {
   const isPasskeyPage = currentPage === "passkey-page";
   const isWarehousePage = currentPage === "warehouse-page";
   const isExpectedCargoPage = currentPage === "expected-cargo";
+  const isAstatkaWorkspace = currentPage === "astatka-workspace";
   const canAccessManagerPage =
     userRole !== null &&
     (ROLE_CONFIG[userRole]?.allowed ?? []).includes("manager-page");
@@ -949,7 +986,7 @@ function AppContent() {
   const isAdminArea =
     isSuperAdminPages || isAdminLoginPage || isPOSPage ||
     isManagerPage || isStandaloneAdminSubpage || isPasskeyPage ||
-    isWarehousePage || isExpectedCargoPage || currentPage === "pickup-tv" ||
+    isWarehousePage || isExpectedCargoPage || isAstatkaWorkspace || currentPage === "pickup-tv" ||
     isNbuRedirectPage;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -1088,7 +1125,12 @@ function AppContent() {
               a page reachable by both kinds of role needs a render in both, or
               it silently comes out blank for one of them. */}
           {currentPage === "astatka" && (
-            <AstatkaPage embedded onBack={() => navigateToPage("flights")} />
+            <AstatkaPage
+              embedded
+              onBack={() => navigateToPage("flights")}
+              onOpenAstatka={(name) => navigateToPage("astatka-workspace", name)}
+              onSendAstatka={(name) => navigateToPage("astatka-send", name)}
+            />
           )}
           {currentPage === "admin-accounts" && <AdminAccountsPage />}
           {currentPage === "admin-roles" && <AdminRolesPage />}
@@ -1104,6 +1146,17 @@ function AppContent() {
         <CashierPage
           onNavigate={(page) => navigateToPage(page as Page)}
           onLogout={handleSignOut}
+        />
+      ) : currentPage === "astatka-workspace" && selectedFlightName ? (
+        // Full screen for every role, like expected-cargo: the scan field and
+        // the saved list need the whole viewport, not a shell around them.
+        // Keyed by flight so the work queue never carries one flight's bags
+        // into another's window.
+        <AstatkaWorkspacePage
+          key={selectedFlightName}
+          flightName={selectedFlightName}
+          onBack={() => navigateBack("astatka")}
+          onSend={() => navigateToPage("astatka-send", selectedFlightName)}
         />
       ) : isPOSPage ? (
         <POSDashboard
@@ -1143,7 +1196,11 @@ function AppContent() {
             />
           )}
           {currentPage === "astatka" && (
-            <AstatkaPage onBack={() => navigateToPage("flights")} />
+            <AstatkaPage
+              onBack={() => navigateToPage("flights")}
+              onOpenAstatka={(name) => navigateToPage("astatka-workspace", name)}
+              onSendAstatka={(name) => navigateToPage("astatka-send", name)}
+            />
           )}
         </>
       ) : isManagerPage && canAccessManagerPage ? (
@@ -1233,6 +1290,15 @@ function AppContent() {
             <FlightNotificationPage
               flightName={selectedFlightName}
               onBack={() => navigateToPage("cargo-list", selectedFlightName)}
+            />
+          )}
+
+          {/* The flight photo page's notification screen, reached from astatka:
+              back returns to the astatka list or window it was opened from. */}
+          {currentPage === "astatka-send" && selectedFlightName && (
+            <FlightNotificationPage
+              flightName={selectedFlightName}
+              onBack={() => navigateBack("astatka")}
             />
           )}
 

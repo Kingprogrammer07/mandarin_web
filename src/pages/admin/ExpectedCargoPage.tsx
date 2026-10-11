@@ -357,6 +357,9 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
     onSuccess: (data) => {
       setActiveFlight(data.flight_name);
       queryClient.invalidateQueries({ queryKey: ['expectedCargo', 'flights'] });
+      // The Reyslar board and the astatka list cache for a minute; without this
+      // the flight just created is missing there until that runs out.
+      queryClient.invalidateQueries({ queryKey: ['flights-board'] });
       if (data.created) {
         toast.success(`"${data.flight_name}" reysi qo'shildi`);
       } else {
