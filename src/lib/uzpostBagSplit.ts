@@ -5,7 +5,7 @@ import type {
   DeliveryFlightState,
 } from "@/api/services/adminDeliveryService";
 
-export const UZPOST_BAG_LIMIT_KG = 20;
+export const UZPOST_BAG_LIMIT_KG = 10;
 export const WEIGHT_TOLERANCE_KG = 0.01;
 
 /**
@@ -66,8 +66,8 @@ export function needsUzpostBags(parcelKg: number): boolean {
 /**
  * The fewest bags that keep each under the limit, filled evenly.
  *
- * Even, not 20 kg and a remainder: 40.2 kg is three bags of 13.4 kg rather than
- * two at the limit and one of 200 g, and no bag sits right at 20 kg where the
+ * Even, not 10 kg and a remainder: 20.2 kg is three bags of 6.74 kg rather than
+ * two at the limit and one of 200 g, and no bag sits right at 10 kg where the
  * post office's scale could put it over.
  */
 export function splitUzpostParcel(parcelKg: number): UzpostBagDraft[] {
@@ -101,7 +101,9 @@ export function validateUzpostBags(
     if (!Number.isFinite(bag.weight_kg) || bag.weight_kg <= 0) {
       errors.push(`${bag.sequence_no}-qop vazni 0 dan katta bo'lishi kerak.`);
     } else if (bag.weight_kg > UZPOST_BAG_LIMIT_KG) {
-      errors.push(`${bag.sequence_no}-qop vazni 20 kgdan oshmasligi kerak.`);
+      errors.push(
+        `${bag.sequence_no}-qop vazni ${UZPOST_BAG_LIMIT_KG} kgdan oshmasligi kerak.`,
+      );
     }
   }
 

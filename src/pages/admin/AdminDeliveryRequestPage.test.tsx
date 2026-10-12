@@ -278,7 +278,7 @@ describe("AdminDeliveryRequestPage", () => {
     expect(String(submissionId).length).toBeGreaterThan(8);
   });
 
-  it("splits a parcel over 20 kg into the fewest even bags", () => {
+  it("splits a parcel over 10 kg into the fewest even bags", () => {
     state.context.data = contextData([paidFlight("M300", 30, "45")]);
     openFormFor("M300", /^UzPost/);
 
@@ -287,9 +287,11 @@ describe("AdminDeliveryRequestPage", () => {
 
     expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
-      { sequence_no: 1, weight_kg: 15 },
-      { sequence_no: 2, weight_kg: 15 },
-      { sequence_no: 3, weight_kg: 15 },
+      { sequence_no: 1, weight_kg: 9 },
+      { sequence_no: 2, weight_kg: 9 },
+      { sequence_no: 3, weight_kg: 9 },
+      { sequence_no: 4, weight_kg: 9 },
+      { sequence_no: 5, weight_kg: 9 },
     ]);
   });
 
@@ -315,29 +317,29 @@ describe("AdminDeliveryRequestPage", () => {
     state.context.data = contextData([
       flightWithRows("M300", [
         { id: 31, weight: "30", taken: true },
-        { id: 32, weight: "15" },
-        { id: 33, weight: "10" },
+        { id: 32, weight: "8" },
+        { id: 33, weight: "7" },
       ]),
     ]);
     openFormFor("M300", /^UzPost/);
 
-    expect(screen.getByText(/Yuk 25\.00 kg/)).toBeInTheDocument();
+    expect(screen.getByText(/Yuk 15\.00 kg/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
     submit();
 
     expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
-      { sequence_no: 1, weight_kg: 12.5 },
-      { sequence_no: 2, weight_kg: 12.5 },
+      { sequence_no: 1, weight_kg: 7.5 },
+      { sequence_no: 2, weight_kg: 7.5 },
     ]);
   });
 
   it("blocks submit when edited bag weights no longer add up to the parcel", () => {
-    state.context.data = contextData([paidFlight("M300", 30, "40")]);
+    state.context.data = contextData([paidFlight("M300", 30, "20")]);
     openFormFor("M300", /^UzPost/);
 
     fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
     fireEvent.change(screen.getAllByLabelText("Qop vazni")[0], {
-      target: { value: "19" },
+      target: { value: "9" },
     });
 
     expect(screen.getByText(/qoldi 1\.00 kg/)).toBeInTheDocument();
@@ -349,8 +351,8 @@ describe("AdminDeliveryRequestPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Qop qo'shish" }));
     submit();
     expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
-      { sequence_no: 1, weight_kg: 19 },
-      { sequence_no: 2, weight_kg: 20 },
+      { sequence_no: 1, weight_kg: 9 },
+      { sequence_no: 2, weight_kg: 10 },
       { sequence_no: 3, weight_kg: 1 },
     ]);
   });

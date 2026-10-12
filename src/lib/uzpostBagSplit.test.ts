@@ -48,22 +48,24 @@ const weights = (parcelKg: number) =>
   splitUzpostParcel(parcelKg).map((bag) => bag.weight_kg);
 
 describe("splitUzpostParcel", () => {
-  it("leaves a parcel of 20 kg or less whole", () => {
+  it("leaves a parcel of 10 kg or less whole", () => {
     expect(splitUzpostParcel(1.9)).toEqual([]);
-    expect(splitUzpostParcel(20)).toEqual([]);
-    expect(needsUzpostBags(20)).toBe(false);
+    expect(splitUzpostParcel(10)).toEqual([]);
+    expect(needsUzpostBags(10)).toBe(false);
+    expect(needsUzpostBags(10.01)).toBe(true);
   });
 
   it("uses the fewest bags and fills them evenly", () => {
-    expect(weights(40)).toEqual([20, 20]);
-    expect(weights(45)).toEqual([15, 15, 15]);
-    expect(weights(40.2)).toEqual([13.4, 13.4, 13.4]);
+    expect(weights(15)).toEqual([7.5, 7.5]);
+    expect(weights(20)).toEqual([10, 10]);
+    expect(weights(25)).toEqual([8.34, 8.34, 8.32]);
+    expect(weights(45)).toEqual([9, 9, 9, 9, 9]);
   });
 
-  it("never makes a bag over 20 kg near the limit", () => {
-    for (const total of [20.005, 39.999, 40.008, 59.99, 60.001]) {
+  it("never makes a bag over 10 kg near the limit", () => {
+    for (const total of [10.005, 19.999, 20.008, 29.99, 30.001, 60.001]) {
       const bags = weights(total);
-      expect(bags.every((weight) => weight > 0 && weight <= 20)).toBe(true);
+      expect(bags.every((weight) => weight > 0 && weight <= 10)).toBe(true);
       expect(validateUzpostBags(splitUzpostParcel(total), total)).toEqual([]);
     }
   });
@@ -94,23 +96,23 @@ describe("validateUzpostBags", () => {
   it("asks for the bags to add up to the parcel", () => {
     const errors = validateUzpostBags(
       [
-        { sequence_no: 1, weight_kg: 19 },
-        { sequence_no: 2, weight_kg: 20 },
+        { sequence_no: 1, weight_kg: 9 },
+        { sequence_no: 2, weight_kg: 10 },
       ],
-      40,
+      20,
     );
-    expect(errors).toEqual(["Qoplar yig'indisi 40.00 kg bo'lishi kerak, hozir 39.00 kg."]);
+    expect(errors).toEqual(["Qoplar yig'indisi 20.00 kg bo'lishi kerak, hozir 19.00 kg."]);
   });
 
   it("flags an empty or overweight bag", () => {
     const errors = validateUzpostBags(
       [
         { sequence_no: 1, weight_kg: Number.NaN },
-        { sequence_no: 2, weight_kg: 20.5 },
+        { sequence_no: 2, weight_kg: 10.5 },
       ],
-      20.5,
+      10.5,
     );
     expect(errors).toContain("1-qop vazni 0 dan katta bo'lishi kerak.");
-    expect(errors).toContain("2-qop vazni 20 kgdan oshmasligi kerak.");
+    expect(errors).toContain("2-qop vazni 10 kgdan oshmasligi kerak.");
   });
 });

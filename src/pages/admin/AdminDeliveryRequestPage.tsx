@@ -210,7 +210,7 @@ export default function AdminDeliveryRequestPage() {
   const isUzpost = deliveryType === "uzpost";
   const canSplitUzpostBags = Boolean(context?.may_override && isUzpost);
 
-  // Only a parcel over 20 kg is split, and only for a filer whose request
+  // Only a parcel over the bag limit (10 kg) is split, and only for a filer whose request
   // creates the orders. Lighter cargo is one parcel and one receipt, as before.
   const uzpostParcelKg = useMemo(
     () => (canSplitUzpostBags ? uzpostParcelWeightKg(flights, submittableFlights) : 0),

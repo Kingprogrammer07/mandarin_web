@@ -32,7 +32,7 @@ export default function UzpostBagSplitPanel({
   const errors = useMemo(() => validateUzpostBags(bags, parcelKg), [bags, parcelKg]);
   const totalKg = bagsTotalKg(bags);
   const remainingKg = roundKg(parcelKg - totalKg);
-  // Fewer bags than this cannot carry the parcel without one going over 20 kg.
+  // Fewer bags than this cannot carry the parcel without one going over the limit.
   const minBagCount = Math.ceil(parcelKg / UZPOST_BAG_LIMIT_KG - 1e-9);
 
   const updateWeight = (index: number, value: string) => {
@@ -72,7 +72,7 @@ export default function UzpostBagSplitPanel({
               Qoplarga ajratish
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-300">
-              Yuk {parcelKg.toFixed(2)} kg — 20 kgdan og'ir. Har bir qop uchun
+              Yuk {parcelKg.toFixed(2)} kg — {UZPOST_BAG_LIMIT_KG} kgdan og'ir. Har bir qop uchun
               alohida UzPost order va chek chiqadi.
             </p>
           </div>
