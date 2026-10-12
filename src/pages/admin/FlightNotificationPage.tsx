@@ -1,583 +1,234 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  ArrowLeft, RefreshCw, Send, Plus, Clock,
-  AlertCircle, Loader2, X, Search, Filter, ChevronLeft, ChevronRight, Download, Bot, Globe,
-} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   getNotificationSummary,
-  startSendNotifications,
-  getSendTaskState,
-  getActiveSendTask,
-  cancelSendTask,
   type ClientNotificationStatus,
+  type ForgottenCargoResult,
   type NotificationSummary,
-  type SendTaskState,
 } from '@/api/services/flightNotifications';
-import { useToast } from '@/hooks/useToast';
-import { useConfirm } from '@/hooks/useConfirm';
 import ForgottenCargoModal from '@/components/admin/ForgottenCargoModal';
-import type { ForgottenCargoResult } from '@/api/services/flightNotifications';
-import { exportFlightCargoExcel } from '@/api/services/cargo';
+import {
+  NotificationClientList,
+  type ListStatus,
+} from '@/components/admin/flight-notifications/NotificationClientList';
+import { NotificationHeader } from '@/components/admin/flight-notifications/NotificationHeader';
+import { NotificationToolbar } from '@/components/admin/flight-notifications/NotificationToolbar';
+import { ResendConfirmDialog } from '@/components/admin/flight-notifications/ResendConfirmDialog';
+import { SendBar } from '@/components/admin/flight-notifications/SendBar';
+import { SendProgressDialog } from '@/components/admin/flight-notifications/SendProgressDialog';
+import {
+  alreadyNotifiedClients,
+  filterClients,
+  isOstatkaFlight,
+  paginate,
+  pendingClientIds,
+  pruneSelection,
+  selectionStateOf,
+  setClientsSelected,
+  toggleSelection,
+  type NotificationFilter,
+} from '@/components/admin/flight-notifications/notificationFilters';
+import { errorMessage } from '@/components/admin/flight-notifications/sendTask';
+import { useSendTask } from '@/components/admin/flight-notifications/useSendTask';
+import { cn } from '@/lib/utils';
 
 interface FlightNotificationPageProps {
   flightName: string;
   onBack: () => void;
+  /**
+   * The page owns the whole viewport (the astatka route has no app navigation
+   * bar): a fixed header and send bar around its own scroller. Without it the
+   * page flows inside the app's padded <main>, under the navigation bar.
+   */
+  fullScreen?: boolean;
 }
 
-type FilterMode = 'all' | 'sent' | 'pending';
+const NO_CLIENTS: ClientNotificationStatus[] = [];
 
-// Polling cadence for bulk-send progress. The previous 1.5 s value generated
-// 200 requests per 5-minute task per watching admin. 5 s is still well below
-// human perception of "live" progress and slashes per-task traffic ~70%.
-const POLL_INTERVAL_MS = 5000;
-const PAGE_SIZE = 30;
-
-const activeTaskKey = (flightName: string) => `cargo_send_task:${flightName}`;
-
-// Written to localStorage the instant "Send" is pressed, before the start
-// request resolves. If the page reloads in that window, mount recovery sees the
-// placeholder and asks the server for the running task instead of losing it.
-const PENDING_PLACEHOLDER = 'pending';
-
-// Ostatka (A-) flights deliver via the bot to the ostatka group, not per-client.
-// The web send path is blocked server-side; the UI disables it too.
-const isOstatkaFlight = (name: string) => name.trim().toUpperCase().startsWith('A-');
-
-// ─── Progress Modal ────────────────────────────────────────────────────────────
-
-interface ProgressModalProps {
-  taskState: SendTaskState;
-  flightName: string;
-  onClose: () => void;
-  onCancel?: () => void;
-  isCancelling?: boolean;
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)} soniya`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return s > 0 ? `${m} daq ${s} son` : `${m} daqiqa`;
-}
-
-function ProgressModal({ taskState, flightName, onClose, onCancel, isCancelling }: ProgressModalProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (taskState.status !== 'running') return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [taskState.status]);
-
-  const handleExport = async () => {
-    setIsExporting(true);
-    setExportError(null);
-    try {
-      await exportFlightCargoExcel(flightName);
-    } catch (e: unknown) {
-      const err = e as { message?: string; status?: number };
-      if (err.message === 'rate_limit') setExportError('1 daqiqa kuting (limit)');
-      else setExportError(err.message ?? 'Yuklab bo\'lmadi');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const isDone = taskState.status === 'completed' || taskState.status === 'failed';
-  const wasCancelled = taskState.status === 'failed' && taskState.sent + taskState.failed + taskState.skipped < taskState.total;
-
-  const processed = taskState.sent + taskState.failed + taskState.skipped;
-  const elapsedSec = (now - new Date(taskState.started_at).getTime()) / 1000;
-  const rate = elapsedSec > 0 && processed > 0 ? processed / elapsedSec : 0;
-  const remaining = taskState.total - processed;
-  const etaSec = rate > 0 ? remaining / rate : null;
-  const etaText = !isDone && etaSec !== null && etaSec > 1 ? `~${formatDuration(etaSec)} qoldi` : null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="w-full max-w-sm bg-white dark:bg-[#111] rounded-3xl border border-gray-100 dark:border-white/[0.08] shadow-2xl overflow-hidden">
-
-        {/* Colour bar */}
-        <div className={`h-1 ${isDone && taskState.failed > 0 ? 'bg-red-500' : 'bg-gradient-to-r from-orange-500 to-amber-400'}`} />
-
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-base font-black text-gray-800 dark:text-white">
-              {!isDone ? 'Yuborilmoqda...' : wasCancelled ? 'Yuborish to\'xtatildi' : 'Yuborish yakunlandi'}
-            </h3>
-            {isDone && (
-              <button
-                onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-white/[0.06] text-gray-500"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          <div className="w-full h-2 bg-gray-100 dark:bg-white/[0.06] rounded-full overflow-hidden mb-4">
-            <div
-              className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500"
-              style={{ width: `${taskState.percent}%` }}
-            />
-          </div>
-
-          {/* Counters */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="flex flex-col items-center p-2 rounded-xl bg-green-50 dark:bg-green-500/[0.08]">
-              <span className="text-lg font-black text-green-600 dark:text-green-400">{taskState.sent}</span>
-              <span className="text-[10px] text-green-600/70 dark:text-green-400/60 font-medium">Yuborildi</span>
-            </div>
-            <div className="flex flex-col items-center p-2 rounded-xl bg-red-50 dark:bg-red-500/[0.08]">
-              <span className="text-lg font-black text-red-600 dark:text-red-400">{taskState.failed}</span>
-              <span className="text-[10px] text-red-600/70 dark:text-red-400/60 font-medium">Xato</span>
-            </div>
-            <div className="flex flex-col items-center p-2 rounded-xl bg-gray-50 dark:bg-white/[0.04]">
-              <span className="text-lg font-black text-gray-600 dark:text-gray-300">{taskState.skipped}</span>
-              <span className="text-[10px] text-gray-500/70 font-medium">O'tkazildi</span>
-            </div>
-          </div>
-
-          {/* Percent */}
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-4">
-            {taskState.percent}% — {taskState.sent + taskState.failed + taskState.skipped}/{taskState.total}
-          </p>
-
-          {/* Errors */}
-          {taskState.errors.length > 0 && (
-            <div className="max-h-28 overflow-y-auto rounded-xl bg-red-50 dark:bg-red-500/[0.06] border border-red-100 dark:border-red-500/15 p-3 space-y-1 mb-4">
-              {taskState.errors.map((err, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs">
-                  <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-                  <span className="text-red-700 dark:text-red-300">
-                    <span className="font-bold">{err.client_id}:</span> {err.error}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!isDone && (
-            <div className="space-y-3">
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {isCancelling ? "To'xtatilmoqda..." : 'Yuborilmoqda...'}
-                </div>
-                {etaText && (
-                  <span className="text-[11px] font-bold text-orange-500">{etaText}</span>
-                )}
-              </div>
-              {onCancel && (
-                <button
-                  onClick={onCancel}
-                  disabled={isCancelling}
-                  className="w-full h-9 rounded-2xl border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm font-bold hover:bg-red-50 dark:hover:bg-red-500/[0.08] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isCancelling
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <X className="w-3.5 h-3.5" />
-                  }
-                  To'xtatish
-                </button>
-              )}
-            </div>
-          )}
-
-          {isDone && (
-            <div className="space-y-2">
-              <button
-                onClick={handleExport}
-                disabled={isExporting}
-                className="w-full h-11 rounded-2xl bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white text-sm font-black transition-colors flex items-center justify-center gap-2"
-              >
-                {isExporting
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Download className="w-4 h-4" />
-                }
-                {isExporting ? 'Yuklanmoqda...' : 'Excel yuklab olish'}
-              </button>
-              {exportError && (
-                <p className="text-center text-xs text-red-500">{exportError}</p>
-              )}
-              <button
-                onClick={onClose}
-                className="w-full h-11 rounded-2xl border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 text-sm font-bold hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
-              >
-                Yopish
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Client row ────────────────────────────────────────────────────────────────
-
-interface ClientRowProps {
-  client: ClientNotificationStatus;
-  isSelected: boolean;
-  onToggle: () => void;
-}
-
-function ClientRow({ client, isSelected, onToggle }: ClientRowProps) {
-  return (
-    <div
-      onClick={onToggle}
-      className={`flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all select-none ${
-        isSelected
-          ? 'bg-orange-50 dark:bg-orange-500/[0.08] border-orange-200 dark:border-orange-500/20'
-          : 'bg-white dark:bg-[#111] border-gray-100 dark:border-white/[0.06] hover:bg-gray-50 dark:hover:bg-white/[0.03]'
-      }`}
-    >
-      {/* Checkbox */}
-      <div
-        className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-colors ${
-          isSelected
-            ? 'bg-orange-500 border-orange-500'
-            : 'border-gray-300 dark:border-white/20'
-        }`}
-      >
-        {isSelected && (
-          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-black text-gray-800 dark:text-white">{client.client_id}</span>
-          {!client.telegram_id && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 font-bold">
-              TG yo'q
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[11px] text-gray-400">{client.cargo_count} ta yuk</span>
-          <span className="text-[11px] text-gray-300 dark:text-white/20">·</span>
-          <span className="text-[11px] text-gray-400">{client.total_weight.toFixed(1)} kg</span>
-          <span className="text-[11px] text-gray-300 dark:text-white/20">·</span>
-          <span className="text-[11px] text-gray-400">
-            {client.total_price_uzs.toLocaleString('uz-UZ')} so'm
-          </span>
-        </div>
-      </div>
-
-      {/* Status badges */}
-      <div className="flex flex-col items-end gap-1 shrink-0">
-        {!client.is_sent && (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/15">
-            <Clock className="w-3 h-3 text-amber-500" />
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Kutmoqda</span>
-          </div>
-        )}
-        {client.is_sent_bot && (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/15">
-            <Bot className="w-3 h-3 text-blue-500" />
-            <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">Bot</span>
-          </div>
-        )}
-        {client.is_sent_web && (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/15">
-            <Globe className="w-3 h-3 text-green-500" />
-            <span className="text-[9px] font-bold text-green-600 dark:text-green-400">Web</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Page ──────────────────────────────────────────────────────────────────────
-
-export default function FlightNotificationPage({ flightName, onBack }: FlightNotificationPageProps) {
-  const { toast, ToastRenderer } = useToast();
-  const { confirm, ConfirmDialog } = useConfirm();
-
+export default function FlightNotificationPage({
+  flightName,
+  onBack,
+  fullScreen = false,
+}: FlightNotificationPageProps) {
   const [summary, setSummary] = useState<NotificationSummary | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Only the newest summary request may write state: an older one resolving
+  // late (slow network, a double refresh) would roll the list back.
+  const requestSeqRef = useRef(0);
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<FilterMode>('all');
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [filter, setFilter] = useState<NotificationFilter>('all');
   const [search, setSearch] = useState('');
-
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [taskState, setTaskState] = useState<SendTaskState | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const [isSending, setIsSending] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [showForgottenModal, setShowForgottenModal] = useState(false);
   const [page, setPage] = useState(1);
   const [markBot, setMarkBot] = useState(false);
   const [markWeb, setMarkWeb] = useState(true);
+  const [showForgottenModal, setShowForgottenModal] = useState(false);
+  // Guards the confirm → start window, where the send button is not yet disabled.
+  const sendInFlightRef = useRef(false);
+  const listTopRef = useRef<HTMLElement>(null);
+  const sendButtonRef = useRef<HTMLButtonElement>(null);
+  const addForgottenRef = useRef<HTMLButtonElement>(null);
+  /** Already-notified clients the re-send question is about; `null` = not asking. */
+  const [resendTargets, setResendTargets] = useState<ClientNotificationStatus[] | null>(null);
+  const resendAnswerRef = useRef<((resend: boolean) => void) | null>(null);
+
+  const notifyError = useCallback((title: string) => {
+    toast.error(title);
+  }, []);
+  const sendTask = useSendTask(flightName, notifyError);
+
+  const askResend = (clients: ClientNotificationStatus[]) =>
+    new Promise<boolean>((resolve) => {
+      resendAnswerRef.current = resolve;
+      setResendTargets(clients);
+    });
+  // Radix reports "closed" after "Ha" too; only the first answer counts.
+  const answerResend = (resend: boolean) => {
+    setResendTargets(null);
+    resendAnswerRef.current?.(resend);
+    resendAnswerRef.current = null;
+  };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchSummary = useCallback(async (quiet = false) => {
-    if (!quiet) setIsLoading(true);
-    else setIsRefreshing(true);
-    try {
-      const data = await getNotificationSummary(flightName);
-      setSummary(data);
-      // Keep selected set consistent: remove IDs that no longer exist
-      setSelected((prev) => {
-        const existingIds = new Set(data.clients.map((c) => c.client_id));
-        return new Set([...prev].filter((id) => existingIds.has(id)));
-      });
-    } catch (err) {
-      const errMsg = (err as { message?: string })?.message ?? "Ma'lumotlarni yuklab bo'lmadi";
-      toast({ title: errMsg, variant: 'error' });
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [flightName, toast]);
+  const loadSummary = useCallback(
+    async (quiet = false) => {
+      const requestSeq = ++requestSeqRef.current;
+      if (quiet) setIsRefreshing(true);
+      else setIsLoading(true);
+      try {
+        const data = await getNotificationSummary(flightName);
+        if (requestSeq !== requestSeqRef.current) return;
+        setSummary(data);
+        setLoadError(null);
+        // Keep the selection consistent: drop ids that no longer exist.
+        setSelected((prev) => pruneSelection(prev, data.clients));
+      } catch (err) {
+        if (requestSeq !== requestSeqRef.current) return;
+        const message = errorMessage(err, "Ma'lumotlarni yuklab bo'lmadi");
+        setLoadError(message);
+        // A failed background refresh keeps the last good list on screen, so
+        // the toast is the only sign that it may be out of date.
+        if (quiet) toast.error(message);
+      } finally {
+        if (requestSeq === requestSeqRef.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    },
+    [flightName],
+  );
 
   useEffect(() => {
-    void fetchSummary();
-  }, [fetchSummary]);
+    void loadSummary();
+  }, [loadSummary]);
 
-  // Restore an in-progress send after page reload/reopen.
-  //
-  // Two recovery paths:
-  //  1. A real task_id in localStorage → resume it directly.
-  //  2. No id, or the "pending" placeholder (reload happened mid send-start),
-  //     or a stale id whose state lookup failed → ask the server for any task
-  //     still running on this flight (cargo_send_active index).
-  useEffect(() => {
-    let cancelled = false;
+  // ── Filtered + paginated clients ───────────────────────────────────────────
 
-    const resume = (state: SendTaskState) => {
-      localStorage.setItem(activeTaskKey(flightName), state.task_id);
-      setTaskId(state.task_id);
-      setTaskState(state);
-      startPolling(state.task_id);
-    };
+  const clients = summary?.clients ?? NO_CLIENTS;
+  const filteredClients = useMemo(
+    () => filterClients(clients, filter, search),
+    [clients, filter, search],
+  );
+  const pageSlice = paginate(filteredClients, page);
+  const selectionState = selectionStateOf(filteredClients, selected);
+  const isOstatka = isOstatkaFlight(flightName);
 
-    const recoverFromServer = async () => {
-      try {
-        const active = await getActiveSendTask(flightName);
-        if (cancelled) return;
-        if (!active || active.status === 'completed' || active.status === 'failed') {
-          localStorage.removeItem(activeTaskKey(flightName));
-          return;
-        }
-        resume(active);
-      } catch {
-        if (!cancelled) localStorage.removeItem(activeTaskKey(flightName));
-      }
-    };
+  let listStatus: ListStatus = 'loading';
+  if (summary) listStatus = 'ready';
+  else if (loadError && !isLoading) listStatus = 'error';
 
-    const restore = async () => {
-      const saved = localStorage.getItem(activeTaskKey(flightName));
-      if (saved && saved !== PENDING_PLACEHOLDER) {
-        try {
-          const state = await getSendTaskState(saved);
-          if (cancelled) return;
-          if (state.status === 'completed' || state.status === 'failed') {
-            localStorage.removeItem(activeTaskKey(flightName));
-            return;
-          }
-          resume(state);
-          return;
-        } catch {
-          // Stale/unknown id — fall through to server-side recovery.
-        }
-      }
-      await recoverFromServer();
-    };
+  // Filter and search changes always start again from the first page.
+  const changeFilter = (next: NotificationFilter) => {
+    setFilter(next);
+    setPage(1);
+  };
+  const changeSearch = (next: string) => {
+    setSearch(next);
+    setPage(1);
+  };
+  const clearFilters = () => {
+    setFilter('all');
+    setSearch('');
+    setPage(1);
+  };
 
-    void restore();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flightName]);
-
-  // ── Task polling ───────────────────────────────────────────────────────────
-
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  const startPolling = useCallback((id: string) => {
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      try {
-        const state = await getSendTaskState(id);
-        setTaskState(state);
-        if (state.status === 'completed' || state.status === 'failed') {
-          stopPolling();
-        }
-      } catch {
-        stopPolling();
-      }
-    }, POLL_INTERVAL_MS);
-  }, [stopPolling]);
-
-  useEffect(() => () => stopPolling(), [stopPolling]);
-
-  // ── Filtered + paginated clients ──────────────────────────────────────────
-
-  const filteredClients: ClientNotificationStatus[] = (summary?.clients ?? []).filter((c) => {
-    if (filter === 'sent' && !c.is_sent) return false;
-    if (filter === 'pending' && c.is_sent) return false;
-    if (search && !c.client_id.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  // Reset to page 1 whenever filter or search changes
-  useEffect(() => { setPage(1); }, [filter, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredClients.length / PAGE_SIZE));
-  const paginatedClients = filteredClients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const goToPage = (next: number) => {
+    // Commit the new page before scrolling, so the scroll runs against the
+    // list that is actually shown (a short last page shrinks the document).
+    flushSync(() => setPage(next));
+    listTopRef.current?.scrollIntoView?.({ block: 'start' });
+  };
 
   // ── Selection helpers ──────────────────────────────────────────────────────
 
-  const toggleClient = (clientId: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(clientId)) next.delete(clientId);
-      else next.add(clientId);
-      return next;
-    });
-  };
+  const toggleClient = useCallback((clientId: string) => {
+    setSelected((prev) => toggleSelection(prev, clientId));
+  }, []);
 
-  const selectAllVisible = () => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      filteredClients.forEach((c) => next.add(c.client_id));
-      return next;
-    });
+  const toggleAllMatching = () => {
+    setSelected((prev) => setClientsSelected(prev, filteredClients, selectionState !== 'all'));
   };
-
-  const deselectAllVisible = () => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      filteredClients.forEach((c) => next.delete(c.client_id));
-      return next;
-    });
-  };
-
-  const allVisibleSelected =
-    filteredClients.length > 0 && filteredClients.every((c) => selected.has(c.client_id));
 
   // Select every not-yet-sent client across the whole flight (not just the
   // current filter/page), so the operator can fire one send at the remainder.
   const selectPending = () => {
-    const pendingIds = (summary?.clients ?? [])
-      .filter((c) => !c.is_sent)
-      .map((c) => c.client_id);
+    const pendingIds = pendingClientIds(clients);
     setSelected(new Set(pendingIds));
     if (pendingIds.length === 0) {
-      toast({ title: "Yuborilmagan mijoz yo'q", variant: 'default' });
+      toast.message("Yuborilmagan mijoz yo'q");
     }
   };
 
   // ── Send ───────────────────────────────────────────────────────────────────
 
   const handleSend = async () => {
+    if (sendInFlightRef.current || sendTask.hasUnfinishedTask) return;
     if (isOstatka) {
-      toast({ title: "Ostatka (A-) reyslar bot orqali yuboriladi", variant: 'error' });
+      toast.error('Ostatka (A-) reyslar bot orqali yuboriladi');
       return;
     }
     if (selected.size === 0) {
-      toast({ title: "Kamida 1 ta mijozni tanlang", variant: 'error' });
+      toast.error('Kamida 1 ta mijozni tanlang');
+      return;
+    }
+    if (!markBot && !markWeb) {
+      toast.error('Kamida bittasini tanlang: Bot yoki Web');
       return;
     }
 
-    // Warn if any selected client was already notified via any channel
-    const alreadySent = (summary?.clients ?? []).filter(
-      (c) => selected.has(c.client_id) && (c.is_sent_bot || c.is_sent_web),
-    );
-    if (alreadySent.length > 0) {
-      const channelList = alreadySent.map((c) => {
-        const channels = [c.is_sent_bot && 'Bot', c.is_sent_web && 'Web'].filter(Boolean).join('+');
-        return `${c.client_id} (${channels})`;
-      }).join(', ');
-      const ok = await confirm({
-        message: `${alreadySent.length} ta mijoz allaqachon yuborilgan`,
-        description: `${channelList}.\n\nBaribir qayta yuborishni xohlaysizmi?`,
-        confirmLabel: 'Ha, qayta yuborish',
-        cancelLabel: 'Bekor qilish',
-        variant: 'warning',
-      });
-      if (!ok) return;
-    }
-
-    setIsSending(true);
+    sendInFlightRef.current = true;
     try {
-      if (!markBot && !markWeb) {
-        toast({ title: "Kamida bittasini tanlang: Bot yoki Web", variant: 'error' });
-        setIsSending(false);
-        return;
-      }
-      // Persist a placeholder BEFORE the request resolves so a reload in this
-      // window can still recover the task via the server-side flight index.
-      localStorage.setItem(activeTaskKey(flightName), PENDING_PLACEHOLDER);
-      const resp = await startSendNotifications(flightName, {
+      // Warn if any selected client was already notified via any channel
+      const alreadySent = alreadyNotifiedClients(clients, selected);
+      if (alreadySent.length > 0 && !(await askResend(alreadySent))) return;
+      await sendTask.start({
         client_ids: [...selected],
         only_pending: false,
         mark_bot: markBot,
         mark_web: markWeb,
       });
-      localStorage.setItem(activeTaskKey(flightName), resp.task_id);
-      setTaskId(resp.task_id);
-      setTaskState({
-        task_id: resp.task_id,
-        status: 'running',
-        total: resp.total_clients,
-        sent: 0,
-        failed: 0,
-        skipped: 0,
-        percent: 0,
-        errors: [],
-        started_at: new Date().toISOString(),
-        finished_at: null,
-      });
-      startPolling(resp.task_id);
-    } catch (err) {
-      // Drop the optimistic placeholder so reload recovery doesn't chase a task
-      // that never started.
-      localStorage.removeItem(activeTaskKey(flightName));
-      const errMsg = (err as { message?: string })?.message ?? "Yuborishni boshlashda xatolik";
-      toast({ title: errMsg, variant: 'error' });
     } finally {
-      setIsSending(false);
+      sendInFlightRef.current = false;
     }
   };
 
-  const handleCloseProgressModal = () => {
-    stopPolling();
-    localStorage.removeItem(activeTaskKey(flightName));
-    setTaskId(null);
-    setTaskState(null);
-    setIsCancelling(false);
-    setSelected(new Set());
-    void fetchSummary(true);
-  };
-
-  const handleCancelTask = async () => {
-    if (!taskId) return;
-    setIsCancelling(true);
-    try {
-      await cancelSendTask(taskId);
-      // Polling will detect status="failed" and stop itself
-    } catch {
-      toast({ title: "Bekor qilishda xatolik yuz berdi", variant: 'error' });
-      setIsCancelling(false);
+  // A finished send is forgotten. One still running (the dialog could only be
+  // closed because progress polls stopped answering) is only hidden: it stays
+  // tracked, the send button stays blocked, and the send bar can reopen it.
+  const handleCloseProgress = () => {
+    if (sendTask.hasUnfinishedTask) {
+      sendTask.hide();
+    } else {
+      sendTask.forget();
+      setSelected(new Set());
     }
+    void loadSummary(true);
   };
 
   // ── Forgotten cargo success ────────────────────────────────────────────────
@@ -587,275 +238,121 @@ export default function FlightNotificationPage({ flightName, onBack }: FlightNot
     const msg = result.sent
       ? `Yuk qo'shildi va yuborildi (${result.track_codes_added} ta trek kod)`
       : `Yuk qo'shildi (${result.track_codes_added} ta trek kod). ${result.send_error ? `Yuborish: ${result.send_error}` : ''}`;
-    toast({ title: msg, variant: result.sent ? 'success' : 'default' });
-    void fetchSummary(true);
+    if (result.sent) toast.success(msg);
+    else toast.message(msg);
+    void loadSummary(true);
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
 
-  // Show the spinner only when there's nothing to display. If a task was
-  // recovered on reload, render the page so the progress modal is visible even
-  // while the summary is still loading.
-  if (isLoading && !taskState) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-      </div>
-    );
-  }
-
-  const isOstatka = isOstatkaFlight(flightName);
-  const pendingCount = summary?.pending_count ?? 0;
-  const totalCount = summary?.total_clients ?? 0;
-  const botSentCount = summary?.bot_sent_count ?? 0;
-  const webSentCount = summary?.web_sent_count ?? 0;
-  const selectedCount = selected.size;
-
+  // The progress dialog is portalled and follows only the task, so a send
+  // recovered on reload shows even while the summary is still loading.
   return (
-    <>
-    <ToastRenderer />
-    <ConfirmDialog />
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
+    <div className={cn('flex flex-col', fullScreen && 'h-dvh overflow-hidden bg-mc-bg')}>
+      <NotificationHeader
+        flightName={flightName}
+        onBack={onBack}
+        onRefresh={() => void loadSummary(summary !== null)}
+        isRefreshing={isLoading || isRefreshing}
+        fullScreen={fullScreen}
+      />
 
-      {/* ── Header ── */}
-      <div className="sticky top-0 z-30 bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/[0.05]">
-        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium truncate">{flightName}</p>
-            <h1 className="text-base font-black text-gray-800 dark:text-white leading-tight">Bildirishnomalar</h1>
-          </div>
-
-          <button
-            onClick={() => fetchSummary(true)}
-            disabled={isRefreshing}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {/* Stats pills */}
-        <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/[0.05]">
-            <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">{totalCount} ta</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/[0.08]">
-            <Clock className="w-3 h-3 text-amber-500" />
-            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">{pendingCount} kutmoqda</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-500/[0.08]">
-            <Bot className="w-3 h-3 text-blue-500" />
-            <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">{botSentCount} bot</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 dark:bg-green-500/[0.08]">
-            <Globe className="w-3 h-3 text-green-500" />
-            <span className="text-[11px] font-bold text-green-600 dark:text-green-400">{webSentCount} web</span>
-          </div>
-        </div>
-
-        {/* Action bar */}
-        <div className="flex items-center gap-2 px-4 pb-3">
-          {/* Search */}
-          <div className="flex-1 flex items-center gap-2 h-9 px-3 rounded-xl bg-gray-100 dark:bg-white/[0.05] border border-gray-200 dark:border-white/[0.06]">
-            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Mijoz kodini qidirish..."
-              className="flex-1 bg-transparent text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none"
-            />
-            {search && (
-              <button onClick={() => setSearch('')}>
-                <X className="w-3 h-3 text-gray-400" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter */}
-          <div className="flex items-center rounded-xl border border-gray-200 dark:border-white/[0.06] overflow-hidden h-9">
-            {(['all', 'pending', 'sent'] as FilterMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setFilter(mode)}
-                className={`px-2.5 h-full text-[11px] font-bold transition-colors ${
-                  filter === mode
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-white dark:bg-white/[0.04] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.07]'
-                }`}
-              >
-                {mode === 'all' ? 'Hammasi' : mode === 'pending' ? 'Kutmoqda' : 'Yuborildi'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Select-all + action row */}
-        <div className="flex items-center gap-2 px-4 pb-2">
-          <button
-            onClick={allVisibleSelected ? deselectAllVisible : selectAllVisible}
-            className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-          >
-            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-              allVisibleSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300 dark:border-white/20'
-            }`}>
-              {allVisibleSelected && (
-                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-            Barchasi
-          </button>
-
-          {/* Quick-select every not-yet-sent client across the whole flight */}
-          <button
-            onClick={selectPending}
-            className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/[0.08] border border-amber-200/60 dark:border-amber-500/15 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-500/15 transition-colors"
-          >
-            <Clock className="w-3 h-3" />
-            Yuborilmaganlar
-          </button>
-
-          <Filter className="w-3.5 h-3.5 text-gray-300 dark:text-white/20" />
-
-          <div className="flex-1" />
-
-          <button
-            onClick={() => setShowForgottenModal(true)}
-            disabled={isOstatka}
-            className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/[0.08] border border-violet-200/60 dark:border-violet-500/15 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-500/15 transition-colors disabled:opacity-40"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Unutilgan yuk
-          </button>
-
-          <button
-            onClick={handleSend}
-            disabled={isSending || selectedCount === 0 || isOstatka}
-            className="flex items-center gap-1.5 h-8 px-3 text-[11px] font-black text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50 rounded-xl transition-colors"
-          >
-            {isSending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Send className="w-3.5 h-3.5" />
-            )}
-            {selectedCount > 0 ? `Yuborish (${selectedCount})` : 'Yuborish'}
-          </button>
-        </div>
-
-        {/* Mark-mode row */}
-        <div className="flex items-center gap-3 px-4 pb-3">
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Belgilash:</span>
-          {(
-            [
-              { id: 'web', label: 'Web', checked: markWeb, set: setMarkWeb },
-              { id: 'bot', label: 'Bot', checked: markBot, set: setMarkBot },
-            ] as const
-          ).map(({ id, label, checked, set }) => (
-            <label key={id} className="flex items-center gap-1.5 cursor-pointer select-none">
-              <div
-                onClick={() => set(!checked)}
-                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                  checked ? 'bg-orange-500 border-orange-500' : 'border-gray-300 dark:border-white/20'
-                }`}
-              >
-                {checked && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">{label}</span>
-            </label>
-          ))}
-          {!markBot && !markWeb && (
-            <span className="text-[10px] text-red-500 font-bold">Kamida bittasini tanlang</span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Ostatka (A-) notice ── */}
-      {isOstatka && (
-        <div className="mx-4 mt-3 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/[0.08] border border-amber-200/60 dark:border-amber-500/15">
-          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 leading-snug">
-            Ostatka (A-) reyslar bot orqali yuboriladi. Web orqali yuborish o'chirilgan.
-          </p>
-        </div>
-      )}
-
-      {/* ── Client list ── */}
-      <div className="px-4 py-3 space-y-2">
-        {filteredClients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-white/[0.05] flex items-center justify-center mb-4">
-              <Send className="w-6 h-6 text-gray-300 dark:text-white/20" />
-            </div>
-            <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Mijozlar topilmadi</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Filtrni o'zgartiring yoki boshqa reys tanlang</p>
-          </div>
-        ) : (
-          paginatedClients.map((client) => (
-            <ClientRow
-              key={client.client_id}
-              client={client}
-              isSelected={selected.has(client.client_id)}
-              onToggle={() => toggleClient(client.client_id)}
-            />
-          ))
+      <div
+        className={cn(
+          fullScreen
+            ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain'
+            : // Clears the send bar, which is pinned to the viewport in this mode.
+              'pb-[calc(5rem+env(safe-area-inset-bottom))]',
         )}
+      >
+        <div className="mx-auto w-full max-w-3xl space-y-4 px-4 pb-6 pt-3">
+          <NotificationToolbar
+            summary={summary}
+            isLoadingSummary={listStatus === 'loading'}
+            search={search}
+            onSearchChange={changeSearch}
+            filter={filter}
+            onFilterChange={changeFilter}
+            markWeb={markWeb}
+            markBot={markBot}
+            onMarkWebChange={setMarkWeb}
+            onMarkBotChange={setMarkBot}
+            onSelectPending={selectPending}
+            onAddForgotten={() => setShowForgottenModal(true)}
+            addForgottenRef={addForgottenRef}
+            isOstatka={isOstatka}
+          />
+
+          {isOstatka && (
+            <p className="flex items-start gap-2 rounded-mc-md bg-mc-warn-soft px-3 py-2.5 text-[12px] font-bold leading-snug text-mc-warn">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              Ostatka (A-) reyslar bot orqali yuboriladi. Web orqali yuborish o'chirilgan.
+            </p>
+          )}
+
+          <NotificationClientList
+            status={listStatus}
+            errorMessage={loadError}
+            // Quiet while a list is on screen (the empty-flight "Yangilash"):
+            // a failure then has to say so, since the list stays as it was.
+            onRetry={() => void loadSummary(summary !== null)}
+            totalClients={clients.length}
+            matchingCount={filteredClients.length}
+            pageClients={pageSlice.items}
+            selected={selected}
+            selectionState={selectionState}
+            onToggleClient={toggleClient}
+            onToggleAll={toggleAllMatching}
+            page={pageSlice.page}
+            totalPages={pageSlice.totalPages}
+            onPageChange={goToPage}
+            onClearFilters={clearFilters}
+            listTopRef={listTopRef}
+            scrollMarginClassName={fullScreen ? 'scroll-mt-3' : 'scroll-mt-24'}
+          />
+        </div>
       </div>
 
-      {/* ── Pagination ── */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 px-4 py-4">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
-            {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <SendBar
+        selectedCount={selected.size}
+        markWeb={markWeb}
+        markBot={markBot}
+        isOstatka={isOstatka}
+        isSending={sendTask.isStarting || sendTask.hasUnfinishedTask}
+        onShowRunningSend={
+          sendTask.hasUnfinishedTask && !sendTask.isDialogOpen ? sendTask.reopen : undefined
+        }
+        onSend={() => void handleSend()}
+        sendButtonRef={sendButtonRef}
+        floating={!fullScreen}
+      />
 
-      {/* ── Modals ── */}
-      {taskState && (
-        <ProgressModal
-          taskState={taskState}
-          flightName={flightName}
-          onClose={handleCloseProgressModal}
-          onCancel={handleCancelTask}
-          isCancelling={isCancelling}
-        />
-      )}
+      <ResendConfirmDialog
+        clients={resendTargets}
+        onConfirm={() => answerResend(true)}
+        onCancel={() => answerResend(false)}
+        returnFocusRef={sendButtonRef}
+      />
+
+      <SendProgressDialog
+        taskState={sendTask.isDialogOpen ? sendTask.taskState : null}
+        flightName={flightName}
+        isCancelling={sendTask.isCancelling}
+        pollFailed={sendTask.pollFailed}
+        onCancel={() => void sendTask.cancel()}
+        onRetryPolling={sendTask.retryPolling}
+        onClose={handleCloseProgress}
+        returnFocusRef={listTopRef}
+      />
 
       {showForgottenModal && (
         <ForgottenCargoModal
           flightName={flightName}
           onClose={() => setShowForgottenModal(false)}
           onSuccess={handleForgottenSuccess}
+          returnFocusRef={addForgottenRef}
         />
       )}
-
     </div>
-    </>
   );
 }

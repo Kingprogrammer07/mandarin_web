@@ -968,6 +968,10 @@ function AppContent() {
   const isWarehousePage = currentPage === "warehouse-page";
   const isExpectedCargoPage = currentPage === "expected-cargo";
   const isAstatkaWorkspace = currentPage === "astatka-workspace";
+  // The astatka window's send screen is a staff tool opened from that
+  // full-screen window, so it is full screen too — never under the client
+  // NavigationBar ("Foydalanuvchi tizimi").
+  const isAstatkaSend = currentPage === "astatka-send";
   const canAccessManagerPage =
     userRole !== null &&
     (ROLE_CONFIG[userRole]?.allowed ?? []).includes("manager-page");
@@ -986,7 +990,8 @@ function AppContent() {
   const isAdminArea =
     isSuperAdminPages || isAdminLoginPage || isPOSPage ||
     isManagerPage || isStandaloneAdminSubpage || isPasskeyPage ||
-    isWarehousePage || isExpectedCargoPage || isAstatkaWorkspace || currentPage === "pickup-tv" ||
+    isWarehousePage || isExpectedCargoPage || isAstatkaWorkspace || isAstatkaSend ||
+    currentPage === "pickup-tv" ||
     isNbuRedirectPage;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -1158,6 +1163,16 @@ function AppContent() {
           onBack={() => navigateBack("astatka")}
           onSend={() => navigateToPage("astatka-send", selectedFlightName)}
         />
+      ) : isAstatkaSend && selectedFlightName ? (
+        // Its own branch ahead of the generic <main>, so admins and workers
+        // alike get it full screen. Back returns to the astatka list or window
+        // it was opened from.
+        <FlightNotificationPage
+          key={selectedFlightName}
+          flightName={selectedFlightName}
+          onBack={() => navigateBack("astatka")}
+          fullScreen
+        />
       ) : isPOSPage ? (
         <POSDashboard
           onNavigate={(page) => navigateToPage(page as Page)}
@@ -1290,15 +1305,6 @@ function AppContent() {
             <FlightNotificationPage
               flightName={selectedFlightName}
               onBack={() => navigateToPage("cargo-list", selectedFlightName)}
-            />
-          )}
-
-          {/* The flight photo page's notification screen, reached from astatka:
-              back returns to the astatka list or window it was opened from. */}
-          {currentPage === "astatka-send" && selectedFlightName && (
-            <FlightNotificationPage
-              flightName={selectedFlightName}
-              onBack={() => navigateBack("astatka")}
             />
           )}
 
