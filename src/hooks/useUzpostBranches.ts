@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { getAddedUzpostBranches } from '@/api/services/uzpostBranches';
 import type { UzpostBranch } from '@/types/uzpostBranch';
 
 interface RawUzpostBranch {
@@ -13,9 +14,11 @@ interface RawUzpostBranch {
   Saturday?: unknown;
   'Day off'?: unknown;
   'Other schedule notes'?: unknown;
+  /** Set on branches staff added; the file's own entries never carry it. */
+  Custom?: unknown;
 }
 
-const UZPOST_BRANCHES_QUERY_KEY = ['uzpost-branches'] as const;
+export const UZPOST_BRANCHES_QUERY_KEY = ['uzpost-branches'] as const;
 
 function readNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -71,10 +74,11 @@ function normalizeBranch(rawBranch: RawUzpostBranch): UzpostBranch | null {
     saturday: readText(rawBranch.Saturday),
     dayOff: readText(rawBranch['Day off']),
     otherScheduleNotes: readText(rawBranch['Other schedule notes']),
+    isCustom: rawBranch.Custom === true,
   };
 }
 
-async function fetchUzpostBranches(): Promise<UzpostBranch[]> {
+async function fetchCatalogueBranches(): Promise<UzpostBranch[]> {
   // The branches file is large and effectively static across sessions; force
   // the browser HTTP cache so repeated calculator opens do not retrigger an
   // Edge Request.
@@ -105,6 +109,29 @@ async function fetchUzpostBranches(): Promise<UzpostBranch[]> {
   return parsedData
     .map((item) => normalizeBranch(item as RawUzpostBranch))
     .filter((branch): branch is UzpostBranch => branch !== null);
+}
+
+/**
+ * Branches staff added on top of the file. A failure here must not take the
+ * whole picker down: the file alone still lists 1593 offices.
+ */
+async function fetchAddedBranches(): Promise<UzpostBranch[]> {
+  try {
+    const entries = await getAddedUzpostBranches();
+    return entries
+      .map((item) => normalizeBranch(item as RawUzpostBranch))
+      .filter((branch): branch is UzpostBranch => branch !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchUzpostBranches(): Promise<UzpostBranch[]> {
+  const [catalogue, added] = await Promise.all([
+    fetchCatalogueBranches(),
+    fetchAddedBranches(),
+  ]);
+  return [...added, ...catalogue];
 }
 
 export function useUzpostBranches(enabled = true) {

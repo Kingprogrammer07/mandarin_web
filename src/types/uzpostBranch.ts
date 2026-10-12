@@ -10,6 +10,8 @@ export interface UzpostBranch {
   saturday: string | null;
   dayOff: string | null;
   otherScheduleNotes: string | null;
+  /** Added by staff because the catalogue lacked it. */
+  isCustom?: boolean;
 }
 
 export interface UzpostBranchSubmission {

@@ -1,14 +1,27 @@
 import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search, MapPin, Check, PackageCheck, Sparkles } from "lucide-react";
+import {
+  Search,
+  MapPin,
+  MapPinPlus,
+  Check,
+  PackageCheck,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useClientDeliveryContext } from "@/api/hooks/useAdminDelivery";
 import { getBranchSuggestions } from "@/api/services/adminDeliveryService";
-import { useUzpostBranches } from "@/hooks/useUzpostBranches";
+import { getAdminJwtClaims } from "@/api/services/adminManagement";
+import { hideUzpostBranch } from "@/api/services/uzpostBranches";
+import { UZPOST_BRANCHES_QUERY_KEY, useUzpostBranches } from "@/hooks/useUzpostBranches";
 import type { UzpostBranch } from "@/types/uzpostBranch";
+import AddUzpostBranchDialog from "./AddUzpostBranchDialog";
 
 interface UzpostDeliveryFormProps {
   selectedBranch: UzpostBranch | null;
@@ -27,7 +40,45 @@ export default function UzpostDeliveryForm({
 }: UzpostDeliveryFormProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [confirmHide, setConfirmHide] = useState(false);
   const { data: branches, isLoading, isError } = useUzpostBranches();
+  const queryClient = useQueryClient();
+  // Hiding an added branch is a super-admin call; the server enforces it too.
+  const { isSuperAdmin } = getAdminJwtClaims();
+
+  const hideMutation = useMutation({
+    mutationFn: hideUzpostBranch,
+    onSuccess: (_result, branchId) => {
+      queryClient.setQueryData<UzpostBranch[]>(UZPOST_BRANCHES_QUERY_KEY, (current) =>
+        current?.filter((branch) => branch.id !== branchId),
+      );
+      setConfirmHide(false);
+      onBranchChange(null);
+      toast.success("Filial ro'yxatdan olib tashlandi");
+    },
+    onError: (error: unknown) => {
+      toast.error(
+        (error as { message?: string }).message ?? "Filialni o'chirib bo'lmadi",
+      );
+    },
+  });
+
+  const selectBranch = (branch: UzpostBranch | null) => {
+    setConfirmHide(false);
+    onBranchChange(branch);
+  };
+
+  const pickListedBranch = (branchId: number) => {
+    const listed = branches?.find((branch) => branch.id === branchId);
+    setAddOpen(false);
+    if (listed) {
+      setQuery("");
+      selectBranch(listed);
+    } else {
+      setQuery(String(branchId));
+    }
+  };
 
   // Same key as the page and ClientDeliveryHistory, so this reads the cached
   // context rather than issuing a second request for the same client.
@@ -105,10 +156,24 @@ export default function UzpostDeliveryForm({
 
       {/* Branch search */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-gray-400" />
-          {t("adminDeliveryRequest.uzpostForm.branchLabel", "UzPost filialini tanlash")}
-        </Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-gray-400" />
+            {t("adminDeliveryRequest.uzpostForm.branchLabel", "UzPost filialini tanlash")}
+          </Label>
+          {/* For an office the catalogue file is missing. Not hidden behind an
+              empty search: a manager who knows the office is new should not
+              have to fail a search first. */}
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 gap-1.5 rounded-xl px-3 text-sm"
+            onClick={() => setAddOpen(true)}
+          >
+            <MapPinPlus className="h-4 w-4 text-orange-500" aria-hidden="true" />
+            Filial qo'shish
+          </Button>
+        </div>
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -168,7 +233,7 @@ export default function UzpostDeliveryForm({
                 <button
                   key={`suggested-${branch.id}`}
                   type="button"
-                  onClick={() => onBranchChange(isSelected ? null : branch)}
+                  onClick={() => selectBranch(isSelected ? null : branch)}
                   className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors border ${
                     isSelected
                       ? "bg-orange-100 dark:bg-orange-500/15 border-orange-300 dark:border-orange-500/40"
@@ -208,9 +273,18 @@ export default function UzpostDeliveryForm({
           className="max-h-60 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-1"
         >
           {filtered.length === 0 && !isLoading && (
-            <p className="text-sm text-gray-500 py-4 text-center">
-              {t("adminDeliveryRequest.uzpostForm.noBranches", "Filial topilmadi")}
-            </p>
+            <div className="py-4 text-center">
+              <p className="text-sm text-gray-500">
+                {t("adminDeliveryRequest.uzpostForm.noBranches", "Filial topilmadi")}
+              </p>
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="mt-1 min-h-11 px-3 text-sm font-semibold text-orange-600 dark:text-orange-400"
+              >
+                Ro'yxatda yo'q bo'lsa, qo'shing
+              </button>
+            </div>
           )}
           {filtered.length > 0 && (
             <div
@@ -237,7 +311,7 @@ export default function UzpostDeliveryForm({
                     }}
                   >
                     <button
-                      onClick={() => onBranchChange(isSelected ? null : branch)}
+                      onClick={() => selectBranch(isSelected ? null : branch)}
                       className={`w-full text-left rounded-lg px-3 py-2.5 mb-1 text-sm transition-colors ${
                         isSelected
                           ? "bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20"
@@ -252,6 +326,11 @@ export default function UzpostDeliveryForm({
                           </p>
                           <p className="text-xs text-gray-400 mt-0.5 font-mono">
                             Indeks: {branch.index}
+                            {branch.isCustom && (
+                              <span className="ml-2 rounded-md bg-blue-50 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                                Qo'lda qo'shilgan
+                              </span>
+                            )}
                           </p>
                         </div>
                         {isSelected && (
@@ -267,7 +346,63 @@ export default function UzpostDeliveryForm({
             </div>
           )}
         </div>
+
+        {selectedBranch?.isCustom && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[13px] leading-relaxed text-blue-900 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-200">
+            <p>
+              Bu filial qo'lda qo'shilgan. Indeks{" "}
+              <span className="font-mono font-semibold">{selectedBranch.index}</span>{" "}
+              to'g'riligini yana bir bor tekshiring.
+            </p>
+            {isSuperAdmin &&
+              (confirmHide ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="h-11 flex-1"
+                    disabled={hideMutation.isPending}
+                    onClick={() => hideMutation.mutate(selectedBranch.id)}
+                  >
+                    {hideMutation.isPending && (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    )}
+                    Ha, o'chirish
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 flex-1"
+                    disabled={hideMutation.isPending}
+                    onClick={() => setConfirmHide(false)}
+                  >
+                    Yo'q
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 h-11 w-full"
+                  onClick={() => setConfirmHide(true)}
+                >
+                  Filialni ro'yxatdan o'chirish
+                </Button>
+              ))}
+          </div>
+        )}
       </div>
+
+      <AddUzpostBranchDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdded={(branch) => {
+          setAddOpen(false);
+          setQuery("");
+          selectBranch(branch);
+        }}
+        onUseExisting={pickListedBranch}
+      />
     </div>
   );
 }
