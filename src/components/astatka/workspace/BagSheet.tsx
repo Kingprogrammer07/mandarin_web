@@ -1,0 +1,147 @@
+import { useId, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
+
+import type { AstatkaBagRef } from "@/api/services/astatkaFlights";
+import type { BagSummary } from "@/lib/astatkaBagSummary";
+
+import {
+  BagEditForm,
+  type BagEditChanges,
+  type BagEditLocks,
+  type BagEditValues,
+} from "./BagEditForm";
+import { BagPhotoReport } from "./BagPhotoReport";
+import { BagSummaryPanel } from "./BagSummaryPanel";
+import { WorkspaceDialog } from "./WorkspaceDialog";
+
+export type BagSheetMode = "view" | "edit";
+
+export interface BagSheetEdit {
+  /** The bag as it is now; untouched fields of the form follow it. */
+  current: BagEditValues;
+  locked?: BagEditLocks;
+  saving: boolean;
+  /**
+   * Why "Saqlash" has to wait right now (the row is being sent, no internet).
+   * The form stays open with what was typed, and saves once this is gone.
+   */
+  disabledReason?: string;
+  onSave: (changes: BagEditChanges) => void;
+}
+
+interface Props {
+  flightName: string;
+  /** The bag's name in the header: its client code, or a track code. */
+  title: string;
+  summary: BagSummary;
+  /** Which bag the photo report reads; `null` while it has no client. */
+  bag: AstatkaBagRef | null;
+  /** The photo report needs the network. */
+  isOnline: boolean;
+  mode: BagSheetMode;
+  onModeChange: (mode: BagSheetMode) => void;
+  onClose: () => void;
+  /** The footer while viewing: the caller's actions for this bag. */
+  footer?: ReactNode;
+  /** What "Tahrirlash" edits; without it the window only shows the bag. */
+  edit?: BagSheetEdit;
+  onWeightChanged?: (weightKg: number | null) => void;
+}
+
+const footerButton =
+  "flex h-12 items-center justify-center gap-2 rounded-mc-md text-[14px] active:scale-[0.98] disabled:opacity-60 sm:min-w-40 sm:px-4";
+
+/**
+ * The one window for a bag, from the saved list and from the scan list alike:
+ * the bag's facts, then its photo report — photos beside their facts on a
+ * wide screen. "Tahrirlash" swaps the facts for the edit form in place, so
+ * there is never a second window on top of this one (only a photo opened
+ * full screen).
+ */
+export function BagSheet({
+  flightName,
+  title,
+  summary,
+  bag,
+  isOnline,
+  mode,
+  onModeChange,
+  onClose,
+  footer,
+  edit,
+  onWeightChanged,
+}: Props) {
+  const formId = useId();
+  const reasonId = useId();
+  const editing = mode === "edit" && edit !== undefined;
+
+  const description = editing
+    ? "O'zgartiring va «Saqlash» ni bosing."
+    : [summary.clientName, summary.sourceFlight || "Reys noma'lum"]
+        .filter(Boolean)
+        .join(" · ");
+
+  const editFooter = editing ? (
+    <div className="space-y-2">
+      {edit.disabledReason && (
+        <p
+          id={reasonId}
+          role="status"
+          className="text-center text-[12px] font-semibold text-mc-warn sm:text-right"
+        >
+          {edit.disabledReason}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+        <button
+          type="button"
+          onClick={() => onModeChange("view")}
+          disabled={edit.saving}
+          className={`${footerButton} border border-mc-border bg-mc-surface font-bold text-mc-text`}
+        >
+          Bekor qilish
+        </button>
+        <button
+          type="submit"
+          form={formId}
+          disabled={edit.saving || edit.disabledReason !== undefined}
+          aria-describedby={edit.disabledReason ? reasonId : undefined}
+          className={`${footerButton} bg-mc-brand font-extrabold text-mc-on-brand`}
+        >
+          {edit.saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          Saqlash
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <WorkspaceDialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={editing ? `Tahrirlash · ${title}` : title}
+      description={description}
+      size="xl"
+      footer={editing ? editFooter : footer}
+    >
+      <div className="@container space-y-5">
+        {editing ? (
+          <BagEditForm
+            id={formId}
+            current={edit.current}
+            locked={edit.locked}
+            onSave={edit.onSave}
+          />
+        ) : (
+          <BagSummaryPanel summary={summary} />
+        )}
+        <BagPhotoReport
+          flightName={flightName}
+          bag={bag}
+          isOnline={isOnline}
+          onWeightChanged={onWeightChanged}
+        />
+      </div>
+    </WorkspaceDialog>
+  );
+}

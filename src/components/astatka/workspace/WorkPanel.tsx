@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { updateAstatkaPackage, type AstatkaBagRef } from "@/api/services/astatkaFlights";
 import { ScannerSoundSettingsModal } from "@/components/expectedCargo/ScannerSoundSettingsModal";
 import {
   DropdownMenu,
@@ -51,22 +50,20 @@ import {
   findRowByCode,
   matchesFilter,
   parseTrackCodes,
-  rowCodes,
   rowView,
   rowsToCsv,
   type WorkFilter,
   type WorkRow,
 } from "@/lib/astatkaWorkQueue";
 import { cn } from "@/lib/utils";
-import { apiErrorMessage } from "@/utils/apiError";
 import { askConfirm } from "@/utils/askConfirm";
 import { downloadBlob, fileStamp, safeFileName } from "@/utils/downloadFile";
 import type { QueueBackup } from "@/utils/astatkaWorkspaceDb";
 import { astatkaWorkspaceDb } from "@/utils/astatkaWorkspaceDb";
 
-import { BagDetailsDialog } from "./BagDetailsDialog";
-import { BagEditDialog, type BagEditValues } from "./BagEditDialog";
+import type { BagSheetMode } from "./BagSheet";
 import { WorkRowItem } from "./WorkRowItem";
+import { WorkRowSheet } from "./WorkRowSheet";
 import { WorkspaceDialog } from "./WorkspaceDialog";
 
 const CAMERA_CONTAINER_ID = "astatka-camera";
@@ -81,6 +78,16 @@ interface Props {
   onAutoConfirmChange: (value: boolean) => void;
   previewVisible: boolean;
   onTogglePreview: () => void;
+}
+
+/**
+ * The bag window. The row is read live by id; the copy is what it still shows
+ * if the row leaves the screen while the window is open.
+ */
+interface OpenRow {
+  rowId: string;
+  snapshot: WorkRow;
+  mode: BagSheetMode;
 }
 
 /** A phone or tablet: focusing a field there pops the on-screen keyboard. */
@@ -114,15 +121,13 @@ export function WorkPanel({
   const [input, setInput] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
   const [filter, setFilter] = useState<WorkFilter>("all");
-  const [editing, setEditing] = useState<WorkRow | null>(null);
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [sheet, setSheet] = useState<OpenRow | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
   const [backups, setBackups] = useState<QueueBackup[] | null>(null);
   const [soundsOpen, setSoundsOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const [detailsRow, setDetailsRow] = useState<WorkRow | null>(null);
   // On a touch screen the field is kept focused with the on-screen keyboard
   // folded away (a Bluetooth scanner still types into it); the keyboard
   // opens only when the worker asks for it.
@@ -254,43 +259,24 @@ export function WorkPanel({
     lastScan && now - lastScan.at < HIGHLIGHT_MS ? lastRow?.id ?? null : null;
 
   const onConfirmRow = useCallback((row: WorkRow) => void queue.confirmRows([row.id]), [queue]);
-  const onRemoveRow = useCallback((row: WorkRow) => queue.removeRow(row.id), [queue]);
-  const onEditRow = useCallback((row: WorkRow) => setEditing(row), []);
-  const onOpenRow = useCallback((row: WorkRow) => setDetailsRow(row), []);
-
-  const saveEdit = async (values: BagEditValues) => {
-    if (!editing) return;
-    const savedId = editing.state === "confirmed" ? editing.pkg?.id ?? null : null;
-    if (savedId !== null) {
-      setSavingEdit(true);
-      try {
-        const pkg = await updateAstatkaPackage(flightName, savedId, {
-          weight_kg: values.weightKg,
-          comment: values.comment || null,
-          track_codes: values.trackCodes,
-        });
-        queue.replacePackage(editing.id, pkg);
-        toast.success("Saqlandi");
-        setEditing(null);
-      } catch (error) {
-        toast.error(apiErrorMessage(error, "Saqlab bo'lmadi."));
-      } finally {
-        setSavingEdit(false);
-      }
-      return;
-    }
-    const view = rowView(editing);
-    queue.updateEdits(editing.id, {
-      clientCode: values.clientCode !== view.clientCode ? values.clientCode : editing.edits.clientCode,
-      sourceFlight:
-        values.sourceFlight !== view.sourceFlight ? values.sourceFlight : editing.edits.sourceFlight,
-      weightKg:
-        values.weightKg !== view.weightKg ? values.weightKg : editing.edits.weightKg,
-      comment: values.comment || undefined,
-      trackCodes: values.trackCodes,
-    });
-    setEditing(null);
-  };
+  const onRemoveRow = useCallback(
+    (row: WorkRow) => {
+      queue.removeRow(row.id);
+      // A confirmed row's bag is saved on the server: its row leaving the
+      // screen must not read as the bag being deleted.
+      if (row.state === "confirmed") toast.success("Ekrandan olib tashlandi. Yuk bazada saqlangan.");
+    },
+    [queue],
+  );
+  const onEditRow = useCallback(
+    (row: WorkRow) => setSheet({ rowId: row.id, snapshot: row, mode: "edit" }),
+    [],
+  );
+  const onOpenRow = useCallback(
+    (row: WorkRow) => setSheet({ rowId: row.id, snapshot: row, mode: "view" }),
+    [],
+  );
+  const sheetRow = sheet ? rows.find((row) => row.id === sheet.rowId) : undefined;
 
   const confirmAll = async () => {
     const ids = queue.confirmableIds;
@@ -641,25 +627,17 @@ export function WorkPanel({
         </ul>
       )}
 
-      {editing && (
-        <BagEditDialog
-          open
-          onOpenChange={(open) => !open && setEditing(null)}
-          title={`Tahrirlash · ${rowView(editing).clientCode || editing.trackCode}`}
-          saving={savingEdit}
-          locked={
-            editing.state === "confirmed"
-              ? { clientCode: true, sourceFlight: true, removeCodes: true }
-              : {}
-          }
-          initial={{
-            clientCode: rowView(editing).clientCode,
-            sourceFlight: rowView(editing).sourceFlight,
-            weightKg: rowView(editing).weightKg,
-            comment: editing.edits.comment ?? editing.pkg?.comment ?? "",
-            trackCodes: rowCodes(editing),
-          }}
-          onSave={(values) => void saveEdit(values)}
+      {sheet && (
+        <WorkRowSheet
+          flightName={flightName}
+          queue={queue}
+          row={sheetRow ?? sheet.snapshot}
+          onScreen={sheetRow !== undefined}
+          mode={sheet.mode}
+          onModeChange={(mode) => setSheet((current) => (current ? { ...current, mode } : current))}
+          onClose={() => setSheet(null)}
+          onConfirm={onConfirmRow}
+          onRemove={onRemoveRow}
         />
       )}
 
@@ -728,34 +706,9 @@ export function WorkPanel({
         </ul>
       </WorkspaceDialog>
 
-      {detailsRow && (
-        <BagDetailsDialog
-          flightName={flightName}
-          bag={bagRefOf(rows.find((row) => row.id === detailsRow.id) ?? detailsRow, flightName)}
-          title={rowView(detailsRow).clientCode || detailsRow.trackCode}
-          isOnline={queue.isOnline}
-          onClose={() => setDetailsRow(null)}
-          onWeightChanged={(weightKg) => queue.applyBagWeight(detailsRow.id, weightKg)}
-        />
-      )}
-
       <ScannerSoundSettingsModal open={soundsOpen} onOpenChange={setSoundsOpen} />
     </div>
   );
-}
-
-/**
- * Which bag the details window reads: a bag saved in this astatka by id, any
- * other by client and flight. `null` while the row has no client yet.
- */
-function bagRefOf(row: WorkRow, flightName: string): AstatkaBagRef | null {
-  const pkg = row.pkg;
-  const sameAstatka =
-    pkg?.astatka_flight_name.trim().toUpperCase() === flightName.trim().toUpperCase();
-  if (pkg?.id != null && sameAstatka && !pkg.already_in_astatka) return { packageId: pkg.id };
-  const view = rowView(row);
-  if (!view.clientCode) return null;
-  return { clientCode: view.clientCode, sourceFlight: view.sourceFlight };
 }
 
 function LastScanBanner({

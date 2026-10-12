@@ -27,6 +27,7 @@ interface Props {
   onOpen: (row: WorkRow) => void;
   onConfirm: (row: WorkRow) => void;
   onEdit: (row: WorkRow) => void;
+  /** Takes the row off the screen only; a confirmed bag stays saved. */
   onRemove: (row: WorkRow) => void;
 }
 
@@ -122,8 +123,10 @@ export const WorkRowItem = memo(function WorkRowItem({
 }: Props) {
   const view = rowView(row);
   const payment = paymentLabel(row.pkg?.payment_state);
-  const removable = row.state !== "saving" && row.state !== "queued" && row.state !== "confirmed";
+  // A saving or queued row holds work the server has not seen yet; any other
+  // row — a confirmed one too — can leave the screen, its bag stays saved.
   const editable = row.state !== "saving" && row.state !== "queued";
+  const removable = editable;
   const problem =
     row.state === "failed" ||
     row.state === "not_found" ||
@@ -169,8 +172,8 @@ export const WorkRowItem = memo(function WorkRowItem({
       type="button"
       onClick={() => onRemove(row)}
       disabled={!removable}
-      aria-label="Ro'yxatdan olib tashlash"
-      title="Ro'yxatdan olib tashlash"
+      aria-label="Ekrandan olib tashlash"
+      title="Ekrandan olib tashlash"
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm text-mc-text-3 active:scale-95 disabled:opacity-30"
     >
       <X className="h-4 w-4" />

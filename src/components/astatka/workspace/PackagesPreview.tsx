@@ -1,44 +1,24 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Images,
-  Loader2,
-  PackageSearch,
-  Pencil,
-  RotateCcw,
-  Search,
-  Trash2,
-  WifiOff,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { ChevronDown, Loader2, PackageSearch, Search, WifiOff, X } from "lucide-react";
 
 import {
   astatkaPackagesQueryKey,
-  astatkaStatsQueryKey,
-  confirmAstatkaPackages,
-  deleteAstatkaPackage,
   getAstatkaPackages,
-  unconfirmAstatkaPackage,
-  updateAstatkaPackage,
   type AstatkaIndexResponse,
   type AstatkaPackage,
   type AstatkaPackageSort,
   type AstatkaPackageStatus,
 } from "@/api/services/astatkaFlights";
-import { formatKg, formatScanTime, paymentLabel } from "@/lib/astatkaFormat";
+import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
 import { filterPackages, totalsOf } from "@/lib/astatkaPackages";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/utils/apiError";
-import { askConfirm } from "@/utils/askConfirm";
 
-import { BagDetailsDialog } from "./BagDetailsDialog";
-import { BagEditDialog, type BagEditValues } from "./BagEditDialog";
-import { WorkspaceDialog } from "./WorkspaceDialog";
+import type { BagSheetMode } from "./BagSheet";
+import { SavedBagHeader, SavedBagRow } from "./SavedBagRow";
+import { SavedBagSheet } from "./SavedBagSheet";
+import { useSavedBagActions } from "./useSavedBagActions";
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -62,9 +42,18 @@ interface Props {
   offlineIndex: AstatkaIndexResponse | null;
 }
 
-function newKey(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+/** The bag window's state: which saved bag, and whether it is being edited. */
+interface OpenBag {
+  /** The newest copy known: the list's, or a local one not refetched yet. */
+  pkg: AstatkaPackage;
+  mode: BagSheetMode;
+  /** The list entry `pkg` was last taken from. */
+  synced: AstatkaPackage;
+}
+
+/** Saved bags are matched by id; one with no id yet is never re-read. */
+function sameBag(a: AstatkaPackage, b: AstatkaPackage): boolean {
+  return a.id !== null && a.id === b.id;
 }
 
 /** A native select (16px, so iOS does not zoom) with the arrow the base reset removed. */
@@ -94,41 +83,19 @@ function SelectBox({
   );
 }
 
-function StatusBadge({ status }: { status: AstatkaPackageStatus | null }) {
-  const confirmed = status === "confirmed";
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
-        confirmed ? "bg-mc-success/12 text-mc-success" : "bg-mc-warn-soft text-mc-warn",
-      )}
-    >
-      {confirmed ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-      {confirmed ? "Tasdiqlangan" : "Kutilmoqda"}
-    </span>
-  );
-}
-
-/**
- * What is already saved in this astatka: the bags "Astatka ajratish" found
- * and the ones confirmed on the shelf. A table on a wide screen, cards on a
- * phone. Tapping a bag shows every track code and what can be done with it.
- */
 /**
  * The saved list: every bag of this astatka flight, expected or confirmed,
- * with search, filters and — in edit mode — fixes. Offline it falls back to
- * the copy the work mode keeps on the device, read-only.
+ * with search, filters and — in edit mode — fixes. A table on a wide screen,
+ * cards on a phone; a tap opens the bag window. Offline it falls back to the
+ * copy the work mode keeps on the device, read-only.
  */
 export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }: Props) {
-  const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<string>("__all__");
   const [sort, setSort] = useState<AstatkaPackageSort>("recent");
-  const [opened, setOpened] = useState<AstatkaPackage | null>(null);
-  const [editing, setEditing] = useState<AstatkaPackage | null>(null);
-  const [photosFor, setPhotosFor] = useState<AstatkaPackage | null>(null);
+  const [opened, setOpened] = useState<OpenBag | null>(null);
 
   const params = useMemo(
     () => ({
@@ -193,124 +160,33 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
   const weights = offlineTotals?.weights ?? first?.weights;
   const sourceFlights = offlineTotals?.sourceFlights ?? first?.source_flights ?? [];
   const canChange = !offline;
+  // The per-row fixes need the server, so offline they are not offered.
+  const fixing = editMode && canChange;
   const listReady = offline ? offlineIndex !== null : query.isSuccess;
 
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: astatkaPackagesQueryKey(flightName) });
-    void queryClient.invalidateQueries({ queryKey: astatkaStatsQueryKey });
-  };
-
-  const unconfirm = useMutation({
-    mutationFn: (pkg: AstatkaPackage) => unconfirmAstatkaPackage(flightName, pkg.id ?? 0),
-    onSuccess: (result) => {
-      toast.success(result.message);
-      result.warnings.forEach((warning) => toast.warning(warning));
-      setOpened(null);
-      refresh();
-    },
-    onError: (error) => toast.error(apiErrorMessage(error, "Bekor qilib bo'lmadi.")),
+  const patchOpened = (pkg: AstatkaPackage, patch: Partial<OpenBag>) =>
+    setOpened((current) => (current && sameBag(current.pkg, pkg) ? { ...current, ...patch } : current));
+  const actions = useSavedBagActions({
+    flightName,
+    onDone: (pkg) =>
+      setOpened((current) =>
+        current && (sameBag(current.pkg, pkg) || current.pkg === pkg) ? null : current,
+      ),
+    onPackageChanged: (pkg) => patchOpened(pkg, { pkg }),
+    // The window stays open on the bag as saved; the list catches up on its own.
+    onSaved: (pkg) => patchOpened(pkg, { pkg, mode: "view" }),
   });
 
-  const remove = useMutation({
-    mutationFn: (pkg: AstatkaPackage) => deleteAstatkaPackage(flightName, pkg.id ?? 0),
-    onSuccess: () => {
-      toast.success("Ro'yxatdan o'chirildi");
-      setOpened(null);
-      refresh();
-    },
-    onError: (error) => toast.error(apiErrorMessage(error, "O'chirib bo'lmadi.")),
-  });
+  // The open bag follows the list, so its facts and its edit form never show
+  // a weight the photo report below has already replaced. An unchanged entry
+  // keeps its identity across refetches, so a local copy that is newer (the
+  // saved edit, the weight just typed) holds until the list really changes.
+  const listed = opened && !offline ? onlineItems.find((item) => sameBag(item, opened.pkg)) : undefined;
+  if (opened && listed && listed !== opened.synced) {
+    setOpened({ ...opened, pkg: listed, synced: listed });
+  }
 
-  const confirm = useMutation({
-    mutationFn: (pkg: AstatkaPackage) =>
-      confirmAstatkaPackages(flightName, [
-        {
-          idempotency_key: newKey(),
-          client_code: pkg.client_code,
-          source_flight_name: pkg.source_flight_name,
-          track_codes: pkg.track_codes,
-          scanned_at: new Date().toISOString(),
-        },
-      ]),
-    onSuccess: ([result]) => {
-      if (result && (result.outcome === "conflict" || result.outcome === "error")) {
-        toast.error(result.message);
-        return;
-      }
-      toast.success("Tasdiqlandi");
-      result?.warnings.forEach((warning) => toast.warning(warning));
-      setOpened(null);
-      refresh();
-    },
-    onError: (error) => toast.error(apiErrorMessage(error, "Tasdiqlab bo'lmadi.")),
-  });
-
-  const update = useMutation({
-    mutationFn: ({ pkg, values }: { pkg: AstatkaPackage; values: BagEditValues }) =>
-      updateAstatkaPackage(flightName, pkg.id ?? 0, {
-        weight_kg: values.weightKg,
-        comment: values.comment || null,
-        track_codes: values.trackCodes,
-        ...(pkg.status === "confirmed" ? {} : { client_code: values.clientCode }),
-      }),
-    onSuccess: () => {
-      toast.success("Saqlandi");
-      setEditing(null);
-      setOpened(null);
-      refresh();
-    },
-    onError: (error) => toast.error(apiErrorMessage(error, "Saqlab bo'lmadi.")),
-  });
-
-  const askUnconfirm = async (pkg: AstatkaPackage) => {
-    if (
-      await askConfirm(
-        `${pkg.client_code} yukining tasdig'i bekor qilinsinmi? Yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi.`,
-      )
-    ) {
-      unconfirm.mutate(pkg);
-    }
-  };
-
-  const askDelete = async (pkg: AstatkaPackage) => {
-    if (await askConfirm(`${pkg.client_code} ro'yxatdan o'chirilsinmi?`)) remove.mutate(pkg);
-  };
-
-  const rowActions = (pkg: AstatkaPackage) =>
-    editMode && canChange && (
-      <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => setEditing(pkg)}
-          aria-label="Tahrirlash"
-          title="Tahrirlash"
-          className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-text-2 active:scale-95"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
-        {pkg.status === "confirmed" ? (
-          <button
-            type="button"
-            onClick={() => void askUnconfirm(pkg)}
-            aria-label="Tasdiqni bekor qilish"
-            title="Tasdiqni bekor qilish"
-            className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-warn active:scale-95"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void askDelete(pkg)}
-            aria-label="O'chirish"
-            title="O'chirish"
-            className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-danger active:scale-95"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-    );
+  const openBag = (pkg: AstatkaPackage, mode: BagSheetMode) => setOpened({ pkg, mode, synced: pkg });
 
   return (
     <div className="flex flex-col gap-3 @container">
@@ -375,7 +251,7 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
       </div>
 
       {/* ── Filters ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
         {(
           [
             ["all", "Hammasi", counts?.all],
@@ -389,7 +265,7 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
             onClick={() => setStatus(key)}
             aria-pressed={status === key}
             className={cn(
-              "inline-flex h-9 items-center gap-1 rounded-full border px-3 text-[12px] font-bold active:scale-[0.97]",
+              "inline-flex h-11 items-center gap-1 rounded-full border px-3 text-[12px] font-bold active:scale-[0.97]",
               status === key
                 ? "border-mc-brand bg-mc-brand text-mc-on-brand"
                 : "border-mc-border bg-mc-surface text-mc-text-2",
@@ -422,7 +298,7 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
         </SelectBox>
       </div>
 
-      {editMode && canChange && (
+      {fixing && (
         <p className="rounded-mc-sm border border-mc-brand/40 bg-mc-brand-soft px-3 py-2 text-[12px] font-semibold text-mc-brand">
           Tahrirlash rejimi: har bir qator yonida tahrirlash, bekor qilish va o'chirish tugmalari.
         </p>
@@ -467,72 +343,19 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
 
       {items.length > 0 && (
         <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface">
-          <div className="hidden border-b border-mc-border bg-mc-surface-2 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3 @2xl:grid @2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_4.5rem_minmax(0,0.9fr)_7.5rem_minmax(0,0.9fr)_auto] @2xl:gap-3">
-            <span>Mijoz</span>
-            <span>Reys</span>
-            <span>Trek</span>
-            <span>Og'irlik</span>
-            <span>Holati</span>
-            <span>Vaqt</span>
-            <span className={editMode ? "w-[92px]" : "w-0"} />
-          </div>
+          <SavedBagHeader editMode={fixing} />
           <ul className="divide-y divide-mc-border">
             {items.map((pkg) => (
               <li key={pkg.id ?? `${pkg.client_code}-${pkg.source_flight_name}`}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setOpened(pkg)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setOpened(pkg);
-                    }
-                  }}
-                  className="cursor-pointer px-3 py-2.5 outline-none focus-visible:bg-mc-surface-2 active:bg-mc-surface-2"
-                >
-                  {/* Wide */}
-                  <div className="hidden items-center gap-3 @2xl:grid @2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_4.5rem_minmax(0,0.9fr)_7.5rem_minmax(0,0.9fr)_auto]">
-                    <div className="min-w-0">
-                      <p className="break-all text-[14px] font-extrabold text-mc-text">{pkg.client_code}</p>
-                      {pkg.client_name && (
-                        <p className="truncate text-[11px] font-medium text-mc-text-3">{pkg.client_name}</p>
-                      )}
-                    </div>
-                    <p className="break-words text-[13px] font-bold text-mc-text">
-                      {pkg.source_flight_name || "—"}
-                    </p>
-                    <p className="text-[13px] font-bold tabular-nums text-mc-text">{pkg.track_count} ta</p>
-                    <p className="break-words text-[13px] font-bold tabular-nums text-mc-text">
-                      {formatKg(pkg.weight_kg)}
-                    </p>
-                    <StatusBadge status={pkg.status} />
-                    <p className="text-[12px] font-medium tabular-nums text-mc-text-3">
-                      {formatScanTime(pkg.confirmed_at ?? pkg.scanned_at ?? pkg.created_at)}
-                    </p>
-                    <div className={editMode ? "w-[92px]" : "w-0"}>{rowActions(pkg)}</div>
-                  </div>
-                  {/* Narrow */}
-                  <div className="flex items-center gap-2 @2xl:hidden">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="min-w-0 break-all text-[15px] font-extrabold text-mc-text">
-                          {pkg.client_code}
-                        </p>
-                        <StatusBadge status={pkg.status} />
-                      </div>
-                      <p className="mt-0.5 break-words text-[12px] font-semibold text-mc-text-2">
-                        {pkg.source_flight_name || "Reys noma'lum"} · {pkg.track_count} ta trek ·{" "}
-                        {formatKg(pkg.weight_kg)}
-                      </p>
-                      <p className="text-[11px] font-medium tabular-nums text-mc-text-3">
-                        {formatScanTime(pkg.confirmed_at ?? pkg.scanned_at ?? pkg.created_at)}
-                        {pkg.confirmed_by ? ` · ${pkg.confirmed_by}` : ""}
-                      </p>
-                    </div>
-                    {rowActions(pkg)}
-                  </div>
-                </div>
+                <SavedBagRow
+                  pkg={pkg}
+                  editMode={fixing}
+                  canChange={canChange}
+                  deleting={pkg.id !== null && actions.deletingIds.has(pkg.id)}
+                  onOpen={openBag}
+                  onUnconfirm={(target) => void actions.askUnconfirm(target)}
+                  onDelete={(target) => void actions.askDelete(target)}
+                />
               </li>
             ))}
           </ul>
@@ -561,144 +384,23 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
       )}
 
       {opened && (
-        <WorkspaceDialog
-          open
-          onOpenChange={(open) => !open && setOpened(null)}
-          title={opened.client_code}
-          description={opened.client_name ?? undefined}
-          footer={
-            !canChange ? (
-              <p className="text-center text-[12px] font-semibold text-mc-text-3">
-                Internet yo'q — o'zgartirish uchun internet kerak.
-              </p>
-            ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {opened.status !== "confirmed" && (
-                <button
-                  type="button"
-                  onClick={() => confirm.mutate(opened)}
-                  disabled={confirm.isPending}
-                  className="flex h-12 items-center justify-center gap-2 rounded-mc-md bg-mc-brand text-[14px] font-extrabold text-mc-on-brand active:scale-[0.98] disabled:opacity-60 sm:col-span-2"
-                >
-                  {confirm.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  Yuk shu yerda — tasdiqlash
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setEditing(opened)}
-                className="flex h-12 items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface text-[14px] font-bold text-mc-text active:scale-[0.98]"
-              >
-                <Pencil className="h-4 w-4" />
-                Tahrirlash
-              </button>
-              {opened.status === "confirmed" ? (
-                <button
-                  type="button"
-                  onClick={() => void askUnconfirm(opened)}
-                  disabled={unconfirm.isPending}
-                  className="flex h-12 items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface text-[14px] font-bold text-mc-warn active:scale-[0.98] disabled:opacity-60"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Tasdiqni bekor qilish
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void askDelete(opened)}
-                  disabled={remove.isPending}
-                  className="flex h-12 items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface text-[14px] font-bold text-mc-danger active:scale-[0.98] disabled:opacity-60"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Ro'yxatdan o'chirish
-                </button>
-              )}
-            </div>
+        <SavedBagSheet
+          flightName={flightName}
+          pkg={opened.pkg}
+          mode={opened.mode}
+          onModeChange={(mode) => setOpened((current) => (current ? { ...current, mode } : current))}
+          onClose={() => setOpened(null)}
+          // The server has already re-weighed the bag; show it before the list does.
+          onWeightChanged={(weightKg) =>
+            setOpened((current) =>
+              current
+                ? { ...current, pkg: { ...current.pkg, weight_kg: weightKg, weight_edited: false } }
+                : current,
             )
           }
-        >
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-            {(
-              [
-                ["Holati", <StatusBadge key="s" status={opened.status} />],
-                ["Qaysi reysdan", opened.source_flight_name || "Noma'lum"],
-                ["Og'irligi", `${formatKg(opened.weight_kg)}${opened.weight_edited ? " (qo'lda)" : ""}`],
-                ["Foto hisobot", opened.has_photo ? `Bor · ${opened.bags} ta` : "Yo'q"],
-                ["To'lov", paymentLabel(opened.payment_state) ?? "Yozuv yo'q"],
-                ["Olib ketilganmi", opened.taken_away ? "Ha — tekshiring!" : "Yo'q"],
-                ["Tasdiqlagan", opened.confirmed_by ?? "—"],
-                ["Vaqti", formatScanTime(opened.confirmed_at ?? opened.created_at)],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <dt className="text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3">{label}</dt>
-                <dd className="break-words text-[13px] font-bold text-mc-text">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          {opened.comment && (
-            <p className="mt-3 rounded-mc-sm bg-mc-surface-2 px-3 py-2 text-[13px] font-medium text-mc-text-2">
-              {opened.comment}
-            </p>
-          )}
-          {opened.id !== null && (
-            <button
-              type="button"
-              onClick={() => {
-                setPhotosFor(opened);
-                setOpened(null);
-              }}
-              className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface-2 text-[13px] font-bold text-mc-text active:scale-[0.98]"
-            >
-              <Images className="h-4 w-4" />
-              Rasmlar va foto hisobot ma'lumotlari
-            </button>
-          )}
-          <p className="mt-4 text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3">
-            Trek kodlar · {opened.track_count} ta
-          </p>
-          <ul className="mt-1.5 flex flex-wrap gap-1.5">
-            {opened.track_codes.map((code) => (
-              <li
-                key={code}
-                className="break-all rounded-mc-sm bg-mc-surface-2 px-2 py-1 font-mono text-[12px] font-bold text-mc-text"
-              >
-                {code}
-              </li>
-            ))}
-          </ul>
-        </WorkspaceDialog>
-      )}
-
-      {photosFor?.id != null && (
-        <BagDetailsDialog
-          flightName={flightName}
-          bag={{ packageId: photosFor.id }}
-          title={photosFor.client_code}
           isOnline={isOnline}
-          onClose={() => setPhotosFor(null)}
-        />
-      )}
-
-      {editing && (
-        <BagEditDialog
-          open
-          onOpenChange={(open) => !open && setEditing(null)}
-          title={`Tahrirlash · ${editing.client_code}`}
-          saving={update.isPending}
-          locked={
-            editing.status === "confirmed"
-              ? { clientCode: true, sourceFlight: true, removeCodes: true }
-              : { sourceFlight: true }
-          }
-          initial={{
-            clientCode: editing.client_code,
-            sourceFlight: editing.source_flight_name,
-            weightKg: editing.weight_kg,
-            comment: editing.comment ?? "",
-            trackCodes: editing.track_codes,
-          }}
-          onSave={(values) => update.mutate({ pkg: editing, values })}
+          canChange={canChange}
+          actions={actions}
         />
       )}
     </div>

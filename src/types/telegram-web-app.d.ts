@@ -117,6 +117,8 @@ interface TelegramWebApp {
   exitFullscreen?(): void;
   disableVerticalSwipes?(): void;
   enableVerticalSwipes?(): void;
+  /** Swipe-down-to-minimise is on (Bot API 7.7+). */
+  isVerticalSwipesEnabled?: boolean;
 
   // Version check (Bot API 6.0+)
   isVersionAtLeast(version: string): boolean;
