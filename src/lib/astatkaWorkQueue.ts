@@ -294,9 +294,15 @@ export function mergeSameBag(rows: WorkRow[]): WorkRow[] {
       result.push(row);
       continue;
     }
+    // A code scanned onto the bag after its list was fixed by hand belongs
+    // in that list: the confirm sends the fixed list as the bag's whole list.
+    const fixedCodes = keeper.edits.trackCodes;
     const merged: WorkRow = {
       ...keeper,
       scannedCodes: [...new Set([...keeper.scannedCodes, ...row.scannedCodes])],
+      edits: fixedCodes
+        ? { ...keeper.edits, trackCodes: [...new Set([...fixedCodes, ...row.scannedCodes])] }
+        : keeper.edits,
       lastScanAt:
         keeper.lastScanAt > row.lastScanAt ? keeper.lastScanAt : row.lastScanAt,
     };

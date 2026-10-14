@@ -110,6 +110,18 @@ describe("one row per bag", () => {
     expect(merged[0].scannedCodes.sort()).toEqual(["YT001", "YT002"]);
     expect(merged[0].id).toBe("a");
   });
+
+  it("adds a code scanned after the codes were fixed by hand to the fixed list", () => {
+    const answer = { ...resolveFromIndex({ packages: [pkg()] }, "YT001")! };
+    let rows = registerScan([], "YT001", T0, "a").rows.map((row) => applyScanResult(row, answer, false));
+    rows = rows.map((row) => ({ ...row, edits: { trackCodes: ["YT001", "NEW777"] } }));
+    rows = registerScan(rows, "YT002", T1, "b").rows.map((row) =>
+      row.id === "b" ? applyScanResult(row, answer, false) : row,
+    );
+    const [merged] = mergeSameBag(rows);
+    expect(merged.edits.trackCodes).toEqual(["YT001", "NEW777", "YT002"]);
+    expect(buildConfirmItem(merged, "key-5").track_codes).toEqual(["YT001", "NEW777", "YT002"]);
+  });
 });
 
 describe("scan answers", () => {
