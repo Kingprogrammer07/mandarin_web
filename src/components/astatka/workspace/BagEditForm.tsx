@@ -18,7 +18,6 @@ export type BagEditChanges = Partial<BagEditValues>;
 export interface BagEditLocks {
   clientCode?: boolean;
   sourceFlight?: boolean;
-  removeCodes?: boolean;
 }
 
 interface Props {
@@ -130,13 +129,8 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
       setError("Og'irlik noto'g'ri. Masalan: 4.5");
       return;
     }
-    if (
-      locked.removeCodes &&
-      current.trackCodes.some((code) => !codes.includes(code))
-    ) {
-      setError(
-        "Tasdiqlangan yukdan trek kod olib bo'lmaydi. Avval tasdiqni bekor qiling.",
-      );
+    if (edited("trackCodes") && codes.length === 0) {
+      setError("Kamida bitta trek kod yozing.");
       return;
     }
     setError(null);

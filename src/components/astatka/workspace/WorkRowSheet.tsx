@@ -179,7 +179,7 @@ export function WorkRowSheet({
               },
               locked:
                 row.state === "confirmed"
-                  ? { clientCode: true, sourceFlight: true, removeCodes: true }
+                  ? { clientCode: true, sourceFlight: true }
                   : {},
               saving: savingEdit,
               disabledReason: waitReason(row),

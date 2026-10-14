@@ -351,6 +351,8 @@ export function buildConfirmItem(row: WorkRow, key: string): AstatkaConfirmItem 
     source_flight_name: view.sourceFlight,
     track_code: row.trackCode,
     track_codes: rowCodes(row),
+    // A list fixed by hand replaces the bag's codes; scanned codes only add.
+    track_codes_edited: row.edits.trackCodes !== undefined ? true : undefined,
     // Only a typed weight is sent: the server already knows the report's.
     weight_kg: row.edits.weightKg !== undefined ? row.edits.weightKg : undefined,
     comment: row.edits.comment ?? undefined,

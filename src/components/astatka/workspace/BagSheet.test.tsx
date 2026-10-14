@@ -454,6 +454,40 @@ describe("BagSheet — edit mode", () => {
     expect(onSave).toHaveBeenCalledWith({});
   });
 
+  it("lets a confirmed bag's codes be replaced", () => {
+    details.mockResolvedValue(bagDetails());
+    const onSave = vi.fn();
+    renderSheet({
+      initialMode: "edit",
+      onSave,
+      locked: { clientCode: true, sourceFlight: true },
+    });
+
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT100\nYT999" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(onSave).toHaveBeenCalledWith({ trackCodes: ["YT100", "YT999"] });
+  });
+
+  it("refuses to save a bag with every code deleted", () => {
+    details.mockResolvedValue(bagDetails());
+    const onSave = vi.fn();
+    renderSheet({ initialMode: "edit", onSave });
+
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Kamida bitta trek kod yozing.",
+    );
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("refuses an empty client code without saving", () => {
     details.mockResolvedValue(bagDetails());
     const onSave = vi.fn();

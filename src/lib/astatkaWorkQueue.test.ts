@@ -214,6 +214,12 @@ describe("confirming", () => {
     expect(rowView({ ...ready, edits: { weightKg: 5.5 } }).weightEdited).toBe(true);
   });
 
+  it("marks a hand-corrected code list so the server replaces the bag's codes", () => {
+    expect(buildConfirmItem(ready, "key-3").track_codes_edited).toBeUndefined();
+    const corrected = buildConfirmItem({ ...ready, edits: { trackCodes: ["NEW777", "NEW888"] } }, "key-4");
+    expect(corrected).toMatchObject({ track_codes: ["NEW777", "NEW888"], track_codes_edited: true });
+  });
+
   it("keeps the key for a transient error and drops it for a refusal", () => {
     const sending: WorkRow = { ...ready, state: "saving", confirmKey: "k1" };
     const base = { idempotency_key: "k1", package: null, message: "x", warnings: [] };

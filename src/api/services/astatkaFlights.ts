@@ -94,6 +94,11 @@ export interface AstatkaConfirmItem {
   source_flight_name: string;
   track_code?: string | null;
   track_codes?: string[] | null;
+  /**
+   * `track_codes` is the worker's corrected list: the server replaces the
+   * bag's codes with it instead of adding to them.
+   */
+  track_codes_edited?: boolean;
   weight_kg?: number | null;
   comment?: string | null;
   scanned_at?: string | null;

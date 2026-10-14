@@ -114,7 +114,7 @@ export function SavedBagSheet({
           trackCodes: pkg.track_codes,
         },
         locked: confirmed
-          ? { clientCode: true, sourceFlight: true, removeCodes: true }
+          ? { clientCode: true, sourceFlight: true }
           : { sourceFlight: true },
         saving: actions.update.isPending,
         // The connection dropping mid-edit must not throw away what was typed.

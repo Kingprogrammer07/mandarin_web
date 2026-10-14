@@ -216,6 +216,31 @@ describe("WorkRowSheet", () => {
     expect(queue.updateEdits).not.toHaveBeenCalled();
   });
 
+  it("replaces a confirmed bag's track codes on the server", async () => {
+    const saved = {
+      ...pkg,
+      status: "confirmed" as const,
+      track_codes: ["YT1", "YT9"],
+    };
+    update.mockResolvedValue(saved);
+    const { queue } = renderSheet("confirmed", "edit");
+
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT1\nYT9" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith("OSTATKA.202", 7, {
+        track_codes: ["YT1", "YT9"],
+      }),
+    );
+    await waitFor(() =>
+      expect(queue.replacePackage).toHaveBeenCalledWith("r1", saved),
+    );
+  });
+
   it("keeps an unconfirmed row's edit on the screen, then shows the row", () => {
     const { queue, handlers } = renderSheet("ready", "edit");
 
