@@ -1,4 +1,5 @@
 import { apiClient } from '../client';
+import { rememberAdminTokenClock } from '@/lib/adminTokenClock';
 
 // ── Response Types ─────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ export async function loginAdminPin(system_username: string, pin: string, device
     pin,
     device_info
   });
+  rememberAdminTokenClock(response.data.access_token);
   return response.data;
 }
 
@@ -105,8 +107,8 @@ export async function loginAdminPin(system_username: string, pin: string, device
  * The endpoint drops the token's `jti` into the Redis blocklist that
  * `get_admin_from_jwt` consults on every staff request, and writes a LOGOUT
  * audit row. Until this was wired up, "Chiqish" only cleared `localStorage`:
- * the token stayed valid for the rest of `API_JWT_EXPIRE_MINUTES` (8h in
- * production), so anyone who had copied it — or picked it out of the nginx
+ * the token stayed valid until its own `exp` (8h in production, 12h for a
+ * warehouse-only account), so anyone who had copied it — or picked it out of the nginx
  * access log, where the SSE streams put it — kept full staff access after the
  * cashier had signed off the shared till.
  *
@@ -143,6 +145,10 @@ const REFRESH_COOLDOWN_MS = 30_000;
 let inFlightRefresh: Promise<RefreshTokenResponse> | null = null;
 let lastRefreshAt = 0;
 let lastRefreshResult: RefreshTokenResponse | null = null;
+// The session the cached result belongs to. Signing out and back in within
+// the window handed the warehouse page the previous, already revoked token,
+// and its next request logged the worker straight out again.
+let lastRefreshSession: ReadonlySet<string> = new Set();
 
 export async function refreshAdminToken(): Promise<RefreshTokenResponse> {
   const token = localStorage.getItem('access_token');
@@ -151,7 +157,11 @@ export async function refreshAdminToken(): Promise<RefreshTokenResponse> {
   if (inFlightRefresh) return inFlightRefresh;
 
   const now = Date.now();
-  if (lastRefreshResult && now - lastRefreshAt < REFRESH_COOLDOWN_MS) {
+  if (
+    lastRefreshResult &&
+    now - lastRefreshAt < REFRESH_COOLDOWN_MS &&
+    lastRefreshSession.has(token)
+  ) {
     return lastRefreshResult;
   }
 
@@ -167,8 +177,12 @@ export async function refreshAdminToken(): Promise<RefreshTokenResponse> {
           },
         },
       );
+      rememberAdminTokenClock(response.data.access_token);
       lastRefreshAt = Date.now();
       lastRefreshResult = response.data;
+      // Both the token sent and the one received: the caller stores the new
+      // one, and the next page to mount reads that back.
+      lastRefreshSession = new Set([token, response.data.access_token]);
       return response.data;
     } finally {
       inFlightRefresh = null;
@@ -200,6 +214,7 @@ export async function switchAdminRole(role_name: string): Promise<SwitchRoleResp
       },
     },
   );
+  rememberAdminTokenClock(response.data.access_token);
   return response.data;
 }
 
@@ -218,6 +233,7 @@ export async function webauthnLoginComplete(
     device_info,
     assertion_response
   });
+  rememberAdminTokenClock(response.data.access_token);
   return response.data;
 }
 

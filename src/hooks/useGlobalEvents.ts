@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '@/config/config';
+import { isAdminTokenExpired } from '@/lib/adminTokenClock';
 
 /**
  * Single app-wide SSE connection that replaces per-resource HTTP polling.
@@ -22,32 +23,6 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 type AppEvent = { type: string; [key: string]: unknown };
 
 /**
- * Whether an admin JWT has already expired, read from its own `exp` claim.
- *
- * `EventSource` exposes no status code on failure, so a 401 is indistinguishable
- * from the network being down — the browser reports both as a bare "connection
- * failed", and Firefox dresses it up as a CORS error with a null status. Without
- * this check a stale token produced ten silent reconnects against a server that
- * was never going to accept it, while the real cause (log in again) was invisible.
- *
- * Returns false when the token cannot be parsed: an unreadable token is the
- * server's business, not ours, and refusing to connect would be worse than
- * letting it answer 401 once.
- */
-function isJwtExpired(token: string): boolean {
-  try {
-    const [, payloadB64] = token.split('.');
-    const payload = JSON.parse(
-      atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')),
-    ) as { exp?: number };
-    if (typeof payload.exp !== 'number') return false;
-    return payload.exp * 1000 <= Date.now();
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Clear a dead admin session once, and say so.
  *
  * Deliberately NOT called from `buildStreamUrl`. This hook listens for
@@ -59,7 +34,7 @@ function isJwtExpired(token: string): boolean {
  */
 function discardExpiredAdminSession(): void {
   const token = localStorage.getItem('access_token');
-  if (!token || !isJwtExpired(token)) return;
+  if (!token || !isAdminTokenExpired(token)) return;
   localStorage.removeItem('access_token');
   localStorage.removeItem('admin_role');
   // Scoped: this only ever discards the ADMIN session, and an unscoped event
@@ -73,8 +48,11 @@ function buildStreamUrl(): string | null {
   const adminToken = localStorage.getItem('access_token');
   if (adminToken) {
     // An expired token would be refused with a 401 that `EventSource` reports
-    // as an unreadable connection failure, so it is not worth opening.
-    if (isJwtExpired(adminToken)) return null;
+    // as an unreadable connection failure (Firefox even calls it CORS), so it
+    // is not worth opening: it only bought ten silent reconnects while the real
+    // cause, log in again, stayed invisible. Expiry is read on the server's
+    // clock — see lib/adminTokenClock.
+    if (isAdminTokenExpired(adminToken)) return null;
     return `${base}/api/v1/events/stream?access_token=${encodeURIComponent(adminToken)}`;
   }
   const userToken = sessionStorage.getItem('access_token');
