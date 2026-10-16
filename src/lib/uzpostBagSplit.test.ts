@@ -5,6 +5,7 @@ import type {
   DeliveryFlightState,
 } from "@/api/services/adminDeliveryService";
 import {
+  bagsTotalKg,
   needsUzpostBags,
   splitUzpostParcel,
   uzpostParcelWeightKg,
@@ -93,6 +94,21 @@ describe("uzpostParcelWeightKg", () => {
 });
 
 describe("validateUzpostBags", () => {
+  it("allows one bag between the automatic split target and the hard limit", () => {
+    expect(
+      validateUzpostBags([{ sequence_no: 1, weight_kg: 11.56 }], 11.56),
+    ).toEqual([]);
+  });
+
+  it("keeps the displayed total finite while an input is incomplete", () => {
+    expect(
+      bagsTotalKg([
+        { sequence_no: 1, weight_kg: Number.NaN },
+        { sequence_no: 2, weight_kg: 5.78 },
+      ]),
+    ).toBe(5.78);
+  });
+
   it("asks for the bags to add up to the parcel", () => {
     const errors = validateUzpostBags(
       [
@@ -108,11 +124,11 @@ describe("validateUzpostBags", () => {
     const errors = validateUzpostBags(
       [
         { sequence_no: 1, weight_kg: Number.NaN },
-        { sequence_no: 2, weight_kg: 10.5 },
+        { sequence_no: 2, weight_kg: 20.5 },
       ],
-      10.5,
+      20.5,
     );
     expect(errors).toContain("1-qop vazni 0 dan katta bo'lishi kerak.");
-    expect(errors).toContain("2-qop vazni 10 kgdan oshmasligi kerak.");
+    expect(errors).toContain("2-qop vazni 20 kgdan oshmasligi kerak.");
   });
 });

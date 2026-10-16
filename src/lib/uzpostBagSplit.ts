@@ -5,7 +5,10 @@ import type {
   DeliveryFlightState,
 } from "@/api/services/adminDeliveryService";
 
-export const UZPOST_BAG_LIMIT_KG = 10;
+/** Above this weight the manager is offered an automatic split. */
+export const UZPOST_BAG_AUTO_SPLIT_KG = 10;
+/** Matches the existing delivery_request_bags database constraint. */
+export const UZPOST_BAG_MAX_WEIGHT_KG = 20;
 export const WEIGHT_TOLERANCE_KG = 0.01;
 
 /**
@@ -58,13 +61,13 @@ export function uzpostParcelWeightKg(
   return roundKg(total);
 }
 
-/** Whether a parcel this heavy has to go as several bags. */
+/** Whether a parcel is heavy enough to open the bag planner. */
 export function needsUzpostBags(parcelKg: number): boolean {
-  return roundKg(parcelKg) > UZPOST_BAG_LIMIT_KG;
+  return roundKg(parcelKg) > UZPOST_BAG_AUTO_SPLIT_KG;
 }
 
 /**
- * The fewest bags that keep each under the limit, filled evenly.
+ * The recommended number of bags at the automatic 10 kg target, filled evenly.
  *
  * Even, not 10 kg and a remainder: 20.2 kg is three bags of 6.74 kg rather than
  * two at the limit and one of 200 g, and no bag sits right at 10 kg where the
@@ -74,7 +77,7 @@ export function splitUzpostParcel(parcelKg: number): UzpostBagDraft[] {
   const total = roundKg(parcelKg);
   if (!needsUzpostBags(total)) return [];
 
-  const count = Math.ceil(total / UZPOST_BAG_LIMIT_KG - 1e-9);
+  const count = Math.ceil(total / UZPOST_BAG_AUTO_SPLIT_KG - 1e-9);
   // Rounded up to 10 g so the last bag, which takes the rest, is never heavier
   // than the others.
   const each = Math.ceil((total / count) * 100 - 1e-6) / 100;
@@ -85,7 +88,12 @@ export function splitUzpostParcel(parcelKg: number): UzpostBagDraft[] {
 }
 
 export function bagsTotalKg(bags: UzpostBagDraft[]): number {
-  return roundKg(bags.reduce((sum, bag) => sum + bag.weight_kg, 0));
+  return roundKg(
+    bags.reduce(
+      (sum, bag) => sum + (Number.isFinite(bag.weight_kg) ? bag.weight_kg : 0),
+      0,
+    ),
+  );
 }
 
 export function validateUzpostBags(
@@ -100,9 +108,9 @@ export function validateUzpostBags(
   for (const bag of bags) {
     if (!Number.isFinite(bag.weight_kg) || bag.weight_kg <= 0) {
       errors.push(`${bag.sequence_no}-qop vazni 0 dan katta bo'lishi kerak.`);
-    } else if (bag.weight_kg > UZPOST_BAG_LIMIT_KG) {
+    } else if (bag.weight_kg > UZPOST_BAG_MAX_WEIGHT_KG) {
       errors.push(
-        `${bag.sequence_no}-qop vazni ${UZPOST_BAG_LIMIT_KG} kgdan oshmasligi kerak.`,
+        `${bag.sequence_no}-qop vazni ${UZPOST_BAG_MAX_WEIGHT_KG} kgdan oshmasligi kerak.`,
       );
     }
   }

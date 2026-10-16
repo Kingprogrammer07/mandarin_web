@@ -295,6 +295,20 @@ describe("AdminDeliveryRequestPage", () => {
     ]);
   });
 
+  it("lets the manager send an 11.56 kg parcel as one bag", () => {
+    state.context.data = contextData([paidFlight("M300", 30, "11.56")]);
+    openFormFor("M300", /^UzPost/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    fireEvent.click(screen.getByRole("button", { name: "1 qop" }));
+    submit();
+
+    expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
+      { sequence_no: 1, weight_kg: 11.56 },
+    ]);
+  });
+
   it("files several small items as one parcel, not one bag each", () => {
     state.context.data = contextData([
       flightWithRows("M300", [

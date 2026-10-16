@@ -1,12 +1,13 @@
 import { useMemo } from "react";
-import { AlertCircle, PackageCheck, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlertCircle, Package, PackageCheck, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   bagsTotalKg,
   roundKg,
   splitUzpostParcel,
-  UZPOST_BAG_LIMIT_KG,
+  UZPOST_BAG_AUTO_SPLIT_KG,
+  UZPOST_BAG_MAX_WEIGHT_KG,
   validateUzpostBags,
   type UzpostBagDraft,
 } from "@/lib/uzpostBagSplit";
@@ -33,7 +34,8 @@ export default function UzpostBagSplitPanel({
   const totalKg = bagsTotalKg(bags);
   const remainingKg = roundKg(parcelKg - totalKg);
   // Fewer bags than this cannot carry the parcel without one going over the limit.
-  const minBagCount = Math.ceil(parcelKg / UZPOST_BAG_LIMIT_KG - 1e-9);
+  const minBagCount = Math.ceil(parcelKg / UZPOST_BAG_MAX_WEIGHT_KG - 1e-9);
+  const canUseOneBag = parcelKg <= UZPOST_BAG_MAX_WEIGHT_KG;
 
   const updateWeight = (index: number, value: string) => {
     const text = value.trim().replace(",", ".");
@@ -72,21 +74,35 @@ export default function UzpostBagSplitPanel({
               Qoplarga ajratish
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-300">
-              Yuk {parcelKg.toFixed(2)} kg — {UZPOST_BAG_LIMIT_KG} kgdan og'ir. Har bir qop uchun
-              alohida UzPost order va chek chiqadi.
+              Yuk {parcelKg.toFixed(2)} kg. Avto bo'lish qoplarni {UZPOST_BAG_AUTO_SPLIT_KG} kg
+              gacha ajratadi; {UZPOST_BAG_MAX_WEIGHT_KG} kg gacha bitta qop ham mumkin.
             </p>
           </div>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => onChange(splitUzpostParcel(parcelKg))}
-          disabled={disabled}
-          className="h-11 shrink-0 rounded-xl border-orange-200 bg-white text-orange-700 hover:bg-orange-50 dark:border-orange-500/30 dark:bg-white/5 dark:text-orange-300"
-        >
-          <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-          Avto bo'lish
-        </Button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {canUseOneBag && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onChange([{ sequence_no: 1, weight_kg: roundKg(parcelKg) }])}
+              disabled={disabled}
+              className="h-11 rounded-xl border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+            >
+              <Package className="mr-2 h-4 w-4" aria-hidden="true" />
+              1 qop
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onChange(splitUzpostParcel(parcelKg))}
+            disabled={disabled}
+            className="h-11 rounded-xl border-orange-200 bg-white text-orange-700 hover:bg-orange-50 dark:border-orange-500/30 dark:bg-white/5 dark:text-orange-300"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+            Avto bo'lish
+          </Button>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -94,7 +110,7 @@ export default function UzpostBagSplitPanel({
           const invalid =
             !Number.isFinite(bag.weight_kg) ||
             bag.weight_kg <= 0 ||
-            bag.weight_kg > UZPOST_BAG_LIMIT_KG;
+            bag.weight_kg > UZPOST_BAG_MAX_WEIGHT_KG;
           return (
             <div
               key={bag.sequence_no}
@@ -111,7 +127,7 @@ export default function UzpostBagSplitPanel({
                 type="number"
                 inputMode="decimal"
                 min="0.01"
-                max={UZPOST_BAG_LIMIT_KG}
+                max={UZPOST_BAG_MAX_WEIGHT_KG}
                 step="0.01"
                 value={Number.isFinite(bag.weight_kg) ? bag.weight_kg : ""}
                 onChange={(event) => updateWeight(index, event.target.value)}
