@@ -149,7 +149,7 @@ describe("scan answers", () => {
     const leftover = resolveFromIndex(base, "YT020");
     expect(leftover?.kind).toBe("new");
     expect(leftover?.package?.client_code).toBe("SS300");
-    expect(leftover?.message).toBe("Ro'yxatda yo'q edi. Tekshirib, tasdiqlang.");
+    expect(leftover?.message).toBe("");
     expect(applyScanResult(scannedRow("YT020"), leftover!, true).state).toBe("ready");
 
     const elsewhere = resolveFromIndex(base, "YT030");

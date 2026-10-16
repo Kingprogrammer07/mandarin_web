@@ -225,7 +225,7 @@ export function resolveFromIndex(base: OfflineBase, code: string): AstatkaScanRe
     other_astatka_flight: null,
     message: pkg.taken_away
       ? "Diqqat: tizimda bu yuk mijozga berilgan deb turibdi. Tekshiring."
-      : "Ro'yxatda yo'q edi. Tekshirib, tasdiqlang.",
+      : "",
   };
 }
 

@@ -768,16 +768,24 @@ function LastScanBanner({
             {view.sourceFlight || "Reys noma'lum"} · {view.trackCount} ta trek ·{" "}
             {formatKg(view.weightKg)}
           </p>
-          <p
-            className={cn(
-              "mt-1 text-[13px] font-bold",
-              bad ? "text-mc-danger" : warn ? "text-mc-warn" : good ? "text-mc-success" : "text-mc-brand",
-            )}
-          >
-            {view.takenAway && row.state === "ready"
-              ? "Diqqat: tizimda bu yuk mijozga berilgan deb turibdi."
-              : headline}
-          </p>
+          {(view.takenAway || headline) && (
+            <p
+              className={cn(
+                "mt-1 text-[13px] font-bold",
+                bad
+                  ? "text-mc-danger"
+                  : warn
+                    ? "text-mc-warn"
+                    : good
+                      ? "text-mc-success"
+                      : "text-mc-brand",
+              )}
+            >
+              {view.takenAway && row.state === "ready"
+                ? "Diqqat: tizimda bu yuk mijozga berilgan deb turibdi."
+                : headline}
+            </p>
+          )}
         </button>
         {canConfirm(row) && (
           <button
