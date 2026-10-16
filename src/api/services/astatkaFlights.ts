@@ -28,6 +28,36 @@ export type AstatkaPackageSort =
   | "weight_desc"
   | "flight_asc";
 
+/**
+ * One flight's worth of a partner cargo's photo-report rows for a client, as
+ * the partner's read-only API reports it. Never stored in our cargo tables.
+ */
+export interface AstatkaExternalBag {
+  flight_name: string;
+  /** Sum of the rows' weights. */
+  weight_kg: number | null;
+  price_per_kg: number | null;
+  /** The partner's photo-report rows in this bag. */
+  rows: number;
+  photo_count: number;
+  /**
+   * The partner's links to the bag's photos, when its API sends them (they
+   * expire within about an hour, so only a scan answer carries them). Absent
+   * or empty: only the count shows, or the stored copies below.
+   */
+  photo_urls?: string[];
+  /**
+   * A saved bag's photos already copied into our storage (the copy runs just
+   * after the confirm). Their links come from `getAstatkaExternalPhotos`.
+   */
+  stored_photos?: number;
+  comment: string | null;
+  /** The partner already reported the bag to its client. */
+  is_sent: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface AstatkaPackage {
   /** null for a proposal a scan made that is not saved yet. */
   id: number | null;
@@ -55,6 +85,16 @@ export interface AstatkaPackage {
   confirmed_at: string | null;
   confirmed_by: string | null;
   created_at: string | null;
+  /**
+   * "" for our own cargo; the partner's code (e.g. "AKB") when the bag was
+   * found through that partner's API. Optional: a package saved on the device
+   * by an older build has none, and that means ours.
+   */
+  source_company?: string;
+  /** The partner's display name; null for our own cargo. */
+  source_company_name?: string | null;
+  /** The partner's data for this bag (the chosen flight's). */
+  external?: AstatkaExternalBag | null;
 }
 
 export interface AstatkaSourceFlight {
@@ -81,7 +121,26 @@ export interface AstatkaScanResult {
   other_astatka_flight: string | null;
   /** Plain-language sentence for the worker. */
   message: string;
+  /**
+   * Every flight the partner holds for this client, newest first; empty for
+   * our own cargo. The chosen one is `package.external`.
+   */
+  external_options?: AstatkaExternalBag[];
+  /**
+   * False when the partner's data did not say which flight the scanned code
+   * is in and the newest one was assumed: the bag's label has to be checked.
+   */
+  external_flight_known?: boolean;
+  /**
+   * On a `not_found` answer whose owner is still open: "unavailable" when a
+   * partner did not answer, "foreign" when our shared table files the code
+   * under a partner's flight. Only "Qayta tekshirish" can settle such a code —
+   * typing a client would make a partner's parcel one of our clients' bags.
+   */
+  partner_state?: AstatkaPartnerState | null;
 }
+
+export type AstatkaPartnerState = "unavailable" | "foreign";
 
 export interface AstatkaConfirmItem {
   /**
@@ -99,10 +158,23 @@ export interface AstatkaConfirmItem {
    * bag's codes with it instead of adding to them.
    */
   track_codes_edited?: boolean;
+  /**
+   * With an edited list: the saved bag whose list it was written against,
+   * or `null` when it was typed before the server named a bag. A confirmed
+   * bag's codes are replaced only by a list written against that bag; any
+   * other list only adds to it.
+   */
+  track_codes_base_package_id?: number | null;
   weight_kg?: number | null;
   comment?: string | null;
   scanned_at?: string | null;
   origin?: AstatkaPackageOrigin;
+  /**
+   * "" for our own cargo; the partner's code for a bag its API found. The
+   * server re-reads the partner's data itself and saves the bag only into the
+   * astatka's own records.
+   */
+  source_company?: string;
 }
 
 export interface AstatkaConfirmResult {
@@ -123,11 +195,15 @@ export interface AstatkaPackagesResponse {
   counts: { all: number; expected: number; confirmed: number };
   weights: { expected: number; confirmed: number };
   source_flights: string[];
+  /** Partner codes with bags in this astatka; empty when every bag is ours. */
+  source_companies?: string[];
 }
 
 export interface AstatkaPackagesParams {
   status?: AstatkaPackageStatus;
   source_flight?: string;
+  /** Absent = every cargo; "" = only ours; "AKB" = only that partner's. */
+  source_company?: string;
   q?: string;
   sort?: AstatkaPackageSort;
   page?: number;
@@ -227,6 +303,12 @@ export const astatkaBagQueryKey = (flightName: string, ref: AstatkaBagRef) =>
 export const astatkaCargoPhotosQueryKey = (cargoId: number) =>
   ["astatka-cargo-photos", cargoId] as const;
 
+/** Every bag's stored partner photos: a confirm can copy them again. */
+export const astatkaExternalPhotosRootKey = ["astatka-external-photos"] as const;
+
+export const astatkaExternalPhotosQueryKey = (packageId: number) =>
+  [...astatkaExternalPhotosRootKey, packageId] as const;
+
 const base = (flightName: string) =>
   `/api/v1/astatka-flights/${encodeURIComponent(flightName)}`;
 
@@ -284,6 +366,8 @@ export async function getAstatkaPackages(
   flightName: string,
   params: AstatkaPackagesParams,
 ): Promise<AstatkaPackagesResponse> {
+  // Axios drops only undefined and null, so `source_company: ""` (our own
+  // cargo) goes out as `source_company=` rather than meaning "every cargo".
   const { data } = await apiClient.get<AstatkaPackagesResponse>(
     `${base(flightName)}/packages`,
     { params },
@@ -358,6 +442,25 @@ export async function getAstatkaCargoPhotos(
     `${base(flightName)}/cargos/${cargoId}/photos`,
   );
   return data.photos;
+}
+
+export interface AstatkaExternalPhotos {
+  photos: AstatkaCargoPhoto[];
+  /** Partner photos still being copied into our storage after the confirm. */
+  pending: number;
+}
+
+/** Short-lived links to our stored copies of a saved partner bag's photos. */
+export async function getAstatkaExternalPhotos(
+  flightName: string,
+  packageId: number,
+): Promise<AstatkaExternalPhotos> {
+  const { data } = await apiClient.get<{
+    package_id: number;
+    photos: AstatkaCargoPhoto[];
+    pending: number;
+  }>(`${base(flightName)}/packages/${packageId}/external-photos`);
+  return { photos: data.photos, pending: data.pending };
 }
 
 export async function updateAstatkaCargoWeight(

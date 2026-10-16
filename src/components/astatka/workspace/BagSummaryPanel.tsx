@@ -5,6 +5,8 @@ import type { BagStatusTone, BagSummary } from "@/lib/astatkaBagSummary";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
 import { cn } from "@/lib/utils";
 
+import { SourceCompanyChip } from "./SourceCompanyChip";
+
 const TONE: Record<BagStatusTone, string> = {
   success: "bg-mc-success/12 text-mc-success",
   warn: "bg-mc-warn-soft text-mc-warn",
@@ -24,6 +26,9 @@ function Fact({ label, children, tone }: { label: string; children: ReactNode; t
 
 /** The bag at a glance: whose, from where, how heavy, and what state it is in. */
 export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
+  // Our payment rows know nothing about a partner's bag: "Yozuv yo'q" and
+  // "Yo'q" would read as facts about it.
+  const partner = summary.sourceCompany !== "";
   return (
     <section aria-label="Yuk haqida" className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -37,6 +42,7 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
           {summary.statusTone === "warn" && <Clock className="h-3.5 w-3.5" />}
           {summary.statusLabel}
         </span>
+        {partner && <SourceCompanyChip label={summary.sourceCompanyName} />}
       </div>
 
       {(summary.takenAway || summary.notes.length > 0) && (
@@ -78,10 +84,14 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
           {summary.weightEdited ? " (qo'lda)" : ""}
         </Fact>
         <Fact label="Foto hisobot">{summary.photoReport ?? "—"}</Fact>
-        <Fact label="To'lov">{summary.payment ?? "Yozuv yo'q"}</Fact>
-        <Fact label="Olib ketilganmi" tone={summary.takenAway ? "text-mc-danger" : undefined}>
-          {summary.takenAway ? "Ha — tekshiring!" : "Yo'q"}
-        </Fact>
+        {!partner && (
+          <>
+            <Fact label="To'lov">{summary.payment ?? "Yozuv yo'q"}</Fact>
+            <Fact label="Olib ketilganmi" tone={summary.takenAway ? "text-mc-danger" : undefined}>
+              {summary.takenAway ? "Ha — tekshiring!" : "Yo'q"}
+            </Fact>
+          </>
+        )}
         <Fact label="Tasdiqlagan">{summary.confirmedBy ?? "—"}</Fact>
         <Fact label="Vaqti">
           <span className="tabular-nums">{formatScanTime(summary.timeIso)}</span>

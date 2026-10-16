@@ -1,5 +1,6 @@
 import type { AstatkaPackage } from "@/api/services/astatkaFlights";
 import { paymentLabel } from "@/lib/astatkaFormat";
+import { sourceCompanyLabel, sourceCompanyOf } from "@/lib/astatkaSource";
 import {
   rowCodes,
   rowView,
@@ -36,10 +37,14 @@ export interface BagSummary {
   trackCodes: string[];
   /** Why a scan row is stuck, and the server's warnings about it. */
   notes: string[];
+  /** "" for our own cargo, otherwise the partner's code ("AKB"). */
+  sourceCompany: string;
+  /** The partner's name for its chip; "" for our own cargo. */
+  sourceCompanyName: string;
 }
 
-function photoReportLabel(pkg: AstatkaPackage): string {
-  return pkg.has_photo ? `Bor · ${pkg.bags} ta` : "Yo'q";
+function photoReportLabel(hasPhoto: boolean, bags: number): string {
+  return hasPhoto ? `Bor · ${bags} ta` : "Yo'q";
 }
 
 export function summaryFromPackage(pkg: AstatkaPackage): BagSummary {
@@ -52,7 +57,7 @@ export function summaryFromPackage(pkg: AstatkaPackage): BagSummary {
     sourceFlight: pkg.source_flight_name,
     weightKg: pkg.weight_kg,
     weightEdited: pkg.weight_edited,
-    photoReport: photoReportLabel(pkg),
+    photoReport: photoReportLabel(pkg.has_photo, pkg.bags),
     payment: paymentLabel(pkg.payment_state),
     takenAway: pkg.taken_away,
     confirmedBy: pkg.confirmed_by,
@@ -60,6 +65,8 @@ export function summaryFromPackage(pkg: AstatkaPackage): BagSummary {
     comment: pkg.comment,
     trackCodes: pkg.track_codes,
     notes: [],
+    sourceCompany: sourceCompanyOf(pkg),
+    sourceCompanyName: sourceCompanyLabel(pkg),
   };
 }
 
@@ -89,7 +96,7 @@ export function summaryFromRow(row: WorkRow): BagSummary {
     sourceFlight: view.sourceFlight,
     weightKg: view.weightKg,
     weightEdited: view.weightEdited,
-    photoReport: pkg ? photoReportLabel(pkg) : null,
+    photoReport: pkg ? photoReportLabel(view.hasPhoto, view.bags) : null,
     payment: paymentLabel(pkg?.payment_state),
     takenAway: view.takenAway,
     confirmedBy: pkg?.confirmed_by ?? null,
@@ -97,5 +104,7 @@ export function summaryFromRow(row: WorkRow): BagSummary {
     comment: row.edits.comment ?? pkg?.comment ?? null,
     trackCodes: rowCodes(row),
     notes: [...(STUCK.includes(row.state) && row.message ? [row.message] : []), ...row.warnings],
+    sourceCompany: view.sourceCompany,
+    sourceCompanyName: view.sourceCompanyName,
   };
 }

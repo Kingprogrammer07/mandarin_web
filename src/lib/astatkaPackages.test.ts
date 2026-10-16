@@ -69,6 +69,49 @@ describe("totalsOf", () => {
       counts: { all: 3, expected: 2, confirmed: 1 },
       weights: { expected: 2, confirmed: 5 },
       sourceFlights: ["M210", "M211"],
+      sourceCompanies: [],
     });
+  });
+
+  it("lists the partner cargos present, ours never among them", () => {
+    const mixed = [
+      ...packages,
+      pkg({ id: 4, source_company: "akb", source_company_name: "AKB" }),
+      pkg({ id: 5, source_company: "" }),
+    ];
+    expect(totalsOf(mixed).sourceCompanies).toEqual(["AKB"]);
+  });
+});
+
+describe("filterPackages by cargo", () => {
+  const mixed = [
+    pkg({ id: 1, client_code: "ZZ17", source_flight_name: "M200" }),
+    // Saved on the device by a build before partner cargo: ours.
+    pkg({ id: 2, client_code: "ZZ18" }),
+    pkg({
+      id: 3,
+      client_code: "ZZ17",
+      source_flight_name: "M200",
+      source_company: "AKB",
+      source_company_name: "AKB",
+    }),
+  ];
+  delete mixed[1].source_company;
+
+  const ids = (sourceCompany?: string) =>
+    filterPackages(mixed, { sourceCompany, sort: "client_asc" }).map((p) => p.id);
+
+  it("keeps every cargo when no cargo is chosen", () => {
+    expect(ids(undefined)).toEqual([1, 3, 2]);
+  });
+
+  it('reads "" as our own cargo, a package with no field included', () => {
+    expect(ids("")).toEqual([1, 2]);
+  });
+
+  it("keeps only the chosen partner's bags, ignoring case", () => {
+    expect(ids("AKB")).toEqual([3]);
+    expect(ids("akb")).toEqual([3]);
+    expect(ids("XYZ")).toEqual([]);
   });
 });

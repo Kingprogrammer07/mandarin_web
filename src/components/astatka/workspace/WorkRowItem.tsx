@@ -6,12 +6,14 @@ import {
   Clock,
   Loader2,
   Pencil,
+  RefreshCw,
   WifiOff,
   X,
 } from "lucide-react";
 
 import {
   canConfirm,
+  canRecheck,
   rowView,
   stateLabel,
   type WorkRow,
@@ -20,15 +22,21 @@ import {
 import { formatKg, formatScanTime, paymentLabel } from "@/lib/astatkaFormat";
 import { cn } from "@/lib/utils";
 
+import { SourceCompanyChip } from "./SourceCompanyChip";
+
 interface Props {
   row: WorkRow;
   highlighted: boolean;
+  /** "Qayta tekshirish" asks the server, so it waits for the internet. */
+  isOnline: boolean;
   /** Opens the bag's photos and photo-report facts. */
   onOpen: (row: WorkRow) => void;
   onConfirm: (row: WorkRow) => void;
   onEdit: (row: WorkRow) => void;
   /** Takes the row off the screen only; a confirmed bag stays saved. */
   onRemove: (row: WorkRow) => void;
+  /** Asks the server about a code it could not find, e.g. while a partner's API was down. */
+  onRecheck: (row: WorkRow) => void;
 }
 
 const ACCENT: Record<WorkRowState, string> = {
@@ -116,10 +124,12 @@ function ConfirmButton({ row, onConfirm }: { row: WorkRow; onConfirm: (row: Work
 export const WorkRowItem = memo(function WorkRowItem({
   row,
   highlighted,
+  isOnline,
   onOpen,
   onConfirm,
   onEdit,
   onRemove,
+  onRecheck,
 }: Props) {
   const view = rowView(row);
   const payment = paymentLabel(row.pkg?.payment_state);
@@ -133,6 +143,7 @@ export const WorkRowItem = memo(function WorkRowItem({
     row.state === "other_astatka" ||
     view.takenAway;
   const note = problem || row.state === "waiting_net" || row.warnings.length > 0;
+  const recheckable = canRecheck(row);
 
   // The keyboard and screen-reader way into the details; a tap anywhere on
   // the row does the same.
@@ -143,9 +154,13 @@ export const WorkRowItem = memo(function WorkRowItem({
       title="Rasmlar va foto hisobot ma'lumotlari"
       className="block min-w-0 max-w-full text-left"
     >
-      {/* Never truncated: the code is what the worker writes on the bag. */}
-      <span className="block break-all text-[16px] font-extrabold leading-tight text-mc-text">
-        {view.clientCode || "Mijoz noma'lum"}
+      {/* Never truncated: the code is what the worker writes on the bag. The
+          partner's chip wraps under it rather than squeeze it at 320px. */}
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="min-w-0 break-all text-[16px] font-extrabold leading-tight text-mc-text">
+          {view.clientCode || "Mijoz noma'lum"}
+        </span>
+        {view.sourceCompany && <SourceCompanyChip label={view.sourceCompanyName} />}
       </span>
       {view.clientName && (
         <span className="mt-0.5 block truncate text-[12px] font-medium text-mc-text-3">
@@ -288,6 +303,20 @@ export const WorkRowItem = memo(function WorkRowItem({
                 {warning}
               </span>
             ))}
+            {recheckable && (
+              <span className="mt-1.5 block">
+                <button
+                  type="button"
+                  onClick={() => onRecheck(row)}
+                  disabled={!isOnline}
+                  title={isOnline ? undefined : "Qayta tekshirish uchun internet kerak"}
+                  className="inline-flex h-11 items-center gap-1.5 rounded-mc-sm border border-mc-border bg-mc-surface px-3 text-[13px] font-bold text-mc-text active:scale-[0.97] disabled:opacity-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Qayta tekshirish
+                </button>
+              </span>
+            )}
           </span>
         </div>
       )}

@@ -46,6 +46,7 @@ import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
 import {
   WORK_FILTERS,
   canConfirm,
+  canRecheck,
   countByFilter,
   findRowByCode,
   matchesFilter,
@@ -62,6 +63,7 @@ import type { QueueBackup } from "@/utils/astatkaWorkspaceDb";
 import { astatkaWorkspaceDb } from "@/utils/astatkaWorkspaceDb";
 
 import type { BagSheetMode } from "./BagSheet";
+import { SourceCompanyChip } from "./SourceCompanyChip";
 import { WorkRowItem } from "./WorkRowItem";
 import { WorkRowSheet } from "./WorkRowSheet";
 import { WorkspaceDialog } from "./WorkspaceDialog";
@@ -259,6 +261,7 @@ export function WorkPanel({
     lastScan && now - lastScan.at < HIGHLIGHT_MS ? lastRow?.id ?? null : null;
 
   const onConfirmRow = useCallback((row: WorkRow) => void queue.confirmRows([row.id]), [queue]);
+  const onRecheckRow = useCallback((row: WorkRow) => void queue.recheckRow(row.id), [queue]);
   const onRemoveRow = useCallback(
     (row: WorkRow) => {
       queue.removeRow(row.id);
@@ -561,7 +564,9 @@ export function WorkPanel({
         <LastScanBanner
           row={lastRow}
           effect={lastScan?.effect ?? "new"}
+          isOnline={queue.isOnline}
           onConfirm={onConfirmRow}
+          onRecheck={onRecheckRow}
           onOpen={onOpenRow}
         />
       )}
@@ -618,10 +623,12 @@ export function WorkPanel({
               key={row.id}
               row={row}
               highlighted={row.id === highlightId}
+              isOnline={queue.isOnline}
               onOpen={onOpenRow}
               onConfirm={onConfirmRow}
               onEdit={onEditRow}
               onRemove={onRemoveRow}
+              onRecheck={onRecheckRow}
             />
           ))}
         </ul>
@@ -638,6 +645,7 @@ export function WorkPanel({
           onClose={() => setSheet(null)}
           onConfirm={onConfirmRow}
           onRemove={onRemoveRow}
+          onRecheck={onRecheckRow}
         />
       )}
 
@@ -714,12 +722,16 @@ export function WorkPanel({
 function LastScanBanner({
   row,
   effect,
+  isOnline,
   onConfirm,
+  onRecheck,
   onOpen,
 }: {
   row: WorkRow;
   effect: "new" | "same_bag" | "repeat";
+  isOnline: boolean;
   onConfirm: (row: WorkRow) => void;
+  onRecheck: (row: WorkRow) => void;
   onOpen: (row: WorkRow) => void;
 }) {
   const view = rowView(row);
@@ -761,8 +773,11 @@ function LastScanBanner({
           <p className="text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3">
             Oxirgi skan · <span className="font-mono normal-case">{row.scannedCodes.at(-1)}</span>
           </p>
-          <p className="break-all text-[24px] font-extrabold leading-tight text-mc-text">
-            {view.clientCode || "—"}
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="min-w-0 break-all text-[24px] font-extrabold leading-tight text-mc-text">
+              {view.clientCode || "—"}
+            </span>
+            {view.sourceCompany && <SourceCompanyChip label={view.sourceCompanyName} />}
           </p>
           <p className="mt-0.5 text-[13px] font-semibold text-mc-text-2">
             {view.sourceFlight || "Reys noma'lum"} · {view.trackCount} ta trek ·{" "}
@@ -787,7 +802,7 @@ function LastScanBanner({
             </p>
           )}
         </button>
-        {canConfirm(row) && (
+        {canConfirm(row) ? (
           <button
             type="button"
             onClick={() => onConfirm(row)}
@@ -795,6 +810,18 @@ function LastScanBanner({
           >
             Tasdiqlash
           </button>
+        ) : (
+          canRecheck(row) && (
+            <button
+              type="button"
+              onClick={() => onRecheck(row)}
+              disabled={!isOnline}
+              className="flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface px-5 text-[15px] font-bold text-mc-text active:scale-[0.97] disabled:opacity-50 @sm:w-auto"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Qayta tekshirish
+            </button>
+          )
         )}
       </div>
     </div>

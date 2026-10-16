@@ -7,11 +7,13 @@ import type { BagSummary } from "@/lib/astatkaBagSummary";
 import {
   BagEditForm,
   type BagEditChanges,
+  type BagEditHints,
   type BagEditLocks,
   type BagEditValues,
 } from "./BagEditForm";
 import { BagPhotoReport } from "./BagPhotoReport";
 import { BagSummaryPanel } from "./BagSummaryPanel";
+import { ExternalBagCard, type ExternalBagCardProps } from "./ExternalBagCard";
 import { WorkspaceDialog } from "./WorkspaceDialog";
 
 export type BagSheetMode = "view" | "edit";
@@ -20,6 +22,9 @@ export interface BagSheetEdit {
   /** The bag as it is now; untouched fields of the form follow it. */
   current: BagEditValues;
   locked?: BagEditLocks;
+  hints?: BagEditHints;
+  /** Which saved bag `current.trackCodes` lists; see BagEditForm. */
+  codesBase?: number | null;
   saving: boolean;
   /**
    * Why "Saqlash" has to wait right now (the row is being sent, no internet).
@@ -36,6 +41,11 @@ interface Props {
   summary: BagSummary;
   /** Which bag the photo report reads; `null` while it has no client. */
   bag: AstatkaBagRef | null;
+  /**
+   * A partner cargo's bag: its data is shown instead of our photo report,
+   * which would read an unrelated client of ours with the same code.
+   */
+  partner?: ExternalBagCardProps;
   /** The photo report needs the network. */
   isOnline: boolean;
   mode: BagSheetMode;
@@ -54,7 +64,7 @@ const footerButton =
 /**
  * The one window for a bag, from the saved list and from the scan list alike:
  * the bag's facts, then its photo report — photos beside their facts on a
- * wide screen. "Tahrirlash" swaps the facts for the edit form in place, so
+ * wide screen — or, for a partner cargo's bag, what the partner's API says. "Tahrirlash" swaps the facts for the edit form in place, so
  * there is never a second window on top of this one (only a photo opened
  * full screen).
  */
@@ -63,6 +73,7 @@ export function BagSheet({
   title,
   summary,
   bag,
+  partner,
   isOnline,
   mode,
   onModeChange,
@@ -77,7 +88,11 @@ export function BagSheet({
 
   const description = editing
     ? "O'zgartiring va «Saqlash» ni bosing."
-    : [summary.clientName, summary.sourceFlight || "Reys noma'lum"]
+    : [
+        summary.clientName,
+        summary.sourceCompanyName,
+        summary.sourceFlight || "Reys noma'lum",
+      ]
         .filter(Boolean)
         .join(" · ");
 
@@ -130,17 +145,23 @@ export function BagSheet({
             id={formId}
             current={edit.current}
             locked={edit.locked}
+            hints={edit.hints}
+            codesBase={edit.codesBase}
             onSave={edit.onSave}
           />
         ) : (
           <BagSummaryPanel summary={summary} />
         )}
-        <BagPhotoReport
-          flightName={flightName}
-          bag={bag}
-          isOnline={isOnline}
-          onWeightChanged={onWeightChanged}
-        />
+        {partner ? (
+          <ExternalBagCard {...partner} />
+        ) : (
+          <BagPhotoReport
+            flightName={flightName}
+            bag={bag}
+            isOnline={isOnline}
+            onWeightChanged={onWeightChanged}
+          />
+        )}
       </div>
     </WorkspaceDialog>
   );

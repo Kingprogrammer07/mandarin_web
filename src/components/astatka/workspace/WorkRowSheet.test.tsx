@@ -16,10 +16,13 @@ vi.mock("@/api/services/astatkaFlights", () => ({
     JSON.stringify(ref),
   ],
   astatkaCargoPhotosQueryKey: (id: number) => ["astatka-cargo-photos", id],
+  astatkaExternalPhotosRootKey: ["astatka-external-photos"],
+  astatkaExternalPhotosQueryKey: (id: number) => ["astatka-external-photos", id],
   astatkaPackagesQueryKey: (name: string) => ["astatka-packages", name],
   astatkaStatsQueryKey: ["astatka-flight-stats"],
   getAstatkaBagDetails: vi.fn(),
   getAstatkaCargoPhotos: vi.fn(),
+  getAstatkaExternalPhotos: vi.fn(),
   replaceAstatkaCargoPhotos: vi.fn(),
   updateAstatkaCargoWeight: vi.fn(),
   updateAstatkaPackage: vi.fn(),
@@ -35,7 +38,9 @@ vi.mock("sonner", () => ({
 
 import {
   getAstatkaBagDetails,
+  getAstatkaExternalPhotos,
   updateAstatkaPackage,
+  type AstatkaExternalBag,
   type AstatkaPackage,
 } from "@/api/services/astatkaFlights";
 import type { WorkRow, WorkRowState } from "@/lib/astatkaWorkQueue";
@@ -93,9 +98,10 @@ function renderSheet(
   state: WorkRowState | WorkRow,
   mode: BagSheetMode = "view",
   onScreen = true,
+  isOnline = true,
 ) {
   const queue = {
-    isOnline: true,
+    isOnline,
     replacePackage: vi.fn(),
     updateEdits: vi.fn(),
     applyBagWeight: vi.fn(),
@@ -105,6 +111,7 @@ function renderSheet(
     onClose: vi.fn(),
     onConfirm: vi.fn(),
     onRemove: vi.fn(),
+    onRecheck: vi.fn(),
   };
   const item = typeof state === "string" ? row(state) : state;
   const client = new QueryClient({
@@ -293,6 +300,55 @@ describe("WorkRowSheet", () => {
     });
   });
 
+  it("marks codes typed before the bag was named as written against no bag", () => {
+    const waiting: WorkRow = { ...row("waiting_net"), pkg: null, kind: null };
+    const { queue, rerender } = renderSheet(waiting, "edit");
+
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT1\nYT9" },
+    });
+    // The answer names a confirmed bag while the form is still open.
+    rerender({ ...waiting, state: "ready", pkg: { ...pkg, status: "confirmed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(queue.updateEdits).toHaveBeenCalledWith("r1", {
+      trackCodes: ["YT1", "YT9"],
+      trackCodesBase: null,
+    });
+  });
+
+  it("ties codes typed over the named bag's list to that bag", () => {
+    const { queue } = renderSheet("ready", "edit");
+
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(queue.updateEdits).toHaveBeenCalledWith("r1", {
+      trackCodes: ["YT1"],
+      trackCodesBase: pkg.id,
+    });
+  });
+
+  it("keeps a list typed blind blind when it is fixed again", () => {
+    const typed: WorkRow = {
+      ...row("ready"),
+      edits: { trackCodes: ["YT1", "YT9"], trackCodesBase: null },
+    };
+    const { queue } = renderSheet(typed, "edit");
+
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT1\nYT9\nYT10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(queue.updateEdits).toHaveBeenCalledWith("r1", {
+      trackCodes: ["YT1", "YT9", "YT10"],
+      trackCodesBase: null,
+    });
+  });
+
   it("keeps the edit open while the row is being sent, and saves once it is confirmed", async () => {
     const saved = { ...pkg, status: "confirmed" as const, comment: "yirtiq" };
     update.mockResolvedValue(saved);
@@ -332,6 +388,177 @@ describe("WorkRowSheet", () => {
     expect(screen.queryByRole("form", { name: "Yukni tahrirlash" })).toBeNull();
     expect(
       screen.getByRole("region", { name: "Yuk haqida" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("WorkRowSheet — Qayta tekshirish", () => {
+  const unknown = (): WorkRow => ({
+    ...row("not_found"),
+    pkg: null,
+    kind: "not_found",
+    message: "AKB bilan aloqa bo'lmadi. Keyinroq qayta tekshiring.",
+  });
+
+  it("asks the server again about a code it could not find", () => {
+    const { handlers, item } = renderSheet(unknown());
+
+    fireEvent.click(screen.getByRole("button", { name: "Qayta tekshirish" }));
+
+    expect(handlers.onRecheck).toHaveBeenCalledWith(item);
+  });
+
+  it("waits for the internet", () => {
+    renderSheet(unknown(), "view", true, false);
+    expect(screen.getByRole("button", { name: "Qayta tekshirish" })).toBeDisabled();
+  });
+
+  it("is not offered on a found bag", () => {
+    renderSheet("ready");
+    expect(screen.queryByRole("button", { name: "Qayta tekshirish" })).toBeNull();
+  });
+});
+
+describe("WorkRowSheet — a partner cargo's bag", () => {
+  function external(overrides: Partial<AstatkaExternalBag> = {}): AstatkaExternalBag {
+    return {
+      flight_name: "M200",
+      weight_kg: 12.5,
+      price_per_kg: 8,
+      rows: 2,
+      photo_count: 3,
+      comment: null,
+      is_sent: false,
+      created_at: "2026-10-01T05:00:00Z",
+      updated_at: null,
+      ...overrides,
+    };
+  }
+  const m200 = external();
+  const m199 = external({ flight_name: "M199", weight_kg: 7, rows: 1, photo_count: 0 });
+
+  function partnerRow(state: WorkRowState = "ready"): WorkRow {
+    return {
+      ...row(state),
+      trackCode: "AK001",
+      scannedCodes: ["AK001"],
+      kind: "new",
+      pkg: {
+        ...pkg,
+        id: null,
+        client_code: "ZZ17",
+        source_flight_name: "M200",
+        track_codes: ["AK001"],
+        weight_kg: 12.5,
+        status: state === "confirmed" ? "confirmed" : null,
+        source_company: "AKB",
+        source_company_name: "AKB",
+        external: m200,
+      },
+      externalOptions: [m200, m199],
+      externalFlightKnown: false,
+    };
+  }
+
+  it("shows the partner's data and never reads our photo report for it", async () => {
+    renderSheet(partnerRow());
+
+    expect(screen.getByRole("region", { name: "AKB ma'lumoti" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Foto hisobot" })).toBeNull();
+    // Give a stray query the chance to fire before saying it did not.
+    await waitFor(() => expect(screen.getByText(/eng oxirgi reys tanlandi/)).toBeInTheDocument());
+    expect(getAstatkaBagDetails).not.toHaveBeenCalled();
+  });
+
+  it("puts the picked flight on the row", () => {
+    const { queue } = renderSheet(partnerRow());
+
+    fireEvent.click(screen.getByRole("radio", { name: /M199/ }));
+
+    expect(queue.updateEdits).toHaveBeenCalledWith("r1", { sourceFlight: "M199" });
+  });
+
+  it("keeps what else was edited on the row when a flight is picked", () => {
+    const { queue } = renderSheet({ ...partnerRow(), edits: { comment: "yirtiq" } });
+
+    fireEvent.click(screen.getByRole("radio", { name: /M199/ }));
+
+    expect(queue.updateEdits).toHaveBeenCalledWith("r1", {
+      comment: "yirtiq",
+      sourceFlight: "M199",
+    });
+  });
+
+  it("shows the picked flight's facts", () => {
+    renderSheet({ ...partnerRow(), edits: { sourceFlight: "M199" } });
+
+    expect(screen.getByRole("radio", { name: /M199/ })).toBeChecked();
+    const facts = screen.getByRole("region", { name: "Yuk haqida" });
+    expect(facts).toHaveTextContent("M199");
+    expect(facts).toHaveTextContent("7 kg");
+  });
+
+  it("offers no choice of flight once the bag is confirmed", () => {
+    renderSheet(partnerRow("confirmed"));
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.getByRole("region", { name: "AKB ma'lumoti" })).toBeInTheDocument();
+  });
+
+  it("locks the client and the flight in the edit form; the weight stays editable", () => {
+    const { queue } = renderSheet(partnerRow(), "edit");
+
+    expect(screen.getByLabelText("Mijoz kodi")).toBeDisabled();
+    expect(screen.getByLabelText("Qaysi reysdan")).toBeDisabled();
+    expect(screen.getByText(/bo'limida tanlanadi/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Og'irligi \(kg\)/), {
+      target: { value: "13" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(queue.updateEdits).toHaveBeenCalledWith("r1", { weightKg: 13 });
+  });
+
+  it("reads a saved bag's photo copies through the astatka that holds it", async () => {
+    vi.mocked(getAstatkaExternalPhotos).mockResolvedValue({
+      photos: [{ index: 0, url: "https://s3.example/a.webp", error: null }],
+      pending: 0,
+    });
+    const saved = partnerRow("confirmed");
+    renderSheet({
+      ...saved,
+      pkg: {
+        ...saved.pkg!,
+        id: 42,
+        astatka_flight_name: "OSTATKA.199",
+        external: { ...m200, photo_urls: [], stored_photos: 1 },
+      },
+    });
+
+    expect(
+      await screen.findAllByRole("button", { name: /rasmni kattalashtirish/ }),
+    ).toHaveLength(1);
+    expect(getAstatkaExternalPhotos).toHaveBeenCalledWith("OSTATKA.199", 42);
+  });
+});
+
+describe("WorkRowSheet — a code a partner cargo may own", () => {
+  function unsureRow(): WorkRow {
+    return {
+      ...row("not_found"),
+      kind: "not_found",
+      pkg: null,
+      message: "AKB bilan aloqa bo'lmadi.",
+      partnerState: "unavailable",
+    };
+  }
+
+  it("does not let a client be typed for it, and says why", () => {
+    renderSheet(unsureRow(), "edit");
+
+    expect(screen.getByLabelText("Mijoz kodi")).toBeDisabled();
+    expect(screen.getByLabelText("Qaysi reysdan")).toBeDisabled();
+    expect(
+      screen.getByText(/boshqa kargoniki bo'lishi mumkin/),
     ).toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
+  astatkaExternalPhotosRootKey,
   astatkaPackagesQueryKey,
   astatkaStatsQueryKey,
   downloadAstatkaExcel,
@@ -54,6 +55,8 @@ export function AstatkaWorkspacePage({ flightName, onBack, onSend }: Props) {
   const refreshSaved = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: astatkaPackagesQueryKey(flightName) });
     void queryClient.invalidateQueries({ queryKey: astatkaStatsQueryKey });
+    // A re-confirmed partner bag may get a new set of photo copies.
+    void queryClient.invalidateQueries({ queryKey: astatkaExternalPhotosRootKey });
   }, [queryClient, flightName]);
 
   const queue = useAstatkaWorkQueue({

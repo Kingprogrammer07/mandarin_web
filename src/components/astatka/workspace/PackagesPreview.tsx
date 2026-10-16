@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ChevronDown, Loader2, PackageSearch, Search, WifiOff, X } from "lucide-react";
 
@@ -12,6 +12,7 @@ import {
 } from "@/api/services/astatkaFlights";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
 import { filterPackages, totalsOf } from "@/lib/astatkaPackages";
+import { cargoLabel } from "@/lib/astatkaSource";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/utils/apiError";
 
@@ -32,6 +33,13 @@ const SORTS: { key: AstatkaPackageSort; label: string }[] = [
 ];
 
 type StatusFilter = "all" | AstatkaPackageStatus;
+
+/** Every cargo. Not "": in the cargo filter "" is a real value, our own cargo. */
+const ALL_CARGO = "__all__";
+
+function sameCodes(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((code, index) => code === right[index]);
+}
 
 interface Props {
   flightName: string;
@@ -94,17 +102,25 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<string>("__all__");
+  const [company, setCompany] = useState<string>(ALL_CARGO);
+  /**
+   * Partner codes the list last reported. Kept across a filter change, so the
+   * cargo chips do not vanish while the next page loads.
+   */
+  const [knownCompanies, setKnownCompanies] = useState<string[]>([]);
   const [sort, setSort] = useState<AstatkaPackageSort>("recent");
   const [opened, setOpened] = useState<OpenBag | null>(null);
+  const cargoFilterLabelId = useId();
 
   const params = useMemo(
     () => ({
       status: status === "all" ? undefined : status,
       source_flight: source === "__all__" ? undefined : source,
+      source_company: company === ALL_CARGO ? undefined : company,
       q: search || undefined,
       sort,
     }),
-    [status, source, search, sort],
+    [status, source, company, search, sort],
   );
 
   useEffect(() => {
@@ -138,6 +154,7 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
         ? filterPackages(offlineIndex.packages, {
             status: params.status,
             sourceFlight: params.source_flight,
+            sourceCompany: params.source_company,
             search: params.q,
             sort: params.sort,
           })
@@ -159,6 +176,15 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
   const counts = offlineTotals?.counts ?? first?.counts;
   const weights = offlineTotals?.weights ?? first?.weights;
   const sourceFlights = offlineTotals?.sourceFlights ?? first?.source_flights ?? [];
+  const reportedCompanies = offline ? offlineTotals?.sourceCompanies : first?.source_companies;
+  if (reportedCompanies && !sameCodes(reportedCompanies, knownCompanies)) {
+    setKnownCompanies(reportedCompanies);
+  }
+  // The partner's bags are gone: a filter the worker can no longer see must
+  // not keep the list empty.
+  if (knownCompanies.length === 0 && company !== ALL_CARGO) setCompany(ALL_CARGO);
+  const narrowed =
+    Boolean(search) || status !== "all" || source !== "__all__" || company !== ALL_CARGO;
   const canChange = !offline;
   // The per-row fixes need the server, so offline they are not offered.
   const fixing = editMode && canChange;
@@ -276,6 +302,33 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
           </button>
         ))}
       </div>
+      {/* Only while partner cargo is here: our own list needs no such choice. */}
+      {knownCompanies.length > 0 && (
+        <div role="group" aria-labelledby={cargoFilterLabelId} className="flex flex-wrap items-center gap-2">
+          <span
+            id={cargoFilterLabelId}
+            className="text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3"
+          >
+            Kargo
+          </span>
+          {[ALL_CARGO, "", ...knownCompanies].map((code) => (
+            <button
+              key={code || "own"}
+              type="button"
+              onClick={() => setCompany(code)}
+              aria-pressed={company === code}
+              className={cn(
+                "inline-flex h-11 items-center rounded-full border px-3 text-[12px] font-bold active:scale-[0.97]",
+                company === code
+                  ? "border-mc-brand bg-mc-brand text-mc-on-brand"
+                  : "border-mc-border bg-mc-surface text-mc-text-2",
+              )}
+            >
+              {code === ALL_CARGO ? "Hammasi" : cargoLabel(code)}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-2 @md:grid-cols-2">
         <SelectBox label="Qaysi reysdan" value={source} onChange={setSource}>
           <option value="__all__">Barcha reyslardan</option>
@@ -330,9 +383,9 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
         <div className="rounded-mc-lg border border-dashed border-mc-border bg-mc-surface px-4 py-8 text-center">
           <PackageSearch className="mx-auto h-8 w-8 text-mc-text-3" />
           <p className="mt-2 text-[14px] font-bold text-mc-text-2">
-            {search ? "Hech narsa topilmadi" : "Hali saqlangan yuk yo'q"}
+            {narrowed ? "Hech narsa topilmadi" : "Hali saqlangan yuk yo'q"}
           </p>
-          {!search && (
+          {!narrowed && (
             <p className="mx-auto mt-1 max-w-[320px] text-[12px] font-medium text-mc-text-3">
               «Astatka ajratish» tugmasi bilan eski reyslardan olib ketilmagan yuklarni qo'shing
               yoki ish rejimida skanerlab tasdiqlang.

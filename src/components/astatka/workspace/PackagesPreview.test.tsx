@@ -16,12 +16,15 @@ vi.mock("@/api/services/astatkaFlights", () => ({
     JSON.stringify(ref),
   ],
   astatkaCargoPhotosQueryKey: (id: number) => ["astatka-cargo-photos", id],
+  astatkaExternalPhotosRootKey: ["astatka-external-photos"],
+  astatkaExternalPhotosQueryKey: (id: number) => ["astatka-external-photos", id],
   astatkaPackagesQueryKey: (name: string) => ["astatka-packages", name],
   astatkaStatsQueryKey: ["astatka-flight-stats"],
   confirmAstatkaPackages: vi.fn(),
   deleteAstatkaPackage: vi.fn(),
   getAstatkaBagDetails: vi.fn(),
   getAstatkaCargoPhotos: vi.fn(),
+  getAstatkaExternalPhotos: vi.fn(),
   getAstatkaPackages: vi.fn(),
   replaceAstatkaCargoPhotos: vi.fn(),
   unconfirmAstatkaPackage: vi.fn(),
@@ -42,8 +45,10 @@ import { toast } from "sonner";
 
 import {
   astatkaPackagesQueryKey,
+  confirmAstatkaPackages,
   deleteAstatkaPackage,
   getAstatkaBagDetails,
+  getAstatkaExternalPhotos,
   getAstatkaPackages,
   unconfirmAstatkaPackage,
   updateAstatkaCargoWeight,
@@ -168,6 +173,7 @@ async function openBag(clientCode = "SS101") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getAstatkaExternalPhotos).mockResolvedValue({ photos: [], pending: 0 });
   confirmDialog.mockResolvedValue(true);
   remove.mockResolvedValue(undefined);
   unconfirm.mockResolvedValue({
@@ -489,6 +495,141 @@ describe("PackagesPreview — the bag window", () => {
       expect(
         within(sheet).getByRole("region", { name: "Yuk haqida" }),
       ).toHaveTextContent("boshqa qurilmada yozildi"),
+    );
+  });
+});
+
+describe("PackagesPreview — partner cargo", () => {
+  const akbBag = pkg({
+    id: 9,
+    client_code: "ZZ17",
+    source_flight_name: "M200",
+    status: "expected",
+    confirmed_at: null,
+    confirmed_by: null,
+    source_company: "AKB",
+    source_company_name: "AKB",
+    external: {
+      flight_name: "M200",
+      weight_kg: 12.5,
+      price_per_kg: 8,
+      rows: 2,
+      photo_count: 3,
+      comment: null,
+      is_sent: false,
+      created_at: null,
+      updated_at: null,
+    },
+  });
+
+  it("offers no cargo filter while every bag is ours", async () => {
+    list.mockResolvedValue({ ...page([pkg()]), source_companies: [] });
+    renderList();
+
+    await screen.findAllByRole("listitem");
+    expect(screen.queryByRole("group", { name: "Kargo" })).toBeNull();
+    // Undefined: axios leaves it out, so the server lists every cargo.
+    expect(list.mock.calls[0][1].source_company).toBeUndefined();
+  });
+
+  it("filters by cargo, sending \"\" for our own", async () => {
+    list.mockResolvedValue({ ...page([pkg(), akbBag]), source_companies: ["AKB"] });
+    renderList();
+
+    const group = await screen.findByRole("group", { name: "Kargo" });
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Hammasi", "Mandarin", "AKB"]);
+    expect(within(group).getByRole("button", { name: "Hammasi" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(within(group).getByRole("button", { name: "Mandarin" }));
+    await waitFor(() =>
+      expect(list.mock.calls.at(-1)?.[1]).toMatchObject({ source_company: "" }),
+    );
+    // The chips stay while the filtered page loads.
+    expect(screen.getByRole("group", { name: "Kargo" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "AKB" }));
+    await waitFor(() =>
+      expect(list.mock.calls.at(-1)?.[1]).toMatchObject({ source_company: "AKB" }),
+    );
+  });
+
+  it("filters the offline copy by cargo too", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <PackagesPreview
+          flightName="OSTATKA.202"
+          editMode={false}
+          isOnline={false}
+          offlineIndex={{
+            astatka_flight_name: "OSTATKA.202",
+            packages: [pkg(), akbBag],
+            synced_at: "2026-10-12T05:00:00Z",
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findAllByRole("listitem")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "AKB" }));
+
+    const rows = await screen.findAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("ZZ17");
+  });
+
+  it("marks a partner's bag and opens its partner data, never our photo report", async () => {
+    list.mockResolvedValue({ ...page([akbBag]), source_companies: ["AKB"] });
+    renderList();
+
+    const [row] = await screen.findAllByRole("listitem");
+    expect(within(row).getAllByTitle("AKB API'dan topildi").length).toBeGreaterThan(0);
+
+    const sheet = await openBag("ZZ17");
+    expect(within(sheet).getByRole("region", { name: "AKB ma'lumoti" })).toBeInTheDocument();
+    // A saved bag's flight is settled: nothing to pick.
+    expect(within(sheet).queryByRole("radiogroup")).toBeNull();
+    // No copy of the partner's photos was made: say where they are.
+    expect(
+      await within(sheet).findByText("3 ta rasm AKB tizimida — bu yerda ko'rinmaydi"),
+    ).toBeInTheDocument();
+    expect(getAstatkaExternalPhotos).toHaveBeenCalledWith("OSTATKA.202", 9);
+    expect(bagDetails).not.toHaveBeenCalled();
+  });
+
+  it("confirms a waiting partner's bag as that partner's", async () => {
+    vi.mocked(confirmAstatkaPackages).mockResolvedValue([
+      {
+        idempotency_key: "k",
+        outcome: "confirmed",
+        package: { ...akbBag, status: "confirmed" },
+        message: "Tasdiqlandi",
+        warnings: [],
+      },
+    ]);
+    list.mockResolvedValue({ ...page([akbBag]), source_companies: ["AKB"] });
+    renderList();
+
+    const sheet = await openBag("ZZ17");
+    fireEvent.click(within(sheet).getByRole("button", { name: /tasdiqlash/ }));
+
+    await waitFor(() =>
+      expect(confirmAstatkaPackages).toHaveBeenCalledWith("OSTATKA.202", [
+        expect.objectContaining({
+          client_code: "ZZ17",
+          source_flight_name: "M200",
+          source_company: "AKB",
+        }),
+      ]),
     );
   });
 });

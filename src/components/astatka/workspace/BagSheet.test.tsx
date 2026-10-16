@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/api/client", () => ({ apiClient: {}, apiClientFormData: {} }));
@@ -31,6 +31,7 @@ import type { BagSummary } from "@/lib/astatkaBagSummary";
 
 import type {
   BagEditChanges,
+  BagEditHints,
   BagEditLocks,
   BagEditValues,
 } from "./BagEditForm";
@@ -90,6 +91,8 @@ const summary: BagSummary = {
   comment: null,
   trackCodes: ["YT100", "YT200"],
   notes: [],
+  sourceCompany: "",
+  sourceCompanyName: "",
 };
 
 const initialEdit: BagEditValues = {
@@ -106,6 +109,8 @@ interface HarnessProps {
   onSave?: (changes: BagEditChanges) => void;
   current?: BagEditValues;
   locked?: BagEditLocks;
+  hints?: BagEditHints;
+  codesBase?: number | null;
   disabledReason?: string;
 }
 
@@ -116,6 +121,8 @@ function Harness({
   onSave = vi.fn(),
   current = initialEdit,
   locked,
+  hints,
+  codesBase,
   disabledReason,
 }: HarnessProps) {
   const [mode, setMode] = useState<BagSheetMode>(initialMode);
@@ -134,7 +141,7 @@ function Harness({
           Tahrirlash
         </button>
       }
-      edit={{ current, locked, saving: false, disabledReason, onSave }}
+      edit={{ current, locked, hints, codesBase, saving: false, disabledReason, onSave }}
       onWeightChanged={onWeightChanged}
     />
   );
@@ -368,6 +375,7 @@ describe("BagSheet — edit mode", () => {
         weightKg: 4.5,
         comment: "qopi yirtilgan",
         trackCodes: ["YT100", "YT300"],
+        trackCodesBase: null,
       }),
     );
   });
@@ -445,13 +453,65 @@ describe("BagSheet — edit mode", () => {
       target: { value: "SS999" },
     });
     // The bag got confirmed meanwhile.
-    rerender({ onSave, locked: { clientCode: true, sourceFlight: true } });
+    rerender({
+      onSave,
+      locked: { clientCode: true, sourceFlight: true, byConfirm: true },
+    });
 
     expect(screen.getByLabelText("Mijoz kodi")).toHaveValue("SS KODSIZ");
     expect(screen.getByLabelText("Mijoz kodi")).toBeDisabled();
-    expect(screen.getByText(/«SS999» saqlanmaydi/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Yuk tasdiqlandi — «SS999» saqlanmaydi/),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
     expect(onSave).toHaveBeenCalledWith({});
+  });
+
+  it("blames the partner, not a confirm, when a code turns out to be a partner's", () => {
+    details.mockResolvedValue(bagDetails());
+    const onSave = vi.fn();
+    const rerender = renderSheet({
+      initialMode: "edit",
+      onSave,
+      current: { ...initialEdit, clientCode: "" },
+    });
+
+    fireEvent.change(screen.getByLabelText("Mijoz kodi"), {
+      target: { value: "SS999" },
+    });
+    // The check came back: the code may be another cargo's.
+    rerender({
+      onSave,
+      current: { ...initialEdit, clientCode: "" },
+      locked: { clientCode: true, sourceFlight: true },
+      hints: { clientCode: "Bu kod boshqa kargoniki bo'lishi mumkin." },
+    });
+
+    expect(screen.queryByText(/Yuk tasdiqlandi/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "«SS999» saqlanmaydi. Bu kod boshqa kargoniki bo'lishi mumkin.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("saves a comment on a bag whose client is locked and still empty", () => {
+    details.mockResolvedValue(bagDetails());
+    const onSave = vi.fn();
+    renderSheet({
+      initialMode: "edit",
+      onSave,
+      current: { ...initialEdit, clientCode: "" },
+      locked: { clientCode: true, sourceFlight: true },
+    });
+
+    fireEvent.change(screen.getByLabelText("Izoh"), {
+      target: { value: "qopi yirtilgan" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(onSave).toHaveBeenCalledWith({ comment: "qopi yirtilgan" });
   });
 
   it("lets a confirmed bag's codes be replaced", () => {
@@ -469,7 +529,43 @@ describe("BagSheet — edit mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(onSave).toHaveBeenCalledWith({ trackCodes: ["YT100", "YT999"] });
+    expect(onSave).toHaveBeenCalledWith({ trackCodes: ["YT100", "YT999"], trackCodesBase: null });
+  });
+
+  it("says which saved bag's list the codes were typed over, as it was when typing began", () => {
+    details.mockResolvedValue(bagDetails());
+    const onSave = vi.fn();
+    // Nothing named yet when the worker starts typing the label's codes …
+    const rerender = renderSheet({ initialMode: "edit", onSave, codesBase: null });
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT100\nYT999" },
+    });
+    // … then the answer names bag 7 while the form is still open.
+    rerender({
+      initialMode: "edit",
+      onSave,
+      codesBase: 7,
+      current: { ...initialEdit, trackCodes: ["YT100", "YT200", "YT300"] },
+    });
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT100\nYT999\nYT555" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+    expect(onSave).toHaveBeenCalledWith({
+      trackCodes: ["YT100", "YT999", "YT555"],
+      trackCodesBase: null,
+    });
+  });
+
+  it("ties codes typed over a saved bag's list to that bag", () => {
+    details.mockResolvedValue(bagDetails());
+    const onSave = vi.fn();
+    renderSheet({ initialMode: "edit", onSave, codesBase: 7 });
+    fireEvent.change(screen.getByLabelText(/Trek kodlar/), {
+      target: { value: "YT100" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
+    expect(onSave).toHaveBeenCalledWith({ trackCodes: ["YT100"], trackCodesBase: 7 });
   });
 
   it("refuses to save a bag with every code deleted", () => {
@@ -500,5 +596,59 @@ describe("BagSheet — edit mode", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Mijoz kodini yozing.");
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe("BagSheet — a partner cargo's bag", () => {
+  it("shows the partner's data instead of our photo report, and never reads ours", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <BagSheet
+          flightName="OSTATKA.202"
+          title="ZZ17"
+          summary={{
+            ...summary,
+            clientCode: "ZZ17",
+            sourceFlight: "M200",
+            sourceCompany: "AKB",
+            sourceCompanyName: "AKB",
+          }}
+          bag={null}
+          partner={{
+            companyName: "AKB",
+            bag: {
+              flight_name: "M200",
+              weight_kg: 12.5,
+              price_per_kg: 8,
+              rows: 2,
+              photo_count: 3,
+              comment: null,
+              is_sent: true,
+              created_at: null,
+              updated_at: null,
+            },
+          }}
+          isOnline
+          mode="view"
+          onModeChange={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("region", { name: "AKB ma'lumoti" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Foto hisobot" })).toBeNull();
+    expect(details).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "ZZ17" })).toHaveAccessibleDescription(
+      "AKB · M200",
+    );
+    const facts = screen.getByRole("region", { name: "Yuk haqida" });
+    expect(within(facts).getByText("AKB · API")).toBeInTheDocument();
+    // Our payment rows know nothing about the partner's bag.
+    expect(within(facts).queryByText("To'lov")).toBeNull();
+    expect(within(facts).queryByText("Olib ketilganmi")).toBeNull();
   });
 });

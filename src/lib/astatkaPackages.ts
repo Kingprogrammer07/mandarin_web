@@ -3,10 +3,13 @@ import type {
   AstatkaPackageSort,
   AstatkaPackageStatus,
 } from "@/api/services/astatkaFlights";
+import { sourceCompanyOf } from "@/lib/astatkaSource";
 
 export interface PackageFilter {
   status?: AstatkaPackageStatus;
   sourceFlight?: string;
+  /** Absent = every cargo; "" = only ours; "AKB" = only that partner's. */
+  sourceCompany?: string;
   search?: string;
   sort: AstatkaPackageSort;
 }
@@ -15,6 +18,8 @@ export interface PackageTotals {
   counts: { all: number; expected: number; confirmed: number };
   weights: { expected: number; confirmed: number };
   sourceFlights: string[];
+  /** Partner codes with bags here; empty when every bag is ours. */
+  sourceCompanies: string[];
 }
 
 function activityTime(pkg: AstatkaPackage): number {
@@ -48,16 +53,18 @@ const COMPARATORS: Record<AstatkaPackageSort, (a: AstatkaPackage, b: AstatkaPack
 
 /**
  * Filters the saved packages held on the device, mirroring the server's list
- * endpoint: status, source flight, one search box over client code and track
- * codes, and the same sort keys.
+ * endpoint: status, source flight, cargo, one search box over client code and
+ * track codes, and the same sort keys.
  */
 export function filterPackages(packages: AstatkaPackage[], filter: PackageFilter): AstatkaPackage[] {
   const needle = (filter.search ?? "").trim().toUpperCase();
   const source = filter.sourceFlight?.trim().toUpperCase();
+  const company = filter.sourceCompany?.trim().toUpperCase();
   return packages
     .filter((pkg) => {
       if (filter.status && pkg.status !== filter.status) return false;
       if (source !== undefined && pkg.source_flight_name.toUpperCase() !== source) return false;
+      if (company !== undefined && sourceCompanyOf(pkg) !== company) return false;
       if (!needle) return true;
       return (
         pkg.client_code.toUpperCase().includes(needle) ||
@@ -73,10 +80,14 @@ export function totalsOf(packages: AstatkaPackage[]): PackageTotals {
     counts: { all: packages.length, expected: 0, confirmed: 0 },
     weights: { expected: 0, confirmed: 0 },
     sourceFlights: [],
+    sourceCompanies: [],
   };
   const flights = new Set<string>();
+  const companies = new Set<string>();
   for (const pkg of packages) {
     flights.add(pkg.source_flight_name);
+    const company = sourceCompanyOf(pkg);
+    if (company) companies.add(company);
     if (pkg.status === "confirmed") {
       totals.counts.confirmed += 1;
       totals.weights.confirmed += pkg.weight_kg ?? 0;
@@ -86,5 +97,6 @@ export function totalsOf(packages: AstatkaPackage[]): PackageTotals {
     }
   }
   totals.sourceFlights = [...flights].sort(compareText);
+  totals.sourceCompanies = [...companies].sort(compareText);
   return totals;
 }

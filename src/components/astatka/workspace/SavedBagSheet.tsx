@@ -5,6 +5,7 @@ import type {
   AstatkaPackage,
 } from "@/api/services/astatkaFlights";
 import { summaryFromPackage } from "@/lib/astatkaBagSummary";
+import { isPartnerPackage, sourceCompanyLabel } from "@/lib/astatkaSource";
 
 import { BagSheet, type BagSheetMode } from "./BagSheet";
 import { SheetActions, type SheetAction } from "./SheetActions";
@@ -26,8 +27,13 @@ interface Props {
   actions: SavedBagActions;
 }
 
-/** A saved bag is read by id; one with no id yet by its client and flight. */
+/**
+ * A saved bag is read by id; one with no id yet by its client and flight. A
+ * partner cargo's bag never: our photo report would read an unrelated client
+ * of ours with the same code.
+ */
 function bagRefOf(pkg: AstatkaPackage): AstatkaBagRef | null {
+  if (isPartnerPackage(pkg)) return null;
   if (pkg.id !== null) return { packageId: pkg.id };
   if (!pkg.client_code) return null;
   return { clientCode: pkg.client_code, sourceFlight: pkg.source_flight_name };
@@ -47,6 +53,7 @@ export function SavedBagSheet({
 }: Props) {
   const confirmed = pkg.status === "confirmed";
   const deleting = pkg.id !== null && actions.deletingIds.has(pkg.id);
+  const partner = sourceCompanyLabel(pkg);
 
   const buttons: SheetAction[] = [];
   if (!confirmed) {
@@ -92,6 +99,16 @@ export function SavedBagSheet({
       title={pkg.client_code}
       summary={summaryFromPackage(pkg)}
       bag={bagRefOf(pkg)}
+      partner={
+        partner
+          ? {
+              companyName: partner,
+              bag: pkg.external ?? null,
+              storedPhotos:
+                pkg.id !== null ? { flightName, packageId: pkg.id } : undefined,
+            }
+          : undefined
+      }
       isOnline={isOnline}
       mode={mode}
       onModeChange={onModeChange}
@@ -113,9 +130,15 @@ export function SavedBagSheet({
           comment: pkg.comment ?? "",
           trackCodes: pkg.track_codes,
         },
+        // A partner's bag: its API named the client.
         locked: confirmed
-          ? { clientCode: true, sourceFlight: true }
-          : { sourceFlight: true },
+          ? { clientCode: true, sourceFlight: true, byConfirm: true }
+          : partner
+            ? { clientCode: true, sourceFlight: true }
+            : { sourceFlight: true },
+        hints: partner
+          ? { weight: `Bo'sh qolsa, ${partner} ma'lumotidagi og'irlik olinadi.` }
+          : undefined,
         saving: actions.update.isPending,
         // The connection dropping mid-edit must not throw away what was typed.
         disabledReason: canChange

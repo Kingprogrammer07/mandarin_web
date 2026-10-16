@@ -50,17 +50,18 @@ function row(state: WorkRowState): WorkRow {
   };
 }
 
-function renderRow(state: WorkRowState) {
+function renderRow(state: WorkRowState | WorkRow, isOnline = true) {
   const handlers = {
     onOpen: vi.fn(),
     onConfirm: vi.fn(),
     onEdit: vi.fn(),
     onRemove: vi.fn(),
+    onRecheck: vi.fn(),
   };
-  const item = row(state);
+  const item = typeof state === "string" ? row(state) : state;
   render(
     <ul>
-      <WorkRowItem row={item} highlighted={false} {...handlers} />
+      <WorkRowItem row={item} highlighted={false} isOnline={isOnline} {...handlers} />
     </ul>,
   );
   // The row renders a wide and a phone layout; CSS shows one of them.
@@ -99,4 +100,65 @@ describe("WorkRowItem's remove button", () => {
       expect(handlers.onRemove).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("WorkRowItem's Qayta tekshirish", () => {
+  it.each<WorkRowState>(["not_found", "failed"])(
+    "asks the server again about a %s row's code",
+    (state) => {
+      const { handlers, item } = renderRow({
+        ...row(state),
+        pkg: null,
+        message: "AKB bilan aloqa bo'lmadi. Keyinroq qayta tekshiring.",
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Qayta tekshirish" }));
+
+      expect(handlers.onRecheck).toHaveBeenCalledWith(item);
+      expect(handlers.onOpen).not.toHaveBeenCalled();
+    },
+  );
+
+  it("waits for the internet", () => {
+    const { handlers } = renderRow({ ...row("not_found"), pkg: null }, false);
+    const button = screen.getByRole("button", { name: "Qayta tekshirish" });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(handlers.onRecheck).not.toHaveBeenCalled();
+  });
+
+  it.each<WorkRowState>(["ready", "confirmed", "queued", "waiting_net"])(
+    "is not offered on a %s row",
+    (state) => {
+      renderRow(state);
+      expect(screen.queryByRole("button", { name: "Qayta tekshirish" })).toBeNull();
+    },
+  );
+});
+
+describe("WorkRowItem — a partner cargo's bag", () => {
+  it("carries the partner's API chip beside the client code in both layouts", () => {
+    renderRow({
+      ...row("ready"),
+      kind: "new",
+      pkg: {
+        ...pkg,
+        id: null,
+        status: null,
+        client_code: "ZZ17",
+        source_company: "AKB",
+        source_company_name: "AKB",
+      },
+    });
+    expect(screen.getAllByText("AKB · API")).toHaveLength(2);
+    // The chip is part of what the client button says.
+    expect(
+      screen.getAllByRole("button", { name: /^ZZ17\s*AKB API'dan topildi/ }),
+    ).toHaveLength(2);
+  });
+
+  it("carries no chip on our own cargo", () => {
+    renderRow("ready");
+    expect(screen.queryByText(/· API/)).toBeNull();
+  });
 });

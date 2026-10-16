@@ -12,12 +12,33 @@ export interface BagEditValues {
 }
 
 /** Only what the worker changed; a field left alone is absent. */
-export type BagEditChanges = Partial<BagEditValues>;
+export type BagEditChanges = Partial<BagEditValues> & {
+  /**
+   * With `trackCodes`: the `codesBase` the form had when the worker started
+   * typing the list — which saved bag's list they were looking at.
+   */
+  trackCodesBase?: number | null;
+};
 
-/** Fields a saved, confirmed bag can no longer change. */
+/** Fields a saved, confirmed bag — or a partner cargo's bag — cannot change. */
 export interface BagEditLocks {
   clientCode?: boolean;
   sourceFlight?: boolean;
+  /**
+   * The locks come from the bag being confirmed. Otherwise they come from
+   * where the bag's data lives (a partner cargo), and the field's hint says so.
+   */
+  byConfirm?: boolean;
+}
+
+/** Where a value comes from, said under its field instead of the default. */
+export interface BagEditHints {
+  /** Under a locked client: why it cannot be typed. */
+  clientCode?: string;
+  /** Under a locked flight: where it is chosen instead. */
+  sourceFlight?: string;
+  /** Under the weight: what an empty field means. */
+  weight?: string;
 }
 
 interface Props {
@@ -30,6 +51,12 @@ interface Props {
    */
   current: BagEditValues;
   locked?: BagEditLocks;
+  hints?: BagEditHints;
+  /**
+   * Which saved bag `current.trackCodes` is the list of; `null` while it is
+   * not one (nothing named yet, or the worker's own earlier list).
+   */
+  codesBase?: number | null;
   onSave: (changes: BagEditChanges) => void;
 }
 
@@ -77,10 +104,20 @@ function scrollToStart(element: HTMLElement) {
  * (a saved bag). It has no buttons of its own: the bag window's footer submits
  * it. Every input is 16px so iOS does not zoom the page on focus.
  */
-export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
+export function BagEditForm({
+  id,
+  current,
+  locked = {},
+  hints = {},
+  codesBase = null,
+  onSave,
+}: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   /** What the worker typed, per field; everything else reads `current`. */
   const [typed, setTyped] = useState<Partial<Record<Field, string>>>({});
+  // The list the worker edits is the one on screen when they start typing;
+  // a bag named while they type does not make it a correction of that bag.
+  const [typedCodesBase, setTypedCodesBase] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // The form replaces the bag's facts in place, possibly while the window is
@@ -101,8 +138,10 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
     !isLocked(field) && typed[field] !== undefined;
   const textFor = (field: Field): string =>
     edited(field) ? (typed[field] ?? "") : textOf(current, field);
-  const type = (field: Field) => (value: string) =>
+  const type = (field: Field) => (value: string) => {
+    if (field === "trackCodes" && typed.trackCodes === undefined) setTypedCodesBase(codesBase);
     setTyped((previous) => ({ ...previous, [field]: value }));
+  };
   // The bag got confirmed while the form was open: what was typed into a
   // field that is now locked cannot be saved, and must not vanish unexplained.
   const lockedAway = (field: Field): boolean =>
@@ -116,7 +155,9 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const client = textFor("clientCode").trim().toUpperCase();
-    if (!client) {
+    // A locked client is not the worker's to fill in: a code a partner may own
+    // has none yet, and its comment or weight must still save.
+    if (!client && !isLocked("clientCode")) {
       setError("Mijoz kodini yozing.");
       return;
     }
@@ -155,12 +196,20 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
     if (
       edited("trackCodes") &&
       !sameCodes(codes, parseTrackCodes(textOf(current, "trackCodes")))
-    )
+    ) {
       changes.trackCodes = codes;
+      changes.trackCodesBase = typedCodesBase;
+    }
     onSave(changes);
   };
 
   const noteId = (field: Field) => `${id}-${field}-note`;
+  const hintFor = (field: Field): string | undefined =>
+    field === "clientCode"
+      ? hints.clientCode
+      : field === "sourceFlight"
+        ? hints.sourceFlight
+        : undefined;
   // Outside the <label>, tied to the input by aria-describedby: inside it
   // would become part of the field's name.
   const lockedNote = (field: Field) =>
@@ -169,8 +218,9 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
         id={noteId(field)}
         className="mt-1 text-[11px] font-semibold text-mc-warn"
       >
-        Yuk tasdiqlandi — «{typed[field]?.trim()}» saqlanmaydi, bu maydon endi
-        o'zgarmaydi.
+        {locked.byConfirm
+          ? `Yuk tasdiqlandi — «${typed[field]?.trim()}» saqlanmaydi, bu maydon endi o'zgarmaydi.`
+          : `«${typed[field]?.trim()}» saqlanmaydi. ${hintFor(field) ?? "Bu maydon endi o'zgarmaydi."}`}
       </p>
     );
 
@@ -200,7 +250,12 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
               className={fieldClass}
             />
           </label>
-          {lockedNote("clientCode")}
+          {lockedNote("clientCode") ||
+            (locked.clientCode && hints.clientCode && (
+              <p className="mt-1 text-[11px] font-medium text-mc-text-3">
+                {hints.clientCode}
+              </p>
+            ))}
         </div>
         <div>
           <label className="block">
@@ -218,7 +273,12 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
               className={fieldClass}
             />
           </label>
-          {lockedNote("sourceFlight")}
+          {lockedNote("sourceFlight") ||
+            (locked.sourceFlight && hints.sourceFlight && (
+              <p className="mt-1 text-[11px] font-medium text-mc-text-3">
+                {hints.sourceFlight}
+              </p>
+            ))}
         </div>
       </div>
       <label className="block">
@@ -231,7 +291,7 @@ export function BagEditForm({ id, current, locked = {}, onSave }: Props) {
           className={fieldClass}
         />
         <span className="mt-1 block text-[11px] font-medium text-mc-text-3">
-          Bo'sh qolsa, foto hisobotdagi og'irlik olinadi.
+          {hints.weight ?? "Bo'sh qolsa, foto hisobotdagi og'irlik olinadi."}
         </span>
       </label>
       <label className="block">

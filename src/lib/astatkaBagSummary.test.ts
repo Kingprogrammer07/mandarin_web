@@ -99,3 +99,59 @@ describe("summaryFromRow", () => {
     expect(summary.notes).toEqual(["Topilmadi", "Diqqat"]);
   });
 });
+
+describe("a partner cargo's bag", () => {
+  const partnerPkg = pkg({
+    id: null,
+    client_code: "ZZ17",
+    client_name: null,
+    source_flight_name: "M200",
+    bags: 2,
+    has_photo: true,
+    payment_state: null,
+    status: null,
+    source_company: "AKB",
+    source_company_name: "AKB Cargo",
+    external: {
+      flight_name: "M200",
+      weight_kg: 12.5,
+      price_per_kg: 8,
+      rows: 2,
+      photo_count: 3,
+      comment: null,
+      is_sent: false,
+      created_at: null,
+      updated_at: null,
+    },
+  });
+
+  it("names the partner; ours names none, also when the field is missing", () => {
+    expect(summaryFromPackage(partnerPkg)).toMatchObject({
+      sourceCompany: "AKB",
+      sourceCompanyName: "AKB Cargo",
+    });
+    const older = pkg();
+    delete older.source_company;
+    expect(summaryFromPackage(older)).toMatchObject({ sourceCompany: "", sourceCompanyName: "" });
+  });
+
+  it("describes the flight the worker picked, not the one proposed", () => {
+    const summary = summaryFromRow(
+      row({
+        kind: "new",
+        pkg: partnerPkg,
+        edits: { sourceFlight: "M199" },
+        externalOptions: [
+          partnerPkg.external!,
+          { ...partnerPkg.external!, flight_name: "M199", weight_kg: 7, rows: 1, photo_count: 0 },
+        ],
+      }),
+    );
+    expect(summary).toMatchObject({
+      sourceFlight: "M199",
+      weightKg: 7,
+      photoReport: "Yo'q",
+      sourceCompany: "AKB",
+    });
+  });
+});

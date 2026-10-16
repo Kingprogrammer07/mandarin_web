@@ -35,6 +35,12 @@ export function formatScanTime(iso: string | null | undefined, now: Date = new D
     : `${dayFormat.format(date)} ${time}`;
 }
 
+/** A per-kilo price in US dollars, cents always shown: "$8.00". */
+export function formatUsd(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return `$${value.toFixed(2)}`;
+}
+
 export function pluralTa(count: number): string {
   return `${count} ta`;
 }

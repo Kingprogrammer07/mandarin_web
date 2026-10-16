@@ -15,7 +15,10 @@ import {
   applyScanResult,
   buildConfirmItem,
   canConfirm,
+  canRecheck,
   markWaitingForNetwork,
+  addsToConfirmedBag,
+  inPressOrder,
   mergeSameBag,
   normaliseTrackCode,
   registerScan,
@@ -290,9 +293,10 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
   const confirmRows = useCallback(
     async (ids: string[]) => {
       const wanted = new Set(ids);
+      const pressedAt = new Date().toISOString();
       const targets = rowsRef.current
         .filter((row) => wanted.has(row.id) && canConfirm(row))
-        .map((row) => ({ ...row, confirmKey: row.confirmKey ?? makeId() }));
+        .map((row) => ({ ...row, confirmKey: row.confirmKey ?? makeId(), pressedAt }));
       if (targets.length === 0) return;
       const online = onlineRef.current;
       const keyed = new Map(targets.map((row) => [row.id, row]));
@@ -334,7 +338,8 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
       if (!quietRef.current) {
         if (result.kind === "not_found") void playExpectedCargoSound("error");
         else if (result.kind === "other_astatka" || taken) void playExpectedCargoSound("warning");
-        else if (result.package?.status === "confirmed") void playExpectedCargoSound("duplicate");
+        else if (result.package?.status === "confirmed" && !addsToConfirmedBag(result))
+          void playExpectedCargoSound("duplicate");
         else void playExpectedCargoSound("success");
       }
 
@@ -355,7 +360,10 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
     async (rowId: string, code: string) => {
       const base = indexRef.current;
       const fromIndex = base ? resolveFromIndex(base, code) : null;
-      const waitForNetwork = (row: WorkRow) => markWaitingForNetwork(row, base !== null);
+      // A late or repeated answer must not undo what the row has become since.
+      const unanswered = (row: WorkRow) => row.state === "checking" || row.state === "waiting_net";
+      const waitForNetwork = (row: WorkRow) =>
+        unanswered(row) ? markWaitingForNetwork(row, base !== null) : row;
       if (!onlineRef.current) {
         if (fromIndex) settleScan(rowId, fromIndex, true);
         else {
@@ -373,11 +381,15 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
           patchRow(rowId, waitForNetwork);
           void playExpectedCargoSound("warning");
         } else {
-          patchRow(rowId, (row) => ({
-            ...row,
-            state: "failed",
-            message: apiErrorMessage(error, "Tekshirib bo'lmadi. Qayta skan qiling."),
-          }));
+          patchRow(rowId, (row) =>
+            unanswered(row)
+              ? {
+                  ...row,
+                  state: "failed",
+                  message: apiErrorMessage(error, "Tekshirib bo'lmadi. Qayta skan qiling."),
+                }
+              : row,
+          );
           void playExpectedCargoSound("error");
         }
       }
@@ -406,6 +418,25 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
       return "new";
     },
     [resolveRow, setRows],
+  );
+
+  /**
+   * "Qayta tekshirish": a code the server could not find — a partner cargo's
+   * API that was down, a server error — is asked about again, the same way
+   * a fresh scan is. A row whose confirm is on its way is never touched.
+   */
+  const recheckRow = useCallback(
+    async (rowId: string) => {
+      const row = rowsRef.current.find((item) => item.id === rowId);
+      if (!row || !canRecheck(row)) return;
+      patchRow(rowId, (current) => ({
+        ...current,
+        state: "checking",
+        message: "Tekshirilmoqda…",
+      }));
+      await resolveRow(rowId, row.trackCode);
+    },
+    [patchRow, resolveRow],
   );
 
   /** Pasted codes: register every row first so the list fills at once, then
@@ -471,11 +502,17 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
   // ── Back online: re-check what waited, send what was queued ──────────────
   const drain = useCallback(async () => {
     if (!onlineRef.current) return;
-    const current = rowsRef.current;
-    for (const row of current.filter((r) => r.state === "waiting_net" || r.state === "checking")) {
-      await resolveRow(row.id, row.trackCode);
-    }
-    const queued = rowsRef.current.filter((r) => r.state === "queued");
+    // Only codes that were waiting when the line came back: a code scanned
+    // while the confirms below are sent asks the server itself.
+    const waiting = new Set(
+      rowsRef.current
+        .filter((r) => r.state === "waiting_net" || r.state === "checking")
+        .map((r) => r.id),
+    );
+    // Pressed confirms go first: anything pressed after the line came back,
+    // including an automatic confirm of a code resolved below, is a later
+    // press and must land after them.
+    const queued = inPressOrder(rowsRef.current.filter((r) => r.state === "queued"));
     if (queued.length > 0) {
       setRows((rowsNow) =>
         rowsNow.map((row) =>
@@ -484,6 +521,12 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
       );
       await sendConfirms(queued);
       toast.success("Internet qaytdi. Navbatdagi yuklar yuborildi.");
+    }
+    for (const id of waiting) {
+      const row = rowsRef.current.find((r) => r.id === id);
+      if (row && (row.state === "waiting_net" || row.state === "checking")) {
+        await resolveRow(row.id, row.trackCode);
+      }
     }
   }, [resolveRow, sendConfirms, setRows]);
 
@@ -499,13 +542,16 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
       patchRow(id, (row) => ({
         ...row,
         edits,
-        // A worker who typed a client for an unknown code made it confirmable.
+        // A worker who typed a client for an unknown code made it confirmable —
+        // unless a partner cargo may own the code, which only a re-check settles.
         state:
-          (row.state === "not_found" || row.state === "failed") && edits.clientCode
+          (row.state === "not_found" || row.state === "failed") &&
+          edits.clientCode &&
+          !row.partnerState
             ? "ready"
             : row.state,
         message:
-          row.state === "not_found" && edits.clientCode
+          row.state === "not_found" && edits.clientCode && !row.partnerState
             ? "Qo'lda kiritildi. Tasdiqlang."
             : row.message,
       }));
@@ -586,6 +632,7 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
     lastScan,
     confirmableIds,
     scan,
+    recheckRow,
     importCodes,
     replacePackage,
     applyBagWeight,

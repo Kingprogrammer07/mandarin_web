@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Pencil, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -8,8 +8,10 @@ import {
 } from "@/api/services/astatkaFlights";
 import type { AstatkaWorkQueue } from "@/hooks/useAstatkaWorkQueue";
 import { summaryFromRow } from "@/lib/astatkaBagSummary";
+import { isPartnerPackage } from "@/lib/astatkaSource";
 import {
   canConfirm,
+  canRecheck,
   rowCodes,
   rowView,
   type WorkRow,
@@ -19,6 +21,7 @@ import { apiErrorMessage } from "@/utils/apiError";
 
 import { BagSheet, type BagSheetMode } from "./BagSheet";
 import type { BagEditChanges } from "./BagEditForm";
+import type { ExternalBagCardProps } from "./ExternalBagCard";
 import { SheetActions, type SheetAction } from "./SheetActions";
 import { packageUpdateOf } from "./useSavedBagActions";
 
@@ -35,14 +38,19 @@ interface Props {
   onClose: () => void;
   onConfirm: (row: WorkRow) => void;
   onRemove: (row: WorkRow) => void;
+  /** "Qayta tekshirish": asks the server about the row's code again. */
+  onRecheck: (row: WorkRow) => void;
 }
 
 /**
  * Which bag the photo report reads: a bag saved in this astatka by id, any
- * other by client and flight. `null` while the row has no client yet.
+ * other by client and flight. `null` while the row has no client yet, and
+ * for a partner cargo's bag: our photo report would read an unrelated client
+ * of ours with the same code.
  */
 function bagRefOf(row: WorkRow, flightName: string): AstatkaBagRef | null {
   const pkg = row.pkg;
+  if (isPartnerPackage(pkg)) return null;
   const sameAstatka =
     pkg?.astatka_flight_name.trim().toUpperCase() ===
     flightName.trim().toUpperCase();
@@ -65,7 +73,10 @@ function mergeEdits(edits: WorkRowEdits, changes: BagEditChanges): WorkRowEdits 
   if ("weightKg" in changes) merged.weightKg = changes.weightKg ?? null;
   // "" is kept: it clears the bag's comment when the row is confirmed.
   if (changes.comment !== undefined) merged.comment = changes.comment;
-  if (changes.trackCodes !== undefined) merged.trackCodes = changes.trackCodes;
+  if (changes.trackCodes !== undefined) {
+    merged.trackCodes = changes.trackCodes;
+    merged.trackCodesBase = changes.trackCodesBase ?? null;
+  }
   return merged;
 }
 
@@ -88,12 +99,34 @@ export function WorkRowSheet({
   onClose,
   onConfirm,
   onRemove,
+  onRecheck,
 }: Props) {
   const [savingEdit, setSavingEdit] = useState(false);
   const view = rowView(row);
   // Same rule as the row: a saving or queued row holds work the server has
   // not seen yet, so it is neither edited nor taken off the screen.
   const editable = onScreen && row.state !== "saving" && row.state !== "queued";
+  const partner = view.sourceCompany !== "";
+  // The flight is the worker's choice until the bag is confirmed.
+  const flightPickable = editable && row.state !== "confirmed";
+
+  const partnerCard: ExternalBagCardProps | undefined = partner
+    ? {
+        companyName: view.sourceCompanyName,
+        bag: view.external,
+        options: row.externalOptions,
+        selectedFlight: view.sourceFlight,
+        flightKnown: row.externalFlightKnown ?? true,
+        onPickFlight: flightPickable
+          ? (sourceFlight) => queue.updateEdits(row.id, mergeEdits(row.edits, { sourceFlight }))
+          : undefined,
+        // A bag held by another astatka is read through that astatka.
+        storedPhotos:
+          row.pkg?.id != null
+            ? { flightName: row.pkg.astatka_flight_name || flightName, packageId: row.pkg.id }
+            : undefined,
+      }
+    : undefined;
 
   // After "Saqlash" the window stays open on the bag as saved.
   const saveEdit = async (changes: BagEditChanges) => {
@@ -132,6 +165,16 @@ export function WorkRowSheet({
       onSelect: () => onConfirm(row),
     });
   }
+  if (onScreen && canRecheck(row)) {
+    buttons.push({
+      key: "recheck",
+      label: "Qayta tekshirish",
+      icon: RefreshCw,
+      tone: "neutral",
+      onSelect: () => onRecheck(row),
+      disabled: !queue.isOnline,
+    });
+  }
   if (editable) {
     buttons.push({
       key: "edit",
@@ -158,6 +201,7 @@ export function WorkRowSheet({
       title={view.clientCode || row.trackCode}
       summary={summaryFromRow(row)}
       bag={bagRefOf(row, flightName)}
+      partner={partnerCard}
       isOnline={queue.isOnline}
       mode={mode}
       onModeChange={onModeChange}
@@ -177,10 +221,34 @@ export function WorkRowSheet({
                 comment: row.edits.comment ?? row.pkg?.comment ?? "",
                 trackCodes: rowCodes(row),
               },
+              // A partner's bag: its API names the client, and the flight
+              // is picked in the partner's data below the form. A code a
+              // partner may own is not typed onto one of our clients at all.
               locked:
                 row.state === "confirmed"
-                  ? { clientCode: true, sourceFlight: true }
-                  : {},
+                  ? { clientCode: true, sourceFlight: true, byConfirm: true }
+                  : partner || row.partnerState
+                    ? { clientCode: true, sourceFlight: true }
+                    : {},
+              hints: partner
+                ? {
+                    sourceFlight: flightPickable
+                      ? `Reys pastdagi «${view.sourceCompanyName} ma'lumoti» bo'limida tanlanadi.`
+                      : undefined,
+                    weight: `Bo'sh qolsa, ${view.sourceCompanyName} ma'lumotidagi og'irlik olinadi.`,
+                  }
+                : row.partnerState
+                  ? {
+                      clientCode:
+                        "Bu kod boshqa kargoniki bo'lishi mumkin — mijozni qo'lda yozib bo'lmaydi. «Qayta tekshirish» ni bosing.",
+                    }
+                  : undefined,
+              // The list shown is the saved bag's own, or the worker's
+              // earlier list — which keeps the bag that one was written on.
+              codesBase:
+                row.edits.trackCodes !== undefined
+                  ? (row.edits.trackCodesBase ?? null)
+                  : (row.pkg?.id ?? null),
               saving: savingEdit,
               disabledReason: waitReason(row),
               onSave: (changes) => void saveEdit(changes),

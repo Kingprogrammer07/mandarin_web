@@ -12,9 +12,11 @@ import type {
   AstatkaPackageStatus,
 } from "@/api/services/astatkaFlights";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
+import { sourceCompanyLabel } from "@/lib/astatkaSource";
 import { cn } from "@/lib/utils";
 
 import type { BagSheetMode } from "./BagSheet";
+import { SourceCompanyChip } from "./SourceCompanyChip";
 
 /**
  * The wide table: the bag's facts in these columns, then the row's buttons in
@@ -104,6 +106,10 @@ export function SavedBagRow({
   const time = formatScanTime(
     pkg.confirmed_at ?? pkg.scanned_at ?? pkg.created_at,
   );
+  const partner = sourceCompanyLabel(pkg);
+  const partnerChip = partner ? (
+    <SourceCompanyChip label={partner} api={false} />
+  ) : null;
 
   // Narrow: the buttons drop under the facts when a 320px card has no room
   // beside them. Wide: the facts fill the columns, the buttons the last one.
@@ -119,6 +125,7 @@ export function SavedBagRow({
             <span className="block break-all text-[14px] font-extrabold text-mc-text">
               {pkg.client_code}
             </span>
+            {partnerChip && <span className="mt-0.5 block">{partnerChip}</span>}
             {pkg.client_name && (
               <span className="block truncate text-[11px] font-medium text-mc-text-3">
                 {pkg.client_name}
@@ -141,8 +148,12 @@ export function SavedBagRow({
         </span>
         <span className="block @2xl:hidden">
           <span className="flex items-start justify-between gap-2">
-            <span className="min-w-0 break-all text-[15px] font-extrabold text-mc-text">
-              {pkg.client_code}
+            {/* The chip wraps under the code rather than squeeze it at 320px. */}
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="min-w-0 break-all text-[15px] font-extrabold text-mc-text">
+                {pkg.client_code}
+              </span>
+              {partnerChip}
             </span>
             <StatusBadge status={pkg.status} />
           </span>

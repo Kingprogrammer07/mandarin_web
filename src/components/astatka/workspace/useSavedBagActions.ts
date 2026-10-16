@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
+  astatkaExternalPhotosRootKey,
   astatkaPackagesQueryKey,
   astatkaStatsQueryKey,
   confirmAstatkaPackages,
@@ -12,6 +13,7 @@ import {
   type AstatkaPackage,
   type AstatkaPackageUpdate,
 } from "@/api/services/astatkaFlights";
+import { isPartnerPackage, sourceCompanyOf } from "@/lib/astatkaSource";
 import { apiErrorMessage } from "@/utils/apiError";
 import { askConfirm } from "@/utils/askConfirm";
 
@@ -28,6 +30,16 @@ interface Options {
   onPackageChanged: (pkg: AstatkaPackage) => void;
   /** An edit was saved: the bag as the server now holds it. */
   onSaved: (pkg: AstatkaPackage) => void;
+}
+
+/**
+ * What undoing a confirmation does to the bag. Ours moves back into the
+ * flight it came from; a partner's bag never left the partner's system, so it
+ * only waits here again.
+ */
+function whereItGoesBack(pkg: AstatkaPackage): string {
+  if (isPartnerPackage(pkg)) return "Yuk shu ro'yxatda «Kutilmoqda» bo'lib qoladi.";
+  return `Yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi.`;
 }
 
 function newKey(): string {
@@ -87,6 +99,8 @@ export function useSavedBagActions({
       queryKey: astatkaPackagesQueryKey(flightName),
     });
     void queryClient.invalidateQueries({ queryKey: astatkaStatsQueryKey });
+    // A re-confirmed partner bag may get a new set of photo copies.
+    void queryClient.invalidateQueries({ queryKey: astatkaExternalPhotosRootKey });
   };
 
   const unconfirm = useMutation({
@@ -113,6 +127,7 @@ export function useSavedBagActions({
           source_flight_name: pkg.source_flight_name,
           track_codes: pkg.track_codes,
           scanned_at: new Date().toISOString(),
+          source_company: sourceCompanyOf(pkg),
         },
       ]),
     onSuccess: ([result], pkg) => {
@@ -156,7 +171,7 @@ export function useSavedBagActions({
   const askUnconfirm = async (pkg: AstatkaPackage) => {
     if (
       await askConfirm(
-        `${pkg.client_code} yukining tasdig'i bekor qilinsinmi? Yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi.`,
+        `${pkg.client_code} yukining tasdig'i bekor qilinsinmi? ${whereItGoesBack(pkg)}`,
       )
     ) {
       unconfirm.mutate(pkg);
@@ -175,7 +190,9 @@ export function useSavedBagActions({
     if (id === null || deletingRef.current.has(id)) return;
     const confirmed = pkg.status === "confirmed";
     const question = confirmed
-      ? `${pkg.client_code} yuki tasdiqlangan. O'chirish uchun avval tasdig'i bekor qilinadi: yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi va bu ro'yxatdan o'chiriladi. Davom etilsinmi?`
+      ? isPartnerPackage(pkg)
+        ? `${pkg.client_code} yuki tasdiqlangan. O'chirish uchun avval tasdig'i bekor qilinadi, keyin yuk bu ro'yxatdan o'chiriladi. Davom etilsinmi?`
+        : `${pkg.client_code} yuki tasdiqlangan. O'chirish uchun avval tasdig'i bekor qilinadi: yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi va bu ro'yxatdan o'chiriladi. Davom etilsinmi?`
       : `${pkg.client_code} ro'yxatdan o'chirilsinmi?`;
     if (!(await askConfirm(question))) return;
     if (deletingRef.current.has(id)) return;
