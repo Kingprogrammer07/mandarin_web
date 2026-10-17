@@ -1622,23 +1622,28 @@ export default function AddCargoForm({
                   </p>
                 )}
                 {showUnregisteredOption && (
-                  <label className="mt-2 flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={allowUnregistered}
-                      onChange={(e) => {
-                        setUnregisteredOkFor(e.target.checked ? clientId : null);
-                        if (e.target.checked) clearError("client_id");
-                      }}
-                      className="h-5 w-5 shrink-0 accent-orange-500"
-                    />
+                  <label className="mt-2 flex min-h-11 cursor-pointer select-none items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] px-4 py-3">
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">
+                      <span className="block text-sm font-semibold text-gray-700 dark:text-gray-200 leading-none">
                         Ro'yxatdan o'tmagan mijoz
                       </span>
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                      <span className="block text-xs text-gray-400 dark:text-gray-500 mt-1">
                         Faqat shu yuk uchun. Saqlangandan keyin o'chadi.
                       </span>
+                    </span>
+                    <span className="relative shrink-0">
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={allowUnregistered}
+                        onChange={(e) => {
+                          setUnregisteredOkFor(e.target.checked ? clientId : null);
+                          if (e.target.checked) clearError("client_id");
+                        }}
+                        className="sr-only peer"
+                      />
+                      <span className="block w-11 h-6 bg-gray-200 dark:bg-gray-800 rounded-full peer-checked:bg-orange-500 dark:peer-checked:bg-orange-600 border border-gray-300 dark:border-gray-700 peer-checked:border-orange-500/50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-500/40 transition-all" />
+                      <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
                     </span>
                   </label>
                 )}
