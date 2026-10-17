@@ -1,6 +1,12 @@
 import { Bell, X, AlertTriangle, CheckCircle2, Info, AlertCircle, ArrowRight, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useExpectedCargoStore, type NotificationItem, type NotificationType } from '@/store/expectedCargoStore';
+import { useMemo } from 'react';
+import {
+  isNotificationForFlight,
+  useExpectedCargoStore,
+  type NotificationItem,
+  type NotificationType,
+} from '@/store/expectedCargoStore';
 
 interface NotificationPanelProps {
   isOpen: boolean;
@@ -128,17 +134,23 @@ function NotificationCard({ item, onDismiss, onNavigate }: NotificationCardProps
 
 export function NotificationPanel({ isOpen, onClose, onNavigateToClient }: NotificationPanelProps) {
   const {
-    notifications,
+    notifications: allNotifications,
+    activeFlightName,
     dismissNotification,
     markAllNotificationsRead,
     clearAllNotifications,
   } = useExpectedCargoStore();
 
+  // Each flight keeps its own notifications; only the active flight's are shown.
+  const notifications = useMemo(
+    () => allNotifications.filter((n) => isNotificationForFlight(n, activeFlightName)),
+    [allNotifications, activeFlightName],
+  );
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // Mark all as read when the panel opens.
   if (isOpen && unreadCount > 0) {
-    markAllNotificationsRead();
+    markAllNotificationsRead(activeFlightName);
   }
 
   const handleNavigate = (flightName: string, clientCode: string) => {
@@ -160,11 +172,14 @@ export function NotificationPanel({ isOpen, onClose, onNavigateToClient }: Notif
       <div className="fixed top-0 right-0 bottom-0 z-50 w-80 max-w-[90vw] bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
-          <div className="flex items-center gap-2">
-            <Bell className="size-4 text-zinc-500 dark:text-zinc-400" />
+          <div className="flex min-w-0 items-center gap-2">
+            <Bell className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
             <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
               Bildirishnomalar
             </span>
+            {activeFlightName && (
+              <span className="truncate text-xs font-semibold text-orange-500">{activeFlightName}</span>
+            )}
             {notifications.length > 0 && (
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
                 ({notifications.length})
@@ -175,8 +190,8 @@ export function NotificationPanel({ isOpen, onClose, onNavigateToClient }: Notif
           <div className="flex items-center gap-1">
             {notifications.length > 0 && (
               <button
-                onClick={clearAllNotifications}
-                title="Barchasini o'chirish"
+                onClick={() => clearAllNotifications(activeFlightName)}
+                title="Shu reysning barchasini o'chirish"
                 className="p-1.5 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
               >
                 <Trash2 className="size-3.5" />
@@ -199,7 +214,7 @@ export function NotificationPanel({ isOpen, onClose, onNavigateToClient }: Notif
                 <Bell className="size-5 text-zinc-400 dark:text-zinc-500" />
               </div>
               <p className="text-sm text-zinc-400 dark:text-zinc-500">
-                Bildirishnomalar yo'q
+                {activeFlightName ? `${activeFlightName} reysida bildirishnoma yo'q` : "Bildirishnomalar yo'q"}
               </p>
             </div>
           ) : (
@@ -226,7 +241,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({ onClick }: NotificationBellProps) {
   const unreadCount = useExpectedCargoStore((state) =>
-    state.notifications.filter((n) => !n.isRead).length,
+    state.notifications.filter((n) => !n.isRead && isNotificationForFlight(n, state.activeFlightName)).length,
   );
 
   return (

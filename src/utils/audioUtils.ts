@@ -185,6 +185,40 @@ export function playClientChangeSound(volumeOverride?: number) {
   }
 }
 
+/**
+ * "This client has parcels saved earlier in this flight": three quick high sine
+ * pings on one note, like a reminder bell. Unlike every other tone (glides,
+ * two-note intervals, sawtooth/square), so it is recognised without looking.
+ */
+export function playSavedBeforeSound(volumeOverride?: number) {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const volume = clampVolume(volumeOverride ?? getCargoAudioVolume());
+
+    for (const offset of [0, 0.13, 0.26]) {
+      const startTime = ctx.currentTime + offset;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1318.5, startTime); // E6
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.9 * volume, startTime + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.11);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.12);
+    }
+
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+    }
+  } catch (e) {
+    console.error('Audio play failed', e);
+  }
+}
+
 /** Two-tone descending warning chime — distinct from success (ascending) and error (square). */
 export function playWarningSound(volumeOverride?: number) {
   try {

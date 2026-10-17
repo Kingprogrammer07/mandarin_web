@@ -26,11 +26,16 @@ import { Switch } from '@/components/ui/switch';
 import {
   resolveClientByTrackCode,
   getResolveIndex,
+  searchExpectedCargo,
   type AlreadySentErrorBody,
   type ResolvedClientResponse,
 } from '@/api/services/expectedCargo';
 import { isAxiosError } from 'axios';
-import { useExpectedCargoStore, type FastEntryQueueItem } from '@/store/expectedCargoStore';
+import {
+  useExpectedCargoStore,
+  type FastEntryQueueItem,
+  type SavedFlightTrack,
+} from '@/store/expectedCargoStore';
 import { expectedCargoScanStore } from '@/utils/expectedCargoScanStore';
 import { exportQueueToCsv } from '@/utils/expectedCargoQueueExport';
 import {
@@ -84,6 +89,26 @@ interface QueueFilterOption {
 
 // Stable DOM id for the Html5Qrcode video container
 const SCANNER_CONTAINER_ID = 'ec-qr-video-container';
+
+// shortcut: a client with more saved codes in one flight shows only the first 500, raise if that happens.
+const SAVED_IN_FLIGHT_LOOKUP_LIMIT = 500;
+
+/** One line of the virtualised scanner table: a queue row or a read-only saved code under it. */
+type QueueDisplayRow =
+  | { kind: 'queue'; key: string; item: FastEntryQueueItem; rowNumber: number }
+  | { kind: 'saved'; key: string; parent: FastEntryQueueItem; saved: SavedFlightTrack };
+
+function formatSavedAt(value: string | null): string {
+  if (!value) return 'offline indexdan';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('uz-UZ', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 function createDraftRow(): FastEntryDraftRow {
   return { id: crypto.randomUUID(), trackCode: '' };
@@ -241,6 +266,8 @@ interface QueueItemRowProps {
   onUnmergeClientGroup: (clientCode: string) => void;
   onPreviewClient: (clientCode: string, trackCode?: string, flightName?: string | null) => void;
   onToggleReviewed: (id: string) => void;
+  /** Show (true) or hide the client's earlier-saved codes next to its rows. */
+  onToggleSavedMerged: (item: FastEntryQueueItem, merged: boolean) => void;
 }
 
 const QueueItemRow = memo(function QueueItemRow({
@@ -258,6 +285,7 @@ const QueueItemRow = memo(function QueueItemRow({
   onUnmergeClientGroup,
   onPreviewClient,
   onToggleReviewed,
+  onToggleSavedMerged,
 }: QueueItemRowProps) {
   // Auto-open edit mode for items that need manual input (not-found or no client code yet).
   const [isEditingCode, setIsEditingCode] = useState(
@@ -315,6 +343,9 @@ const QueueItemRow = memo(function QueueItemRow({
   // A code already saved under a DIFFERENT flight is informational, not an error:
   // render it green like a resolved row (it just won't be saved again).
   const isCrossFlight = item.isAlreadySent && item.isCrossFlight;
+  const savedInFlightCount = item.savedInFlight?.length ?? 0;
+  const hasSavedInFlight =
+    savedInFlightCount > 0 && !item.isWrongClient && !item.isAlreadySent && !item.notFound;
 
   const sheetRowStyle = item.isWrongClient || item.notFound
     ? 'bg-red-50/90 dark:bg-red-950/25 border-red-300 dark:border-red-800 text-red-950 dark:text-red-100'
@@ -324,6 +355,8 @@ const QueueItemRow = memo(function QueueItemRow({
         ? 'bg-orange-50/90 dark:bg-orange-950/25 border-orange-300 dark:border-orange-800 text-orange-950 dark:text-orange-100'
         : item.isContinuation
           ? 'bg-amber-50/90 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-100'
+          : hasSavedInFlight
+            ? 'bg-blue-50/90 dark:bg-blue-950/25 border-blue-300 dark:border-blue-800 text-blue-950 dark:text-blue-100'
           : item.isResolved
             ? 'bg-emerald-50/70 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/70 text-zinc-900 dark:text-zinc-100'
             : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100';
@@ -342,6 +375,8 @@ const QueueItemRow = memo(function QueueItemRow({
           ? 'Mijoz topilmadi'
         : item.isContinuation
           ? `Navbat almashdi: avvalgi userdan ${item.priorCountForClient} ta`
+          : hasSavedInFlight
+            ? `Avval saqlangan: ${savedInFlightCount} ta · jami ${savedInFlightCount + clientScanCount}`
           : item.isResolved
             ? item.resolvedClientName ?? 'Aniqlandi'
             : item.clientCode
@@ -438,6 +473,8 @@ const QueueItemRow = memo(function QueueItemRow({
           <XCircle className="size-4 shrink-0 text-red-500" />
         ) : item.isContinuation ? (
           <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+        ) : hasSavedInFlight ? (
+          <History className="size-4 shrink-0 text-blue-500" />
         ) : item.isResolved ? (
           <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
         ) : (
@@ -467,7 +504,24 @@ const QueueItemRow = memo(function QueueItemRow({
         >
           {item.isReviewed ? <CheckSquare className="size-4" /> : <Square className="size-4" />}
         </button>
-        {isSplitGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
+        {hasSavedInFlight && (
+          <button
+            type="button"
+            onClick={() => onToggleSavedMerged(item, !item.isSavedMerged)}
+            className={cn(
+              'h-7 rounded-md px-2 text-[11px] font-bold',
+              item.isSavedMerged
+                ? 'border border-blue-300 bg-white/70 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-black/20 dark:text-blue-300'
+                : 'bg-blue-600 text-white hover:bg-blue-700',
+            )}
+            title={item.isSavedMerged
+              ? 'Saqlangan kodlarni jadvaldan yashirish'
+              : 'Saqlangan kodlarni shu mijoz qatorlari bilan birga ko\'rsatish'}
+          >
+            {item.isSavedMerged ? 'Yashirish' : 'Birlashtir'}
+          </button>
+        )}
+        {!hasSavedInFlight && isSplitGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
           <button
             type="button"
             onClick={() => onMergeClientGroup(item.clientCode)}
@@ -476,7 +530,7 @@ const QueueItemRow = memo(function QueueItemRow({
             Birlashtir
           </button>
         )}
-        {!isSplitGroup && isMergedGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
+        {!hasSavedInFlight && !isSplitGroup && isMergedGroup && item.clientCode.trim() && !item.isWrongClient && !item.isAlreadySent && !item.notFound && (
           <button
             type="button"
             onClick={() => onUnmergeClientGroup(item.clientCode)}
@@ -685,6 +739,54 @@ const QueueItemRow = memo(function QueueItemRow({
   );
 });
 
+// ── Earlier-saved code row (read-only) ─────────────────────────────────────────
+
+interface SavedTrackRowProps {
+  parent: FastEntryQueueItem;
+  saved: SavedFlightTrack;
+  onPreviewClient: (clientCode: string, trackCode?: string, flightName?: string | null) => void;
+}
+
+const SavedTrackRow = memo(function SavedTrackRow({ parent, saved, onPreviewClient }: SavedTrackRowProps) {
+  return (
+    <div className="grid min-w-[1110px] grid-cols-[52px_44px_minmax(150px,1fr)_minmax(280px,2fr)_120px_minmax(220px,1.4fr)_176px] border-b border-dashed border-blue-200 bg-blue-50/40 text-sm text-blue-950 dark:border-blue-900/70 dark:bg-blue-950/10 dark:text-blue-100">
+      <div className="flex h-11 items-center justify-center border-r border-inherit font-mono text-[12px] text-blue-400">
+        ↳
+      </div>
+      <div className="h-11 border-r border-inherit" />
+      <div className="flex h-11 min-w-0 items-center border-r border-inherit px-2">
+        <span className="truncate font-mono font-bold">{parent.clientCode}</span>
+      </div>
+      <div className="flex h-11 min-w-0 items-center border-r border-inherit px-3">
+        <span className="truncate font-mono font-semibold tracking-wide">{saved.trackCode}</span>
+      </div>
+      <div className="flex h-11 items-center justify-center border-r border-inherit px-2">
+        <span className="rounded-full border border-blue-200 bg-white/60 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:border-blue-800 dark:bg-black/20 dark:text-blue-300">
+          Saqlangan
+        </span>
+      </div>
+      <div className="flex h-11 min-w-0 items-center gap-2 border-r border-inherit px-3">
+        <History className="size-4 shrink-0 text-blue-500" />
+        <div className="min-w-0">
+          <div className="truncate text-[12px] font-semibold">
+            Avval saqlangan{parent.resolvedClientName ? ` · ${parent.resolvedClientName}` : ''}
+          </div>
+          <div className="font-mono text-[10px] text-current/55">{formatSavedAt(saved.savedAt)}</div>
+        </div>
+      </div>
+      <div className="flex h-11 items-center justify-end px-2">
+        <button
+          type="button"
+          onClick={() => onPreviewClient(parent.clientCode, saved.trackCode)}
+          className="h-7 rounded-md border border-current/15 bg-white/70 px-2 text-[11px] font-bold hover:bg-white dark:bg-black/20 dark:hover:bg-black/30"
+        >
+          Ko'rish
+        </button>
+      </div>
+    </div>
+  );
+});
+
 // ── FastEntryPanel ─────────────────────────────────────────────────────────────
 
 export function FastEntryPanel({
@@ -755,6 +857,8 @@ export function FastEntryPanel({
     unmergeClientQueueGroup,
     toggleQueueItemReviewed,
     setQueueItemClientCode,
+    setQueueItemSavedInFlight,
+    setQueueItemSavedMerged,
     selectedQueueItemIds,
     toggleQueueItemSelected,
     setQueueItemsSelected,
@@ -1006,6 +1110,78 @@ export function FastEntryPanel({
     });
   }, []);
 
+  // ── Earlier-saved codes of the same client in this flight ────────────────
+  // After "Saqlash" a client's rows leave the table, so a parcel scanned later
+  // looks like a brand-new client. Look the client up among saved rows and say so.
+  const mergeWithSaved = useCallback((itemId: string, clientCode: string) => {
+    mergeClientQueueGroup(clientCode);
+    setQueueItemSavedMerged(itemId, true);
+  }, [mergeClientQueueGroup, setQueueItemSavedMerged]);
+
+  const handleToggleSavedMerged = useCallback((item: FastEntryQueueItem, merged: boolean) => {
+    if (merged) mergeWithSaved(item.id, item.clientCode);
+    else setQueueItemSavedMerged(item.id, false);
+  }, [mergeWithSaved, setQueueItemSavedMerged]);
+
+  const checkSavedInFlight = useCallback(async (trackCode: string, clientCode: string) => {
+    if (!flightName) return;
+    const startedAt = Date.now();
+    let saved: SavedFlightTrack[] | null = null;
+
+    if (navigator.onLine) {
+      try {
+        const page = await searchExpectedCargo({
+          flight_name: flightName,
+          client_code: clientCode,
+          size: SAVED_IN_FLIGHT_LOOKUP_LIMIT,
+        });
+        saved = page.items.map((row) => ({ trackCode: row.track_code, savedAt: row.created_at }));
+      } catch {
+        // Fall through to the offline snapshot.
+      }
+    }
+    if (saved === null) {
+      const index = offlineIndexRef.current;
+      if (!index || offlineIndexFlightRef.current !== flightName.trim().toUpperCase()) return;
+      saved = [...index.alreadySent]
+        .filter((code) => index.map.get(code)?.clientCode.trim().toUpperCase() === clientCode)
+        .map((code) => ({ trackCode: code, savedAt: null }));
+    }
+
+    saved = saved.filter((row) => row.trackCode.toUpperCase() !== trackCode);
+    if (saved.length === 0) return;
+
+    // The row may have been removed or given another owner while we waited.
+    const row = useExpectedCargoStore.getState().entryQueue.find((item) =>
+      item.trackCode === trackCode && item.clientCode.trim().toUpperCase() === clientCode,
+    );
+    if (!row) return;
+
+    setQueueItemSavedInFlight(trackCode, clientCode, saved);
+    if (isAutoMergeEnabled) mergeWithSaved(row.id, clientCode);
+
+    // Let the scan's own tone finish first so the two do not blur together.
+    window.setTimeout(
+      () => { void playExpectedCargoSound('savedBefore'); },
+      Math.max(0, 300 - (Date.now() - startedAt)),
+    );
+    const preview = saved.slice(0, 3).map((item) => item.trackCode).join(', ');
+    toast.info(`${clientCode} — shu reysda avval ${saved.length} ta saqlangan`, {
+      duration: 6000,
+      description: `Yangi: ${trackCode}. Saqlanganlar: ${preview}${saved.length > 3 ? ' …' : ''}`,
+      action: isAutoMergeEnabled
+        ? undefined
+        : { label: 'Birlashtir', onClick: () => mergeWithSaved(row.id, clientCode) },
+    });
+    addNotification({
+      type: 'info',
+      title: `Avval saqlangan: ${clientCode}`,
+      description: `"${flightName}" reysida bu mijozning ${saved.length} ta kodi oldin saqlangan. Yangi skan: ${trackCode}. Jami: ${saved.length + 1}.`,
+      flightName,
+      navigateTo: { flightName, clientCode },
+    });
+  }, [flightName, isAutoMergeEnabled, mergeWithSaved, setQueueItemSavedInFlight, addNotification]);
+
   // ── Shared resolution appliers (used by BOTH the online mutation and the
   // offline index path) so behaviour — continuation warning, sounds, toasts —
   // stays identical regardless of resolve source. ──────────────────────────
@@ -1016,6 +1192,10 @@ export function FastEntryPanel({
     const currentQueue = useExpectedCargoStore.getState().entryQueue;
     const { isContinuation, priorCount, isClientChanged } =
       detectClientSwitchWarning(currentQueue, resolved.client_code);
+    const clientKey = resolved.client_code.trim().toUpperCase();
+    const isClientFirstRow = !currentQueue.some((item) =>
+      item.trackCode !== trackCode && item.clientCode.trim().toUpperCase() === clientKey,
+    );
 
     resolveQueueItemClient(
       trackCode,
@@ -1053,6 +1233,7 @@ export function FastEntryPanel({
         type: 'warning',
         title: `Navbat almashdi: ${resolved.client_code}`,
         description: `Oldingi userdan ${priorCount} ta ketma-ket scan bor edi. Yangi "${resolved.client_code}" rowi tekshirish nuqtasi sifatida belgilandi. Jami taxminiy: ${totalCount}.`,
+        flightName,
         navigateTo: { flightName: flightName ?? '', clientCode: resolved.client_code },
       });
     } else if (isClientChanged) {
@@ -1063,8 +1244,10 @@ export function FastEntryPanel({
     } else {
       void playExpectedCargoSound('success');
     }
+
+    if (isClientFirstRow) void checkSavedInFlight(trackCode, clientKey);
   }, [
-    isAutoMergeEnabled, resolveQueueItemClient, mergeClientQueueGroup,
+    isAutoMergeEnabled, resolveQueueItemClient, mergeClientQueueGroup, checkSavedInFlight,
     addNotification, flightName, setClientListHidden, setFastEntryOpen, setSearchQuery, setExpandedClient,
   ]);
 
@@ -1881,13 +2064,25 @@ export function FastEntryPanel({
     setQueueScrollMargin((prev) => (Math.abs(prev - offset) > 1 ? offset : prev));
   });
 
+  const queueDisplayRows = useMemo(() => {
+    const rows: QueueDisplayRow[] = [];
+    filteredQueue.forEach((item, index) => {
+      rows.push({ kind: 'queue', key: item.id, item, rowNumber: filteredQueue.length - index });
+      if (!item.isSavedMerged) return;
+      for (const saved of item.savedInFlight ?? []) {
+        rows.push({ kind: 'saved', key: `${item.id}:${saved.trackCode}`, parent: item, saved });
+      }
+    });
+    return rows;
+  }, [filteredQueue]);
+
   const queueVirtualizer = useVirtualizer({
-    count: filteredQueue.length,
+    count: queueDisplayRows.length,
     getScrollElement: () => queueScrollRef.current,
     estimateSize: () => 44, // QueueItemRow is a fixed h-11 (44px) grid row.
     overscan: 12,
     scrollMargin: queueScrollMargin,
-    getItemKey: (index) => filteredQueue[index]?.id ?? index,
+    getItemKey: (index) => queueDisplayRows[index]?.key ?? index,
   });
 
   return (
@@ -2442,25 +2637,38 @@ export function FastEntryPanel({
               style={{ height: queueVirtualizer.getTotalSize() }}
             >
               {queueVirtualizer.getVirtualItems().map((virtualRow) => {
-                const item = filteredQueue[virtualRow.index];
-                if (!item) return null;
+                const displayRow = queueDisplayRows[virtualRow.index];
+                if (!displayRow) return null;
+                const rowStyle = {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start - queueScrollMargin}px)`,
+                } as const;
+                if (displayRow.kind === 'saved') {
+                  return (
+                    <div key={displayRow.key} data-index={virtualRow.index} style={rowStyle}>
+                      <SavedTrackRow
+                        parent={displayRow.parent}
+                        saved={displayRow.saved}
+                        onPreviewClient={handlePreviewClient}
+                      />
+                    </div>
+                  );
+                }
+                const { item } = displayRow;
                 const clientCode = item.clientCode.trim().toUpperCase();
                 const splitSegment = clientCode ? splitClientSegments.get(clientCode) : undefined;
                 return (
                   <div
                     key={item.id}
                     data-index={virtualRow.index}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualRow.start - queueScrollMargin}px)`,
-                    }}
+                    style={rowStyle}
                   >
                     <QueueItemRow
                       item={item}
-                      rowNumber={filteredQueue.length - virtualRow.index}
+                      rowNumber={displayRow.rowNumber}
                       isSelected={selectedQueueItemIds.includes(item.id)}
                       clientScanCount={clientScanCounts.get(clientCode) ?? 0}
                       isSplitGroup={(splitSegment?.segmentCount ?? 0) > 1}
@@ -2473,6 +2681,7 @@ export function FastEntryPanel({
                       onUnmergeClientGroup={handleUnmergeClientGroup}
                       onPreviewClient={handlePreviewClient}
                       onToggleReviewed={toggleQueueItemReviewed}
+                      onToggleSavedMerged={handleToggleSavedMerged}
                     />
                   </div>
                 );

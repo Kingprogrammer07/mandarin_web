@@ -66,6 +66,21 @@ export interface FastEntryQueueItem {
   status?: 'pending' | 'saving' | 'saved';
   /** Active flight the item was scanned under. Informational / future per-flight load. */
   flightName?: string | null;
+  /**
+   * The client's codes that were already SAVED in this flight before this scan
+   * (earlier batch). Set only on the client's first row in the queue, so the
+   * worker learns the client has more parcels than the table shows.
+   */
+  savedInFlight?: SavedFlightTrack[];
+  /** The saved codes are shown as read-only rows together with the client's rows. */
+  isSavedMerged?: boolean;
+}
+
+/** A track code already saved to the server for the same client and flight. */
+export interface SavedFlightTrack {
+  trackCode: string;
+  /** Save time (ISO); null when only the offline snapshot knew the code. */
+  savedAt: string | null;
 }
 
 // ── Notification History ───────────────────────────────────────────────────────
@@ -79,10 +94,24 @@ export interface NotificationItem {
   description: string;
   createdAt: string;
   isRead: boolean;
+  /** Flight the notification belongs to; the panel shows only the active flight's. */
+  flightName?: string | null;
   navigateTo?: {
     flightName: string;
     clientCode: string;
   };
+}
+
+const NOTIFICATIONS_PER_FLIGHT = 100;
+
+/** Upper-cased flight of a notification; older entries only carry it in `navigateTo`. */
+export function getNotificationFlight(item: NotificationItem): string | null {
+  const flight = (item.flightName ?? item.navigateTo?.flightName ?? '').trim().toUpperCase();
+  return flight || null;
+}
+
+export function isNotificationForFlight(item: NotificationItem, flightName: string | null): boolean {
+  return getNotificationFlight(item) === (flightName?.trim().toUpperCase() || null);
 }
 
 // ── Store Interface ────────────────────────────────────────────────────────────
@@ -167,6 +196,10 @@ interface ExpectedCargoState {
   mergeClientQueueGroup: (clientCode: string) => void;
   /** Undo a merge: put the client's rows back where they were scanned. */
   unmergeClientQueueGroup: (clientCode: string) => void;
+  /** Attach the client's earlier-saved codes to a row (ignored if the row changed owner). */
+  setQueueItemSavedInFlight: (trackCode: string, clientCode: string, saved: SavedFlightTrack[]) => void;
+  /** Show or hide the earlier-saved codes next to the client's rows. */
+  setQueueItemSavedMerged: (id: string, merged: boolean) => void;
   toggleQueueItemReviewed: (id: string) => void;
   setQueueItemClientCode: (id: string, clientCode: string) => void;
   removeLatestQueueItem: () => void;
@@ -174,9 +207,10 @@ interface ExpectedCargoState {
   clearQueue: () => void;
 
   addNotification: (notification: Omit<NotificationItem, 'id' | 'createdAt' | 'isRead'>) => void;
-  markAllNotificationsRead: () => void;
+  /** Mark read / clear only the given flight's notifications. */
+  markAllNotificationsRead: (flightName: string | null) => void;
   dismissNotification: (id: string) => void;
-  clearAllNotifications: () => void;
+  clearAllNotifications: (flightName: string | null) => void;
 }
 
 // ── Store Implementation ───────────────────────────────────────────────────────
@@ -439,6 +473,23 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
           ),
         })),
 
+      setQueueItemSavedInFlight: (trackCode, clientCode, saved) =>
+        set((state) => ({
+          entryQueue: state.entryQueue.map((item) =>
+            item.trackCode === trackCode
+              && item.clientCode.trim().toUpperCase() === clientCode.trim().toUpperCase()
+              ? { ...item, savedInFlight: saved }
+              : item,
+          ),
+        })),
+
+      setQueueItemSavedMerged: (id, merged) =>
+        set((state) => ({
+          entryQueue: state.entryQueue.map((item) =>
+            item.id === id ? { ...item, isSavedMerged: merged } : item,
+          ),
+        })),
+
       toggleQueueItemReviewed: (id) =>
         set((state) => ({
           entryQueue: state.entryQueue.map((item) =>
@@ -472,17 +523,30 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
 
       addNotification: (notification) => {
         const id = crypto.randomUUID();
-        set((state) => ({
-          notifications: [
-            { ...notification, id, createdAt: new Date().toISOString(), isRead: false },
-            ...state.notifications,
-          ].slice(0, 100),
-        }));
+        set((state) => {
+          const created: NotificationItem = {
+            ...notification,
+            id,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+          };
+          // Cap per flight, so a busy flight cannot push another flight's history out.
+          const perFlight = new Map<string, number>();
+          const notifications = [created, ...state.notifications].filter((n) => {
+            const key = getNotificationFlight(n) ?? '';
+            const count = (perFlight.get(key) ?? 0) + 1;
+            perFlight.set(key, count);
+            return count <= NOTIFICATIONS_PER_FLIGHT;
+          });
+          return { notifications };
+        });
       },
 
-      markAllNotificationsRead: () =>
+      markAllNotificationsRead: (flightName) =>
         set((state) => ({
-          notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+          notifications: state.notifications.map((n) =>
+            isNotificationForFlight(n, flightName) ? { ...n, isRead: true } : n,
+          ),
         })),
 
       dismissNotification: (id) =>
@@ -490,7 +554,10 @@ export const useExpectedCargoStore = create<ExpectedCargoState>()(
           notifications: state.notifications.filter((n) => n.id !== id),
         })),
 
-      clearAllNotifications: () => set({ notifications: [] }),
+      clearAllNotifications: (flightName) =>
+        set((state) => ({
+          notifications: state.notifications.filter((n) => !isNotificationForFlight(n, flightName)),
+        })),
     }),
 
     {

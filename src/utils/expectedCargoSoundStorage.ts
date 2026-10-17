@@ -11,6 +11,9 @@ export const EXPECTED_CARGO_SOUND_EVENTS = [
   // Added after the original five, so `normalizeProfile` backfills it into
   // profiles already stored in IndexedDB — no DB version bump needed.
   'clientChange',
+  // The scanned client already has codes saved in this flight from an earlier
+  // batch. Backfilled by `normalizeProfile` like `clientChange`.
+  'savedBefore',
 ] as const;
 
 export type ExpectedCargoSoundEvent = typeof EXPECTED_CARGO_SOUND_EVENTS[number];
@@ -106,6 +109,7 @@ export function createDefaultExpectedCargoSoundProfile(): ExpectedCargoSoundProf
       duplicate: base(),
       merge: base(),
       clientChange: base(),
+      savedBefore: base(),
     },
     updatedAt: Date.now(),
   };

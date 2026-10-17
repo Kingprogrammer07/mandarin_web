@@ -4,6 +4,7 @@ import {
   Ban,
   CheckCircle2,
   GitMerge,
+  History,
   Play,
   RotateCcw,
   Save,
@@ -92,6 +93,12 @@ const EVENT_META: Record<ExpectedCargoSoundEvent, SoundEventMeta> = {
     description: 'Skanerlangan kod oldingisidan boshqa mijozniki bo‘lganda',
     icon: UsersRound,
     color: 'text-sky-600 dark:text-sky-400',
+  },
+  savedBefore: {
+    label: 'Avval saqlangan mijoz',
+    description: 'Mijozning shu reysda oldin saqlangan kodlari bo‘lganda',
+    icon: History,
+    color: 'text-blue-600 dark:text-blue-400',
   },
 };
 

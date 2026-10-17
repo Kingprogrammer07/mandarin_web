@@ -2,6 +2,7 @@ import {
   playClientChangeSound,
   playErrorSound,
   playRusterSuccessSound,
+  playSavedBeforeSound,
   playSuccessSound,
   playWarningSound,
 } from '@/utils/audioUtils';
@@ -75,6 +76,8 @@ function playDefaultSound(event: ExpectedCargoSoundEvent, volume: number): void 
     playErrorSound(volume);
   } else if (event === 'clientChange') {
     playClientChangeSound(volume);
+  } else if (event === 'savedBefore') {
+    playSavedBeforeSound(volume);
   } else {
     playWarningSound(volume);
   }
