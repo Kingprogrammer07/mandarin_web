@@ -1,10 +1,16 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { offlineStorage } from "@/utils/offlineStorage";
-import { getClientCodeSuggestions, uploadPhoto } from "@/api/services/cargo";
-import type { ClientCodeSuggestionsResponse } from "@/api/services/cargo";
+import {
+  deleteCargo,
+  getClientCodeSuggestions,
+  getFlightPhotos,
+  uploadPhoto,
+} from "@/api/services/cargo";
+import type { CargoPhoto, ClientCodeSuggestionsResponse } from "@/api/services/cargo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MultiPhotoUpload from "@/components/MultiPhotoUpload";
+import PhotoViewerModal from "@/components/cargo/PhotoViewerModal";
 import type { MultiPhotoUploadHandle } from "@/components/MultiPhotoUpload";
 import {
   ArrowLeft,
@@ -35,6 +41,7 @@ import {
   resolveCodeForSubmit,
 } from "@/lib/clientCodeCompletion";
 import { useToast } from "@/hooks/useToast";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useTranslation } from "react-i18next";
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
 
@@ -63,6 +70,12 @@ interface QueuedUpload {
 interface SelectOption {
   value: string;
   label: string;
+}
+
+/** Photo reports the flight already holds for one client code. */
+interface ExistingReports {
+  code: string;
+  photos: CargoPhoto[];
 }
 
 /** Result of looking the typed client code up, keyed by what was typed. */
@@ -289,6 +302,19 @@ const RETRY_BASE_DELAY = 2000;
 const CODE_LOOKUP_DEBOUNCE_MS = 200;
 /** How long a looked-up completion is reused; new clients get codes all day */
 const CODE_LOOKUP_TTL_MS = 60_000;
+/** Pause after the last keystroke before the flight is checked for an earlier report */
+const EXISTING_REPORT_DEBOUNCE_MS = 300;
+/** One client has a handful of reports on a flight; the search is a substring match */
+const EXISTING_REPORT_PAGE_SIZE = 100;
+
+const formatReportDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("uz-UZ", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 const CODE_SUBMIT_ERRORS = {
   ambiguous: "Bir nechta mijoz mos keldi, pastdan tumanni tanlang.",
@@ -520,6 +546,11 @@ export default function AddCargoForm({
   onSuccess,
 }: AddCargoFormProps) {
   const { t } = useTranslation();
+  const jwtClaims = getAdminJwtClaims();
+  const canReadReports =
+    jwtClaims.isSuperAdmin || jwtClaims.permissions.has("flights:read");
+  const canDeleteReports =
+    jwtClaims.isSuperAdmin || jwtClaims.permissions.has("flights:delete");
 
   // ── Form state ──
   const [clientId, setClientId] = useState("");
@@ -557,6 +588,11 @@ export default function AddCargoForm({
   const regionOnlyKeepRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
 
+  // ── Earlier photo report of the same client on this flight ──
+  const [existingReports, setExistingReports] = useState<ExistingReports | null>(null);
+  const [viewingReportIndex, setViewingReportIndex] = useState<number | null>(null);
+  const [deletingReports, setDeletingReports] = useState(false);
+
   // ── Refs ──
   const clientIdRef = useRef<HTMLInputElement>(null);
   const weightRef = useRef<HTMLInputElement>(null);
@@ -589,6 +625,7 @@ export default function AddCargoForm({
   }, []);
 
   const { toast, ToastRenderer } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   /**
    * Persist a failed upload to IndexedDB so it survives a page refresh and
@@ -1167,14 +1204,123 @@ export default function AddCargoForm({
   }, [uploadQueue, fastMode, onSuccess, toast, t, safeTimeout, persistFailed]);
 
   /* ── Auto-focus clientId after photos ── */
+  // Read from the field, not state: re-running on every keystroke would yank
+  // the caret to the end while the worker edits the code.
   useEffect(() => {
-    if (photos.length > 0 && !clientId) {
+    if (photos.length > 0 && !parseClientCodeInput(clientIdRef.current?.value ?? "")) {
       focusClientIdEnd();
     }
-  }, [photos.length, clientId, focusClientIdEnd]);
+  }, [photos.length, focusClientIdEnd]);
+
+  /* ── Earlier report check, once the code is complete ── */
+  useEffect(() => {
+    const code = clientId;
+    if (!canReadReports || !parseClientCodeInput(code) || isRegionOnlyCode(code)) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      // Advisory only: offline or a failed request leaves the form as it was.
+      if (!navigator.onLine) return;
+      getFlightPhotos(flightName, 1, EXISTING_REPORT_PAGE_SIZE, code).then(
+        (res) => {
+          if (cancelled) return;
+          const photos = res.photos.filter((p) => p.client_id.toUpperCase() === code);
+          setExistingReports({ code, photos });
+        },
+        () => {},
+      );
+    }, EXISTING_REPORT_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [canReadReports, clientId, flightName]);
+
+  const duplicateReports = useMemo(
+    () =>
+      existingReports && existingReports.code === clientId
+        ? [...existingReports.photos].sort((a, b) =>
+            b.created_at.localeCompare(a.created_at),
+          )
+        : [],
+    [existingReports, clientId],
+  );
+  const viewingReport =
+    viewingReportIndex !== null ? duplicateReports[viewingReportIndex] ?? null : null;
+
+  /** Delete earlier reports of the code in the field, after the worker confirms. */
+  const deleteExistingReports = useCallback(
+    async (reports: CargoPhoto[]) => {
+      if (reports.length === 0 || deletingReports) return;
+      const code = reports[0].client_id;
+      const ok = await confirm({
+        message:
+          reports.length > 1
+            ? `${code}: ${reports.length} ta eski foto hisobot o'chirilsinmi?`
+            : `${code}: eski foto hisobot o'chirilsinmi?`,
+        description: reports.some((p) => p.is_sent)
+          ? "Mijozga yuborilgan hisobot ham o'chadi. Bu amalni ortga qaytarib bo'lmaydi."
+          : "Bu amalni ortga qaytarib bo'lmaydi.",
+        confirmLabel: "O'chirish",
+        variant: "danger",
+      });
+      if (!ok || !mountedRef.current) return;
+
+      setDeletingReports(true);
+      const removed = new Set<string>();
+      let failure: string | null = null;
+      for (const report of reports) {
+        try {
+          await deleteCargo(report.id);
+          removed.add(report.id);
+        } catch (error: unknown) {
+          failure =
+            (error as { data?: { detail?: string } })?.data?.detail ??
+            (error as { message?: string })?.message ??
+            "Qayta urinib ko'ring";
+          break;
+        }
+      }
+      if (!mountedRef.current) return;
+      setDeletingReports(false);
+      setExistingReports((prev) =>
+        prev ? { ...prev, photos: prev.photos.filter((p) => !removed.has(p.id)) } : prev,
+      );
+      setViewingReportIndex(null);
+
+      if (failure) {
+        toast({
+          title: "❌ O'chirishda xatolik yuz berdi",
+          description: failure,
+          variant: "error",
+        });
+        return;
+      }
+      toast({
+        title: "✅ Eski foto hisobot o'chirildi",
+        description: code,
+        variant: "success",
+        duration: 2000,
+      });
+      requestAnimationFrame(() => weightRef.current?.focus());
+    },
+    [confirm, deletingReports, toast],
+  );
+
+  const closeReportViewer = useCallback(() => {
+    setViewingReportIndex(null);
+    focusClientIdEnd();
+  }, [focusClientIdEnd]);
+
+  const stepReportViewer = useCallback(
+    (step: number) => {
+      const total = duplicateReports.length;
+      if (total < 2) return;
+      setViewingReportIndex((i) => (i === null ? i : (i + step + total) % total));
+    },
+    [duplicateReports.length],
+  );
 
   /* ── Permission guard — must be after all hooks ── */
-  const jwtClaims = getAdminJwtClaims();
   const canCreate = jwtClaims.isSuperAdmin || jwtClaims.permissions.has('flights:create');
   if (!canCreate) {
     return (
@@ -1196,6 +1342,22 @@ export default function AddCargoForm({
   return (
     <>
       <ToastRenderer />
+      <ConfirmDialog />
+      {viewingReport && (
+        <PhotoViewerModal
+          photo={viewingReport}
+          onClose={closeReportViewer}
+          onDelete={
+            canDeleteReports ? () => void deleteExistingReports([viewingReport]) : undefined
+          }
+          isDeleting={deletingReports}
+          formatDate={formatReportDate}
+          canNavigateReports={duplicateReports.length > 1}
+          reportPositionLabel={`${(viewingReportIndex ?? 0) + 1}/${duplicateReports.length}`}
+          onPreviousReport={() => stepReportViewer(-1)}
+          onNextReport={() => stepReportViewer(1)}
+        />
+      )}
 
       <div className="w-full max-w-xl mx-auto p-4 sm:p-6 lg:p-8">
         <div className="relative bg-white dark:bg-[#0d0a04] rounded-3xl border border-orange-100/80 dark:border-orange-500/15 overflow-hidden shadow-xl">
@@ -1301,7 +1463,7 @@ export default function AddCargoForm({
                 maxPhotos={10}
                 fastMode={fastMode}
                 onCameraClose={() => {
-                  if (!clientId) focusClientIdEnd();
+                  if (!parseClientCodeInput(clientId)) focusClientIdEnd();
                 }}
               />
 
@@ -1402,6 +1564,43 @@ export default function AddCargoForm({
                   <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
                     {errors.client_id}
                   </p>
+                )}
+                {duplicateReports.length > 0 && (
+                  <div
+                    role="alert"
+                    className="mt-2 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3 py-2.5"
+                  >
+                    <p className="flex items-start gap-1.5 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        Bu mijozga shu reysda foto hisobot qilingan
+                        {duplicateReports.length > 1 ? ` (${duplicateReports.length} ta)` : ""}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 pl-[22px] text-xs text-amber-700 dark:text-amber-300/80">
+                      Oxirgisi: {formatReportDate(duplicateReports[0].created_at)}
+                      {duplicateReports[0].is_sent ? " · mijozga yuborilgan" : ""}
+                    </p>
+                    <div className="mt-2 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setViewingReportIndex(0)}
+                        className="h-11 rounded-lg border border-amber-300 dark:border-amber-500/30 bg-white dark:bg-white/5 px-2 text-[13px] font-semibold text-amber-800 dark:text-amber-200 active:scale-[0.98] transition-transform"
+                      >
+                        Eskisini ko'rish
+                      </button>
+                      {canDeleteReports && (
+                        <button
+                          type="button"
+                          onClick={() => void deleteExistingReports(duplicateReports)}
+                          disabled={deletingReports}
+                          className="h-11 rounded-lg border border-red-200 dark:border-red-500/30 bg-white dark:bg-white/5 px-2 text-[13px] font-semibold text-red-600 dark:text-red-400 active:scale-[0.98] transition-transform disabled:opacity-50"
+                        >
+                          {deletingReports ? "O'chirilmoqda…" : "Eskisini o'chirish"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 
