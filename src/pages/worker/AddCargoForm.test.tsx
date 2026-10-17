@@ -14,6 +14,7 @@ vi.mock("@/api/services/adminManagement", () => ({
 }));
 vi.mock("@/api/services/cargo", () => ({
   getClientCodeSuggestions: vi.fn(),
+  getClientCodeIndex: vi.fn(),
   getFlightPhotos: vi.fn(),
   deleteCargo: vi.fn(),
   uploadPhoto: vi.fn(),
@@ -42,8 +43,10 @@ vi.mock("@/components/MultiPhotoUpload", () => ({
 
 import {
   deleteCargo,
+  getClientCodeIndex,
   getClientCodeSuggestions,
   getFlightPhotos,
+  uploadPhoto,
   type CargoPhoto,
   type FlightPhotosResponse,
 } from "@/api/services/cargo";
@@ -52,6 +55,8 @@ import AddCargoForm from "./AddCargoForm";
 const suggestions = vi.mocked(getClientCodeSuggestions);
 const flightPhotos = vi.mocked(getFlightPhotos);
 const removeCargo = vi.mocked(deleteCargo);
+const codeIndex = vi.mocked(getClientCodeIndex);
+const upload = vi.mocked(uploadPhoto);
 
 function report(id: string, clientId: string): CargoPhoto {
   return {
@@ -96,6 +101,8 @@ beforeEach(() => {
   });
   flightPhotos.mockResolvedValue(photosPage([]));
   removeCargo.mockResolvedValue({ success: true, message: "", deleted_cargo_id: "" });
+  codeIndex.mockRejectedValue(new Error("offline"));
+  upload.mockResolvedValue({ success: true, message: "", photo: report("1", "X1") });
 });
 
 function renderForm() {
@@ -156,5 +163,42 @@ describe("AddCargoForm", () => {
 
     await waitFor(() => expect(flightPhotos).toHaveBeenCalled());
     expect(screen.queryByText("Eskisini ko'rish")).not.toBeInTheDocument();
+  });
+
+  it("refuses an unregistered code until it is ticked, for that one parcel", async () => {
+    suggestions.mockResolvedValue({ query: "", exact: false, best: null, best_reason: null, items: [] });
+    renderForm();
+    fireEvent.click(screen.getByText("cargo.fastMode"));
+    fireEvent.click(screen.getByText("rasmga olish"));
+    fireEvent.change(codeInput(), { target: { value: "SAAN999" } });
+    fireEvent.change(weightInput(), { target: { value: "2" } });
+
+    fireEvent.click(screen.getByText("cargo.saveAndNext"));
+    expect(
+      await screen.findByText(/tizimda ro'yxatdan o'tmagan. Baribir yuklash/),
+    ).toBeInTheDocument();
+    expect(upload).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByLabelText(/Ro'yxatdan o'tmagan mijoz/));
+    fireEvent.click(screen.getByText("cargo.saveAndNext"));
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    expect(upload.mock.calls[0][1]).toBe("SAAN999");
+
+    // The same code on the next parcel starts unticked again.
+    fireEvent.change(codeInput(), { target: { value: "SAAN999" } });
+    expect(await screen.findByLabelText(/Ro'yxatdan o'tmagan mijoz/)).not.toBeChecked();
+  });
+
+  it("completes a code from the saved list without waiting for the server", async () => {
+    codeIndex.mockResolvedValue({ clients: [["SAAN123"]], flight_codes: [], generated_at: "" });
+    suggestions.mockReturnValue(new Promise(() => {}));
+    renderForm();
+    await waitFor(() => expect(codeIndex).toHaveBeenCalled());
+    fireEvent.change(codeInput(), { target: { value: "SA123" } });
+
+    expect(await screen.findByText("SAAN123")).toBeInTheDocument();
+    fireEvent.keyDown(codeInput(), { key: "Enter" });
+    await waitFor(() => expect(codeInput()).toHaveValue("SAAN123"));
+    expect(weightInput()).toHaveFocus();
   });
 });

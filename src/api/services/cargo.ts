@@ -218,6 +218,30 @@ export const getClientCodeSuggestions = async (
   return response.data;
 };
 
+export interface ClientCodeIndexResponse {
+  /** One list per client, codes in primary-code order; null when not asked for. */
+  clients: string[][] | null;
+  /** Client codes on the flight's expected-cargo list. */
+  flight_codes: string[];
+  generated_at: string;
+}
+
+// Every client code, so the cargo form can complete codes on the device.
+export const getClientCodeIndex = async (
+  flightName: string,
+  includeClients: boolean,
+): Promise<ClientCodeIndexResponse> => {
+  const response = await apiClient.get<ClientCodeIndexResponse>(
+    '/api/v1/flights/client-code-index',
+    {
+      params: { flight_name: flightName, include_clients: includeClients },
+      // Tens of thousands of codes on a phone connection; it runs in the background.
+      timeout: 60_000,
+    },
+  );
+  return response.data;
+};
+
 // Get flight photo statistics
 export const getFlightStats = async (flightName: string): Promise<FlightStatsResponse> => {
   const response = await apiClient.get<FlightStatsResponse>(`/api/v1/flights/${flightName}/stats`);

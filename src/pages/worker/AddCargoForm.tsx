@@ -34,6 +34,7 @@ import {
   getRegionAndDistrictFromCode,
 } from "@/lib/aviaCodes";
 import {
+  completeFromIndex,
   isRegionOnlyCode,
   parseClientCodeInput,
   placeLabelKeyForCode,
@@ -42,6 +43,7 @@ import {
 } from "@/lib/clientCodeCompletion";
 import { useToast } from "@/hooks/useToast";
 import { useConfirm } from "@/hooks/useConfirm";
+import { useClientCodeIndex } from "@/hooks/useClientCodeIndex";
 import { useTranslation } from "react-i18next";
 import { getAdminJwtClaims } from "@/api/services/adminManagement";
 
@@ -318,7 +320,7 @@ const formatReportDate = (iso: string) =>
 
 const CODE_SUBMIT_ERRORS = {
   ambiguous: "Bir nechta mijoz mos keldi, pastdan tumanni tanlang.",
-  not_found: "Bunday raqamli mijoz topilmadi.",
+  not_found: "Bu kod tizimda ro'yxatdan o'tmagan. Baribir yuklash uchun pastdagi belgini qo'ying.",
   unavailable: "Kodni tekshirib bo'lmadi. Tuman harflari bilan to'liq yozing (masalan SAAN123).",
 } as const;
 
@@ -461,7 +463,7 @@ const ClientCodeHint = memo(function ClientCodeHint({
     return (
       <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
         <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-        {clientId} bo'yicha mijoz topilmadi
+        {clientId} tizimda ro'yxatdan o'tmagan
       </p>
     );
   }
@@ -574,6 +576,12 @@ export default function AddCargoForm({
 
   // ── Client code completion ──
   const [codeLookup, setCodeLookup] = useState<CodeLookupState | null>(null);
+  const codeIndex = useClientCodeIndex(flightName);
+  /**
+   * The code the worker ticked "Ro'yxatdan o'tmagan mijoz" for. Tied to the
+   * code, so typing another one or saving the parcel switches it off again.
+   */
+  const [unregisteredOkFor, setUnregisteredOkFor] = useState<string | null>(null);
   const lookupCacheRef = useRef(
     new Map<string, { data: ClientCodeSuggestionsResponse; at: number }>(),
   );
@@ -754,11 +762,43 @@ export default function AddCargoForm({
     [flightName],
   );
 
-  /** The lookup answer for exactly what is in the field now, if it has arrived. */
-  const activeLookup =
+  /** The server's answer for exactly what is in the field now, if it has arrived. */
+  const serverLookup =
     codeLookup && codeLookup.query === clientId ? codeLookup : null;
+  // The saved code list answers at once; the server still has the last word,
+  // since it also knows clients registered after the list was saved.
+  const activeLookup = useMemo<CodeLookupState | null>(() => {
+    if (serverLookup?.status === "done") return serverLookup;
+    const local = codeIndex ? completeFromIndex(clientId, codeIndex) : null;
+    return local ? { query: clientId, status: "done", data: local } : serverLookup;
+  }, [serverLookup, codeIndex, clientId]);
   const activeLookupData =
     activeLookup?.status === "done" ? activeLookup.data : null;
+  const isUnregisteredCode =
+    activeLookupData !== null &&
+    resolveCodeForSubmit(clientId, activeLookupData).kind === "not_found";
+  const allowUnregistered = unregisteredOkFor !== null && unregisteredOkFor === clientId;
+
+  /**
+   * The answer to act on for `query`: a fresh server answer, else a decisive
+   * one from the saved list, else the server (falling back to the saved list
+   * when it cannot be reached). A code the saved list does not know is always
+   * asked again: the client may have registered a minute ago.
+   */
+  const resolveLookup = useCallback(
+    async (query: string): Promise<ClientCodeSuggestionsResponse | null> => {
+      const cached = lookupCacheRef.current.get(query);
+      if (cached && Date.now() - cached.at < CODE_LOOKUP_TTL_MS) return cached.data;
+      const local = codeIndex ? completeFromIndex(query, codeIndex) : null;
+      if (local && (local.exact || local.best)) return local;
+      try {
+        return await lookupClientCode(query);
+      } catch {
+        return local;
+      }
+    },
+    [codeIndex, lookupClientCode],
+  );
 
   /** Tap on a suggested code: take it and move on to the weight. */
   const handlePickCode = useCallback(
@@ -776,23 +816,24 @@ export default function AddCargoForm({
    */
   const handleClientIdEnter = useCallback(async () => {
     const typed = clientId;
-    let data = activeLookupData;
-    if (!data && isRegionOnlyCode(typed)) {
-      try {
-        data = await lookupClientCode(typed);
-      } catch {
-        data = null;
-      }
+    let data = serverLookup?.status === "done" ? serverLookup.data : null;
+    if (!data && parseClientCodeInput(typed)) {
+      data = await resolveLookup(typed);
       // Typed on while the answer was coming: it no longer applies.
       if (!mountedRef.current || clientIdRef.current?.value !== typed) return;
     }
     if (data?.best && !data.exact && data.best !== typed) {
       applyCompletion(typed, data.best);
-    } else if (resolveCodeForSubmit(typed, data).kind !== "ok") {
-      return;
+    } else {
+      const kind = resolveCodeForSubmit(typed, data).kind;
+      if (kind === "not_found" && unregisteredOkFor !== typed) {
+        setErrors((prev) => ({ ...prev, client_id: CODE_SUBMIT_ERRORS.not_found }));
+        return;
+      }
+      if (kind !== "ok" && kind !== "not_found") return;
     }
     weightRef.current?.focus();
-  }, [activeLookupData, applyCompletion, clientId, lookupClientCode]);
+  }, [applyCompletion, clientId, resolveLookup, serverLookup, unregisteredOkFor]);
 
   /** Leaving a region-only code for the weight fills in its single completion. */
   const handleWeightFocus = useCallback(() => {
@@ -941,22 +982,24 @@ export default function AddCargoForm({
         return;
       }
 
-      // "SA123" is not a client: swap in its completion before uploading, or
-      // stop here and say why. Full codes are never held up by the lookup.
+      // "SA123" is not a client: swap in its completion before uploading.
+      // A code nobody is registered under is uploaded only when the worker
+      // ticked it for this parcel; otherwise stop here and say why.
       let code = clientId;
-      if (isRegionOnlyCode(code)) {
+      if (parseClientCodeInput(code)) {
         submittingRef.current = true;
         let data: ClientCodeSuggestionsResponse | null = null;
         try {
-          data = await lookupClientCode(code);
-        } catch {
-          data = null;
+          data = await resolveLookup(code);
         } finally {
           submittingRef.current = false;
         }
         if (!mountedRef.current) return;
         const resolution = resolveCodeForSubmit(code, data);
-        if (resolution.kind !== "ok") {
+        if (resolution.kind === "ok") {
+          if (resolution.code !== code) applyCompletion(code, resolution.code);
+          code = resolution.code;
+        } else if (!(resolution.kind === "not_found" && unregisteredOkFor === code)) {
           setErrors((prev) => ({
             ...prev,
             client_id: CODE_SUBMIT_ERRORS[resolution.kind],
@@ -964,9 +1007,8 @@ export default function AddCargoForm({
           focusClientIdEnd();
           return;
         }
-        if (resolution.code !== code) applyCompletion(code, resolution.code);
-        code = resolution.code;
       }
+      setUnregisteredOkFor(null);
 
       const item: QueuedUpload = {
         id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -1037,7 +1079,8 @@ export default function AddCargoForm({
       safeTimeout,
       toast,
       uploadQueue,
-      lookupClientCode,
+      resolveLookup,
+      unregisteredOkFor,
       applyCompletion,
     ],
   );
@@ -1564,6 +1607,27 @@ export default function AddCargoForm({
                   <p className="text-sm font-medium text-red-500 dark:text-red-400 mt-1.5">
                     {errors.client_id}
                   </p>
+                )}
+                {isUnregisteredCode && (
+                  <label className="mt-2 flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={allowUnregistered}
+                      onChange={(e) => {
+                        setUnregisteredOkFor(e.target.checked ? clientId : null);
+                        if (e.target.checked) clearError("client_id");
+                      }}
+                      className="h-5 w-5 shrink-0 accent-orange-500"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        Ro'yxatdan o'tmagan mijoz
+                      </span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        Faqat shu yuk uchun. Saqlangandan keyin o'chadi.
+                      </span>
+                    </span>
+                  </label>
                 )}
                 {duplicateReports.length > 0 && (
                   <div

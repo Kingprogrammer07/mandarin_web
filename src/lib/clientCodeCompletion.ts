@@ -46,20 +46,126 @@ export type CodeSubmitResolution =
 /**
  * What to upload for the typed code.
  *
- * A full code goes through untouched, as it always has. A region-only code is
- * replaced by its single completion, or kept when it exists exactly as typed
- * (old codes such as "SS50"); anything else is refused, because uploading
- * "SA123" would attach the parcel to no client at all.
+ * A code that exists as typed goes through; a code with one safe completion
+ * ("SA123" -> "SAAN123") is replaced by it. A code the system does not know
+ * comes back "not_found": the form uploads it only when the worker ticks
+ * "Ro'yxatdan o'tmagan mijoz" for this one parcel. Without an answer (offline
+ * and no saved code list) a full code goes through as it always has, while a
+ * region-only one is refused: uploading "SA123" would attach the parcel to no
+ * client at all.
  */
 export function resolveCodeForSubmit(
   typed: string,
   lookup: ClientCodeSuggestionsResponse | null,
 ): CodeSubmitResolution {
-  if (!isRegionOnlyCode(typed)) return { kind: "ok", code: typed };
-  if (!lookup) return { kind: "unavailable" };
+  if (!lookup) {
+    return isRegionOnlyCode(typed) ? { kind: "unavailable" } : { kind: "ok", code: typed };
+  }
   if (lookup.exact) return { kind: "ok", code: typed };
   if (lookup.best) return { kind: "ok", code: lookup.best };
   return lookup.items.length > 0 ? { kind: "ambiguous" } : { kind: "not_found" };
+}
+
+/** Every client's codes, indexed by number, for completing codes on the device. */
+export interface ClientCodeIndex {
+  /** Number part ("123") -> positions in `clients` with a code ending in it. */
+  byDigits: Map<string, number[]>;
+  /** One list per client, codes in primary-code order (as the server sends them). */
+  clients: string[][];
+  /** Upper-cased codes on the flight's expected-cargo list. */
+  flightCodes: Set<string>;
+}
+
+const FULL_CODE_RE = /^([A-Z]+)([0-9]+)$/;
+
+export function buildClientCodeIndex(
+  clients: string[][],
+  flightCodes: readonly string[],
+): ClientCodeIndex {
+  const byDigits = new Map<string, number[]>();
+  clients.forEach((codes, position) => {
+    const numbers = new Set<string>();
+    for (const code of codes) {
+      const match = FULL_CODE_RE.exec(code);
+      if (match) numbers.add(match[2]);
+    }
+    for (const digits of numbers) {
+      const list = byDigits.get(digits);
+      if (list) list.push(position);
+      else byDigits.set(digits, [position]);
+    }
+  });
+  return {
+    byDigits,
+    clients,
+    flightCodes: new Set(flightCodes.map((c) => c.trim().toUpperCase())),
+  };
+}
+
+function codeSortKey(code: string): [string, number] {
+  const match = /^([A-Z]*)([0-9]*)/.exec(code);
+  return [match?.[1] ?? code, match?.[2] ? Number(match[2]) : 0];
+}
+
+/**
+ * The answer `/flights/client-code-suggestions` would give, worked out from the
+ * saved code list. Mirrors backend `pick_completion`; keep the two in step.
+ */
+export function completeFromIndex(
+  typed: string,
+  index: ClientCodeIndex,
+): ClientCodeSuggestionsResponse | null {
+  const parsed = parseClientCodeInput(typed);
+  if (!parsed) return null;
+  const { letters, digits } = parsed;
+  const typedCode = letters + digits;
+  const matches = (code: string) => {
+    const match = FULL_CODE_RE.exec(code);
+    return match !== null && match[2] === digits && match[1].startsWith(letters);
+  };
+
+  const chosen: { code: string; inFlight: boolean }[] = [];
+  for (const position of index.byDigits.get(digits) ?? []) {
+    const codes = index.clients[position];
+    const matching = codes.filter(matches);
+    if (matching.length === 0) continue;
+    chosen.push({
+      code: matching.includes(typedCode) ? typedCode : matching[0],
+      inFlight: codes.some((c) => index.flightCodes.has(c)),
+    });
+  }
+
+  const exact = chosen.some((c) => c.code === typedCode);
+  let best: string | null = null;
+  let bestReason: ClientCodeSuggestionsResponse["best_reason"] = null;
+  if (chosen.length === 1) {
+    best = chosen[0].code;
+    bestReason = exact ? "exact" : "unique";
+  } else if (chosen.length > 1) {
+    const onFlight = chosen.filter((c) => c.inFlight);
+    if (onFlight.length === 1) {
+      best = onFlight[0].code;
+      bestReason = "flight";
+    }
+  }
+
+  chosen.sort((a, b) => {
+    if (a.inFlight !== b.inFlight) return a.inFlight ? -1 : 1;
+    const aTyped = a.code === typedCode;
+    if (aTyped !== (b.code === typedCode)) return aTyped ? -1 : 1;
+    const [aLetters, aNumber] = codeSortKey(a.code);
+    const [bLetters, bNumber] = codeSortKey(b.code);
+    if (aLetters !== bLetters) return aLetters < bLetters ? -1 : 1;
+    return aNumber - bNumber;
+  });
+
+  return {
+    query: typedCode,
+    exact,
+    best,
+    best_reason: bestReason,
+    items: chosen.map((c) => ({ code: c.code, in_flight: c.inFlight })),
+  };
 }
 
 /** i18n key of the district (or, failing that, region) a code belongs to. */
