@@ -40,6 +40,7 @@ import {
   placeLabelKeyForCode,
   regionOnlyPrefix,
   resolveCodeForSubmit,
+  type CodeSubmitResolution,
 } from "@/lib/clientCodeCompletion";
 import { useToast } from "@/hooks/useToast";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -321,8 +322,13 @@ const formatReportDate = (iso: string) =>
 const CODE_SUBMIT_ERRORS = {
   ambiguous: "Bir nechta mijoz mos keldi, pastdan tumanni tanlang.",
   not_found: "Bu kod tizimda ro'yxatdan o'tmagan. Baribir yuklash uchun pastdagi belgini qo'ying.",
-  unavailable: "Kodni tekshirib bo'lmadi. Tuman harflari bilan to'liq yozing (masalan SAAN123).",
+  unavailable:
+    "Kodni tekshirib bo'lmadi. Tuman harflari bilan to'liq yozing (masalan SAAN123) yoki mijoz ro'yxatdan o'tmagan bo'lsa, pastdagi belgini qo'ying.",
 } as const;
+
+/** Answers the "Ro'yxatdan o'tmagan mijoz" tick can override: unknown, or not checkable. */
+const canUploadUnregistered = (kind: CodeSubmitResolution["kind"]) =>
+  kind === "not_found" || kind === "unavailable";
 
 /* ───────────────────────────────────────────
    Queue Status (memoised to avoid repainting form)
@@ -778,6 +784,13 @@ export default function AddCargoForm({
     activeLookupData !== null &&
     resolveCodeForSubmit(clientId, activeLookupData).kind === "not_found";
   const allowUnregistered = unregisteredOkFor !== null && unregisteredOkFor === clientId;
+  // Also after a refused save with no answer at all (offline, no saved list):
+  // the worker must never be left with no way to upload.
+  const showUnregisteredOption =
+    isUnregisteredCode ||
+    allowUnregistered ||
+    errors.client_id === CODE_SUBMIT_ERRORS.not_found ||
+    errors.client_id === CODE_SUBMIT_ERRORS.unavailable;
 
   /**
    * The answer to act on for `query`: a fresh server answer, else a decisive
@@ -826,11 +839,11 @@ export default function AddCargoForm({
       applyCompletion(typed, data.best);
     } else {
       const kind = resolveCodeForSubmit(typed, data).kind;
-      if (kind === "not_found" && unregisteredOkFor !== typed) {
-        setErrors((prev) => ({ ...prev, client_id: CODE_SUBMIT_ERRORS.not_found }));
+      if (canUploadUnregistered(kind) && unregisteredOkFor !== typed) {
+        setErrors((prev) => ({ ...prev, client_id: CODE_SUBMIT_ERRORS[kind] }));
         return;
       }
-      if (kind !== "ok" && kind !== "not_found") return;
+      if (kind === "ambiguous") return;
     }
     weightRef.current?.focus();
   }, [applyCompletion, clientId, resolveLookup, serverLookup, unregisteredOkFor]);
@@ -999,7 +1012,7 @@ export default function AddCargoForm({
         if (resolution.kind === "ok") {
           if (resolution.code !== code) applyCompletion(code, resolution.code);
           code = resolution.code;
-        } else if (!(resolution.kind === "not_found" && unregisteredOkFor === code)) {
+        } else if (!(canUploadUnregistered(resolution.kind) && unregisteredOkFor === code)) {
           setErrors((prev) => ({
             ...prev,
             client_id: CODE_SUBMIT_ERRORS[resolution.kind],
@@ -1608,7 +1621,7 @@ export default function AddCargoForm({
                     {errors.client_id}
                   </p>
                 )}
-                {isUnregisteredCode && (
+                {showUnregisteredOption && (
                   <label className="mt-2 flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-2">
                     <input
                       type="checkbox"

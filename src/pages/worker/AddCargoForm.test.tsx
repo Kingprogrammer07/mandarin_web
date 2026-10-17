@@ -201,4 +201,23 @@ describe("AddCargoForm", () => {
     await waitFor(() => expect(codeInput()).toHaveValue("SAAN123"));
     expect(weightInput()).toHaveFocus();
   });
+
+  it("lets a region-only code through when it cannot be checked and the worker ticks it", async () => {
+    suggestions.mockRejectedValue(new Error("Network Error"));
+    renderForm();
+    fireEvent.click(screen.getByText("rasmga olish"));
+    fireEvent.change(codeInput(), { target: { value: "SA999" } });
+    fireEvent.change(weightInput(), { target: { value: "2" } });
+
+    fireEvent.click(screen.getByText("cargo.submit"));
+    const tick = await screen.findByLabelText(/Ro'yxatdan o'tmagan mijoz/);
+    expect(upload).not.toHaveBeenCalled();
+
+    fireEvent.click(tick);
+    expect(tick).toBeChecked();
+    fireEvent.click(screen.getByText("cargo.submit"));
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    expect(upload.mock.calls[0][1]).toBe("SA999");
+  });
 });
+
