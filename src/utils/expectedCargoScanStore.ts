@@ -43,12 +43,21 @@ export interface ResolveIndexEntryRecord {
   client_name: string | null;
 }
 
-/** Persisted offline resolve snapshot for one flight (downloaded via Sync). */
+/**
+ * Persisted offline resolve snapshot. Keyed by flight name; the special key
+ * `SHARED_RESOLVE_INDEX_KEY` holds the track→client map every flight reuses,
+ * and a flight's own record then carries only its `alreadySent` list.
+ */
 export interface ResolveIndexRecord {
   flightName: string;
   entries: ResolveIndexEntryRecord[];
   alreadySent: string[];
+  /** Server time of the last sync; the next sync asks only for changes since then. */
   syncedAt: string;
+  /** Shared record only: when the map was last downloaded in full. */
+  fullSyncedAt?: string;
+  /** Shared record only: flight tabs whose own cargo rows are already in the map. */
+  coveredFlights?: string[];
 }
 
 interface ExpectedCargoDB extends DBSchema {

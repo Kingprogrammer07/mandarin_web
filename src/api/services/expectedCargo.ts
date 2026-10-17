@@ -195,18 +195,22 @@ export interface CreateEmptyFlightResponse {
 
 // ── API 14 — Resolve index (offline scanner snapshot) ─────────────────────────
 
-export interface ResolveIndexEntry {
-  track_code: string;
-  client_code: string;
-  client_id: number | null;
-  client_name: string | null;
-}
-
-export interface ResolveIndexResponse {
+/** Compact snapshot: `[track_code, client_code]` pairs and one name per client. */
+export interface CompactResolveIndexResponse {
   flight_name: string;
-  entries: ResolveIndexEntry[];
+  entries: [string, string][];
+  /** UPPER client code → [client_id, full_name]. */
+  clients: Record<string, [number | null, string | null]>;
   already_sent: string[];
   synced_at: string;
+  is_delta: boolean;
+}
+
+export interface CompactResolveIndexParams {
+  /** Only cargo changed at or after this server time. */
+  since?: string;
+  /** Also send every cargo row of this flight tab's own flights. */
+  includeFlightRows: boolean;
 }
 
 export interface CargoItemFlightOption {
@@ -485,10 +489,22 @@ export async function createEmptyFlight(
 }
 
 /** API 14 — Download the offline resolve snapshot (track→client map) for a flight. */
-export async function getResolveIndex(flightName: string): Promise<ResolveIndexResponse> {
-  const response = await apiClient.get<ResolveIndexResponse>(`${BASE}/resolve-index`, {
-    params: { flight_name: flightName },
-  });
+export async function getCompactResolveIndex(
+  flightName: string,
+  { since, includeFlightRows }: CompactResolveIndexParams,
+): Promise<CompactResolveIndexResponse> {
+  const response = await apiClient.get<CompactResolveIndexResponse>(
+    `${BASE}/resolve-index/compact`,
+    {
+      params: {
+        flight_name: flightName,
+        include_flight_rows: includeFlightRows,
+        ...(since ? { since } : {}),
+      },
+      // The first full download can be several MB on a warehouse connection.
+      timeout: 120_000,
+    },
+  );
   return response.data;
 }
 

@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
   resolveClientByTrackCode,
-  getResolveIndex,
+  getCompactResolveIndex,
   searchExpectedCargo,
   type AlreadySentErrorBody,
   type ResolvedClientResponse,
@@ -38,6 +38,13 @@ import {
 } from '@/store/expectedCargoStore';
 import { expectedCargoScanStore } from '@/utils/expectedCargoScanStore';
 import { exportQueueToCsv } from '@/utils/expectedCargoQueueExport';
+import type { ResolveIndexEntryRecord } from '@/utils/expectedCargoScanStore';
+import {
+  buildSharedResolveIndexRecord,
+  mergeResolveIndexEntries,
+  planResolveIndexSync,
+  SHARED_RESOLVE_INDEX_KEY,
+} from '@/lib/expectedCargoResolveIndex';
 import {
   compareQueueNewestFirst,
   countClientSegments,
@@ -97,6 +104,16 @@ const SAVED_IN_FLIGHT_LOOKUP_LIMIT = 500;
 type QueueDisplayRow =
   | { kind: 'queue'; key: string; item: FastEntryQueueItem; rowNumber: number }
   | { kind: 'saved'; key: string; parent: FastEntryQueueItem; saved: SavedFlightTrack };
+
+type OfflineEntry = { clientCode: string; clientName: string | null; clientId: number | null };
+
+function toOfflineMap(entries: readonly ResolveIndexEntryRecord[]): Map<string, OfflineEntry> {
+  return new Map(entries.map((entry) => [entry.track_code.toUpperCase(), {
+    clientCode: entry.client_code,
+    clientName: entry.client_name,
+    clientId: entry.client_id,
+  }]));
+}
 
 function formatSavedAt(value: string | null): string {
   if (!value) return 'offline indexdan';
@@ -879,7 +896,6 @@ export function FastEntryPanel({
   } = useExpectedCargoStore();
 
   // ── Offline resolve index (downloaded snapshot for the active flight) ──────
-  type OfflineEntry = { clientCode: string; clientName: string | null; clientId: number | null };
   const offlineIndexRef = useRef<{ map: Map<string, OfflineEntry>; alreadySent: Set<string> } | null>(null);
   const offlineIndexFlightRef = useRef<string | null>(null);
   const scannerModeRef = useRef(scannerMode);
@@ -1963,25 +1979,21 @@ export function FastEntryPanel({
     }
   }, [replaceEntryQueue]);
 
-  // ── Offline index: build in-memory map, download (Sync), restore from IDB ──
-  const applyOfflineIndex = useCallback((payload: {
-    flight_name: string;
-    entries: { track_code: string; client_code: string; client_name: string | null; client_id: number | null }[];
-    already_sent: string[];
-  }) => {
-    const map = new Map<string, OfflineEntry>();
-    for (const entry of payload.entries) {
-      map.set(entry.track_code.toUpperCase(), {
-        clientCode: entry.client_code,
-        clientName: entry.client_name,
-        clientId: entry.client_id,
-      });
-    }
+  // ── Offline index: one shared track→client map reused by every flight,
+  // refreshed with small deltas; each flight stores only its saved codes. ──
+  const sharedOfflineMapRef = useRef<Map<string, OfflineEntry> | null>(null);
+  const isSyncingRef = useRef(false);
+
+  const applyOfflineIndex = useCallback((
+    flightKey: string,
+    map: Map<string, OfflineEntry>,
+    alreadySent: string[],
+  ) => {
     offlineIndexRef.current = {
       map,
-      alreadySent: new Set(payload.already_sent.map((code) => code.toUpperCase())),
+      alreadySent: new Set(alreadySent.map((code) => code.toUpperCase())),
     };
-    offlineIndexFlightRef.current = payload.flight_name.trim().toUpperCase();
+    offlineIndexFlightRef.current = flightKey;
   }, []);
 
   const syncOfflineIndex = useCallback(async () => {
@@ -1989,33 +2001,60 @@ export function FastEntryPanel({
       toast.warning('Avval reys tanlang');
       return;
     }
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
     setIsSyncing(true);
+    const flightKey = flightName.trim().toUpperCase();
     try {
-      const data = await getResolveIndex(flightName);
-      applyOfflineIndex(data);
-      await expectedCargoScanStore.saveResolveIndex({
-        flightName: data.flight_name,
-        entries: data.entries,
-        alreadySent: data.already_sent,
-        syncedAt: data.synced_at,
-      });
-      toast.success(`Offline index yangilandi — ${data.entries.length} ta kod`);
+      const shared = await expectedCargoScanStore
+        .loadResolveIndex(SHARED_RESOLVE_INDEX_KEY)
+        .catch(() => null);
+      const plan = planResolveIndexSync(shared, flightKey, Date.now());
+      if (plan.isFull) toast.info("Offline index to'liq yuklanmoqda, biroz kuting…", { duration: 4000 });
+
+      const data = await getCompactResolveIndex(flightName, plan);
+      const entries = mergeResolveIndexEntries(plan.isFull ? [] : shared?.entries ?? [], data);
+      const map = toOfflineMap(entries);
+      sharedOfflineMapRef.current = map;
+      applyOfflineIndex(flightKey, map, data.already_sent);
+
+      // Storage failure only costs a full download next time; the index above is live.
+      await Promise.all([
+        expectedCargoScanStore.saveResolveIndex(
+          buildSharedResolveIndexRecord(shared, plan, flightKey, entries, data.synced_at),
+        ),
+        expectedCargoScanStore.saveResolveIndex({
+          flightName: flightKey,
+          entries: [],
+          alreadySent: data.already_sent,
+          syncedAt: data.synced_at,
+        }),
+      ]).catch(() => {});
+
+      toast.success(
+        plan.isFull
+          ? `Offline index yuklandi — ${entries.length} ta kod`
+          : `Offline index yangilandi — ${data.entries.length} ta yangi/o'zgargan kod`,
+      );
     } catch {
-      toast.error("Offline indexni yuklab bo'lmadi");
+      toast.error(
+        offlineIndexFlightRef.current === flightKey
+          ? "Offline indexni yangilab bo'lmadi — saqlangan nusxa ishlatilmoqda"
+          : "Offline indexni yuklab bo'lmadi",
+      );
     } finally {
+      isSyncingRef.current = false;
       setIsSyncing(false);
     }
   }, [flightName, applyOfflineIndex]);
 
   const handleScannerModeChange = useCallback((offline: boolean) => {
+    // Loading and syncing the index for the active flight is done by the effect below.
     setScannerMode(offline ? 'offline' : 'online');
-    if (offline && flightName && offlineIndexFlightRef.current !== flightName.trim().toUpperCase()) {
-      void syncOfflineIndex();
-    }
-  }, [setScannerMode, flightName, syncOfflineIndex]);
+  }, [setScannerMode]);
 
-  // When offline and the in-memory index isn't loaded for the active flight,
-  // hydrate it from the durable IDB snapshot (so offline survives reloads).
+  // Offline mode on a flight: use the stored copy at once (survives reloads and
+  // works without network), then, when online, top it up with a delta.
   useEffect(() => {
     if (scannerMode !== 'offline' || !flightName) return;
     const flightKey = flightName.trim().toUpperCase();
@@ -2023,22 +2062,31 @@ export function FastEntryPanel({
 
     let cancelled = false;
     (async () => {
-      const cached = await expectedCargoScanStore.loadResolveIndex(flightName);
+      const [shared, flightRecord] = await Promise.all([
+        expectedCargoScanStore.loadResolveIndex(SHARED_RESOLVE_INDEX_KEY).catch(() => null),
+        expectedCargoScanStore.loadResolveIndex(flightName).catch(() => null),
+      ]);
       if (cancelled) return;
-      if (cached) {
-        applyOfflineIndex({
-          flight_name: cached.flightName,
-          entries: cached.entries,
-          already_sent: cached.alreadySent,
-        });
+      if (!sharedOfflineMapRef.current && shared) sharedOfflineMapRef.current = toOfflineMap(shared.entries);
+      // A snapshot saved before the shared index existed carries its own entries.
+      const map = flightRecord?.entries.length
+        ? toOfflineMap([...(shared?.entries ?? []), ...flightRecord.entries])
+        : sharedOfflineMapRef.current;
+
+      if (map) {
+        applyOfflineIndex(flightKey, map, flightRecord?.alreadySent ?? []);
       } else {
         offlineIndexRef.current = null;
         offlineIndexFlightRef.current = null;
-        toast.info("Bu reys uchun offline index yo'q — «Sync» bosing", { duration: 4000 });
+      }
+      if (navigator.onLine) {
+        void syncOfflineIndex();
+      } else if (!map) {
+        toast.info("Offline index yo'q — internet bo'lganda «Sync» bosing", { duration: 4000 });
       }
     })();
     return () => { cancelled = true; };
-  }, [scannerMode, flightName, applyOfflineIndex]);
+  }, [scannerMode, flightName, applyOfflineIndex, syncOfflineIndex]);
 
   // ── Virtualized queue rendering ──────────────────────────────────────────
   // The queue can hold 1k+ rows over an 8h shift; rendering all of them froze
