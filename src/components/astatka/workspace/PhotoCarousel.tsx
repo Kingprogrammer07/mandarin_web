@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryKey } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ImageOff, RefreshCw } from "lucide-react";
 
-import {
-  astatkaCargoPhotosQueryKey,
-  getAstatkaCargoPhotos,
-  type AstatkaBagCargo,
-  type AstatkaCargoPhoto,
-} from "@/api/services/astatkaFlights";
+import type { AstatkaCargoPhoto } from "@/api/services/astatkaFlights";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/utils/apiError";
 
@@ -17,29 +12,32 @@ import { PhotoViewer } from "./PhotoViewer";
 import { useSnapCarousel } from "./useSnapCarousel";
 
 interface Props {
-  flightName: string;
-  cargo: Pick<AstatkaBagCargo, "id" | "photo_count">;
-  /** Re-take one photo (by its index); absent when the record is read-only. */
+  /** How many photos there are; with none nothing is asked for. */
+  photoCount: number;
+  queryKey: QueryKey;
+  /** Short-lived links to the photos. */
+  queryFn: () => Promise<AstatkaCargoPhoto[]>;
+  /** Re-take one photo (by its index); absent when the photos are read-only. */
   onReplace?: (photoIndex: number) => void;
   /** A photo upload is running: the viewer's re-take button waits. */
   busy?: boolean;
 }
 
 /**
- * One photo-report record's photos inside the bag window: one large photo,
- * or a swipeable strip when there are several. Tapping a photo opens it full
- * screen.
+ * A set of photos inside the bag window — a photo-report record's, or the
+ * ones retaken for the bag: one large photo, or a swipeable strip when there
+ * are several. Tapping a photo opens it full screen.
  */
-export function PhotoCarousel({ flightName, cargo, onReplace, busy = false }: Props) {
+export function PhotoCarousel({ photoCount, queryKey, queryFn, onReplace, busy = false }: Props) {
   const photos = useQuery({
-    queryKey: astatkaCargoPhotosQueryKey(cargo.id),
-    queryFn: () => getAstatkaCargoPhotos(flightName, cargo.id),
-    enabled: cargo.photo_count > 0,
+    queryKey,
+    queryFn,
+    enabled: photoCount > 0,
     // The links expire after about an hour.
     staleTime: 20 * 60_000,
   });
 
-  if (cargo.photo_count === 0 || (photos.isSuccess && photos.data.length === 0)) {
+  if (photoCount === 0 || (photos.isSuccess && photos.data.length === 0)) {
     return (
       <p className="flex items-center gap-2 rounded-mc-sm bg-mc-surface-2 px-3 py-3 text-[13px] font-semibold text-mc-text">
         <ImageOff className="h-4 w-4 shrink-0 text-mc-text-3" />
@@ -51,9 +49,9 @@ export function PhotoCarousel({ flightName, cargo, onReplace, busy = false }: Pr
     return (
       <div aria-busy="true" aria-label="Rasmlar yuklanmoqda" className="space-y-2">
         <div className="aspect-[4/3] w-full animate-pulse rounded-mc-md bg-mc-surface-2" />
-        {cargo.photo_count > 1 && (
+        {photoCount > 1 && (
           <div className="flex gap-2">
-            {Array.from({ length: Math.min(cargo.photo_count, 5) }, (_, index) => (
+            {Array.from({ length: Math.min(photoCount, 5) }, (_, index) => (
               <div key={index} className="h-12 w-12 shrink-0 animate-pulse rounded-mc-sm bg-mc-surface-2" />
             ))}
           </div>

@@ -443,12 +443,10 @@ export function PackagesPreview({ flightName, editMode, isOnline, offlineIndex }
           mode={opened.mode}
           onModeChange={(mode) => setOpened((current) => (current ? { ...current, mode } : current))}
           onClose={() => setOpened(null)}
-          // The server has already re-weighed the bag; show it before the list does.
-          onWeightChanged={(weightKg) =>
+          // The server already holds the new photos; show them before the list does.
+          onPackageChanged={(pkg) =>
             setOpened((current) =>
-              current
-                ? { ...current, pkg: { ...current.pkg, weight_kg: weightKg, weight_edited: false } }
-                : current,
+              current && current.pkg.id === pkg.id ? { ...current, pkg } : current,
             )
           }
           isOnline={isOnline}

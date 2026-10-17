@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
-import type { AstatkaBagRef } from "@/api/services/astatkaFlights";
+import type { AstatkaBagRef, AstatkaPackage } from "@/api/services/astatkaFlights";
 import type { BagSummary } from "@/lib/astatkaBagSummary";
 
 import {
@@ -11,6 +11,7 @@ import {
   type BagEditLocks,
   type BagEditValues,
 } from "./BagEditForm";
+import { BagOwnPhotos } from "./BagOwnPhotos";
 import { BagPhotoReport } from "./BagPhotoReport";
 import { BagSummaryPanel } from "./BagSummaryPanel";
 import { ExternalBagCard, type ExternalBagCardProps } from "./ExternalBagCard";
@@ -55,7 +56,8 @@ interface Props {
   footer?: ReactNode;
   /** What "Tahrirlash" edits; without it the window only shows the bag. */
   edit?: BagSheetEdit;
-  onWeightChanged?: (weightKg: number | null) => void;
+  /** The saved bag as the server holds it after its own photos changed. */
+  onPackageChanged?: (pkg: AstatkaPackage) => void;
 }
 
 const footerButton =
@@ -63,10 +65,11 @@ const footerButton =
 
 /**
  * The one window for a bag, from the saved list and from the scan list alike:
- * the bag's facts, then its photo report — photos beside their facts on a
- * wide screen — or, for a partner cargo's bag, what the partner's API says. "Tahrirlash" swaps the facts for the edit form in place, so
- * there is never a second window on top of this one (only a photo opened
- * full screen).
+ * the bag's facts, the photos retaken for it here, then the old flight's
+ * photo report (read-only) — photos beside their facts on a wide screen — or,
+ * for a partner cargo's bag, what the partner's API says. "Tahrirlash" swaps
+ * the facts for the edit form in place, so there is never a second window on
+ * top of this one (only a photo opened full screen).
  */
 export function BagSheet({
   flightName,
@@ -80,7 +83,7 @@ export function BagSheet({
   onClose,
   footer,
   edit,
-  onWeightChanged,
+  onPackageChanged,
 }: Props) {
   const formId = useId();
   const reasonId = useId();
@@ -155,12 +158,22 @@ export function BagSheet({
         {partner ? (
           <ExternalBagCard {...partner} />
         ) : (
-          <BagPhotoReport
-            flightName={flightName}
-            bag={bag}
-            isOnline={isOnline}
-            onWeightChanged={onWeightChanged}
-          />
+          <>
+            {bag && "packageId" in bag && (
+              <BagOwnPhotos
+                flightName={flightName}
+                packageId={bag.packageId}
+                isOnline={isOnline}
+                onPackageChanged={onPackageChanged}
+              />
+            )}
+            <BagPhotoReport
+              flightName={flightName}
+              bag={bag}
+              sourceFlight={summary.sourceFlight}
+              isOnline={isOnline}
+            />
+          </>
         )}
       </div>
     </WorkspaceDialog>

@@ -473,23 +473,6 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
     [resolveRow, setRows],
   );
 
-  /** The photo report's weight changed in the bag window; the row follows. */
-  const applyBagWeight = useCallback(
-    (rowId: string, weightKg: number | null) => {
-      patchRow(rowId, (row) => {
-        // A weight typed on the row would hide the one just saved.
-        const edits = { ...row.edits };
-        delete edits.weightKg;
-        return {
-          ...row,
-          edits,
-          pkg: row.pkg ? { ...row.pkg, weight_kg: weightKg, weight_edited: false } : row.pkg,
-        };
-      });
-    },
-    [patchRow],
-  );
-
   /** A saved bag was edited on the server; show the new facts on its row. */
   const replacePackage = useCallback(
     (rowId: string, pkg: AstatkaPackage) => {
@@ -635,7 +618,6 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
     recheckRow,
     importCodes,
     replacePackage,
-    applyBagWeight,
     confirmRows,
     syncIndex,
     drain,

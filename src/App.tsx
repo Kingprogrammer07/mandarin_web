@@ -25,6 +25,7 @@ import { isMaintenanceScreenPath } from "@/lib/maintenanceScope";
 import { pickSession } from "@/lib/session";
 import { discardAdminSession } from "@/lib/adminSession";
 import { setRouterDepth } from "@/lib/backStack";
+import { isAstatkaFlightName } from "@/lib/astatkaFlight";
 import { TelegramBackBridge } from "@/components/TelegramBackBridge";
 import { NbuPaymentWatch } from "@/components/payment/NbuPaymentWatch";
 
@@ -493,6 +494,13 @@ function AppContent() {
       method: "push" | "replace" = "replace",
     ) => {
       let { page, flightName, clientId } = routeInfo;
+
+      // An astatka flight's cargo is kept in its own window; the regular
+      // cargo list would write the flight's photo report, which the astatka
+      // never does. Every role with the cargo list may open that window.
+      if ((page === "cargo-list" || page === "cargo-add") && isAstatkaFlightName(flightName)) {
+        page = "astatka-workspace";
+      }
 
       const finalPage = checkAccess(page, role);
 
@@ -1237,6 +1245,11 @@ function AppContent() {
         <ExpectedCargoPage
           onNavigate={(page) => navigateToPage(page as Page)}
           onLogout={handleSignOut}
+          onOpenAstatka={
+            checkAccess("astatka-workspace", userRole) === "astatka-workspace"
+              ? (name) => navigateToPage("astatka-workspace", name)
+              : undefined
+          }
         />
       ) : currentPage === "pickup-tv" ? (
         <PickupQueueTVPage />

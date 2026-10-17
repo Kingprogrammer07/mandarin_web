@@ -4,7 +4,7 @@ import type {
   AstatkaBagRef,
   AstatkaPackage,
 } from "@/api/services/astatkaFlights";
-import { summaryFromPackage } from "@/lib/astatkaBagSummary";
+import { isSentFromAstatka, summaryFromPackage } from "@/lib/astatkaBagSummary";
 import { isPartnerPackage, sourceCompanyLabel } from "@/lib/astatkaSource";
 
 import { BagSheet, type BagSheetMode } from "./BagSheet";
@@ -18,8 +18,8 @@ interface Props {
   mode: BagSheetMode;
   onModeChange: (mode: BagSheetMode) => void;
   onClose: () => void;
-  /** The photo report's weight was fixed in this window. */
-  onWeightChanged: (weightKg: number | null) => void;
+  /** The bag's own photos were retaken in this window. */
+  onPackageChanged: (pkg: AstatkaPackage) => void;
   /** The photo report needs the network. */
   isOnline: boolean;
   /** False while the list is the offline snapshot: nothing can change. */
@@ -46,7 +46,7 @@ export function SavedBagSheet({
   mode,
   onModeChange,
   onClose,
-  onWeightChanged,
+  onPackageChanged,
   isOnline,
   canChange,
   actions,
@@ -73,7 +73,8 @@ export function SavedBagSheet({
     tone: "neutral",
     onSelect: () => onModeChange("edit"),
   });
-  if (confirmed) {
+  // The server keeps a bag the astatka already sent confirmed.
+  if (confirmed && !isSentFromAstatka(pkg)) {
     buttons.push({
       key: "unconfirm",
       label: "Tasdiqni bekor qilish",
@@ -149,7 +150,7 @@ export function SavedBagSheet({
           else actions.update.mutate({ pkg, changes });
         },
       }}
-      onWeightChanged={onWeightChanged}
+      onPackageChanged={onPackageChanged}
     />
   );
 }

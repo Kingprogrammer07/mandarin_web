@@ -18,13 +18,14 @@ vi.mock("@/api/services/astatkaFlights", () => ({
   astatkaCargoPhotosQueryKey: (id: number) => ["astatka-cargo-photos", id],
   astatkaExternalPhotosRootKey: ["astatka-external-photos"],
   astatkaExternalPhotosQueryKey: (id: number) => ["astatka-external-photos", id],
+  astatkaPackagePhotosQueryKey: (id: number) => ["astatka-package-photos", id],
   astatkaPackagesQueryKey: (name: string) => ["astatka-packages", name],
   astatkaStatsQueryKey: ["astatka-flight-stats"],
   getAstatkaBagDetails: vi.fn(),
   getAstatkaCargoPhotos: vi.fn(),
   getAstatkaExternalPhotos: vi.fn(),
-  replaceAstatkaCargoPhotos: vi.fn(),
-  updateAstatkaCargoWeight: vi.fn(),
+  getAstatkaPackagePhotos: vi.fn(),
+  replaceAstatkaPackagePhotos: vi.fn(),
   updateAstatkaPackage: vi.fn(),
 }));
 vi.mock("sonner", () => ({
@@ -39,6 +40,7 @@ vi.mock("sonner", () => ({
 import {
   getAstatkaBagDetails,
   getAstatkaExternalPhotos,
+  getAstatkaPackagePhotos,
   updateAstatkaPackage,
   type AstatkaExternalBag,
   type AstatkaPackage,
@@ -104,7 +106,6 @@ function renderSheet(
     isOnline,
     replacePackage: vi.fn(),
     updateEdits: vi.fn(),
-    applyBagWeight: vi.fn(),
   };
   const handlers = {
     onModeChange: vi.fn(),
@@ -148,6 +149,7 @@ function footerButtons(): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getAstatkaPackagePhotos).mockResolvedValue([]);
   vi.mocked(getAstatkaBagDetails).mockResolvedValue({
     client_code: "SS101",
     client_name: null,
@@ -264,11 +266,11 @@ describe("WorkRowSheet", () => {
     expect(handlers.onClose).not.toHaveBeenCalled();
   });
 
-  it("does not turn a weight fixed in the photo report into a typed one", () => {
+  it("does not turn a weight the server changed meanwhile into a typed one", () => {
     const { queue, item, rerender } = renderSheet("ready", "edit");
     expect(screen.getByLabelText(/Og'irligi \(kg\)/)).toHaveValue("4.5");
 
-    // applyBagWeight: the report's new weight lands on the row's package.
+    // The saved bag came back from the server with a new weight.
     rerender({ ...item, pkg: { ...pkg, weight_kg: 7 } });
     fireEvent.change(screen.getByLabelText("Izoh"), {
       target: { value: "qopi yirtilgan" },

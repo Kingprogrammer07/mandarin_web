@@ -32,6 +32,7 @@ import {
 } from '@/components/admin/flight-notifications/notificationFilters';
 import { errorMessage } from '@/components/admin/flight-notifications/sendTask';
 import { useSendTask } from '@/components/admin/flight-notifications/useSendTask';
+import { isAstatkaFlightName } from '@/lib/astatkaFlight';
 import { cn } from '@/lib/utils';
 
 interface FlightNotificationPageProps {
@@ -280,7 +281,7 @@ export default function FlightNotificationPage({
             onSelectPending={selectPending}
             onAddForgotten={() => setShowForgottenModal(true)}
             addForgottenRef={addForgottenRef}
-            isOstatka={isOstatka}
+            canAddForgotten={!isOstatka && !isAstatkaFlightName(flightName)}
           />
 
           {isOstatka && (

@@ -33,14 +33,11 @@ interface Options {
 }
 
 /**
- * What undoing a confirmation does to the bag. Ours moves back into the
- * flight it came from; a partner's bag never left the partner's system, so it
- * only waits here again.
+ * What undoing a confirmation does to the bag. A confirm writes only the
+ * astatka's own record — never the old flight, ours or a partner's — so the
+ * bag simply waits here again.
  */
-function whereItGoesBack(pkg: AstatkaPackage): string {
-  if (isPartnerPackage(pkg)) return "Yuk shu ro'yxatda «Kutilmoqda» bo'lib qoladi.";
-  return `Yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi.`;
-}
+const WHERE_IT_GOES_BACK = "Yuk shu ro'yxatda «Kutilmoqda» bo'lib qoladi.";
 
 function newKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto)
@@ -50,7 +47,7 @@ function newKey(): string {
 
 /**
  * Only what the worker changed goes out: the server keeps every field the
- * request leaves out, so a weight the photo report changed meanwhile is not
+ * request leaves out, so a weight another worker saved meanwhile is not
  * overwritten by the value the form was opened with.
  */
 export function packageUpdateOf(
@@ -171,7 +168,7 @@ export function useSavedBagActions({
   const askUnconfirm = async (pkg: AstatkaPackage) => {
     if (
       await askConfirm(
-        `${pkg.client_code} yukining tasdig'i bekor qilinsinmi? ${whereItGoesBack(pkg)}`,
+        `${pkg.client_code} yukining tasdig'i bekor qilinsinmi? ${WHERE_IT_GOES_BACK}`,
       )
     ) {
       unconfirm.mutate(pkg);
@@ -179,11 +176,10 @@ export function useSavedBagActions({
   };
 
   /**
-   * The server keeps a confirmed bag (its codes and photo-report rows were
-   * moved into this flight), so deleting one is two requests: undo the
-   * confirmation, which moves everything back, then delete the now-waiting
-   * bag. Each step reports on its own, because a failure between them leaves
-   * a real, different state behind.
+   * The server keeps a confirmed bag (it may already be sent from here), so
+   * deleting one is two requests: undo the confirmation, then delete the
+   * now-waiting bag. Each step reports on its own, because a failure between
+   * them leaves a real, different state behind.
    */
   const askDelete = async (pkg: AstatkaPackage) => {
     const id = pkg.id;
@@ -192,7 +188,7 @@ export function useSavedBagActions({
     const question = confirmed
       ? isPartnerPackage(pkg)
         ? `${pkg.client_code} yuki tasdiqlangan. O'chirish uchun avval tasdig'i bekor qilinadi, keyin yuk bu ro'yxatdan o'chiriladi. Davom etilsinmi?`
-        : `${pkg.client_code} yuki tasdiqlangan. O'chirish uchun avval tasdig'i bekor qilinadi: yuk ${pkg.source_flight_name || "o'z"} reysiga qaytadi va bu ro'yxatdan o'chiriladi. Davom etilsinmi?`
+        : `${pkg.client_code} yuki tasdiqlangan. O'chirish uchun avval tasdig'i bekor qilinadi, keyin yuk bu ro'yxatdan o'chiriladi. ${pkg.source_flight_name || "Eski"} reysidagi ma'lumotlari o'zgarmaydi. Davom etilsinmi?`
       : `${pkg.client_code} ro'yxatdan o'chirilsinmi?`;
     if (!(await askConfirm(question))) return;
     if (deletingRef.current.has(id)) return;

@@ -1,5 +1,5 @@
 import type { AstatkaPackage } from "@/api/services/astatkaFlights";
-import { paymentLabel } from "@/lib/astatkaFormat";
+import { formatDateTime, paymentLabel } from "@/lib/astatkaFormat";
 import { sourceCompanyLabel, sourceCompanyOf } from "@/lib/astatkaSource";
 import {
   rowCodes,
@@ -41,6 +41,25 @@ export interface BagSummary {
   sourceCompany: string;
   /** The partner's name for its chip; "" for our own cargo. */
   sourceCompanyName: string;
+  /**
+   * How the astatka's own «Yuborish» already notified the client, one line
+   * per channel ("Bot · 16.10.2026, 14:20"); `null` while it has not.
+   */
+  astatkaSent: string | null;
+}
+
+type SentFields = Pick<AstatkaPackage, "sent_at" | "sent_web_at">;
+
+/** The astatka's own «Yuborish» already notified the client about the bag. */
+export function isSentFromAstatka(pkg: SentFields | null | undefined): boolean {
+  return Boolean(pkg?.sent_at || pkg?.sent_web_at);
+}
+
+export function astatkaSentLabel(pkg: SentFields | null | undefined): string | null {
+  const parts: string[] = [];
+  if (pkg?.sent_at) parts.push(`Bot · ${formatDateTime(pkg.sent_at)}`);
+  if (pkg?.sent_web_at) parts.push(`Sayt · ${formatDateTime(pkg.sent_web_at)}`);
+  return parts.length > 0 ? parts.join("\n") : null;
 }
 
 function photoReportLabel(hasPhoto: boolean, bags: number): string {
@@ -67,6 +86,7 @@ export function summaryFromPackage(pkg: AstatkaPackage): BagSummary {
     notes: [],
     sourceCompany: sourceCompanyOf(pkg),
     sourceCompanyName: sourceCompanyLabel(pkg),
+    astatkaSent: astatkaSentLabel(pkg),
   };
 }
 
@@ -106,5 +126,6 @@ export function summaryFromRow(row: WorkRow): BagSummary {
     notes: [...(STUCK.includes(row.state) && row.message ? [row.message] : []), ...row.warnings],
     sourceCompany: view.sourceCompany,
     sourceCompanyName: view.sourceCompanyName,
+    astatkaSent: astatkaSentLabel(pkg),
   };
 }

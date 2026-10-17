@@ -70,7 +70,12 @@ interface NotificationToolbarProps {
   onAddForgotten: () => void;
   /** The forgotten-cargo dialog hands the focus back to this button. */
   addForgottenRef?: Ref<HTMLButtonElement>;
-  isOstatka: boolean;
+  /**
+   * False for an ostatka (A-) or astatka (O…) flight: the forgotten-cargo
+   * dialog writes photo-report rows under the flight's name, and there they
+   * would belong to no bag.
+   */
+  canAddForgotten: boolean;
 }
 
 export function NotificationToolbar({
@@ -87,7 +92,7 @@ export function NotificationToolbar({
   onSelectPending,
   onAddForgotten,
   addForgottenRef,
-  isOstatka,
+  canAddForgotten,
 }: NotificationToolbarProps) {
   const searchId = useId();
   const channelLabelId = useId();
@@ -215,7 +220,7 @@ export function NotificationToolbar({
           ref={addForgottenRef}
           type="button"
           onClick={onAddForgotten}
-          disabled={isOstatka}
+          disabled={!canAddForgotten}
           className={SECONDARY_BUTTON}
         >
           <Plus

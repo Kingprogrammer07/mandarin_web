@@ -1,11 +1,9 @@
 import { useId, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, RefreshCw, WifiOff } from "lucide-react";
 
 import {
   astatkaBagQueryKey,
-  astatkaPackagesQueryKey,
-  astatkaStatsQueryKey,
   getAstatkaBagDetails,
   type AstatkaBagRef,
 } from "@/api/services/astatkaFlights";
@@ -18,9 +16,9 @@ interface Props {
   flightName: string;
   /** `null` when the bag has no client yet: nothing to look up. */
   bag: AstatkaBagRef | null;
+  /** The flight the bag came from, for the heading; "" when unknown. */
+  sourceFlight: string;
   isOnline: boolean;
-  /** The bag's photo-report weight after a change; `null` when it has none. */
-  onWeightChanged?: (weightKg: number | null) => void;
 }
 
 function Notice({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
@@ -36,16 +34,11 @@ const heading =
   "text-[10px] font-extrabold uppercase tracking-wide text-mc-text-3";
 
 /**
- * Everything the photo report (`flight_cargos`) holds for one bag, record by
- * record, and — when the bag has none — the client's records on other flights.
+ * Everything the old flight's photo report (`flight_cargos`) holds for one
+ * bag, record by record, and — when the bag has none — the client's records
+ * on other flights. Read-only: the astatka never writes another flight.
  */
-export function BagPhotoReport({
-  flightName,
-  bag,
-  isOnline,
-  onWeightChanged,
-}: Props) {
-  const queryClient = useQueryClient();
+export function BagPhotoReport({ flightName, bag, sourceFlight, isOnline }: Props) {
   const headingId = useId();
   const details = useQuery({
     queryKey: bag
@@ -55,17 +48,6 @@ export function BagPhotoReport({
     enabled: isOnline && bag !== null,
     staleTime: 15_000,
   });
-
-  const refreshAfterChange = () => {
-    if (bag)
-      void queryClient.invalidateQueries({
-        queryKey: astatkaBagQueryKey(flightName, bag),
-      });
-    void queryClient.invalidateQueries({
-      queryKey: astatkaPackagesQueryKey(flightName),
-    });
-    void queryClient.invalidateQueries({ queryKey: astatkaStatsQueryKey });
-  };
 
   const data = details.data;
   let body: ReactNode;
@@ -127,18 +109,8 @@ export function BagPhotoReport({
           <PhotoReportRecord
             key={cargo.id}
             flightName={flightName}
+            bag={bag}
             cargo={cargo}
-            editable
-            onWeightSaved={(saved) => {
-              const total = data.cargos.reduce<number | null>((sum, row) => {
-                const weight =
-                  row.id === saved.id ? saved.weight_kg : row.weight_kg;
-                return weight === null ? sum : (sum ?? 0) + weight;
-              }, null);
-              onWeightChanged?.(total);
-              refreshAfterChange();
-            }}
-            onPhotosSaved={refreshAfterChange}
           />
         ))}
         {data.other_cargos.length > 0 && (
@@ -150,8 +122,8 @@ export function BagPhotoReport({
               <PhotoReportRecord
                 key={cargo.id}
                 flightName={flightName}
+                bag={bag}
                 cargo={cargo}
-                editable={false}
               />
             ))}
           </section>
@@ -162,9 +134,17 @@ export function BagPhotoReport({
 
   return (
     <section aria-labelledby={headingId} className="space-y-2">
-      <h3 id={headingId} className={heading}>
-        Foto hisobot
-      </h3>
+      <div>
+        <h3 id={headingId} className={`${heading} break-words`}>
+          {sourceFlight
+            ? `Eski reys (${sourceFlight}) foto hisoboti`
+            : "Eski reys foto hisoboti"}
+        </h3>
+        <p className="mt-0.5 text-[12px] font-medium text-mc-text-3">
+          O'zgartirilmaydi: vaznni «Tahrirlash»da, rasmni «Astatka rasmlari»da
+          o'zgartiring.
+        </p>
+      </div>
       {body}
     </section>
   );

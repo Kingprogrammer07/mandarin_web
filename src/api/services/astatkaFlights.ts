@@ -5,10 +5,10 @@ import { apiClient, apiClientFormData } from "../client";
  *
  * An astatka flight is an ordinary flight whose name starts with "O". Its
  * contents are packages: one client's bag from one source flight. A package is
- * `expected` until a worker confirms it on the shelf; confirming moves the
- * bag's track codes and photo-report rows into the astatka flight (the payment
- * row stays on the old flight), so the flight's "Yuborish" sends it like any
- * other flight's cargo. Mirrors `src/api/schemas/astatka_flight.py`.
+ * `expected` until a worker confirms it on the shelf. Confirming writes only
+ * the package: the old flight's photo report, track codes and payment stay as
+ * they are, and the astatka's "Yuborish" reads its packages and marks them
+ * sent (`sent_at` / `sent_web_at`). Mirrors `src/api/schemas/astatka_flight.py`.
  */
 
 export type AstatkaPackageStatus = "expected" | "confirmed";
@@ -95,6 +95,14 @@ export interface AstatkaPackage {
   source_company_name?: string | null;
   /** The partner's data for this bag (the chosen flight's). */
   external?: AstatkaExternalBag | null;
+  /**
+   * When the astatka's own "Yuborish" notified the client: by the bot, and by
+   * the web report. Optional: a copy saved on the device before these existed.
+   */
+  sent_at?: string | null;
+  sent_web_at?: string | null;
+  /** Photos retaken in the astatka window; they replace the old flight's. */
+  own_photo_count?: number;
 }
 
 export interface AstatkaSourceFlight {
@@ -257,6 +265,8 @@ export interface AstatkaBagDetails {
   cargos: AstatkaBagCargo[];
   /** The client's newest rows in other flights, only when the bag has none. */
   other_cargos: AstatkaBagCargo[];
+  /** The saved bag, when it was asked for by id. */
+  package?: AstatkaPackage | null;
 }
 
 /** Which bag to open: a saved one by id, or any by client and flight. */
@@ -270,9 +280,10 @@ export interface AstatkaCargoPhoto {
   error: string | null;
 }
 
-export interface AstatkaCargoUpdateResult {
-  cargo: AstatkaBagCargo;
-  synced_packages: number;
+/** A bag's own photos after a retake, with the bag as the server now holds it. */
+export interface AstatkaPackagePhotosResult {
+  package: AstatkaPackage;
+  photos: AstatkaCargoPhoto[];
 }
 
 export interface AstatkaFlightStats {
@@ -283,6 +294,10 @@ export interface AstatkaFlightStats {
   confirmed_weight_kg: number;
   source_flights: string[];
   last_confirmed_at: string | null;
+  confirmed_clients?: number;
+  confirmed_track_codes?: number;
+  /** Own bags the astatka's "Yuborish" already notified. */
+  sent?: number;
 }
 
 /** Every astatka flight's counts; refreshed after any change to a package. */
@@ -292,7 +307,7 @@ export const astatkaStatsQueryKey = ["astatka-flight-stats"] as const;
 export const astatkaPackagesQueryKey = (flightName: string) =>
   ["astatka-packages", flightName.trim().toUpperCase()] as const;
 
-/** One bag's photo-report rows; refreshed after a weight or photo change. */
+/** One bag's photo-report rows and its saved package. */
 export const astatkaBagQueryKey = (flightName: string, ref: AstatkaBagRef) =>
   [
     "astatka-bag",
@@ -302,6 +317,10 @@ export const astatkaBagQueryKey = (flightName: string, ref: AstatkaBagRef) =>
 
 export const astatkaCargoPhotosQueryKey = (cargoId: number) =>
   ["astatka-cargo-photos", cargoId] as const;
+
+/** The photos retaken for one saved bag in the astatka window. */
+export const astatkaPackagePhotosQueryKey = (packageId: number) =>
+  ["astatka-package-photos", packageId] as const;
 
 /** Every bag's stored partner photos: a confirm can copy them again. */
 export const astatkaExternalPhotosRootKey = ["astatka-external-photos"] as const;
@@ -422,24 +441,32 @@ export async function downloadAstatkaExcel(
   return data;
 }
 
+/** Which bag to read; the server opens only that bag's photo-report rows. */
+function bagParams(ref: AstatkaBagRef) {
+  return "packageId" in ref
+    ? { package_id: ref.packageId }
+    : { client_code: ref.clientCode, source_flight: ref.sourceFlight };
+}
+
 export async function getAstatkaBagDetails(
   flightName: string,
   ref: AstatkaBagRef,
 ): Promise<AstatkaBagDetails> {
-  const params =
-    "packageId" in ref
-      ? { package_id: ref.packageId }
-      : { client_code: ref.clientCode, source_flight: ref.sourceFlight };
-  const { data } = await apiClient.get<AstatkaBagDetails>(`${base(flightName)}/bag`, { params });
+  const { data } = await apiClient.get<AstatkaBagDetails>(`${base(flightName)}/bag`, {
+    params: bagParams(ref),
+  });
   return data;
 }
 
+/** Short-lived links to one photo-report row's photos, read-only. */
 export async function getAstatkaCargoPhotos(
   flightName: string,
   cargoId: number,
+  bag: AstatkaBagRef,
 ): Promise<AstatkaCargoPhoto[]> {
   const { data } = await apiClient.get<{ cargo_id: number; photos: AstatkaCargoPhoto[] }>(
     `${base(flightName)}/cargos/${cargoId}/photos`,
+    { params: bagParams(bag) },
   );
   return data.photos;
 }
@@ -463,33 +490,33 @@ export async function getAstatkaExternalPhotos(
   return { photos: data.photos, pending: data.pending };
 }
 
-export async function updateAstatkaCargoWeight(
+/** Short-lived links to the photos retaken for a saved bag of ours. */
+export async function getAstatkaPackagePhotos(
   flightName: string,
-  cargoId: number,
-  weightKg: number,
-): Promise<AstatkaCargoUpdateResult> {
-  const { data } = await apiClient.patch<AstatkaCargoUpdateResult>(
-    `${base(flightName)}/cargos/${cargoId}`,
-    { weight_kg: weightKg },
+  packageId: number,
+): Promise<AstatkaCargoPhoto[]> {
+  const { data } = await apiClient.get<{ package_id: number; photos: AstatkaCargoPhoto[] }>(
+    `${base(flightName)}/packages/${packageId}/photos`,
   );
-  return data;
+  return data.photos;
 }
 
 /**
- * Re-take a photo-report row's photos. With `replaceIndex` only that photo is
+ * Retake a saved bag's own photos; they are stored on the package only, never
+ * on the old flight's photo report. With `replaceIndex` only that photo is
  * swapped (the photo count adds one at the end); without it all are replaced.
  */
-export async function replaceAstatkaCargoPhotos(
+export async function replaceAstatkaPackagePhotos(
   flightName: string,
-  cargoId: number,
+  packageId: number,
   photos: File[],
   replaceIndex?: number,
-): Promise<AstatkaCargoUpdateResult> {
+): Promise<AstatkaPackagePhotosResult> {
   const form = new FormData();
   for (const photo of photos) form.append("photos", photo);
   if (replaceIndex !== undefined) form.append("replace_index", String(replaceIndex));
-  const { data } = await apiClientFormData.put<AstatkaCargoUpdateResult>(
-    `${base(flightName)}/cargos/${cargoId}/photos`,
+  const { data } = await apiClientFormData.put<AstatkaPackagePhotosResult>(
+    `${base(flightName)}/packages/${packageId}/photos`,
     form,
   );
   return data;

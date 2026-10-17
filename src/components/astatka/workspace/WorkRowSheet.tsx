@@ -28,7 +28,7 @@ import { packageUpdateOf } from "./useSavedBagActions";
 interface Props {
   flightName: string;
   /** Only what the window does to the queue: edits, a saved bag's new facts, the weight. */
-  queue: Pick<AstatkaWorkQueue, "isOnline" | "replacePackage" | "updateEdits" | "applyBagWeight">;
+  queue: Pick<AstatkaWorkQueue, "isOnline" | "replacePackage" | "updateEdits">;
   /** The row as it is now, or as it was when it left the screen. */
   row: WorkRow;
   /** False once the row is gone from the screen: shown, but not acted on. */
@@ -63,8 +63,8 @@ function bagRefOf(row: WorkRow, flightName: string): AstatkaBagRef | null {
 
 /**
  * What the worker changed, laid over the row's own edits as they are now —
- * not as they were when the form opened — so a weight the photo report fixed
- * meanwhile, or a flight the server resolved, is not written back stale.
+ * not as they were when the form opened — so a flight the server resolved
+ * meanwhile is not written back stale.
  */
 function mergeEdits(edits: WorkRowEdits, changes: BagEditChanges): WorkRowEdits {
   const merged: WorkRowEdits = { ...edits };
@@ -255,7 +255,6 @@ export function WorkRowSheet({
             }
           : undefined
       }
-      onWeightChanged={(weightKg) => queue.applyBagWeight(row.id, weightKg)}
     />
   );
 }

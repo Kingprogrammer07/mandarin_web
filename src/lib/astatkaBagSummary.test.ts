@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { AstatkaPackage } from "@/api/services/astatkaFlights";
 import type { WorkRow } from "@/lib/astatkaWorkQueue";
 
-import { summaryFromPackage, summaryFromRow } from "./astatkaBagSummary";
+import {
+  astatkaSentLabel,
+  isSentFromAstatka,
+  summaryFromPackage,
+  summaryFromRow,
+} from "./astatkaBagSummary";
 
 function pkg(overrides: Partial<AstatkaPackage> = {}): AstatkaPackage {
   return {
@@ -153,5 +158,26 @@ describe("a partner cargo's bag", () => {
       photoReport: "Yo'q",
       sourceCompany: "AKB",
     });
+  });
+});
+
+describe("the astatka's own send", () => {
+  it("is unknown for a bag saved on the device before the markers existed", () => {
+    expect(isSentFromAstatka(pkg())).toBe(false);
+    expect(astatkaSentLabel(pkg())).toBeNull();
+    expect(summaryFromPackage(pkg()).astatkaSent).toBeNull();
+  });
+
+  it("counts either channel and lists each on its own line", () => {
+    const web = pkg({ sent_at: null, sent_web_at: "2026-10-16T09:31:00Z" });
+    expect(isSentFromAstatka(web)).toBe(true);
+    expect(astatkaSentLabel(web)).toMatch(/^Sayt · /);
+
+    const both = pkg({ sent_at: "2026-10-16T09:30:00Z", sent_web_at: "2026-10-16T09:31:00Z" });
+    const lines = astatkaSentLabel(both)?.split("\n") ?? [];
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^Bot · /);
+    expect(lines[1]).toMatch(/^Sayt · /);
+    expect(summaryFromPackage(both).astatkaSent).toBe(astatkaSentLabel(both));
   });
 });

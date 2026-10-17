@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ShieldOff, Plane, Plus } from 'lucide-react';
+import { ShieldOff, Plane, Plus, Archive } from 'lucide-react';
 
 import { getAdminJwtClaims } from '@/api/services/adminManagement';
 import {
@@ -15,6 +15,7 @@ import {
   type DeleteExpectedCargoResponse,
 } from '@/api/services/expectedCargo';
 import { useExpectedCargoStore } from '@/store/expectedCargoStore';
+import { isAstatkaFlightName } from '@/lib/astatkaFlight';
 
 import { FlightBottomTabs } from '@/components/expectedCargo/FlightBottomTabs';
 import { ExpectedCargoHeader } from '@/components/expectedCargo/ExpectedCargoHeader';
@@ -31,6 +32,8 @@ import type { FastEntryQueueItem } from '@/store/expectedCargoStore';
 interface ExpectedCargoPageProps {
   onNavigate: (page: string) => void;
   onLogout: () => void;
+  /** Opens an astatka's window; absent for a role that cannot open it. */
+  onOpenAstatka?: (flightName: string) => void;
 }
 
 interface DeleteTarget {
@@ -55,19 +58,62 @@ function AccessDenied() {
   );
 }
 
-export default function ExpectedCargoPage({ onNavigate }: ExpectedCargoPageProps) {
+/**
+ * An astatka (O…) flight keeps its track codes in its saved bags, which only
+ * its own window changes; codes added here would belong to no bag, so the
+ * server refuses them.
+ */
+function AstatkaFlightNotice({
+  flightName,
+  onOpenAstatka,
+}: {
+  flightName: string;
+  onOpenAstatka?: (flightName: string) => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+      <Archive className="h-10 w-10 text-mc-text-3" strokeWidth={1.5} />
+      <div className="max-w-sm">
+        <p className="break-words text-[15px] font-extrabold text-mc-text">
+          {flightName} — astatka reysi
+        </p>
+        <p className="mt-1 text-[13px] font-medium text-mc-text-2">
+          Uning yuklari va trek kodlari faqat astatka oynasida qo'shiladi va
+          o'zgartiriladi.
+        </p>
+      </div>
+      {onOpenAstatka && (
+        <button
+          type="button"
+          onClick={() => onOpenAstatka(flightName)}
+          className="flex h-11 items-center gap-2 rounded-mc-sm bg-mc-brand px-4 text-[13px] font-extrabold text-mc-on-brand active:scale-[0.97]"
+        >
+          Astatka oynasini ochish
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function ExpectedCargoPage({ onNavigate, onOpenAstatka }: ExpectedCargoPageProps) {
   const jwtClaims = useMemo(() => getAdminJwtClaims(), []);
   const hasAccess =
     jwtClaims.isSuperAdmin || jwtClaims.permissions.has('expected_cargo:manage');
 
   if (!hasAccess) return <AccessDenied />;
 
-  return <ExpectedCargoPageContent onNavigate={onNavigate} />;
+  return <ExpectedCargoPageContent onNavigate={onNavigate} onOpenAstatka={onOpenAstatka} />;
 }
 
 // Separate inner component so hooks are only called when the user has access.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (page: string) => void }) {
+function ExpectedCargoPageContent({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onNavigate: _onNavigate,
+  onOpenAstatka,
+}: {
+  onNavigate: (page: string) => void;
+  onOpenAstatka?: (flightName: string) => void;
+}) {
   const queryClient = useQueryClient();
 
   // ── Store state ─────────────────────────────────────────────────────────────
@@ -543,6 +589,8 @@ function ExpectedCargoPageContent({ onNavigate: _onNavigate }: { onNavigate: (pa
                 Pastdagi tabdan reys tanlang
               </div>
             )
+          ) : isAstatkaFlightName(activeFlightName) ? (
+            <AstatkaFlightNotice flightName={activeFlightName} onOpenAstatka={onOpenAstatka} />
           ) : (
             <VirtualizedClientList
               items={summaryQuery.data?.items ?? []}

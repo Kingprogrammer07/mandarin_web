@@ -4,6 +4,7 @@ import {
   Loader2,
   Pencil,
   RotateCcw,
+  Send,
   Trash2,
 } from "lucide-react";
 
@@ -11,6 +12,7 @@ import type {
   AstatkaPackage,
   AstatkaPackageStatus,
 } from "@/api/services/astatkaFlights";
+import { isSentFromAstatka } from "@/lib/astatkaBagSummary";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
 import { sourceCompanyLabel } from "@/lib/astatkaSource";
 import { cn } from "@/lib/utils";
@@ -51,10 +53,21 @@ export function SavedBagHeader({ editMode }: { editMode: boolean }) {
 
 function StatusBadge({
   status,
+  sent,
 }: {
   status: AstatkaPackageStatus | null;
+  /** The astatka's own «Yuborish» already notified the client. */
+  sent: boolean;
 }) {
   const confirmed = status === "confirmed";
+  if (confirmed && sent) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-mc-brand-soft px-2 py-0.5 text-[11px] font-bold text-mc-brand">
+        <Send className="h-3 w-3" />
+        Yuborilgan
+      </span>
+    );
+  }
   return (
     <span
       className={cn(
@@ -107,6 +120,7 @@ export function SavedBagRow({
     pkg.confirmed_at ?? pkg.scanned_at ?? pkg.created_at,
   );
   const partner = sourceCompanyLabel(pkg);
+  const sent = isSentFromAstatka(pkg);
   const partnerChip = partner ? (
     <SourceCompanyChip label={partner} api={false} />
   ) : null;
@@ -141,7 +155,7 @@ export function SavedBagRow({
           <span className="break-words text-[13px] font-bold tabular-nums text-mc-text">
             {formatKg(pkg.weight_kg)}
           </span>
-          <StatusBadge status={pkg.status} />
+          <StatusBadge status={pkg.status} sent={sent} />
           <span className="text-[12px] font-medium tabular-nums text-mc-text-3">
             {time}
           </span>
@@ -155,7 +169,7 @@ export function SavedBagRow({
               </span>
               {partnerChip}
             </span>
-            <StatusBadge status={pkg.status} />
+            <StatusBadge status={pkg.status} sent={sent} />
           </span>
           <span className="mt-0.5 block break-words text-[12px] font-semibold text-mc-text-2">
             {pkg.source_flight_name || "Reys noma'lum"} · {pkg.track_count} ta
@@ -184,7 +198,8 @@ export function SavedBagRow({
             >
               <Pencil className="h-4 w-4" />
             </button>
-            {pkg.status === "confirmed" && (
+            {/* The server keeps a bag the astatka already sent confirmed. */}
+            {pkg.status === "confirmed" && !sent && (
               <button
                 type="button"
                 onClick={() => onUnconfirm(pkg)}

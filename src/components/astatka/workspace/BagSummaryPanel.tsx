@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Send } from "lucide-react";
 
 import type { BagStatusTone, BagSummary } from "@/lib/astatkaBagSummary";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
@@ -42,6 +42,12 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
           {summary.statusTone === "warn" && <Clock className="h-3.5 w-3.5" />}
           {summary.statusLabel}
         </span>
+        {summary.astatkaSent && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-mc-brand-soft px-2.5 py-1 text-[12px] font-bold text-mc-brand">
+            <Send className="h-3.5 w-3.5" />
+            Astatkadan yuborilgan
+          </span>
+        )}
         {partner && <SourceCompanyChip label={summary.sourceCompanyName} />}
       </div>
 
@@ -93,6 +99,11 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
           </>
         )}
         <Fact label="Tasdiqlagan">{summary.confirmedBy ?? "—"}</Fact>
+        {summary.astatkaSent && (
+          <Fact label="Astatkadan yuborilgan">
+            <span className="whitespace-pre-line tabular-nums">{summary.astatkaSent}</span>
+          </Fact>
+        )}
         <Fact label="Vaqti">
           <span className="tabular-nums">{formatScanTime(summary.timeIso)}</span>
         </Fact>

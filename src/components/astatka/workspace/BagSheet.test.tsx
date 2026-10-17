@@ -11,21 +11,24 @@ vi.mock("@/api/services/astatkaFlights", () => ({
     JSON.stringify(ref),
   ],
   astatkaCargoPhotosQueryKey: (id: number) => ["astatka-cargo-photos", id],
+  astatkaPackagePhotosQueryKey: (id: number) => ["astatka-package-photos", id],
   astatkaPackagesQueryKey: (name: string) => ["astatka-packages", name],
   astatkaStatsQueryKey: ["astatka-flight-stats"],
   getAstatkaBagDetails: vi.fn(),
   getAstatkaCargoPhotos: vi.fn(),
-  replaceAstatkaCargoPhotos: vi.fn(),
-  updateAstatkaCargoWeight: vi.fn(),
+  getAstatkaPackagePhotos: vi.fn(),
+  replaceAstatkaPackagePhotos: vi.fn(),
 }));
 
 import {
   getAstatkaBagDetails,
   getAstatkaCargoPhotos,
-  replaceAstatkaCargoPhotos,
-  updateAstatkaCargoWeight,
+  getAstatkaPackagePhotos,
+  replaceAstatkaPackagePhotos,
   type AstatkaBagCargo,
   type AstatkaBagDetails,
+  type AstatkaBagRef,
+  type AstatkaPackage,
 } from "@/api/services/astatkaFlights";
 import type { BagSummary } from "@/lib/astatkaBagSummary";
 
@@ -39,8 +42,10 @@ import { BagSheet, type BagSheetMode } from "./BagSheet";
 
 const details = vi.mocked(getAstatkaBagDetails);
 const photos = vi.mocked(getAstatkaCargoPhotos);
-const replacePhotos = vi.mocked(replaceAstatkaCargoPhotos);
-const saveWeight = vi.mocked(updateAstatkaCargoWeight);
+const ownPhotos = vi.mocked(getAstatkaPackagePhotos);
+const retakeOwnPhotos = vi.mocked(replaceAstatkaPackagePhotos);
+
+const SCAN_BAG: AstatkaBagRef = { clientCode: "SS KODSIZ", sourceFlight: "M262-M263" };
 
 function cargo(overrides: Partial<AstatkaBagCargo> = {}): AstatkaBagCargo {
   return {
@@ -93,6 +98,7 @@ const summary: BagSummary = {
   notes: [],
   sourceCompany: "",
   sourceCompanyName: "",
+  astatkaSent: null,
 };
 
 const initialEdit: BagEditValues = {
@@ -105,7 +111,8 @@ const initialEdit: BagEditValues = {
 
 interface HarnessProps {
   initialMode?: BagSheetMode;
-  onWeightChanged?: (weightKg: number | null) => void;
+  bag?: AstatkaBagRef;
+  onPackageChanged?: (pkg: AstatkaPackage) => void;
   onSave?: (changes: BagEditChanges) => void;
   current?: BagEditValues;
   locked?: BagEditLocks;
@@ -117,7 +124,8 @@ interface HarnessProps {
 /** BagSheet's mode is the caller's state; the harness plays the caller. */
 function Harness({
   initialMode = "view",
-  onWeightChanged,
+  bag = SCAN_BAG,
+  onPackageChanged,
   onSave = vi.fn(),
   current = initialEdit,
   locked,
@@ -131,7 +139,7 @@ function Harness({
       flightName="OSTATKA.202"
       title="SS KODSIZ"
       summary={summary}
-      bag={{ clientCode: "SS KODSIZ", sourceFlight: "M262-M263" }}
+      bag={bag}
       isOnline
       mode={mode}
       onModeChange={setMode}
@@ -142,7 +150,7 @@ function Harness({
         </button>
       }
       edit={{ current, locked, hints, codesBase, saving: false, disabledReason, onSave }}
-      onWeightChanged={onWeightChanged}
+      onPackageChanged={onPackageChanged}
     />
   );
 }
@@ -174,7 +182,7 @@ beforeEach(() => {
 });
 
 describe("BagSheet — photo report", () => {
-  it("shows the bag's facts, then the photo report's rows, photos and facts", async () => {
+  it("shows the bag's facts, then the old flight's photo report, read-only", async () => {
     details.mockResolvedValue(bagDetails());
     renderSheet();
 
@@ -182,6 +190,9 @@ describe("BagSheet — photo report", () => {
       screen.getByRole("region", { name: "Yuk haqida" }),
     ).toBeInTheDocument();
     expect(screen.getByText("YT200")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Eski reys (M262-M263) foto hisoboti" }),
+    ).toBeInTheDocument();
     expect(
       await screen.findByText("Foto hisobot yozuvi №11"),
     ).toBeInTheDocument();
@@ -195,51 +206,91 @@ describe("BagSheet — photo report", () => {
       screen.getByText("Rasm havolasini olib bo'lmadi."),
     ).toBeInTheDocument();
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Rasmlarni qayta olish" }),
-    ).toBeInTheDocument();
+    // The server opens only this bag's rows, so the photos ask with the bag.
+    expect(photos).toHaveBeenCalledWith("OSTATKA.202", 11, SCAN_BAG);
+    // Nothing on the old flight's record can be changed from the astatka.
+    expect(screen.queryByRole("button", { name: /Rasm/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Og'irlik kiritish" })).toBeNull();
+    expect(screen.queryByLabelText("Og'irlik, kg")).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 
-  it("saves a typed weight to the photo report and reports the bag's new total", async () => {
-    details.mockResolvedValue(
-      bagDetails({
-        weight_kg: 2,
-        cargos: [cargo(), cargo({ id: 12, weight_kg: 2, photo_count: 0 })],
-      }),
-    );
-    saveWeight.mockResolvedValue({
-      cargo: cargo({ weight_kg: 12.5 }),
-      synced_packages: 1,
-    });
-    const onWeightChanged = vi.fn();
-    renderSheet({ onWeightChanged });
-
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Og'irlik kiritish" }),
-    );
-    const input = screen.getByLabelText("Og'irlik, kg");
-    fireEvent.change(input, { target: { value: "12,5" } });
-    fireEvent.click(screen.getByRole("button", { name: "Saqlash" }));
-
-    await waitFor(() =>
-      expect(saveWeight).toHaveBeenCalledWith("OSTATKA.202", 11, 12.5),
-    );
-    await waitFor(() => expect(onWeightChanged).toHaveBeenCalledWith(14.5));
-  });
-
-  it("re-takes one photo from the full-size view", async () => {
+  it("has no full-size re-take for the old flight's photos", async () => {
     details.mockResolvedValue(bagDetails());
-    replacePhotos.mockResolvedValue({ cargo: cargo(), synced_packages: 0 });
     renderSheet();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "2-rasmni kattalashtirish" }),
     );
     expect(await screen.findByText("2 / 2")).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Shu rasmni qayta olish" }),
+    expect(
+      screen.queryByRole("button", { name: "Shu rasmni qayta olish" }),
+    ).toBeNull();
+  });
+
+  it("offers no own photos for a bag that is not saved yet", async () => {
+    details.mockResolvedValue(bagDetails());
+    renderSheet();
+    await screen.findByText("Foto hisobot yozuvi №11");
+    expect(screen.queryByRole("region", { name: "Astatka rasmlari" })).toBeNull();
+    expect(ownPhotos).not.toHaveBeenCalled();
+  });
+});
+
+describe("BagSheet — the astatka's own photos", () => {
+  const savedBag: AstatkaBagRef = { packageId: 41 };
+
+  it("takes the first photos of a saved bag and hands the bag back", async () => {
+    details.mockResolvedValue(bagDetails());
+    ownPhotos.mockResolvedValue([]);
+    const updated = { id: 41, own_photo_count: 1 } as AstatkaPackage;
+    retakeOwnPhotos.mockResolvedValue({
+      package: updated,
+      photos: [{ index: 0, url: "https://files.example/own.webp", error: null }],
+    });
+    const onPackageChanged = vi.fn();
+    renderSheet({ bag: savedBag, onPackageChanged });
+
+    const own = screen.getByRole("region", { name: "Astatka rasmlari" });
+    expect(
+      await within(own).findByText(/Hali rasm olinmagan/),
+    ).toBeInTheDocument();
+    fireEvent.click(within(own).getByRole("button", { name: "Rasm olish" }));
+    const picker = own.querySelector<HTMLInputElement>('input[type="file"][multiple]');
+    expect(picker).not.toBeNull();
+    const file = new File(["x"], "new.jpg", { type: "image/jpeg" });
+    fireEvent.change(picker!, { target: { files: [file] } });
+
+    await waitFor(() =>
+      expect(retakeOwnPhotos).toHaveBeenCalledWith("OSTATKA.202", 41, [file], undefined),
     );
-    const picker = document.querySelector<HTMLInputElement>(
+    await waitFor(() => expect(onPackageChanged).toHaveBeenCalledWith(updated));
+    expect(await within(own).findByAltText("1-rasm")).toHaveAttribute(
+      "src",
+      "https://files.example/own.webp",
+    );
+  });
+
+  it("re-takes one of the bag's own photos from the full-size view", async () => {
+    details.mockResolvedValue(bagDetails());
+    ownPhotos.mockResolvedValue([
+      { index: 0, url: "https://files.example/o1.webp", error: null },
+      { index: 1, url: "https://files.example/o2.webp", error: null },
+    ]);
+    retakeOwnPhotos.mockResolvedValue({
+      package: { id: 41 } as AstatkaPackage,
+      photos: [],
+    });
+    renderSheet({ bag: savedBag });
+
+    const own = screen.getByRole("region", { name: "Astatka rasmlari" });
+    fireEvent.click(
+      await within(own).findByRole("button", { name: "2-rasmni kattalashtirish" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Shu rasmni qayta olish" }),
+    );
+    const picker = own.querySelector<HTMLInputElement>(
       'input[type="file"]:not([multiple])',
     );
     expect(picker).not.toBeNull();
@@ -247,10 +298,12 @@ describe("BagSheet — photo report", () => {
     fireEvent.change(picker!, { target: { files: [file] } });
 
     await waitFor(() =>
-      expect(replacePhotos).toHaveBeenCalledWith("OSTATKA.202", 11, [file], 1),
+      expect(retakeOwnPhotos).toHaveBeenCalledWith("OSTATKA.202", 41, [file], 1),
     );
   });
+});
 
+describe("BagSheet — photo report, other flights", () => {
   it("explains a missing photo report and lists the client's other flights", async () => {
     details.mockResolvedValue(
       bagDetails({

@@ -18,6 +18,7 @@ vi.mock("@/api/services/astatkaFlights", () => ({
   astatkaCargoPhotosQueryKey: (id: number) => ["astatka-cargo-photos", id],
   astatkaExternalPhotosRootKey: ["astatka-external-photos"],
   astatkaExternalPhotosQueryKey: (id: number) => ["astatka-external-photos", id],
+  astatkaPackagePhotosQueryKey: (id: number) => ["astatka-package-photos", id],
   astatkaPackagesQueryKey: (name: string) => ["astatka-packages", name],
   astatkaStatsQueryKey: ["astatka-flight-stats"],
   confirmAstatkaPackages: vi.fn(),
@@ -25,10 +26,10 @@ vi.mock("@/api/services/astatkaFlights", () => ({
   getAstatkaBagDetails: vi.fn(),
   getAstatkaCargoPhotos: vi.fn(),
   getAstatkaExternalPhotos: vi.fn(),
+  getAstatkaPackagePhotos: vi.fn(),
   getAstatkaPackages: vi.fn(),
-  replaceAstatkaCargoPhotos: vi.fn(),
+  replaceAstatkaPackagePhotos: vi.fn(),
   unconfirmAstatkaPackage: vi.fn(),
-  updateAstatkaCargoWeight: vi.fn(),
   updateAstatkaPackage: vi.fn(),
 }));
 vi.mock("@/utils/askConfirm", () => ({ askConfirm: vi.fn() }));
@@ -49,9 +50,9 @@ import {
   deleteAstatkaPackage,
   getAstatkaBagDetails,
   getAstatkaExternalPhotos,
+  getAstatkaPackagePhotos,
   getAstatkaPackages,
   unconfirmAstatkaPackage,
-  updateAstatkaCargoWeight,
   updateAstatkaPackage,
   type AstatkaBagCargo,
   type AstatkaPackage,
@@ -67,7 +68,6 @@ const remove = vi.mocked(deleteAstatkaPackage);
 const confirmDialog = vi.mocked(askConfirm);
 const errorToast = vi.mocked(toast.error);
 const bagDetails = vi.mocked(getAstatkaBagDetails);
-const saveCargoWeight = vi.mocked(updateAstatkaCargoWeight);
 const updatePackage = vi.mocked(updateAstatkaPackage);
 
 function cargo(overrides: Partial<AstatkaBagCargo> = {}): AstatkaBagCargo {
@@ -174,6 +174,7 @@ async function openBag(clientCode = "SS101") {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getAstatkaExternalPhotos).mockResolvedValue({ photos: [], pending: 0 });
+  vi.mocked(getAstatkaPackagePhotos).mockResolvedValue([]);
   confirmDialog.mockResolvedValue(true);
   remove.mockResolvedValue(undefined);
   unconfirm.mockResolvedValue({
@@ -223,7 +224,9 @@ describe("PackagesPreview — delete", () => {
 
     await waitFor(() => expect(remove).toHaveBeenCalledWith("OSTATKA.202", 7));
     expect(confirmDialog.mock.calls[0][0]).toMatch(/tasdig'i bekor qilinadi/);
-    expect(confirmDialog.mock.calls[0][0]).toMatch(/M262 reysiga qaytadi/);
+    // A confirm never moved the bag, so undoing it moves nothing back either.
+    expect(confirmDialog.mock.calls[0][0]).toMatch(/M262 reysidagi ma'lumotlari o'zgarmaydi/);
+    expect(confirmDialog.mock.calls[0][0]).not.toMatch(/reysiga qaytadi/);
     expect(unconfirm).toHaveBeenCalledWith("OSTATKA.202", 7);
     expect(unconfirm.mock.invocationCallOrder[0]).toBeLessThan(
       remove.mock.invocationCallOrder[0],
@@ -368,8 +371,7 @@ describe("PackagesPreview — delete", () => {
 describe("PackagesPreview — the bag window", () => {
   const waiting = { status: "expected" as const, confirmed_at: null };
 
-  it("shows a weight fixed in the photo report and never saves the old one back", async () => {
-    // The list keeps answering 5 kg: only the window's own copy knows 7.
+  it("saves a typed weight on the bag only; the old flight's report keeps its own", async () => {
     list.mockResolvedValue(page([pkg({ ...waiting, weight_kg: 5 })]));
     bagDetails.mockResolvedValue({
       client_code: "SS101",
@@ -379,50 +381,54 @@ describe("PackagesPreview — the bag window", () => {
       cargos: [cargo()],
       other_cargos: [],
     });
-    saveCargoWeight.mockResolvedValue({
-      cargo: cargo({ weight_kg: 7 }),
-      synced_packages: 1,
-    });
     updatePackage.mockResolvedValue(
-      pkg({ ...waiting, weight_kg: 7, comment: "qopi yirtilgan" }),
+      pkg({ ...waiting, weight_kg: 7, weight_edited: true }),
     );
     renderList();
 
     const sheet = await openBag();
-    const facts = within(sheet).getByRole("region", { name: "Yuk haqida" });
-    expect(facts).toHaveTextContent("5 kg");
+    const report = within(sheet).getByRole("region", {
+      name: "Eski reys (M262) foto hisoboti",
+    });
+    expect(await within(report).findByText("Foto hisobot yozuvi №11")).toBeInTheDocument();
+    expect(within(within(report).getByRole("article")).getByText("5 kg")).toBeInTheDocument();
+    expect(within(report).queryByRole("button", { name: "O'zgartirish" })).toBeNull();
 
-    fireEvent.click(
-      await within(sheet).findByRole("button", { name: "O'zgartirish" }),
-    );
-    fireEvent.change(within(sheet).getByLabelText("Og'irlik, kg"), {
+    fireEvent.click(within(sheet).getByRole("button", { name: "Tahrirlash" }));
+    fireEvent.change(within(sheet).getByLabelText(/Og'irligi \(kg\)/), {
       target: { value: "7" },
     });
     fireEvent.click(within(sheet).getByRole("button", { name: "Saqlash" }));
+
+    await waitFor(() =>
+      expect(updatePackage).toHaveBeenCalledWith("OSTATKA.202", 7, { weight_kg: 7 }),
+    );
+    const after = await screen.findByRole("dialog", { name: "SS101" });
     await waitFor(() =>
       expect(
-        within(sheet).getByRole("region", { name: "Yuk haqida" }),
-      ).toHaveTextContent("7 kg"),
+        within(after).getByRole("region", { name: "Yuk haqida" }),
+      ).toHaveTextContent("7 kg (qo'lda)"),
     );
-
-    fireEvent.click(within(sheet).getByRole("button", { name: "Tahrirlash" }));
-    expect(within(sheet).getByLabelText(/Og'irligi \(kg\)/)).toHaveValue("7");
-    fireEvent.change(within(sheet).getByLabelText("Izoh"), {
-      target: { value: "qopi yirtilgan" },
+    const reportAfter = within(after).getByRole("region", {
+      name: "Eski reys (M262) foto hisoboti",
     });
-    fireEvent.click(within(sheet).getByRole("button", { name: "Saqlash" }));
+    expect(within(within(reportAfter).getByRole("article")).getByText("5 kg")).toBeInTheDocument();
+  });
 
-    await waitFor(() =>
-      expect(updatePackage).toHaveBeenCalledWith("OSTATKA.202", 7, {
-        comment: "qopi yirtilgan",
-      }),
+  it("marks a bag the astatka already sent and offers no undo for it", async () => {
+    list.mockResolvedValue(
+      page([pkg({ sent_at: "2026-10-16T09:30:00Z", sent_web_at: null })]),
     );
-    // Saved: the same window, back on the bag's facts as the server has them.
-    expect(toast.success).toHaveBeenCalledWith("Saqlandi");
-    const after = await screen.findByRole("dialog", { name: "SS101" });
+    renderList();
+
+    const [row] = await screen.findAllByRole("listitem");
+    expect(within(row).getAllByText("Yuborilgan").length).toBeGreaterThan(0);
+    const sheet = await openBag();
+    expect(within(sheet).getByText("Astatkadan yuborilgan", { selector: "span" })).toBeInTheDocument();
+    expect(within(sheet).getByText(/^Bot · /)).toBeInTheDocument();
     expect(
-      within(after).getByRole("region", { name: "Yuk haqida" }),
-    ).toHaveTextContent("qopi yirtilgan");
+      within(sheet).queryByRole("button", { name: "Tasdiqni bekor qilish" }),
+    ).toBeNull();
   });
 
   it("gives the focus back to the row that opened the window", async () => {
