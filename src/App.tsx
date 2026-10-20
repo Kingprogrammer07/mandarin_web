@@ -74,6 +74,7 @@ const PaymentNbuFailure = lazy(() => import("./pages/payment/PaymentNbuFailure")
 const SavedCardsPage = lazy(() => import("./pages/payment/SavedCardsPage"));
 const ReferralPage = lazy(() => import("./pages/user/ReferralPage"));
 const SystemSettingsPage = lazy(() => import("./pages/admin/SystemSettingsPage"));
+const AdminLandingPage = lazy(() => import("./pages/admin/AdminLandingPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,7 +117,8 @@ type Page =
   | "payment_nbu_success"
   | "payment_nbu_failure"
   | "saved_cards"
-  | "system-settings";
+  | "system-settings"
+  | "admin-landing";
 
 interface RouteInfo {
   page: Page;
@@ -194,6 +196,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-expenses",
       "saved_cards",
       "system-settings",
+      "admin-landing",
     ],
   },
   "super-admin": {
@@ -236,6 +239,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "admin-expenses",
       "saved_cards",
       "system-settings",
+      "admin-landing",
     ],
   },
   manager: {
@@ -367,6 +371,7 @@ function getPathForPage(
   if (page === "pickup-tv") return "/pickup-tv";
   if (page === "admin-expenses") return "/admin/expenses";
   if (page === "system-settings") return "/admin/system-settings";
+  if (page === "admin-landing") return "/admin/landing";
   if (page === "payment_nbu_success") return "/payment/nbu/success";
   if (page === "payment_nbu_failure") return "/payment/nbu/failure";
   if (page === "saved_cards") return "/payment/nbu/cards";
@@ -450,6 +455,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/payment/nbu/failure") return { page: "payment_nbu_failure" };
   if (path === "/payment/nbu/cards") return { page: "saved_cards" };
   if (path === "/admin/system-settings") return { page: "system-settings" };
+  if (path === "/admin/landing") return { page: "admin-landing" };
 
   return { page: "login" };
 }
@@ -953,6 +959,7 @@ function AppContent() {
     "admin-delivery-request",
     "admin-expenses",
     "system-settings",
+    "admin-landing",
   ].includes(currentPage);
 
   // Only roles with admin-accounts (admin, super-admin) get the full AdminLayout shell.
@@ -1154,6 +1161,7 @@ function AppContent() {
           {currentPage === "admin-delivery-request" && <AdminDeliveryRequestPage />}
           {currentPage === "admin-expenses" && <ExpensesPage />}
           {currentPage === "system-settings" && <SystemSettingsPage />}
+          {currentPage === "admin-landing" && <AdminLandingPage />}
         </AdminLayout>
       ) : currentPage === "kassa" ? (
         <CashierPage
