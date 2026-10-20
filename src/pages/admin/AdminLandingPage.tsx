@@ -7,10 +7,13 @@ import {
   Globe,
   Link2,
   Loader2,
+  MessageSquareQuote,
+  Pencil,
   Plus,
   RefreshCw,
   Rocket,
   Save,
+  Star,
   Tag,
   Trash2,
 } from 'lucide-react';
@@ -21,7 +24,9 @@ import {
   landingAdminService,
   type LandingAdminData,
   type LandingLang,
+  type LandingReviewItem,
   type LandingTier,
+  type ReviewStatus,
   type LinkKey,
   type MetricKey,
 } from '@/api/services/landingAdmin';
@@ -61,8 +66,9 @@ const LINK_LABELS: Record<LinkKey, string> = {
 const LANG_LABELS: Record<LandingLang, string> = { uz: "O'zb", ru: 'Рус', en: 'Eng', cn: '中文' };
 
 const TABS = [
-  { key: 'stats', label: "Ko'rsatkichlar", icon: BarChart3 },
+  { key: 'stats', label: 'Raqamlar', icon: BarChart3 },
   { key: 'tiers', label: 'Tariflar', icon: Tag },
+  { key: 'reviews', label: 'Sharhlar', icon: MessageSquareQuote },
   { key: 'general', label: 'Havolalar', icon: Link2 },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
@@ -168,7 +174,7 @@ export default function AdminLandingPage() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold transition-colors ${
+            className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-bold sm:px-3 sm:text-sm transition-colors ${
               tab === key
                 ? 'bg-white text-gray-900 shadow-sm dark:bg-white/10 dark:text-white'
                 : 'text-gray-500 hover:text-gray-800 dark:text-white/50 dark:hover:text-white/80'
@@ -176,12 +182,18 @@ export default function AdminLandingPage() {
           >
             <Icon className="hidden h-4 w-4 sm:block" />
             {label}
+            {key === 'reviews' && data.reviews_pending > 0 && (
+              <span className="rounded-full bg-orange-500 px-1.5 text-[11px] font-black leading-5 text-white">
+                {data.reviews_pending}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {tab === 'stats' && <StatsSection data={data} />}
       {tab === 'tiers' && <TiersSection data={data} />}
+      {tab === 'reviews' && <ReviewsSection data={data} />}
       {tab === 'general' && <GeneralSection data={data} />}
     </div>
   );
@@ -205,7 +217,7 @@ function PublishBar({ data }: { data: LandingAdminData }) {
   return (
     <section className={`${cardClass} flex flex-wrap items-center justify-between gap-4`}>
       <div className="min-w-0">
-        <h1 className="flex items-center gap-2 text-base font-black text-gray-900 dark:text-white">
+        <h1 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-base font-black text-gray-900 dark:text-white">
           <Globe className="h-4 w-4 text-orange-500" />
           Landing sahifa
           <a
@@ -662,5 +674,249 @@ function GeneralSection({ data }: { data: LandingAdminData }) {
         </button>
       </div>
     </section>
+  );
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+
+const REVIEW_FILTERS: { key: ReviewStatus | 'all'; label: string }[] = [
+  { key: 'pending', label: 'Kutilmoqda' },
+  { key: 'approved', label: 'Saytda' },
+  { key: 'rejected', label: 'Rad etilgan' },
+  { key: 'all', label: 'Barchasi' },
+];
+
+const STATUS_BADGE: Record<ReviewStatus, { label: string; className: string }> = {
+  pending: {
+    label: 'Kutilmoqda',
+    className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+  },
+  approved: {
+    label: 'Saytda',
+    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+  },
+  rejected: {
+    label: 'Rad etilgan',
+    className: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-white/60',
+  },
+};
+
+const PAGE_SIZE = 30;
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={`${rating} / 5`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          className={`h-3.5 w-3.5 ${
+            n <= rating ? 'fill-orange-400 text-orange-400' : 'text-gray-300 dark:text-white/20'
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function ReviewsSection({ data }: { data: LandingAdminData }) {
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<ReviewStatus | 'all'>('pending');
+  const [withText, setWithText] = useState(true);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+
+  const params = { status: filter === 'all' ? undefined : filter, with_text: withText || undefined, limit };
+  const { data: list, isLoading, isFetching } = useQuery({
+    queryKey: [...QUERY_KEY, 'reviews', params],
+    queryFn: () => landingAdminService.listReviews(params),
+    placeholderData: (previous) => previous,
+  });
+
+  const toggle = useMutation({
+    mutationFn: (enabled: boolean) => landingAdminService.updateSettings({ review_prompts_enabled: enabled }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(QUERY_KEY, updated);
+      toast.success(updated.review_prompts_enabled ? "Bot sharh so'raydi" : "Bot sharh so'ramaydi");
+    },
+    onError: (err) => toast.error(errorText(err, "Saqlab bo'lmadi")),
+  });
+
+  return (
+    <div className="space-y-4">
+      <section className={`${cardClass} flex flex-wrap items-center justify-between gap-4`}>
+        <div className="min-w-0">
+          <p className="flex items-baseline gap-2">
+            <span className="text-2xl font-black text-gray-900 tabular-nums dark:text-white">
+              {data.rating_average == null ? '—' : data.rating_average.toFixed(1)}
+            </span>
+            <Stars rating={Math.round(data.rating_average ?? 0)} />
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-white/45">
+            {data.rating_count} ta baho. O'rtacha barcha baholardan olinadi; saytga faqat siz tasdiqlagan
+            izohlar chiqadi.
+          </p>
+        </div>
+        <div className="max-w-xs">
+          <Switch
+            checked={data.review_prompts_enabled}
+            onChange={(on) => toggle.mutate(on)}
+            label="Bot sharh so'rasin"
+          />
+          <p className="mt-1 text-xs text-gray-400 dark:text-white/35">
+            Yuk olib ketilgandan 3 kun keyin, kunduzi, bir mijozga 60 kunda bir marta.
+          </p>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1 rounded-lg bg-gray-100 p-0.5 dark:bg-white/5">
+          {REVIEW_FILTERS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setFilter(key);
+                setLimit(PAGE_SIZE);
+              }}
+              className={`whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-bold sm:px-2.5 ${
+                filter === key
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-white/10 dark:text-white'
+                  : 'text-gray-500 dark:text-white/50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <Switch checked={withText} onChange={setWithText} label="Faqat izohlilar" />
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center p-8">
+          <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+        </div>
+      ) : !list || list.items.length === 0 ? (
+        <p className={`${cardClass} text-sm text-gray-500 dark:text-white/45`}>Bu bo'limda sharh yo'q.</p>
+      ) : (
+        <>
+          {list.items.map((review) => (
+            <ReviewCard key={review.id} review={review} />
+          ))}
+          {list.items.length < list.total && (
+            <button
+              type="button"
+              onClick={() => setLimit((prev) => prev + PAGE_SIZE)}
+              disabled={isFetching}
+              className={`${ghostButton} w-full`}
+            >
+              {isFetching && <Loader2 className="h-4 w-4 animate-spin" />}
+              Yana ko'rsatish ({list.total - list.items.length})
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ReviewCard({ review }: { review: LandingReviewItem }) {
+  const queryClient = useQueryClient();
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState(review.author_name);
+
+  const update = useMutation({
+    mutationFn: (body: { status?: ReviewStatus; author_name?: string }) =>
+      landingAdminService.updateReview(review.id, body),
+    onSuccess: () => {
+      setEditingName(false);
+      // Counts in the header and the list filters both change.
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+    onError: (err) => toast.error(errorText(err, "Saqlab bo'lmadi")),
+  });
+
+  const badge = STATUS_BADGE[review.status];
+  const saveName = () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error("Ism bo'sh bo'lmasin");
+      return;
+    }
+    update.mutate({ author_name: trimmed });
+  };
+
+  return (
+    <article className={cardClass}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Stars rating={review.rating} />
+          {editingName ? (
+            <span className="flex items-center gap-1.5">
+              <input
+                className={`${inputClass} h-9 w-40`}
+                value={name}
+                maxLength={80}
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && saveName()}
+                aria-label="Saytdagi ism"
+              />
+              <button type="button" onClick={saveName} className="text-xs font-bold text-orange-600">
+                Saqlash
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingName(true)}
+              className="inline-flex items-center gap-1 text-sm font-bold text-gray-900 dark:text-white"
+              title="Saytdagi ismni o'zgartirish"
+            >
+              {review.author_name}
+              <Pencil className="h-3 w-3 text-gray-400" />
+            </button>
+          )}
+        </div>
+        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-black ${badge.className}`}>{badge.label}</span>
+      </div>
+
+      <p className="mt-1 text-xs text-gray-500 dark:text-white/45">
+        {review.client_code}
+        {review.flight_name && ` · ${review.flight_name}`} · {formatDateTime(review.created_at)} ·{' '}
+        {review.language.toUpperCase()}
+      </p>
+
+      {review.text ? (
+        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-gray-800 dark:text-white/85">
+          {review.text}
+        </p>
+      ) : (
+        <p className="mt-3 text-sm italic text-gray-400 dark:text-white/35">Faqat baho, izoh yozilmagan.</p>
+      )}
+
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {review.status !== 'rejected' && (
+          <button
+            type="button"
+            onClick={() => update.mutate({ status: 'rejected' })}
+            disabled={update.isPending}
+            className={ghostButton}
+          >
+            {review.status === 'approved' ? 'Saytdan olish' : 'Rad etish'}
+          </button>
+        )}
+        {review.status !== 'approved' && (
+          <button
+            type="button"
+            onClick={() => update.mutate({ status: 'approved' })}
+            disabled={update.isPending || !review.text}
+            title={review.text ? undefined : 'Izohsiz sharh saytga chiqmaydi'}
+            className={primaryButton}
+          >
+            {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Saytga chiqarish
+          </button>
+        )}
+      </div>
+    </article>
   );
 }

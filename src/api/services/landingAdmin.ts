@@ -63,6 +63,41 @@ export interface LandingAdminData {
   /** False until API_LANDING_DEPLOY_HOOK_URL is set on the server. */
   publish_configured: boolean;
   last_published_at: string | null;
+  /** Bot asks clients for a rating a few days after pickup. */
+  review_prompts_enabled: boolean;
+  /** Average of every rating, whatever its moderation status. */
+  rating_average: number | null;
+  rating_count: number;
+  reviews_pending: number;
+}
+
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
+export interface LandingReviewItem {
+  id: number;
+  client_code: string;
+  flight_name: string | null;
+  rating: number;
+  /** Null when the client gave stars only. */
+  text: string | null;
+  /** Name shown on the site, e.g. "Dilshod A.". */
+  author_name: string;
+  language: string;
+  status: ReviewStatus;
+  created_at: string | null;
+  moderated_at: string | null;
+}
+
+export interface LandingReviewList {
+  items: LandingReviewItem[];
+  total: number;
+}
+
+export interface ReviewListParams {
+  status?: ReviewStatus;
+  with_text?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export interface LandingSettingsUpdate {
@@ -71,6 +106,7 @@ export interface LandingSettingsUpdate {
   links?: Partial<Record<LinkKey, string | null>>;
   /** Replaces all overrides; entries without a value and not hidden are dropped. */
   stat_overrides?: Partial<Record<MetricKey, MetricOverride>>;
+  review_prompts_enabled?: boolean;
 }
 
 export const landingAdminService = {
@@ -101,6 +137,20 @@ export const landingAdminService = {
 
   async deleteTier(id: number): Promise<void> {
     await apiClient.delete(`${BASE}/tiers/${id}`);
+  },
+
+  async listReviews(params: ReviewListParams): Promise<LandingReviewList> {
+    const { data } = await apiClient.get<LandingReviewList>(`${BASE}/reviews`, { params });
+    return data;
+  },
+
+  /** Staff change the status or the displayed name; the client's words stay as written. */
+  async updateReview(
+    id: number,
+    body: { status?: ReviewStatus; author_name?: string },
+  ): Promise<LandingReviewItem> {
+    const { data } = await apiClient.patch<LandingReviewItem>(`${BASE}/reviews/${id}`, body);
+    return data;
   },
 
   async publish(): Promise<{ last_published_at: string }> {

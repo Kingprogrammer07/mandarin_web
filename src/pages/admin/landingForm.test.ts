@@ -32,6 +32,10 @@ const data = {
   tiers: [],
   publish_configured: false,
   last_published_at: null,
+  review_prompts_enabled: true,
+  rating_average: null,
+  rating_count: 0,
+  reviews_pending: 0,
 } as LandingAdminData;
 
 describe('parseAmount', () => {
