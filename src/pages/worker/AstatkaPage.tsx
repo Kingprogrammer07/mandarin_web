@@ -11,10 +11,12 @@ import {
   Package,
   PackagePlus,
   PackageSearch,
+  Trash2,
   Users,
   Weight,
 } from "lucide-react";
 
+import { getAdminJwtClaims } from "@/api/services/adminManagement";
 import { listAstatka, type Astatka } from "@/api/services/astatka";
 import {
   astatkaPackagesQueryKey,
@@ -26,6 +28,7 @@ import {
   getFlightsDashboard,
   type FlightDashboardItem,
 } from "@/api/services/flightSchedule";
+import { AstatkaDeleteDialog } from "@/components/astatka/AstatkaDeleteDialog";
 import { AstatkaExtractDialog } from "@/components/astatka/AstatkaExtractDialog";
 import { AstatkaItemSheet } from "@/components/astatka/AstatkaItemSheet";
 import { AstatkaScanner } from "@/components/astatka/AstatkaScanner";
@@ -132,6 +135,13 @@ export function AstatkaPage({
   }, [statsQuery.data]);
 
   const [extractFor, setExtractFor] = useState<string | null>(null);
+  const [deleteFor, setDeleteFor] = useState<string | null>(null);
+  // The server checks flights:delete again; this only hides a button that
+  // would answer 403.
+  const [canDelete] = useState(() => {
+    const claims = getAdminJwtClaims();
+    return claims.isSuperAdmin || claims.permissions.has("flights:delete");
+  });
 
   const [active, setActive] = useState<Astatka | null>(null);
 
@@ -291,6 +301,7 @@ export function AstatkaPage({
                 onOpen={() => onOpenAstatka(flight.name)}
                 onExtract={() => setExtractFor(flight.name)}
                 onSend={() => onSendAstatka(flight.name)}
+                onDelete={canDelete ? () => setDeleteFor(flight.name) : undefined}
               />
             </li>
           ))}
@@ -316,6 +327,20 @@ export function AstatkaPage({
         </div>
       </main>
 
+      {deleteFor && (
+        <AstatkaDeleteDialog
+          flightName={deleteFor}
+          stats={statsByFlight.get(deleteFor.trim().toUpperCase()) ?? null}
+          open
+          onOpenChange={(open) => !open && setDeleteFor(null)}
+          onDeleted={() => {
+            queryClient.removeQueries({ queryKey: astatkaPackagesQueryKey(deleteFor) });
+            void queryClient.invalidateQueries({ queryKey: ["flights-board"] });
+            void queryClient.invalidateQueries({ queryKey: astatkaStatsQueryKey });
+          }}
+        />
+      )}
+
       {extractFor && (
         <AstatkaExtractDialog
           flightName={extractFor}
@@ -339,12 +364,15 @@ interface AstatkaFlightCardProps {
   onOpen: () => void;
   onExtract: () => void;
   onSend: () => void;
+  /** Absent when this admin may not delete flights: no button then. */
+  onDelete?: () => void;
 }
 
 /**
  * One astatka flight. The card itself opens the astatka window; the two
- * buttons beside it pull leftovers in and notify clients. Visibility is
- * switched on the Reyslar board — the chip only reports it.
+ * buttons beside it pull leftovers in and notify clients, and a small third
+ * one deletes the astatka. Visibility is switched on the Reyslar board — the
+ * chip only reports it.
  */
 function AstatkaFlightCard({
   flight,
@@ -352,6 +380,7 @@ function AstatkaFlightCard({
   onOpen,
   onExtract,
   onSend,
+  onDelete,
 }: AstatkaFlightCardProps) {
   const trackCount =
     flight.stats.expected_track_codes || flight.stats.cargo_count;
@@ -428,7 +457,13 @@ function AstatkaFlightCard({
         <ChevronRight className="h-5 w-5 shrink-0 text-mc-text-3" />
       </button>
 
-      <div className="grid grid-cols-2 gap-1.5 @xl:flex @xl:shrink-0">
+      <div
+        className={
+          onDelete
+            ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_3rem] gap-1.5 @xl:flex @xl:shrink-0"
+            : "grid grid-cols-2 gap-1.5 @xl:flex @xl:shrink-0"
+        }
+      >
         <button
           type="button"
           onClick={onExtract}
@@ -447,6 +482,19 @@ function AstatkaFlightCard({
           <Bell className="h-4 w-4 shrink-0" />
           Yuborish
         </button>
+        {onDelete && (
+          // Icon only and last: the destructive action stays out of the way
+          // of the two daily ones, and the dialog behind it asks for the name.
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label="Astatkani o‘chirish"
+            title="Astatkani o‘chirish"
+            className="flex min-h-12 items-center justify-center rounded-mc-md border border-mc-border bg-mc-surface text-mc-danger active:scale-[0.97] @xl:h-11 @xl:min-h-0 @xl:w-11"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );

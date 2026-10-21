@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/api/client", () => ({ apiClient: {}, apiClientFormData: {} }));
@@ -11,7 +11,9 @@ vi.mock("@/api/services/astatkaFlights", () => ({
   astatkaStatsQueryKey: ["astatka-flight-stats"],
   astatkaPackagesQueryKey: (name: string) => ["astatka-packages", name],
   getAstatkaFlightStats: vi.fn(),
+  deleteAstatkaFlight: vi.fn(),
 }));
+vi.mock("@/api/services/adminManagement", () => ({ getAdminJwtClaims: vi.fn() }));
 vi.mock("@/components/astatka/AstatkaExtractDialog", () => ({
   AstatkaExtractDialog: ({ flightName }: { flightName: string }) => (
     <div role="dialog" aria-label={`ajratish ${flightName}`} />
@@ -23,7 +25,8 @@ vi.mock("@/components/astatka/AstatkaItemSheet", () => ({ AstatkaItemSheet: () =
 vi.mock("@/utils/astatkaStore", () => ({ astatkaStore: {} }));
 
 import { listAstatka, type Astatka } from "@/api/services/astatka";
-import { getAstatkaFlightStats } from "@/api/services/astatkaFlights";
+import { getAdminJwtClaims, type AdminJwtClaims } from "@/api/services/adminManagement";
+import { deleteAstatkaFlight, getAstatkaFlightStats } from "@/api/services/astatkaFlights";
 import {
   getFlightsDashboard,
   type FlightDashboardItem,
@@ -33,6 +36,20 @@ import { AstatkaPage } from "./AstatkaPage";
 const dashboard = vi.mocked(getFlightsDashboard);
 const stockTakes = vi.mocked(listAstatka);
 const astatkaStats = vi.mocked(getAstatkaFlightStats);
+const deleteAstatka = vi.mocked(deleteAstatkaFlight);
+const claims = vi.mocked(getAdminJwtClaims);
+
+function signedInAs(permissions: string[], isSuperAdmin = false): void {
+  const value: AdminJwtClaims = {
+    permissions: new Set(permissions),
+    role_name: isSuperAdmin ? "super-admin" : "admin",
+    role_names: [isSuperAdmin ? "super-admin" : "admin"],
+    home_page: null,
+    isSuperAdmin,
+    admin_id: 1,
+  };
+  claims.mockReturnValue(value);
+}
 const onOpenAstatka = vi.fn();
 const onSendAstatka = vi.fn();
 
@@ -79,6 +96,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   stockTakes.mockResolvedValue([]);
   astatkaStats.mockResolvedValue([]);
+  signedInAs([]);
 });
 
 describe("AstatkaPage", () => {
@@ -183,5 +201,76 @@ describe("AstatkaPage", () => {
 
     expect(await screen.findByText("Oldingi astatka hisoblari")).toBeTruthy();
     expect(screen.getByRole("button", { name: /OSTATKA-05\.08/ })).toBeTruthy();
+  });
+
+  it("offers delete only to an admin who may delete flights", async () => {
+    dashboard.mockResolvedValue({
+      items: [flight("OSTATKA.202", true)],
+      total: 1,
+      page: 1,
+      per_page: 100,
+      total_pages: 1,
+    });
+    signedInAs(["flights:read", "flights:update"]);
+    const { unmount } = renderPage();
+    expect(await screen.findByText("OSTATKA.202")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Astatkani o‘chirish" })).toBeNull();
+    unmount();
+
+    signedInAs(["flights:delete"]);
+    renderPage();
+    expect(await screen.findByRole("button", { name: "Astatkani o‘chirish" })).toBeTruthy();
+  });
+
+  it("deletes an astatka only after its name is typed again", async () => {
+    dashboard.mockResolvedValue({
+      items: [flight("OSTATKA.202", true)],
+      total: 1,
+      page: 1,
+      per_page: 100,
+      total_pages: 1,
+    });
+    astatkaStats.mockResolvedValue([
+      {
+        astatka_flight_name: "OSTATKA.202",
+        expected: 4,
+        confirmed: 9,
+        expected_weight_kg: 12.5,
+        confirmed_weight_kg: 30,
+        source_flights: ["M210"],
+        last_confirmed_at: null,
+        sent: 3,
+      },
+    ]);
+    deleteAstatka.mockResolvedValue({
+      flight_name: "OSTATKA.202",
+      deleted_packages: 13,
+      confirmed: 9,
+      sent: 3,
+    });
+    signedInAs([], true);
+    renderPage();
+
+    await screen.findByText(/9 ta tasdiqlandi/);
+    fireEvent.click(screen.getByRole("button", { name: "Astatkani o‘chirish" }));
+    const dialog = await screen.findByRole("dialog", { name: "Astatkani o'chirish" });
+    expect(dialog.textContent).toContain("3 ta yuk haqida mijozlarga xabar yuborilgan");
+
+    const submit = screen.getByRole("button", { name: "O'chirish" }) as HTMLButtonElement;
+    const field = screen.getByLabelText(/Tasdiqlash uchun astatka nomini yozing/);
+    fireEvent.change(field, { target: { value: "OSTATKA.20" } });
+    expect(submit.disabled).toBe(true);
+
+    // Case and spaces do not matter; the name does.
+    fireEvent.change(field, { target: { value: " ostatka.202 " } });
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+
+    await waitFor(() =>
+      expect(deleteAstatka).toHaveBeenCalledWith("OSTATKA.202", "ostatka.202"),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Astatkani o'chirish" })).toBeNull(),
+    );
   });
 });

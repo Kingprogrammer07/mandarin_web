@@ -431,6 +431,30 @@ export async function deleteAstatkaPackage(
   await apiClient.delete(`${base(flightName)}/packages/${packageId}`);
 }
 
+/** What `DELETE /astatka-flights/{name}` removed. */
+export interface AstatkaDeleteResult {
+  flight_name: string;
+  deleted_packages: number;
+  confirmed: number;
+  sent: number;
+}
+
+/**
+ * Deletes a whole astatka: its bags (any status, sent ones too), the row that
+ * lists it and its board setting. `confirmName` is the name the user typed;
+ * the server refuses when it does not match, so a stale tab cannot delete the
+ * wrong astatka.
+ */
+export async function deleteAstatkaFlight(
+  flightName: string,
+  confirmName: string,
+): Promise<AstatkaDeleteResult> {
+  const { data } = await apiClient.delete<AstatkaDeleteResult>(base(flightName), {
+    params: { confirm: confirmName },
+  });
+  return data;
+}
+
 export async function downloadAstatkaExcel(
   flightName: string,
   status?: AstatkaPackageStatus,
