@@ -256,10 +256,17 @@ describe("BagSheet — the astatka's own photos", () => {
       await within(own).findByText(/Hali rasm olinmagan/),
     ).toBeInTheDocument();
     fireEvent.click(within(own).getByRole("button", { name: "Rasm olish" }));
-    const picker = own.querySelector<HTMLInputElement>('input[type="file"][multiple]');
+    // The in-app camera opens; jsdom has none, so it offers the gallery.
+    const camera = await screen.findByRole("dialog", { name: "Rasm olish" });
+    expect(
+      await within(camera).findByRole("button", { name: /Galereyadan tanlash/ }),
+    ).toBeInTheDocument();
+    const picker = camera.querySelector<HTMLInputElement>('input[type="file"][multiple]');
     expect(picker).not.toBeNull();
     const file = new File(["x"], "new.jpg", { type: "image/jpeg" });
     fireEvent.change(picker!, { target: { files: [file] } });
+    expect(retakeOwnPhotos).not.toHaveBeenCalled();
+    fireEvent.click(within(camera).getByRole("button", { name: "Tayyor" }));
 
     await waitFor(() =>
       expect(retakeOwnPhotos).toHaveBeenCalledWith("OSTATKA.202", 41, [file], undefined),
@@ -290,7 +297,8 @@ describe("BagSheet — the astatka's own photos", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Shu rasmni qayta olish" }),
     );
-    const picker = own.querySelector<HTMLInputElement>(
+    const camera = await screen.findByRole("dialog", { name: "2-rasmni qayta olish" });
+    const picker = camera.querySelector<HTMLInputElement>(
       'input[type="file"]:not([multiple])',
     );
     expect(picker).not.toBeNull();

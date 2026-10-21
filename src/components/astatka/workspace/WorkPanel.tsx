@@ -40,9 +40,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { useBarcodeCamera } from "@/hooks/useBarcodeCamera";
+import type { AstatkaPendingPhotos } from "@/hooks/useAstatkaPendingPhotos";
 import type { AstatkaWorkQueue } from "@/hooks/useAstatkaWorkQueue";
 import { useScanFieldFocusLock } from "@/hooks/useScanFieldFocusLock";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
+import { usePhotoCameraOpen } from "@/lib/photoCameraActivity";
 import {
   WORK_FILTERS,
   canConfirm,
@@ -76,6 +78,7 @@ const HIGHLIGHT_MS = 2500;
 interface Props {
   flightName: string;
   queue: AstatkaWorkQueue;
+  pendingPhotos: AstatkaPendingPhotos;
   autoConfirm: boolean;
   onAutoConfirmChange: (value: boolean) => void;
   previewVisible: boolean;
@@ -115,6 +118,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function WorkPanel({
   flightName,
   queue,
+  pendingPhotos,
   autoConfirm,
   onAutoConfirmChange,
   previewVisible,
@@ -205,9 +209,11 @@ export function WorkPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [scan]);
 
+  // A phone has one back camera: the scanner lets go while a photo is taken.
+  const photoCameraOpen = usePhotoCameraOpen();
   useBarcodeCamera({
     containerId: CAMERA_CONTAINER_ID,
-    active: cameraOn,
+    active: cameraOn && !photoCameraOpen,
     onCode: (code) => scan(code),
     onError: (message) => {
       toast.error(message);
@@ -638,6 +644,7 @@ export function WorkPanel({
         <WorkRowSheet
           flightName={flightName}
           queue={queue}
+          pendingPhotos={pendingPhotos}
           row={sheetRow ?? sheet.snapshot}
           onScreen={sheetRow !== undefined}
           mode={sheet.mode}

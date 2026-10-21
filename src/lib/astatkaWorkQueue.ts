@@ -493,7 +493,11 @@ function foldIntoSettled(keeper: WorkRow, row: WorkRow): WorkRow {
  * cannot join yet stays on its own, and a later row of the bag may still
  * join it.
  */
-export function mergeSameBag(rows: WorkRow[]): WorkRow[] {
+export function mergeSameBag(
+  rows: WorkRow[],
+  /** Told each row that left the list, and the row it joined. */
+  onFold?: (goneId: string, keptId: string) => void,
+): WorkRow[] {
   const byBag = new Map<string, WorkRow[]>();
   const result: WorkRow[] = [];
   for (const row of [...rows].sort((a, b) => a.firstScanAt.localeCompare(b.firstScanAt))) {
@@ -518,6 +522,7 @@ export function mergeSameBag(rows: WorkRow[]): WorkRow[] {
       continue;
     }
     const merged = way === "into_settled" ? foldIntoSettled(keeper, row) : foldIntoKeeper(keeper, row);
+    onFold?.(row.id, keeper.id);
     byBag.set(
       identity,
       group.map((candidate) => (candidate === keeper ? merged : candidate)),
@@ -609,6 +614,22 @@ export function canRecheck(row: WorkRow): boolean {
   return RECHECKABLE.includes(row.state);
 }
 
+/**
+ * The id of the row's bag saved in THIS astatka, for its own photos; null
+ * for a bag not saved yet, held by another astatka, or a partner cargo's.
+ */
+export function ownPackageId(row: WorkRow, flightName: string): number | null {
+  return row.pkg ? ownPackageIdOf(row.pkg, flightName) : null;
+}
+
+/** {@link ownPackageId} for a bag the server just answered with. */
+export function ownPackageIdOf(pkg: AstatkaPackage, flightName: string): number | null {
+  if (pkg.id == null || isPartnerPackage(pkg) || pkg.already_in_astatka) return null;
+  const sameAstatka =
+    pkg.astatka_flight_name.trim().toUpperCase() === flightName.trim().toUpperCase();
+  return sameAstatka ? pkg.id : null;
+}
+
 /** Can "Tasdiqlash" be pressed on this row? */
 export function canConfirm(row: WorkRow): boolean {
   if (!CONFIRMABLE.includes(row.state)) return false;
@@ -641,12 +662,17 @@ export function buildConfirmItem(row: WorkRow, key: string): AstatkaConfirmItem 
   };
 }
 
-export function applyConfirmResult(row: WorkRow, result: AstatkaConfirmResult): WorkRow {
-  if (
+/** The confirm left the bag saved: newly, or by an earlier press of the same key. */
+export function confirmSaved(result: AstatkaConfirmResult): boolean {
+  return (
     result.outcome === "confirmed" ||
     result.outcome === "duplicate" ||
     result.outcome === "already_confirmed"
-  ) {
+  );
+}
+
+export function applyConfirmResult(row: WorkRow, result: AstatkaConfirmResult): WorkRow {
+  if (confirmSaved(result)) {
     return {
       ...row,
       state: "confirmed",

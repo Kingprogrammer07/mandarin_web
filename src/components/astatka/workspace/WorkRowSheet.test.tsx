@@ -45,6 +45,7 @@ import {
   type AstatkaExternalBag,
   type AstatkaPackage,
 } from "@/api/services/astatkaFlights";
+import type { PendingPhotos } from "@/hooks/useAstatkaPendingPhotos";
 import type { WorkRow, WorkRowState } from "@/lib/astatkaWorkQueue";
 
 import type { BagSheetMode } from "./BagSheet";
@@ -101,11 +102,18 @@ function renderSheet(
   mode: BagSheetMode = "view",
   onScreen = true,
   isOnline = true,
+  waitingPhotos: Map<string, PendingPhotos> = new Map(),
 ) {
   const queue = {
     isOnline,
     replacePackage: vi.fn(),
     updateEdits: vi.fn(),
+  };
+  const pendingPhotos = {
+    entries: waitingPhotos,
+    add: vi.fn(),
+    remove: vi.fn(),
+    retry: vi.fn(),
   };
   const handlers = {
     onModeChange: vi.fn(),
@@ -123,6 +131,7 @@ function renderSheet(
       <WorkRowSheet
         flightName="OSTATKA.202"
         queue={queue}
+        pendingPhotos={pendingPhotos}
         row={current}
         onScreen={visible}
         mode={mode}
@@ -134,7 +143,7 @@ function renderSheet(
   /** The queue changed the row while the window was open. */
   const rerender = (next: WorkRow, visible = true) =>
     view.rerender(sheet(next, visible));
-  return { queue, handlers, item, rerender };
+  return { queue, pendingPhotos, handlers, item, rerender };
 }
 
 function footerButtons(): string[] {
@@ -562,5 +571,54 @@ describe("WorkRowSheet — a code a partner cargo may own", () => {
     expect(
       screen.getByText(/boshqa kargoniki bo'lishi mumkin/),
     ).toBeInTheDocument();
+  });
+});
+
+describe("WorkRowSheet — photos before the bag is saved here", () => {
+  /** A bag the photo report knows, not saved in this astatka yet. */
+  const unsaved = (): WorkRow => ({ ...row("ready"), pkg: { ...pkg, id: null } });
+  const photo = new File(["x"], "bag.jpg", { type: "image/jpeg" });
+
+  it("takes photos in the app's camera and keeps them for the confirm", async () => {
+    const { pendingPhotos } = renderSheet(unsaved());
+
+    const section = screen.getByRole("region", { name: "Astatka rasmlari" });
+    expect(within(section).getByText("Hali rasm olinmagan.")).toBeInTheDocument();
+    fireEvent.click(within(section).getByRole("button", { name: "Rasm olish" }));
+
+    const camera = await screen.findByRole("dialog", { name: "Rasm olish" });
+    await within(camera).findByRole("button", { name: /Galereyadan tanlash/ });
+    const picker = camera.querySelector<HTMLInputElement>('input[type="file"][multiple]');
+    fireEvent.change(picker!, { target: { files: [photo] } });
+    fireEvent.click(within(camera).getByRole("button", { name: "Tayyor" }));
+
+    expect(pendingPhotos.add).toHaveBeenCalledWith("r1", [photo], null);
+  });
+
+  it("shows the waiting photos and takes one off", () => {
+    const waiting = new Map<string, PendingPhotos>([
+      ["r1", { files: [photo], status: "waiting", error: null, packageId: null }],
+    ]);
+    const { pendingPhotos } = renderSheet(unsaved(), "view", true, true, waiting);
+
+    expect(screen.getByAltText("1-rasm")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "1-rasmni o'chirish" }));
+    expect(pendingPhotos.remove).toHaveBeenCalledWith("r1", 0);
+  });
+
+  it("offers to send again photos that did not reach the confirmed bag", () => {
+    const failed = new Map<string, PendingPhotos>([
+      ["r1", { files: [photo], status: "failed", error: "Internet yo'q", packageId: 7 }],
+    ]);
+    const { pendingPhotos } = renderSheet("confirmed", "view", true, true, failed);
+
+    expect(screen.getByText("Internet yo'q")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Qayta yuborish" }));
+    expect(pendingPhotos.retry).toHaveBeenCalledWith("r1");
+  });
+
+  it("offers no waiting photos for a bag already saved here", () => {
+    renderSheet("ready");
+    expect(screen.queryByText(/Yuk tasdiqlanganda shu yukka saqlanadi/)).toBeNull();
   });
 });

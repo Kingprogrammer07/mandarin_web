@@ -47,6 +47,8 @@ interface Props {
    * which would read an unrelated client of ours with the same code.
    */
   partner?: ExternalBagCardProps;
+  /** Photos waiting for the bag to be saved here, shown above the photo report. */
+  pendingPhotos?: ReactNode;
   /** The photo report needs the network. */
   isOnline: boolean;
   mode: BagSheetMode;
@@ -77,6 +79,7 @@ export function BagSheet({
   summary,
   bag,
   partner,
+  pendingPhotos,
   isOnline,
   mode,
   onModeChange,
@@ -167,6 +170,7 @@ export function BagSheet({
                 onPackageChanged={onPackageChanged}
               />
             )}
+            {pendingPhotos}
             <BagPhotoReport
               flightName={flightName}
               bag={bag}

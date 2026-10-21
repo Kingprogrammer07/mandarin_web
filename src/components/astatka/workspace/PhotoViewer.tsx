@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   motion,
@@ -10,6 +9,7 @@ import {
 import { Camera, ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 
 import type { AstatkaCargoPhoto } from "@/api/services/astatkaFlights";
+import { useTelegramVerticalSwipesOff } from "@/hooks/useTelegramVerticalSwipesOff";
 import { shouldDismissVerticalSwipe } from "@/lib/swipeGesture";
 import { cn } from "@/lib/utils";
 
@@ -42,24 +42,6 @@ const FADE_DISTANCE_PX = 260;
 // would be dead patches where a swipe does nothing.
 const navButton =
   "absolute top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-mc-border bg-mc-surface/85 text-mc-text active:scale-95 aria-disabled:opacity-40 pointer-coarse:sr-only";
-
-/**
- * Telegram minimises the whole Mini App on a downward swipe. While a photo is
- * open that gesture closes the photo, so Telegram's is switched off and put
- * back as it was.
- */
-function useTelegramVerticalSwipesOff() {
-  useEffect(() => {
-    const webApp = window.Telegram?.WebApp;
-    // Older clients only print an "unsupported" warning.
-    if (!webApp?.disableVerticalSwipes || webApp.isVersionAtLeast?.("7.7") !== true) return;
-    const wasEnabled = webApp.isVerticalSwipesEnabled !== false;
-    webApp.disableVerticalSwipes();
-    return () => {
-      if (wasEnabled) webApp.enableVerticalSwipes?.();
-    };
-  }, []);
-}
 
 /**
  * Full-size photos over the bag window, like the phone's own gallery: swipe

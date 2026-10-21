@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   AstatkaExternalBag,
@@ -112,10 +112,13 @@ describe("one row per bag", () => {
     rows = registerScan(rows, "YT002", T1, "b").rows;
     const answer = { ...resolveFromIndex({ packages: [pkg()] }, "YT001")! };
     rows = rows.map((row) => applyScanResult(row, answer, false));
-    const merged = mergeSameBag(rows);
+    const onFold = vi.fn();
+    const merged = mergeSameBag(rows, onFold);
     expect(merged).toHaveLength(1);
     expect(merged[0].scannedCodes.sort()).toEqual(["YT001", "YT002"]);
     expect(merged[0].id).toBe("a");
+    // Whatever was kept for the folded row (its photos) follows it.
+    expect(onFold).toHaveBeenCalledWith("b", "a");
   });
 
   it("never folds away a confirm that still has to reach the server", () => {

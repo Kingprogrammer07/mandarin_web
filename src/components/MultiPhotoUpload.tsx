@@ -12,104 +12,24 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * Maximum output canvas width — caps the captured image to 1280px
- * to reduce RAM pressure in Telegram WebView.
- */
-const MAX_CANVAS_WIDTH = 1280;
-
-/** Ideal getUserMedia resolution (720p, optimized for Telegram) */
-const IDEAL_WIDTH = 1280;
-const IDEAL_HEIGHT = 720;
-
-/** JPEG blob quality */
-const JPEG_QUALITY = 0.7;
+import {
+  IDEAL_HEIGHT,
+  IDEAL_WIDTH,
+  JPEG_QUALITY,
+  MAX_CANVAS_WIDTH,
+  canAttemptTorch,
+  clampZoom,
+  formatZoomValue,
+  normalizeZoomCapability,
+  type CameraConstraintSet,
+  type CameraMediaTrackConstraints,
+  type CameraTrackCapabilities,
+  type CameraTrackSettings,
+  type CameraZoomCapability,
+} from '@/lib/camera';
 
 /** Hardware sync delay before requesting a new stream (ms) */
 const HARDWARE_SYNC_DELAY = 100;
-
-const DEFAULT_ZOOM_STEP = 0.1;
-
-interface CameraNumericCapability {
-  min?: number;
-  max?: number;
-  step?: number;
-}
-
-interface CameraZoomCapability {
-  min: number;
-  max: number;
-  step: number;
-}
-
-type CameraSupportedConstraints = MediaTrackSupportedConstraints & {
-  torch?: boolean;
-};
-
-type CameraTrackCapabilities = Omit<MediaTrackCapabilities, 'torch' | 'zoom'> & {
-  torch?: boolean | boolean[];
-  zoom?: CameraNumericCapability;
-};
-
-type CameraTrackSettings = Omit<MediaTrackSettings, 'torch' | 'zoom'> & {
-  torch?: boolean;
-  zoom?: number;
-};
-
-type CameraConstraintSet = MediaTrackConstraintSet & {
-  torch?: boolean;
-  zoom?: number;
-};
-
-type CameraMediaTrackConstraints = MediaTrackConstraints & {
-  torch?: boolean;
-  zoom?: number;
-  advanced?: CameraConstraintSet[];
-};
-
-const normalizeZoomCapability = (
-  range: CameraNumericCapability | undefined
-): CameraZoomCapability | null => {
-  if (!range) return null;
-
-  const min = typeof range.min === 'number' && Number.isFinite(range.min) ? range.min : 1;
-  const max = typeof range.max === 'number' && Number.isFinite(range.max) ? range.max : min;
-
-  if (max <= min) return null;
-
-  const step =
-    typeof range.step === 'number' && Number.isFinite(range.step) && range.step > 0
-      ? range.step
-      : DEFAULT_ZOOM_STEP;
-
-  return { min, max, step };
-};
-
-const clampZoom = (value: number, range: CameraZoomCapability): number => {
-  return Math.min(range.max, Math.max(range.min, value));
-};
-
-const formatZoomValue = (value: number): string => {
-  return Number.isInteger(value) ? value.toString() : value.toFixed(1);
-};
-
-const isTorchCapabilityEnabled = (capabilities: CameraTrackCapabilities): boolean => {
-  const torch = capabilities.torch;
-  if (Array.isArray(torch)) return torch.includes(true);
-  return torch === true;
-};
-
-const canAttemptTorch = (capabilities: CameraTrackCapabilities): boolean => {
-  if (isTorchCapabilityEnabled(capabilities)) return true;
-  if (capabilities.torch === false) return false;
-
-  const supportedConstraints =
-    typeof navigator !== 'undefined' && navigator.mediaDevices?.getSupportedConstraints
-      ? (navigator.mediaDevices.getSupportedConstraints() as CameraSupportedConstraints)
-      : null;
-
-  return supportedConstraints?.torch === true;
-};
 
 // ─── Public API exposed via ref ───────────────────────────────────────
 export interface MultiPhotoUploadHandle {

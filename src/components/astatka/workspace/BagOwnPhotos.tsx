@@ -1,6 +1,6 @@
-import { useId, useRef, type ChangeEvent, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, Images, Loader2, RefreshCw, WifiOff } from "lucide-react";
+import { Camera, ImagePlus, Loader2, RefreshCw, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -12,12 +12,14 @@ import {
   replaceAstatkaPackagePhotos,
   type AstatkaPackage,
 } from "@/api/services/astatkaFlights";
+import { MAX_OWN_PHOTOS as MAX_PHOTOS } from "@/lib/astatkaPendingPhotos";
 import { apiErrorMessage } from "@/utils/apiError";
 
+import { CameraCapture } from "./CameraCapture";
 import { PhotoCarousel } from "./PhotoCarousel";
 
-/** Same ceiling the server enforces. */
-const MAX_PHOTOS = 10;
+/** What the open camera is for: every photo anew, or one at `replaceIndex`. */
+type CameraJob = { kind: "all" } | { kind: "one"; replaceIndex: number };
 
 interface Props {
   flightName: string;
@@ -55,10 +57,7 @@ export function BagOwnPhotos({
 }: Props) {
   const queryClient = useQueryClient();
   const headingId = useId();
-  const allPhotosRef = useRef<HTMLInputElement>(null);
-  const onePhotoRef = useRef<HTMLInputElement>(null);
-  /** Which photo the single-file picker replaces; the count means "add". */
-  const replaceIndexRef = useRef(0);
+  const [camera, setCamera] = useState<CameraJob | null>(null);
 
   const queryKey = astatkaPackagePhotosQueryKey(packageId);
   const queryFn = () => getAstatkaPackagePhotos(flightName, packageId);
@@ -97,27 +96,15 @@ export function BagOwnPhotos({
       toast.error(apiErrorMessage(error, "Rasmni saqlab bo'lmadi.")),
   });
 
-  const pickAll = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = "";
+  const taken = (job: CameraJob, files: File[]) => {
+    setCamera(null);
     if (files.length === 0) return;
-    if (files.length > MAX_PHOTOS) {
-      toast.error(`Ko'pi bilan ${MAX_PHOTOS} ta rasm tanlang.`);
-      return;
-    }
-    save.mutate({ files });
+    if (job.kind === "all") save.mutate({ files: files.slice(0, MAX_PHOTOS) });
+    else save.mutate({ files: files.slice(0, 1), replaceIndex: job.replaceIndex });
   };
 
-  const pickOne = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (file) save.mutate({ files: [file], replaceIndex: replaceIndexRef.current });
-  };
-
-  const replaceOne = (index: number) => {
-    replaceIndexRef.current = index;
-    onePhotoRef.current?.click();
-  };
+  /** `index` equal to the photo count adds a photo at the end. */
+  const replaceOne = (index: number) => setCamera({ kind: "one", replaceIndex: index });
 
   let body: ReactNode;
   if (!isOnline) {
@@ -170,14 +157,14 @@ export function BagOwnPhotos({
         <div className="grid grid-cols-1 gap-2 @md:grid-cols-2">
           <button
             type="button"
-            onClick={() => allPhotosRef.current?.click()}
+            onClick={() => setCamera({ kind: "all" })}
             disabled={save.isPending}
             className={outlineButton}
           >
             {save.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Images className="h-4 w-4" />
+              <Camera className="h-4 w-4" />
             )}
             {count === 0 ? "Rasm olish" : "Rasmlarni qayta olish"}
           </button>
@@ -188,28 +175,44 @@ export function BagOwnPhotos({
               disabled={save.isPending}
               className={outlineButton}
             >
-              <Camera className="h-4 w-4" />
+              <ImagePlus className="h-4 w-4" />
               Yana rasm qo'shish
             </button>
           )}
         </div>
-        {/* No `capture`: a phone then offers both the camera and the gallery. */}
-        <input
-          ref={allPhotosRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={pickAll}
-        />
-        <input
-          ref={onePhotoRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={pickOne}
-        />
       </div>
+    );
+  }
+
+  let cameraWindow: ReactNode = null;
+  if (camera?.kind === "all") {
+    cameraWindow = (
+      <CameraCapture
+        mode="many"
+        max={MAX_PHOTOS}
+        title={count === 0 ? "Rasm olish" : "Rasmlarni qayta olish"}
+        note={
+          count > 0
+            ? `«Tayyor» bosilganda eski ${count} ta rasm o'rniga shular saqlanadi.`
+            : undefined
+        }
+        onDone={(files) => taken(camera, files)}
+        onClose={() => setCamera(null)}
+      />
+    );
+  } else if (camera?.kind === "one") {
+    cameraWindow = (
+      <CameraCapture
+        mode="one"
+        max={1}
+        title={
+          camera.replaceIndex >= count
+            ? "Yana rasm qo'shish"
+            : `${camera.replaceIndex + 1}-rasmni qayta olish`
+        }
+        onDone={(files) => taken(camera, files)}
+        onClose={() => setCamera(null)}
+      />
     );
   }
 
@@ -225,6 +228,7 @@ export function BagOwnPhotos({
         </p>
       </div>
       {body}
+      {cameraWindow}
     </section>
   );
 }

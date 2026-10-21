@@ -17,6 +17,7 @@ import {
   WorkspaceHeader,
   type WorkspaceCounts,
 } from "@/components/astatka/workspace/WorkspaceHeader";
+import { useAstatkaPendingPhotos } from "@/hooks/useAstatkaPendingPhotos";
 import { useAstatkaWorkQueue } from "@/hooks/useAstatkaWorkQueue";
 import { useStoredFlag } from "@/hooks/useStoredFlag";
 import { totalsOf } from "@/lib/astatkaPackages";
@@ -59,10 +60,13 @@ export function AstatkaWorkspacePage({ flightName, onBack, onSend }: Props) {
     void queryClient.invalidateQueries({ queryKey: astatkaExternalPhotosRootKey });
   }, [queryClient, flightName]);
 
+  const pendingPhotos = useAstatkaPendingPhotos(flightName);
   const queue = useAstatkaWorkQueue({
     flightName,
     autoConfirm,
     onPackagesChanged: refreshSaved,
+    onConfirmed: pendingPhotos.saveFor,
+    onRowsMerged: pendingPhotos.moveRow,
   });
 
   const statsQuery = useQuery({
@@ -159,6 +163,7 @@ export function AstatkaWorkspacePage({ flightName, onBack, onSend }: Props) {
               <WorkPanel
                 flightName={flightName}
                 queue={queue}
+                pendingPhotos={pendingPhotos}
                 autoConfirm={autoConfirm}
                 onAutoConfirmChange={setAutoConfirm}
                 previewVisible={previewVisible}

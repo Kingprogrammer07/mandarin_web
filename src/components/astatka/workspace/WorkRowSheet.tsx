@@ -6,12 +6,14 @@ import {
   updateAstatkaPackage,
   type AstatkaBagRef,
 } from "@/api/services/astatkaFlights";
+import type { AstatkaPendingPhotos } from "@/hooks/useAstatkaPendingPhotos";
 import type { AstatkaWorkQueue } from "@/hooks/useAstatkaWorkQueue";
 import { summaryFromRow } from "@/lib/astatkaBagSummary";
 import { isPartnerPackage } from "@/lib/astatkaSource";
 import {
   canConfirm,
   canRecheck,
+  ownPackageId,
   rowCodes,
   rowView,
   type WorkRow,
@@ -21,6 +23,7 @@ import { apiErrorMessage } from "@/utils/apiError";
 
 import { BagSheet, type BagSheetMode } from "./BagSheet";
 import type { BagEditChanges } from "./BagEditForm";
+import { BagPendingPhotos } from "./BagPendingPhotos";
 import type { ExternalBagCardProps } from "./ExternalBagCard";
 import { SheetActions, type SheetAction } from "./SheetActions";
 import { packageUpdateOf } from "./useSavedBagActions";
@@ -29,6 +32,8 @@ interface Props {
   flightName: string;
   /** Only what the window does to the queue: edits, a saved bag's new facts, the weight. */
   queue: Pick<AstatkaWorkQueue, "isOnline" | "replacePackage" | "updateEdits">;
+  /** Photos taken before the row's bag is saved here; they go to it on confirm. */
+  pendingPhotos: Pick<AstatkaPendingPhotos, "entries" | "add" | "remove" | "retry">;
   /** The row as it is now, or as it was when it left the screen. */
   row: WorkRow;
   /** False once the row is gone from the screen: shown, but not acted on. */
@@ -49,13 +54,9 @@ interface Props {
  * of ours with the same code.
  */
 function bagRefOf(row: WorkRow, flightName: string): AstatkaBagRef | null {
-  const pkg = row.pkg;
-  if (isPartnerPackage(pkg)) return null;
-  const sameAstatka =
-    pkg?.astatka_flight_name.trim().toUpperCase() ===
-    flightName.trim().toUpperCase();
-  if (pkg?.id != null && sameAstatka && !pkg.already_in_astatka)
-    return { packageId: pkg.id };
+  if (isPartnerPackage(row.pkg)) return null;
+  const packageId = ownPackageId(row, flightName);
+  if (packageId !== null) return { packageId };
   const view = rowView(row);
   if (!view.clientCode) return null;
   return { clientCode: view.clientCode, sourceFlight: view.sourceFlight };
@@ -92,6 +93,7 @@ function waitReason(row: WorkRow): string | undefined {
 export function WorkRowSheet({
   flightName,
   queue,
+  pendingPhotos,
   row,
   onScreen,
   mode,
@@ -102,6 +104,7 @@ export function WorkRowSheet({
   onRecheck,
 }: Props) {
   const [savingEdit, setSavingEdit] = useState(false);
+  const [pendingCameraOpen, setPendingCameraOpen] = useState(false);
   const view = rowView(row);
   // Same rule as the row: a saving or queued row holds work the server has
   // not seen yet, so it is neither edited nor taken off the screen.
@@ -127,6 +130,27 @@ export function WorkRowSheet({
             : undefined,
       }
     : undefined;
+
+  // A bag already saved here takes photos straight onto itself (BagOwnPhotos);
+  // one that will be saved by "Tasdiqlash" keeps them until then. A partner's
+  // bag, or a code a partner may own, has no photos of ours.
+  const savedHere = ownPackageId(row, flightName);
+  const pendingEntry = pendingPhotos.entries.get(row.id);
+  const awaitingConfirm = canConfirm(row) || row.state === "queued" || row.state === "saving";
+  const canHoldPhotos =
+    onScreen && !partner && !row.partnerState && savedHere === null && awaitingConfirm;
+  const pendingSection =
+    canHoldPhotos || pendingEntry || pendingCameraOpen ? (
+      <BagPendingPhotos
+        entry={pendingEntry}
+        canAdd={canHoldPhotos}
+        onAdd={(files) => pendingPhotos.add(row.id, files, savedHere)}
+        onRemove={(index) => pendingPhotos.remove(row.id, index)}
+        onRetry={() => pendingPhotos.retry(row.id)}
+        cameraOpen={pendingCameraOpen}
+        onCameraOpenChange={setPendingCameraOpen}
+      />
+    ) : undefined;
 
   // After "Saqlash" the window stays open on the bag as saved.
   const saveEdit = async (changes: BagEditChanges) => {
@@ -202,6 +226,7 @@ export function WorkRowSheet({
       summary={summaryFromRow(row)}
       bag={bagRefOf(row, flightName)}
       partner={partnerCard}
+      pendingPhotos={pendingSection}
       isOnline={queue.isOnline}
       mode={mode}
       onModeChange={onModeChange}

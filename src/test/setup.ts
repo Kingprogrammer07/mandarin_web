@@ -21,3 +21,10 @@ Object.defineProperty(window, "Telegram", {
     },
   },
 })
+
+// jsdom has no object URLs; photo previews only need a unique string back.
+if (typeof URL.createObjectURL !== "function") {
+  let next = 0
+  URL.createObjectURL = () => `blob:test/${(next += 1)}`
+  URL.revokeObjectURL = () => {}
+}

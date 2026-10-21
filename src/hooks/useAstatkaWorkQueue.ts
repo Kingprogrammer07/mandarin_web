@@ -16,6 +16,7 @@ import {
   buildConfirmItem,
   canConfirm,
   canRecheck,
+  confirmSaved,
   markWaitingForNetwork,
   addsToConfirmedBag,
   inPressOrder,
@@ -75,13 +76,23 @@ interface Options {
   autoConfirm: boolean;
   /** Saved packages changed on the server: refresh the preview. */
   onPackagesChanged: () => void;
+  /** A confirm saved the row's bag — newly, or as a repeat of an earlier press. */
+  onConfirmed?: (rowId: string, pkg: AstatkaPackage) => void;
+  /** Two rows turned out to be one bag: `goneId` left the list, joined into `keptId`. */
+  onRowsMerged?: (goneId: string, keptId: string) => void;
 }
 
 /**
  * The astatka work mode's brain: scanning, the offline list, confirming and
  * the queue that survives reloads. The screen only renders what this returns.
  */
-export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged }: Options) {
+export function useAstatkaWorkQueue({
+  flightName,
+  autoConfirm,
+  onPackagesChanged,
+  onConfirmed,
+  onRowsMerged,
+}: Options) {
   const [rows, setRowsState] = useState<WorkRow[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [index, setIndex] = useState<AstatkaIndexResponse | null>(null);
@@ -100,6 +111,8 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
   const onlineRef = useRef(isOnline);
   const autoConfirmRef = useRef(autoConfirm);
   const changedRef = useRef(onPackagesChanged);
+  const confirmedRef = useRef(onConfirmed);
+  const mergedRef = useRef(onRowsMerged);
   /** Set while an import runs: two hundred beeps help nobody. */
   const quietRef = useRef(false);
 
@@ -107,7 +120,14 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
     onlineRef.current = isOnline;
     autoConfirmRef.current = autoConfirm;
     changedRef.current = onPackagesChanged;
-  }, [isOnline, autoConfirm, onPackagesChanged]);
+    confirmedRef.current = onConfirmed;
+    mergedRef.current = onRowsMerged;
+  }, [isOnline, autoConfirm, onPackagesChanged, onConfirmed, onRowsMerged]);
+
+  const reportFold = useCallback(
+    (goneId: string, keptId: string) => mergedRef.current?.(goneId, keptId),
+    [],
+  );
 
   const setRows = useCallback((update: (current: WorkRow[]) => WorkRow[]) => {
     const next = update(rowsRef.current);
@@ -252,6 +272,7 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
             if (!result) continue;
             patchRow(row.id, (current) => applyConfirmResult(current, result));
             if (result.package) saved.push(result.package);
+            if (result.package && confirmSaved(result)) confirmedRef.current?.(row.id, result.package);
             if (result.outcome === "conflict" || result.outcome === "error") failed += 1;
             else confirmed += 1;
             for (const warning of result.warnings) toast.warning(warning);
@@ -331,6 +352,7 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
       setRows((current) =>
         mergeSameBag(
           current.map((row) => (row.id === rowId ? applyScanResult(row, result, fromIndex) : row)),
+          reportFold,
         ),
       );
       const row = rowsRef.current.find((item) => item.id === rowId);
@@ -353,7 +375,7 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
         void confirmRows([row.id]);
       }
     },
-    [confirmRows, setRows],
+    [confirmRows, reportFold, setRows],
   );
 
   const resolveRow = useCallback(
@@ -592,10 +614,10 @@ export function useAstatkaWorkQueue({ flightName, autoConfirm, onPackagesChanged
     (backup: QueueBackup) => {
       const present = new Set(rowsRef.current.map((row) => row.id));
       const missing = backup.rows.filter((row) => !present.has(row.id));
-      setRows((current) => mergeSameBag([...current, ...missing]));
+      setRows((current) => mergeSameBag([...current, ...missing], reportFold));
       return missing.length;
     },
-    [setRows],
+    [reportFold, setRows],
   );
 
   const confirmableIds = useMemo(

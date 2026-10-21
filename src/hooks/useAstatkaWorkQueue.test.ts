@@ -32,6 +32,7 @@ import {
   getAstatkaIndex,
   scanAstatkaTrackCode,
   type AstatkaExternalBag,
+  type AstatkaPackage,
   type AstatkaScanResult,
 } from "@/api/services/astatkaFlights";
 import type { WorkRow, WorkRowState } from "@/lib/astatkaWorkQueue";
@@ -108,10 +109,19 @@ function storedRow(state: WorkRowState): WorkRow {
   };
 }
 
-async function renderQueue(rows: WorkRow[], autoConfirm = false) {
+async function renderQueue(
+  rows: WorkRow[],
+  autoConfirm = false,
+  onConfirmed?: (rowId: string, pkg: AstatkaPackage) => void,
+) {
   vi.mocked(astatkaWorkspaceDb.loadQueue).mockResolvedValue(rows);
   const hook = renderHook(() =>
-    useAstatkaWorkQueue({ flightName: "OSTATKA.202", autoConfirm, onPackagesChanged: vi.fn() }),
+    useAstatkaWorkQueue({
+      flightName: "OSTATKA.202",
+      autoConfirm,
+      onPackagesChanged: vi.fn(),
+      onConfirmed,
+    }),
   );
   await waitFor(() => expect(hook.result.current.hydrated).toBe(true));
   return hook;
@@ -275,5 +285,40 @@ describe("useAstatkaWorkQueue — scanning while queued confirms go out", () => 
     expect(scan).toHaveBeenCalledTimes(1);
     const row = result.current.rows.find((r) => r.trackCode === "AK777")!;
     expect(row.state).toBe("ready");
+  });
+});
+
+describe("useAstatkaWorkQueue — onConfirmed", () => {
+  const ours: AstatkaPackage = {
+    ...partnerAnswer.package!,
+    id: 55,
+    source_company: undefined,
+    source_company_name: null,
+    external: null,
+    status: "confirmed",
+  };
+
+  it.each([
+    ["confirmed", true],
+    ["already_confirmed", true],
+    ["conflict", false],
+  ] as const)("reports a %s answer: %s", async (outcome, reported) => {
+    vi.mocked(confirmAstatkaPackages).mockImplementation(async (_flight, items) =>
+      items.map((item) => ({
+        idempotency_key: item.idempotency_key,
+        outcome,
+        package: ours,
+        message: "",
+        warnings: [],
+      })),
+    );
+    const onConfirmed = vi.fn();
+    const ready: WorkRow = { ...storedRow("ready"), edits: { clientCode: "SS9" } };
+    const { result } = await renderQueue([ready], false, onConfirmed);
+
+    await act(() => result.current.confirmRows(["r1"]));
+
+    if (reported) expect(onConfirmed).toHaveBeenCalledWith("r1", ours);
+    else expect(onConfirmed).not.toHaveBeenCalled();
   });
 });
