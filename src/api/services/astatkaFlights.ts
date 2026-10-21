@@ -23,6 +23,7 @@ export type AstatkaConfirmOutcome =
   | "error";
 export type AstatkaPackageSort =
   | "recent"
+  | "scanned"
   | "client_asc"
   | "client_desc"
   | "weight_desc"

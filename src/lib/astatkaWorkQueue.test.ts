@@ -14,6 +14,7 @@ import {
   canRecheck,
   countByFilter,
   inPressOrder,
+  inScanOrder,
   markWaitingForNetwork,
   mergeSameBag,
   normaliseTrackCode,
@@ -307,6 +308,17 @@ describe("one row per bag", () => {
     // An older build left no press time: the scan time stands in for it.
     const rows = [row("late", T0, T2), row("legacy", T1), row("early", T2, T0)];
     expect(inPressOrder(rows).map((r) => r.id)).toEqual(["early", "legacy", "late"]);
+  });
+
+  it("sends rows pressed together in the order they were scanned", () => {
+    const row = (id: string, firstScanAt: string, pressedAt?: string): WorkRow => ({
+      ...registerScan([], id, firstScanAt, id).row,
+      pressedAt,
+    });
+    // The scan list shows the newest scan on top; the server must get the first one first.
+    const together = [row("third", T2, T2), row("second", T1, T2), row("first", T0, T2)];
+    expect(inPressOrder(together).map((r) => r.id)).toEqual(["first", "second", "third"]);
+    expect(inScanOrder(together).map((r) => r.id)).toEqual(["first", "second", "third"]);
   });
 
   it("adds a code scanned after the codes were fixed by hand to the fixed list", () => {

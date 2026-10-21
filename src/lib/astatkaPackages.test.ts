@@ -83,6 +83,19 @@ describe("totalsOf", () => {
   });
 });
 
+describe("filterPackages in scan order", () => {
+  it("puts the first scanned bag first and bags not scanned yet last", () => {
+    const shelf = [
+      pkg({ id: 1, status: "confirmed", scanned_at: "2026-10-21T10:05:00Z", confirmed_at: "2026-10-21T10:06:00Z" }),
+      pkg({ id: 2 }),
+      pkg({ id: 3, status: "confirmed", scanned_at: "2026-10-21T10:00:00Z", confirmed_at: "2026-10-21T11:00:00Z" }),
+      // Confirmed without a scan time: its confirm time stands in.
+      pkg({ id: 4, status: "confirmed", confirmed_at: "2026-10-21T10:02:00Z" }),
+    ];
+    expect(filterPackages(shelf, { sort: "scanned" }).map((p) => p.id)).toEqual([3, 4, 1, 2]);
+  });
+});
+
 describe("filterPackages by cargo", () => {
   const mixed = [
     pkg({ id: 1, client_code: "ZZ17", source_flight_name: "M200" }),

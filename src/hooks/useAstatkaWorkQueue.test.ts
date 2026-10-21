@@ -322,3 +322,26 @@ describe("useAstatkaWorkQueue — onConfirmed", () => {
     else expect(onConfirmed).not.toHaveBeenCalled();
   });
 });
+
+describe("useAstatkaWorkQueue — Hammasini tasdiqlash", () => {
+  it("sends the bags in the order they were scanned, first scan first", async () => {
+    vi.mocked(confirmAstatkaPackages).mockResolvedValue([]);
+    const scannedAt = (minute: number) => `2026-10-21T10:0${minute}:00Z`;
+    const ready = (id: string, minute: number): WorkRow => ({
+      ...storedRow("ready"),
+      id,
+      trackCode: id,
+      scannedCodes: [id],
+      firstScanAt: scannedAt(minute),
+      lastScanAt: scannedAt(minute),
+      edits: { clientCode: `SS${id}` },
+    });
+    // The scan list holds the newest scan on top.
+    const { result } = await renderQueue([ready("C", 3), ready("B", 2), ready("A", 1)]);
+
+    await act(() => result.current.confirmRows(result.current.confirmableIds));
+
+    const [, items] = vi.mocked(confirmAstatkaPackages).mock.calls[0];
+    expect(items.map((item) => item.track_code)).toEqual(["A", "B", "C"]);
+  });
+});

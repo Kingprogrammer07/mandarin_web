@@ -28,6 +28,13 @@ function activityTime(pkg: AstatkaPackage): number {
   return Number.isNaN(time) ? 0 : time;
 }
 
+/** When the bag was scanned on the device; a bag confirmed without one, when it was confirmed. */
+function scanTime(pkg: AstatkaPackage): number | null {
+  const iso = pkg.scanned_at ?? pkg.confirmed_at;
+  const time = iso ? Date.parse(iso) : Number.NaN;
+  return Number.isNaN(time) ? null : time;
+}
+
 const compareText = (left: string, right: string) =>
   left < right ? -1 : left > right ? 1 : 0;
 
@@ -37,6 +44,15 @@ const compareText = (left: string, right: string) =>
  */
 const COMPARATORS: Record<AstatkaPackageSort, (a: AstatkaPackage, b: AstatkaPackage) => number> = {
   recent: (a, b) => activityTime(b) - activityTime(a) || (b.id ?? 0) - (a.id ?? 0),
+  scanned: (a, b) => {
+    const [left, right] = [scanTime(a), scanTime(b)];
+    if (left !== right) {
+      if (left === null) return 1;
+      if (right === null) return -1;
+      return left - right;
+    }
+    return (a.id ?? 0) - (b.id ?? 0);
+  },
   client_asc: (a, b) => compareText(a.client_code, b.client_code) || (a.id ?? 0) - (b.id ?? 0),
   client_desc: (a, b) => compareText(b.client_code, a.client_code) || (b.id ?? 0) - (a.id ?? 0),
   weight_desc: (a, b) => {

@@ -20,6 +20,7 @@ import {
   markWaitingForNetwork,
   addsToConfirmedBag,
   inPressOrder,
+  inScanOrder,
   mergeSameBag,
   normaliseTrackCode,
   registerScan,
@@ -315,9 +316,9 @@ export function useAstatkaWorkQueue({
     async (ids: string[]) => {
       const wanted = new Set(ids);
       const pressedAt = new Date().toISOString();
-      const targets = rowsRef.current
-        .filter((row) => wanted.has(row.id) && canConfirm(row))
-        .map((row) => ({ ...row, confirmKey: row.confirmKey ?? makeId(), pressedAt }));
+      const targets = inScanOrder(
+        rowsRef.current.filter((row) => wanted.has(row.id) && canConfirm(row)),
+      ).map((row) => ({ ...row, confirmKey: row.confirmKey ?? makeId(), pressedAt }));
       if (targets.length === 0) return;
       const online = onlineRef.current;
       const keyed = new Map(targets.map((row) => [row.id, row]));

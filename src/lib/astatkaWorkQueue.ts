@@ -540,7 +540,18 @@ export function mergeSameBag(
  */
 export function inPressOrder(rows: WorkRow[]): WorkRow[] {
   const pressed = (row: WorkRow) => row.pressedAt ?? row.firstScanAt;
-  return [...rows].sort((a, b) => pressed(a).localeCompare(pressed(b)));
+  // Rows pressed together ("Hammasini tasdiqlash") go in the order they were scanned.
+  return [...rows].sort(
+    (a, b) => pressed(a).localeCompare(pressed(b)) || a.firstScanAt.localeCompare(b.firstScanAt),
+  );
+}
+
+/**
+ * First scanned first. The server saves a batch in the order it is sent, so
+ * the bags get their ids and confirm times in the order they were scanned.
+ */
+export function inScanOrder(rows: WorkRow[]): WorkRow[] {
+  return [...rows].sort((a, b) => a.firstScanAt.localeCompare(b.firstScanAt));
 }
 
 export interface WorkRowView {

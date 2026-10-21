@@ -26,6 +26,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 const SORTS: { key: AstatkaPackageSort; label: string }[] = [
   { key: "recent", label: "Oxirgi o'zgarganlar" },
+  { key: "scanned", label: "Skanerlash tartibida" },
   { key: "client_asc", label: "Mijoz kodi A→Z" },
   { key: "client_desc", label: "Mijoz kodi Z→A" },
   { key: "weight_desc", label: "Eng og'irlari" },
