@@ -441,9 +441,9 @@ function foldWay(keeper: WorkRow, row: WorkRow): FoldWay | null {
     return (keeper.pkg?.id ?? null) === (row.pkg?.id ?? null) ? "into_keeper" : null;
   }
   if (!isSettled(keeper) && !isSettled(row)) return "into_keeper";
-  // A settled row is never sent again, so the other row may only join it when
-  // nothing on it is unsent: every scanned code already on the saved bag, and
-  // nothing typed.
+  // A settled row may never be sent again, so the other row may only join it
+  // when nothing on it is unsent: every scanned code already on the saved
+  // bag, and nothing typed.
   const [open, settled] = isSettled(keeper) ? [row, keeper] : [keeper, row];
   const held = new Set(settled.pkg?.track_codes ?? []);
   if (hasEdits(open) || !open.scannedCodes.every((code) => held.has(code))) return null;
@@ -612,7 +612,11 @@ export function rowView(row: WorkRow): WorkRowView {
   };
 }
 
-const CONFIRMABLE: WorkRowState[] = ["ready", "failed", "not_found", "waiting_net"];
+// "Boshqa astatkada" is what the server said at scan time; that astatka may
+// have been deleted or the bag unconfirmed there since. The confirm checks
+// again: it refuses a bag still confirmed elsewhere and moves one that is
+// only listed there, so pressing it is how the worker asks.
+const CONFIRMABLE: WorkRowState[] = ["ready", "failed", "not_found", "waiting_net", "other_astatka"];
 
 /** States "Qayta tekshirish" asks the server about again. */
 const RECHECKABLE: WorkRowState[] = ["not_found", "failed"];

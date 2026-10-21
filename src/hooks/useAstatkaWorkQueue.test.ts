@@ -345,3 +345,53 @@ describe("useAstatkaWorkQueue — Hammasini tasdiqlash", () => {
     expect(items.map((item) => item.track_code)).toEqual(["A", "B", "C"]);
   });
 });
+
+describe("useAstatkaWorkQueue — a bag seen on another astatka", () => {
+  const held: AstatkaPackage = {
+    ...partnerAnswer.package!,
+    id: 122,
+    astatka_flight_name: "OSTATKA 16.10",
+    client_code: "SNMB43",
+    source_flight_name: "M286-M287",
+    source_company: undefined,
+    source_company_name: null,
+    external: null,
+    status: "confirmed",
+    already_in_astatka: "OSTATKA 16.10",
+  };
+  const stale: WorkRow = {
+    ...storedRow("other_astatka"),
+    kind: "other_astatka",
+    message: "Bu yuk OSTATKA 16.10 astatkasida turibdi.",
+    pkg: held,
+    otherAstatka: "OSTATKA 16.10",
+  };
+
+  it.each([
+    ["confirmed", "confirmed", ""],
+    ["conflict", "failed", "Bu yuk OSTATKA 16.10 astatkasida tasdiqlangan. Avval u yerdagi tasdiqni bekor qiling."],
+  ] as const)("is sent on 'Tasdiqlash' and takes the server's %s answer", async (outcome, state, message) => {
+    vi.mocked(confirmAstatkaPackages).mockImplementation(async (_flight, items) =>
+      items.map((item) => ({
+        idempotency_key: item.idempotency_key,
+        outcome,
+        package: outcome === "confirmed" ? { ...held, id: 900, astatka_flight_name: "OSTATKA.202", already_in_astatka: null } : null,
+        message,
+        warnings: [],
+      })),
+    );
+    const { result } = await renderQueue([stale]);
+
+    await act(() => result.current.confirmRows(["r1"]));
+
+    const [, items] = vi.mocked(confirmAstatkaPackages).mock.calls[0];
+    expect(items[0]).toMatchObject({ client_code: "SNMB43", source_flight_name: "M286-M287" });
+    expect(result.current.rows[0].state).toBe(state);
+    expect(result.current.rows[0].message).toBe(message);
+  });
+
+  it("is left out of 'Hammasini tasdiqlash': only a press of its own sends it", async () => {
+    const { result } = await renderQueue([stale]);
+    expect(result.current.confirmableIds).toEqual([]);
+  });
+});

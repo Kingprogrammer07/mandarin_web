@@ -421,6 +421,24 @@ describe("confirming", () => {
     expect(canConfirm(typed)).toBe(true);
   });
 
+  it("lets a bag seen on another astatka be pressed: the server checks it again", () => {
+    // The answer is from scan time; that astatka may be deleted by now.
+    const elsewhere = applyScanResult(
+      scannedRow("YT030"),
+      resolveFromIndex(
+        { packages: [], candidates: [pkg({ id: 9, track_codes: ["YT030"], already_in_astatka: "OSTATKA.203" })] },
+        "YT030",
+      )!,
+      false,
+    );
+    expect(elsewhere.state).toBe("other_astatka");
+    expect(canConfirm(elsewhere)).toBe(true);
+    const item = buildConfirmItem(elsewhere, "key-elsewhere");
+    expect(item.client_code).toBe(elsewhere.pkg?.client_code);
+    expect(item.source_flight_name).toBe(elsewhere.pkg?.source_flight_name);
+    expect(item.track_codes).toContain("YT030");
+  });
+
   it("sends every code of the bag and only a weight the worker typed", () => {
     const item = buildConfirmItem(ready, "key-123456");
     expect(item).toMatchObject({
