@@ -18,6 +18,8 @@ import type {
   GroupedTransactionItem,
 } from "../../api/services/warehouse";
 import { formatCurrencySum } from "../../lib/format";
+import { needsShelfHandout } from "../../lib/astatkaShelf";
+import AstatkaShelfBags from "./AstatkaShelfBags";
 
 // ── Status Styling ────────────────────────────────────────────────────────────
 
@@ -120,10 +122,16 @@ export default function GroupedTransactionsList({
     );
   }
 
+  // A bag left behind on an astatka shelf still has to be given, even though
+  // every payment row of its client is proved.
   const displayItems = showProved
     ? items
     : items.filter(client =>
-        client.flights.some(f => f.transactions.some(tx => !tx.has_proof))
+        client.flights.some(
+          f =>
+            f.transactions.some(tx => !tx.has_proof) ||
+            (f.astatka_bags ?? []).some(needsShelfHandout),
+        )
       );
 
   return (
@@ -380,6 +388,15 @@ export default function GroupedTransactionsList({
 
                         {isFlightExpanded && (
                           <div className="overflow-hidden transition-all">
+                            {(flight.astatka_bags?.length ?? 0) > 0 && (
+                              <AstatkaShelfBags
+                                bags={flight.astatka_bags ?? []}
+                                clientCode={client.client_code}
+                                flightName={flight.flight_name}
+                                canMarkTaken={canMarkTaken}
+                                onOpenPhoto={setSelectedImage}
+                              />
+                            )}
                             <div className="divide-y divide-gray-100/50 dark:divide-white/[0.02] bg-white/30 dark:bg-black/10">
                               {flight.transactions.map((tx) => {
                                 const paymentStyle = getPaymentStyle(tx.payment_status);

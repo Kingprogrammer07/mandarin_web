@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Send } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, PackageCheck, Send } from "lucide-react";
 
 import type { BagStatusTone, BagSummary } from "@/lib/astatkaBagSummary";
 import { formatKg, formatScanTime } from "@/lib/astatkaFormat";
+import { formatUzs } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { SourceCompanyChip } from "./SourceCompanyChip";
@@ -48,6 +49,12 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
             Astatkadan yuborilgan
           </span>
         )}
+        {summary.handedOut && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-mc-success/12 px-2.5 py-1 text-[12px] font-bold text-mc-success">
+            <PackageCheck className="h-3.5 w-3.5" />
+            Ostatkadan berilgan
+          </span>
+        )}
         {partner && <SourceCompanyChip label={summary.sourceCompanyName} />}
       </div>
 
@@ -65,6 +72,8 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
             {summary.takenAway && (
               <span className="block">
                 Diqqat: tizimda bu yuk mijozga berilgan deb turibdi. Tekshiring.
+                {!summary.handedOut &&
+                  " Javonda qolgan bo'lsa, ombor uni «Ostatkadan berish» bilan beradi."}
               </span>
             )}
             {summary.notes.map((note) => (
@@ -90,6 +99,23 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
           {summary.weightEdited ? " (qo'lda)" : ""}
         </Fact>
         <Fact label="Foto hisobot">{summary.photoReport ?? "—"}</Fact>
+        {summary.price && summary.price.amount !== null && (
+          <Fact label="Narx (astatka vaznidan)">
+            <span className="tabular-nums">
+              {summary.price.first_amount !== null && (
+                <span className="font-semibold text-mc-text-3 line-through decoration-1">
+                  {formatUzs(summary.price.first_amount)}
+                </span>
+              )}{" "}
+              {formatUzs(summary.price.amount)}
+            </span>
+            {summary.price.first_weight_kg !== null && (
+              <span className="block text-[12px] font-medium text-mc-text-2 tabular-nums">
+                Asl vazn {formatKg(summary.price.first_weight_kg)}
+              </span>
+            )}
+          </Fact>
+        )}
         {!partner && (
           <>
             <Fact label="To'lov">{summary.payment ?? "Yozuv yo'q"}</Fact>
@@ -99,6 +125,7 @@ export function BagSummaryPanel({ summary }: { summary: BagSummary }) {
           </>
         )}
         <Fact label="Tasdiqlagan">{summary.confirmedBy ?? "—"}</Fact>
+        {summary.handedOut && <Fact label="Ostatkadan berilgan">{summary.handedOut}</Fact>}
         {summary.astatkaSent && (
           <Fact label="Astatkadan yuborilgan">
             <span className="whitespace-pre-line tabular-nums">{summary.astatkaSent}</span>

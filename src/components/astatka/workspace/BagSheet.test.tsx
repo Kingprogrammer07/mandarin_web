@@ -99,6 +99,8 @@ const summary: BagSummary = {
   sourceCompany: "",
   sourceCompanyName: "",
   astatkaSent: null,
+  price: null,
+  handedOut: null,
 };
 
 const initialEdit: BagEditValues = {

@@ -317,6 +317,39 @@ export interface FlightGroup {
   transactions: GroupedTransactionItem[];
   /** The astatka whose shelf holds this client's bag from this flight. */
   astatka_flight_name?: string | null;
+  /** This client's bags from this flight that an astatka confirmed, any state. */
+  astatka_bags?: AstatkaShelfBag[];
+}
+
+/**
+ * Where an astatka bag is now:
+ * - `on_shelf`: its payment row is not taken yet; the regular «Berish» gives it.
+ * - `left_behind`: marked taken before it reached the shelf (an item fell out at
+ *   the hand-out); «Ostatkadan berish» gives it.
+ * - `taken`: marked taken after it reached the shelf; given with «Berish».
+ * - `handed_out`: given with «Ostatkadan berish».
+ */
+export type AstatkaShelfState = 'on_shelf' | 'left_behind' | 'taken' | 'handed_out';
+
+export interface AstatkaShelfBag {
+  package_id: number;
+  astatka_flight_name: string;
+  state: AstatkaShelfState;
+  weight_kg: number | null;
+  track_codes: string[];
+  /** Photos retaken in the astatka window. */
+  photos: string[];
+  confirmed_at: string | null;
+  handed_out_at: string | null;
+  handed_out_by: string | null;
+  handout_photos: string[];
+  handout_comment: string | null;
+}
+
+export interface AstatkaHandOutResponse {
+  bag: AstatkaShelfBag;
+  message: string;
+  telegram_notified: boolean;
 }
 
 export interface ClientGroup {
@@ -537,6 +570,29 @@ export async function searchTransactionsGrouped(params: SearchTransactionsParams
 
 export async function bulkMarkTransactionTaken(data: FormData): Promise<BulkMarkTakenResponse> {
   const response = await apiClientFormData.post<BulkMarkTakenResponse>('/api/v1/warehouse/transactions/bulk-mark-taken', data);
+  return response.data;
+}
+
+/** «Ostatkadan berish»: give the bag an astatka holds after its row said taken. */
+export async function handOutAstatkaBag(
+  packageId: number,
+  photos: File[],
+  comment: string,
+): Promise<AstatkaHandOutResponse> {
+  const data = new FormData();
+  photos.forEach((photo) => data.append('photos', photo));
+  if (comment.trim()) data.append('comment', comment.trim());
+  const response = await apiClientFormData.post<AstatkaHandOutResponse>(
+    `/api/v1/warehouse/astatka-packages/${packageId}/hand-out`,
+    data,
+  );
+  return response.data;
+}
+
+export async function undoAstatkaHandOut(packageId: number): Promise<AstatkaHandOutResponse> {
+  const response = await apiClient.post<AstatkaHandOutResponse>(
+    `/api/v1/warehouse/astatka-packages/${packageId}/hand-out/undo`,
+  );
   return response.data;
 }
 

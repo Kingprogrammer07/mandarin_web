@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@/api/client", () => ({ apiClient: {}, apiClientFormData: {} }));
+
 import type { ClientGroup, FlightGroup } from "../../api/services/warehouse";
 import GroupedTransactionsList from "./GroupedTransactionsList";
 

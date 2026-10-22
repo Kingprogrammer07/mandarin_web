@@ -8,7 +8,7 @@ import {
 } from "@/api/services/astatkaFlights";
 import type { AstatkaPendingPhotos } from "@/hooks/useAstatkaPendingPhotos";
 import type { AstatkaWorkQueue } from "@/hooks/useAstatkaWorkQueue";
-import { summaryFromRow } from "@/lib/astatkaBagSummary";
+import { ownWeightHint, summaryFromRow } from "@/lib/astatkaBagSummary";
 import { isPartnerPackage } from "@/lib/astatkaSource";
 import {
   canConfirm,
@@ -267,7 +267,7 @@ export function WorkRowSheet({
                       clientCode:
                         "Bu kod boshqa kargoniki bo'lishi mumkin — mijozni qo'lda yozib bo'lmaydi. «Qayta tekshirish» ni bosing.",
                     }
-                  : undefined,
+                  : { weight: ownWeightHint(view.sourceFlight) },
               // The list shown is the saved bag's own, or the worker's
               // earlier list — which keeps the bag that one was written on.
               codesBase:

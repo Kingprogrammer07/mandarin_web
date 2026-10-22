@@ -159,6 +159,8 @@ export function useSavedBagActions({
       ),
     onSuccess: (saved) => {
       toast.success("Saqlandi");
+      // A typed weight reprices an unpaid bag, or says why it could not.
+      if (saved.notice) toast.warning(saved.notice, { duration: 8000 });
       onSaved(saved);
       refresh();
     },

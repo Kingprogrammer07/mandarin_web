@@ -4,7 +4,7 @@ import type {
   AstatkaBagRef,
   AstatkaPackage,
 } from "@/api/services/astatkaFlights";
-import { isSentFromAstatka, summaryFromPackage } from "@/lib/astatkaBagSummary";
+import { isSentFromAstatka, ownWeightHint, summaryFromPackage } from "@/lib/astatkaBagSummary";
 import { isPartnerPackage, sourceCompanyLabel } from "@/lib/astatkaSource";
 
 import { BagSheet, type BagSheetMode } from "./BagSheet";
@@ -139,7 +139,7 @@ export function SavedBagSheet({
             : { sourceFlight: true },
         hints: partner
           ? { weight: `Bo'sh qolsa, ${partner} ma'lumotidagi og'irlik olinadi.` }
-          : undefined,
+          : { weight: ownWeightHint(pkg.source_flight_name) },
         saving: actions.update.isPending,
         // The connection dropping mid-edit must not throw away what was typed.
         disabledReason: canChange

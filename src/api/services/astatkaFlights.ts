@@ -104,6 +104,25 @@ export interface AstatkaPackage {
   sent_web_at?: string | null;
   /** Photos retaken in the astatka window; they replace the old flight's. */
   own_photo_count?: number;
+  /**
+   * Set once a weight typed here repriced the unpaid bag on its source flight:
+   * the first price and the one it has now. Optional for older device copies.
+   */
+  price?: AstatkaPackagePrice | null;
+  /** The warehouse gave it from the shelf («Ostatkadan berish»). */
+  handed_out_at?: string | null;
+  handed_out_by?: string | null;
+  /** An edit's answer only: what the save did to the price, or why it kept it. */
+  notice?: string | null;
+}
+
+export interface AstatkaPackagePrice {
+  first_weight_kg: number | null;
+  first_amount: number | null;
+  weight_kg: number | null;
+  amount: number | null;
+  changed_at: string | null;
+  changed_by: string | null;
 }
 
 export interface AstatkaSourceFlight {

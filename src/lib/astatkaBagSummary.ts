@@ -1,4 +1,4 @@
-import type { AstatkaPackage } from "@/api/services/astatkaFlights";
+import type { AstatkaPackage, AstatkaPackagePrice } from "@/api/services/astatkaFlights";
 import { formatDateTime, paymentLabel } from "@/lib/astatkaFormat";
 import { sourceCompanyLabel, sourceCompanyOf } from "@/lib/astatkaSource";
 import {
@@ -46,6 +46,23 @@ export interface BagSummary {
    * per channel ("Bot · 16.10.2026, 14:20"); `null` while it has not.
    */
   astatkaSent: string | null;
+  /** A weight typed here repriced the bag: the first price and today's. */
+  price: AstatkaPackagePrice | null;
+  /** «Ostatkadan berish»: "22.10.2026, 15:40 · ombor1"; `null` while on the shelf. */
+  handedOut: string | null;
+}
+
+/** Under the weight field of our own bag: what typing a weight does. */
+export function ownWeightHint(sourceFlight: string): string {
+  const flight = sourceFlight || "eski";
+  return `Vazn o'zgarsa, to'lanmagan yukning narxi ${flight} reysida shu vazndan qayta hisoblanadi. Bo'sh qolsa, foto hisobotdagi og'irlik olinadi.`;
+}
+
+function handedOutLabel(
+  pkg: Pick<AstatkaPackage, "handed_out_at" | "handed_out_by"> | null | undefined,
+): string | null {
+  if (!pkg?.handed_out_at) return null;
+  return [formatDateTime(pkg.handed_out_at), pkg.handed_out_by].filter(Boolean).join(" · ");
 }
 
 type SentFields = Pick<AstatkaPackage, "sent_at" | "sent_web_at">;
@@ -87,6 +104,8 @@ export function summaryFromPackage(pkg: AstatkaPackage): BagSummary {
     sourceCompany: sourceCompanyOf(pkg),
     sourceCompanyName: sourceCompanyLabel(pkg),
     astatkaSent: astatkaSentLabel(pkg),
+    price: pkg.price ?? null,
+    handedOut: handedOutLabel(pkg),
   };
 }
 
@@ -127,5 +146,7 @@ export function summaryFromRow(row: WorkRow): BagSummary {
     sourceCompany: view.sourceCompany,
     sourceCompanyName: view.sourceCompanyName,
     astatkaSent: astatkaSentLabel(pkg),
+    price: pkg?.price ?? null,
+    handedOut: handedOutLabel(pkg),
   };
 }
