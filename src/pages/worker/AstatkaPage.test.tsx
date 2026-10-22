@@ -19,6 +19,11 @@ vi.mock("@/components/astatka/AstatkaExtractDialog", () => ({
     <div role="dialog" aria-label={`ajratish ${flightName}`} />
   ),
 }));
+vi.mock("@/components/astatka/AstatkaCleanupDialog", () => ({
+  AstatkaCleanupDialog: ({ flightName }: { flightName: string }) => (
+    <div role="dialog" aria-label={`tozalash ${flightName}`} />
+  ),
+}));
 // The scanner pulls in IndexedDB and the camera; the list never renders it.
 vi.mock("@/components/astatka/AstatkaScanner", () => ({ AstatkaScanner: () => null }));
 vi.mock("@/components/astatka/AstatkaItemSheet", () => ({ AstatkaItemSheet: () => null }));
@@ -203,7 +208,7 @@ describe("AstatkaPage", () => {
     expect(screen.getByRole("button", { name: /OSTATKA-05\.08/ })).toBeTruthy();
   });
 
-  it("offers delete only to an admin who may delete flights", async () => {
+  it("offers delete and cleanup only to an admin who may delete flights", async () => {
     dashboard.mockResolvedValue({
       items: [flight("OSTATKA.202", true)],
       total: 1,
@@ -215,11 +220,14 @@ describe("AstatkaPage", () => {
     const { unmount } = renderPage();
     expect(await screen.findByText("OSTATKA.202")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Astatkani o‘chirish" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reyslarni tozalash" })).toBeNull();
     unmount();
 
     signedInAs(["flights:delete"]);
     renderPage();
     expect(await screen.findByRole("button", { name: "Astatkani o‘chirish" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reyslarni tozalash" }));
+    expect(screen.getByRole("dialog", { name: "tozalash OSTATKA.202" })).toBeTruthy();
   });
 
   it("deletes an astatka only after its name is typed again", async () => {

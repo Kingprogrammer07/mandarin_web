@@ -109,6 +109,8 @@ const LOG_ACTION_LABELS: Record<string, string> = {
   DELETED_ADMIN: "Adminni o'chirdi",
   RESET_ADMIN_PIN: 'PIN reset qildi',
   DELETED_ASTATKA: "Astatkani o'chirdi",
+  ASTATKA_CLEANUP: "Astatka reyslarini tozaladi",
+  ASTATKA_CLEANUP_UNDONE: "Astatka tozalashini bekor qildi",
 };
 
 function logActionLabel(action: string): string {

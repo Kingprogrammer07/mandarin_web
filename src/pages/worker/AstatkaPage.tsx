@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Eraser,
   Eye,
   EyeOff,
   Package,
@@ -28,6 +29,7 @@ import {
   getFlightsDashboard,
   type FlightDashboardItem,
 } from "@/api/services/flightSchedule";
+import { AstatkaCleanupDialog } from "@/components/astatka/AstatkaCleanupDialog";
 import { AstatkaDeleteDialog } from "@/components/astatka/AstatkaDeleteDialog";
 import { AstatkaExtractDialog } from "@/components/astatka/AstatkaExtractDialog";
 import { AstatkaItemSheet } from "@/components/astatka/AstatkaItemSheet";
@@ -136,8 +138,9 @@ export function AstatkaPage({
 
   const [extractFor, setExtractFor] = useState<string | null>(null);
   const [deleteFor, setDeleteFor] = useState<string | null>(null);
-  // The server checks flights:delete again; this only hides a button that
-  // would answer 403.
+  const [cleanFor, setCleanFor] = useState<string | null>(null);
+  // The server checks flights:delete again (deleting and cleaning both need
+  // it); this only hides buttons that would answer 403.
   const [canDelete] = useState(() => {
     const claims = getAdminJwtClaims();
     return claims.isSuperAdmin || claims.permissions.has("flights:delete");
@@ -302,6 +305,7 @@ export function AstatkaPage({
                 onExtract={() => setExtractFor(flight.name)}
                 onSend={() => onSendAstatka(flight.name)}
                 onDelete={canDelete ? () => setDeleteFor(flight.name) : undefined}
+                onClean={canDelete ? () => setCleanFor(flight.name) : undefined}
               />
             </li>
           ))}
@@ -326,6 +330,15 @@ export function AstatkaPage({
         )}
         </div>
       </main>
+
+      {cleanFor && (
+        <AstatkaCleanupDialog
+          flightName={cleanFor}
+          stats={statsByFlight.get(cleanFor.trim().toUpperCase()) ?? null}
+          open
+          onOpenChange={(open) => !open && setCleanFor(null)}
+        />
+      )}
 
       {deleteFor && (
         <AstatkaDeleteDialog
@@ -366,6 +379,8 @@ interface AstatkaFlightCardProps {
   onSend: () => void;
   /** Absent when this admin may not delete flights: no button then. */
   onDelete?: () => void;
+  /** "Reyslarni tozalash"; same right as deleting, absent without it. */
+  onClean?: () => void;
 }
 
 /**
@@ -381,6 +396,7 @@ function AstatkaFlightCard({
   onExtract,
   onSend,
   onDelete,
+  onClean,
 }: AstatkaFlightCardProps) {
   const trackCount =
     flight.stats.expected_track_codes || flight.stats.cargo_count;
@@ -459,9 +475,11 @@ function AstatkaFlightCard({
 
       <div
         className={
-          onDelete
-            ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_3rem] gap-1.5 @xl:flex @xl:shrink-0"
-            : "grid grid-cols-2 gap-1.5 @xl:flex @xl:shrink-0"
+          onDelete && onClean
+            ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_3rem_3rem] gap-1.5 @xl:flex @xl:shrink-0"
+            : onDelete || onClean
+              ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_3rem] gap-1.5 @xl:flex @xl:shrink-0"
+              : "grid grid-cols-2 gap-1.5 @xl:flex @xl:shrink-0"
         }
       >
         <button
@@ -482,6 +500,19 @@ function AstatkaFlightCard({
           <Bell className="h-4 w-4 shrink-0" />
           Yuborish
         </button>
+        {onClean && (
+          // Admin-only and rare, so an icon beside the delete one; the sheet
+          // behind it spells out what it changes.
+          <button
+            type="button"
+            onClick={onClean}
+            aria-label="Reyslarni tozalash"
+            title="Reyslarni tozalash: hech qayerda yo‘q yuklarni «olib ketilgan» deb belgilash"
+            className="flex min-h-12 items-center justify-center rounded-mc-md border border-mc-border bg-mc-surface text-mc-text active:scale-[0.97] @xl:h-11 @xl:min-h-0 @xl:w-11"
+          >
+            <Eraser className="h-4 w-4" />
+          </button>
+        )}
         {onDelete && (
           // Icon only and last: the destructive action stays out of the way
           // of the two daily ones, and the dialog behind it asks for the name.
