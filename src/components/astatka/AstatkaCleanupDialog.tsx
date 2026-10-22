@@ -17,6 +17,7 @@ import {
   astatkaCleanupQueryKey,
   cleanAstatkaFlights,
   downloadAstatkaCleanupExcel,
+  downloadAstatkaInventoryReport,
   getAstatkaCleanupPreview,
   getAstatkaCleanupRuns,
   undoAstatkaCleanup,
@@ -200,6 +201,7 @@ export function AstatkaCleanupDialog({ flightName, stats, open, onOpenChange }: 
       ) : (
         <div className="space-y-4">
           <WhatItDoes />
+          <InventoryReport flightName={flightName} />
 
           {stats && stats.expected > 0 && (
             <p className="flex gap-2 rounded-mc-sm bg-mc-warn-soft px-3 py-2 text-[12px] font-semibold text-mc-warn">
@@ -568,6 +570,39 @@ function CleanupDone({ flightName, result }: { flightName: string; result: Clean
         Xato bo'lsa, «Reyslarni tozalash» oynasining pastidagi «Oldingi tozalashlar»dan bekor
         qilish mumkin.
       </p>
+    </div>
+  );
+}
+
+function InventoryReport({ flightName }: { flightName: string }) {
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const blob = await downloadAstatkaInventoryReport(flightName);
+      downloadBlob(`inventarizatsiya_${safeFileName(flightName)}.xlsx`, blob);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Hisobotni olib bo'lmadi."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded-mc-md border border-mc-border bg-mc-surface p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <p className="min-w-0 text-[12px] font-medium leading-relaxed text-mc-text-2">
+        <span className="font-extrabold text-mc-text">Inventarizatsiya hisoboti.</span> Har bir
+        reysning yuklari: javonda, isbot bilan yoki isbotsiz olib ketilgan, hech qayerda yo'q,
+        qarzlari va kassa tasdiqlamagan cheklar. Hech narsani o'zgartirmaydi.
+      </p>
+      <button
+        type="button"
+        onClick={download}
+        disabled={busy}
+        className="inline-flex h-11 shrink-0 items-center justify-center gap-2 self-start rounded-mc-md border border-mc-border bg-mc-surface-2 px-3 sm:self-auto text-[13px] font-bold text-mc-text active:scale-[0.98] disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+        Hisobot
+      </button>
     </div>
   );
 }

@@ -114,3 +114,11 @@ export async function downloadAstatkaCleanupExcel(
   });
   return data;
 }
+
+/** Inventory Excel: each source-flight bag on the shelf, taken, or found nowhere. */
+export async function downloadAstatkaInventoryReport(flightName: string): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`${base(flightName)}/cleanup/report`, {
+    responseType: "blob",
+  });
+  return data;
+}

@@ -10,6 +10,7 @@ vi.mock("@/api/services/astatkaCleanup", () => ({
   cleanAstatkaFlights: vi.fn(),
   undoAstatkaCleanup: vi.fn(),
   downloadAstatkaCleanupExcel: vi.fn(),
+  downloadAstatkaInventoryReport: vi.fn(),
 }));
 
 import {
@@ -123,6 +124,7 @@ describe("AstatkaCleanupDialog", () => {
     expect(dialog.textContent).toContain("«olib ketilgan» deb belgilaydi");
     expect(dialog.textContent).toContain("To'lanmagan yuk kassada qarz bo'lib qoladi");
     expect(dialog.textContent).toContain("Mijozga xabar bormaydi");
+    expect(within(dialog).getByRole("button", { name: /Hisobot/ })).toBeTruthy();
   });
 
   it("ticks old flights only, and cleans after the name is typed", async () => {
