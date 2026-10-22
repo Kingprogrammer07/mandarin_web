@@ -87,6 +87,30 @@ describe("SendProgressDialog", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("does not call a run that reached no one finished", () => {
+    renderDialog(
+      makeTask({
+        status: "completed",
+        total: 1,
+        sent: 0,
+        failed: 1,
+        percent: 100,
+        errors: [
+          {
+            client_id: "SSSS77",
+            error: "Rasm topilmadi: astatka oynasida yukning rasmini qo'shing",
+          },
+        ],
+      }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Hech kimga yuborilmadi" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Xatolar" })).toHaveTextContent(
+      "SSSS77: Rasm topilmadi",
+    );
+  });
+
   // The page then only hides it: the send stays tracked (see the page test).
   it("can be closed once progress polling has failed", () => {
     const { onClose, onRetryPolling, rerender } = renderDialog(makeTask());

@@ -1,21 +1,20 @@
-# TASK: Mijoz ilovasida astatkadagi yuk uchun "Ostatkada" belgisi
+# TASK: Astatka "Yuborish" yuborilgandek ko'rinadi, lekin yuborilmaydi
 
 ## Objective
-Foydalanuvchi (2026-10-22) astatkadagi yukning asl reys qarzini mijozdan yashirishni taklif qildi. Muhokamadan keyin "Belgi qo'yish" tanlandi: qarz asl reysda qoladi (mijoz uni ko'radi va to'laydi), yonida "Ostatkada: OSTATKA-…" yoziladi.
+Foydalanuvchi (2026-10-22): OSTATKA-21.10.2026 da SSSS77 ni yuborsa "yuborildi" deydi, mijozga esa hech narsa bormaydi va qator "Kutmoqda" bo'lib qoladi.
 
-Sabab: 16.10 dan beri astatka yuborilganda qarz yozilmaydi, qarz faqat asl reysda turadi. Yashirsak mijoz qarzni ko'rmaydi va ilovadan to'lay olmaydi; qarz reys bo'yicha bitta qator bo'lgani uchun reysdagi boshqa yuklar qarzi ham yashirinib qolardi.
+Sabab (server ma'lumoti bilan tasdiqlandi): SSSS77 yuki M306 dan tasdiqlangan, lekin M306 da uning foto hisoboti yo'q va astatkada rasm olinmagan. Rasmsiz yukni web yuborish jimgina "o'tkazib yuborardi" (sababsiz), oyna esa "Yuborish yakunlandi" derdi. Bot orqali yuborish shu holatda allaqachon aniq xato beradi.
 
 ## Implementation Plan
-- [x] Backend: `astatka_warehouse.client_astatka_shelves(codes, flights)` — mijozning qaysi reysdagi yuki qaysi astatkada (faqat bizning tasdiqlangan yuklar, aliaslar bilan)
-- [x] Backend: `GET /payments/available-flights` (to'lov uchun reys tanlash) har bir reysga `astatka_flight_name`
-- [x] Backend: `GET /shipments` ("Yuklarim" kartalari) har bir reysga `astatka_flight_name`; olib ketilgan yukda yo'q
-- [x] Frontend: `AstatkaShelfNote` — "📦 Ostatkada: OSTATKA-…" qatori (uz/ru), to'lov ro'yxatida va `ShipmentCard` da; nom kesilmaydi, butunligicha keyingi qatorga o'tadi
-- [x] Yo'lda: to'lov ro'yxatida 320px da katta summa reys nomini "M286-M..." qilib kesardi; endi summa kerak bo'lsa pastki qatorga tushadi
-- [x] /pos va /kassa (2026-10-22, foydalanuvchi so'radi): `GET /verification/{kod}/cargo/unpaid` har bir yukka `astatka_flight_name`; /pos ning ikkala reys ro'yxatida reys nomi ostida "Ostatkada: …" (nom endi kesilmaydi), /kassa da reys tanlovida "· Ostatkada" va tanlangan reys uchun "M286-M287 yuki ostatkada: OSTATKA-…" qatori
-- [x] Testlar: backend Postgres (ikkala endpoint, boshqa mijozga chiqmasligi), `ShipmentCard` komponent testi; 320/360/390 light/dark skrinshot, overflow 0
-- [x] Commit + push main (backend, frontend)
+- [x] Backend: `astatka_send.build_web_report` rasm bo'lmasa `NoPhotoError` ko'taradi (botdagi matn bilan bir xil: "Rasm topilmadi: astatka oynasida yukning rasmini qo'shing"); rasm bor-u, ombor javob bermasa alohida matn
+- [x] Backend: web yuborish bu holatni "Xato" deb sanaydi, sababi ro'yxatda chiqadi, logga yoziladi; yuk "Kutmoqda" bo'lib qoladi
+- [x] Frontend: hech kimga yetmagan yuborishda oyna sarlavhasi "Hech kimga yuborilmadi"
+- [x] Testlar: backend Postgres (rasmsiz yuk → xato, yuborilmaydi, belgilanmaydi), dialog testi
+- [ ] Commit + push main (backend, frontend)
 
 ## Walkthrough / Architecture
-Astatka yuki `astatka_packages` da (status confirmed, source_company = own) asl reys nomi bilan turadi. `client_astatka_shelves` mijozning barcha kodlari va sahifadagi reys nomlari bo'yicha bitta so'rov qiladi va `{reys: astatka}` qaytaradi. Endpointlar bu nomni javobga qo'shadi; eski frontend yangi maydonni e'tiborsiz qoldiradi, yangi frontend eski backendda maydon bo'lmasa hech narsa ko'rsatmaydi, shuning uchun deploy tartibi muhim emas.
+Astatka yuborishda har bir mijoz uchun `build_web_report` xabar yig'adi. Rasm yo'q bo'lsa endi `None` emas, `NoPhotoError` qaytadi; `_run_send_task` uni ushlab `failed` natija yozadi, Redis'dagi vazifa holatida `errors` ro'yxatiga sabab tushadi va `SendProgressDialog` uni qizil "Xatolar" qutisida ko'rsatadi. Oddiy reyslar o'zgarmadi.
 
-Oldingi vazifa (warehouse astatka qidiruvi, checkboxlar, strict switch): web 771244e, 1210b1c; bot 381f519.
+Yukni yuborish uchun: astatka oynasida yukning rasmini oling (vaznini ham yozing), keyin qayta yuboring.
+
+Oldingi vazifa (mijoz ilovasi, /pos, /kassa'da "Ostatkada" belgisi): web 9e51972, d836c92; bot a746c8c, 753d59a.

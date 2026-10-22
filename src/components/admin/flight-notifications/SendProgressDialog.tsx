@@ -91,7 +91,10 @@ function ProgressContent({
     ? "Yuborilmoqda..."
     : progress.wasCancelled
       ? "Yuborish to'xtatildi"
-      : "Yuborish yakunlandi";
+      : // "Yakunlandi" over a run that reached no one read as a send that went out.
+        taskState.sent === 0 && taskState.total > 0
+        ? "Hech kimga yuborilmadi"
+        : "Yuborish yakunlandi";
 
   const blockWhileRunning = (event: Event) => {
     if (!canDismiss) event.preventDefault();
