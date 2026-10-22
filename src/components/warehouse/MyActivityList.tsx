@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMyActivity, useAllWarehouseActivity, useUndoTakeaway } from "../../api/hooks/useWarehouse";
 import { formatCurrencySum, formatTashkentDateTime } from "../../lib/format";
 import { cn } from "../../lib/utils";
+import FilterSwitch from "./FilterSwitch";
 
 // ── Payment badge ─────────────────────────────────────────────────────────────
 
@@ -256,30 +257,27 @@ export default function MyActivityList({
 
         {/* Filter row */}
         <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+          <div className="relative min-w-0 flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Mijoz kodi..."
-              className="w-full pl-8 pr-3 py-2 rounded-xl border-2 border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.03] text-[13px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-orange-400 dark:focus:border-orange-500/50 outline-none transition-all"
+              className="w-full h-[42px] pl-8 pr-3 rounded-xl border-2 border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.03] text-[16px] sm:text-[13px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-orange-400 dark:focus:border-orange-500/50 outline-none transition-all"
             />
           </div>
-          <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.03] text-[12px] font-bold text-gray-600 dark:text-gray-400 cursor-pointer select-none active:scale-[0.97] transition-all shrink-0">
-            <input
-              type="checkbox"
-              checked={strict}
-              onChange={(e) => onStrictChange(e.target.checked)}
-              className="w-3.5 h-3.5 accent-orange-500 rounded"
-            />
-            Aniq
-          </label>
+          <FilterSwitch
+            checked={strict}
+            onChange={onStrictChange}
+            label="Strict"
+            ariaLabel="Aniq moslik (strict)"
+          />
           <button
             type="button"
             onClick={handleRefresh}
             disabled={isFetching}
-            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl border-2 border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.03] text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 hover:border-orange-200 dark:hover:border-orange-500/30 disabled:opacity-50 transition-all"
+            className="shrink-0 size-[42px] flex items-center justify-center rounded-xl border-2 border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.03] text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 hover:border-orange-200 dark:hover:border-orange-500/30 disabled:opacity-50 transition-all"
             title="Yangilash"
           >
             <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />

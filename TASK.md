@@ -12,6 +12,7 @@ Hozir warehouse mijozning yuklarini to'lov qatorlaridan ko'rsatadi. Astatka yuki
 - [x] Yo'lda topilgan xato: mijoz va reys kartalari birinchi bosishda yopilmas edi (ikki marta bosish kerak edi)
 - [x] Testlar: backend Postgres (astatka nomi bilan qidirish, alias kod, boshqa reys va boshqa mijoz chiqmasligi), frontend komponent testi; 320/360/390/1280 px skrinshot va overflow tekshiruvi
 - [x] Warehouse checkboxlari ko'rinmas edi: `index.css` dagi `appearance: none` checkbox va radioga ham tushardi (qutisi ham, belgisi ham chizilmasdi). Endi faqat matn maydonlariga tushadi; reys tanlash checkboxi 44px bosish joyi bilan, "Isbot yuborilganlarni ko'rsatish" esa toggle (switch)
+- [x] "Strict" qidiruv: "Mening faolligim" bo'limidagi "Aniq" checkboxi ko'rinmas edi; endi asosiy qidiruvdagi kabi switch. Ikkalasi bitta `FilterSwitch` komponentidan; faollik qatoridagi input 16px (iPhone zoom qilmasin), qator 42px
 - [x] Asl reys nomi bilan qidirishda ham shu guruh "Ostatkada" belgisi bilan chiqadi (backend testi)
 - [x] Commit + push main (backend, frontend)
 

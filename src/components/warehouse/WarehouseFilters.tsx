@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Search, Plane, Filter, RotateCcw, ChevronDown } from "lucide-react";
 import { useWarehouseStore } from "../../store/useWarehouseStore";
 import { useWarehouseFlights } from "../../api/hooks/useWarehouse";
-import { triggerSoftHaptic } from "@/utils/haptics";
+import FilterSwitch from "./FilterSwitch";
 
 const PAYMENT_OPTIONS = [
   { value: "all", label: "Barchasi" },
@@ -200,52 +200,12 @@ export default function WarehouseFilters() {
               className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] rounded-xl text-[12px] sm:text-[13px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all"
             />
           </div>
-          {/* A switch, not a checkbox: a 14px tick box is a poor target for
-              someone holding a scanner, and the state reads at a glance from
-              across the bench. The whole control is the target, not just the
-              switch. */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={strictSearch}
-            aria-label="Aniq moslik (strict)"
-            onClick={() => {
-              triggerSoftHaptic();
-              setStrictSearch(!strictSearch);
-            }}
-            className={`flex items-center gap-2 shrink-0 px-2.5 h-[42px] rounded-xl border select-none transition-colors ${
-              strictSearch
-                ? "bg-orange-50 border-orange-300 dark:bg-orange-500/[0.08] dark:border-orange-500/30"
-                : "bg-white border-gray-200 dark:bg-white/[0.04] dark:border-white/[0.08]"
-            }`}
-          >
-            <span
-              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 ${
-                strictSearch
-                  ? "bg-orange-500"
-                  : "bg-gray-200 dark:bg-white/[0.12]"
-              }`}
-              aria-hidden="true"
-            >
-              <span
-                className="inline-block rounded-full bg-white shadow transition-transform duration-150"
-                style={{
-                  height: 15,
-                  width: 15,
-                  transform: `translateX(${strictSearch ? 18 : 3}px)`,
-                }}
-              />
-            </span>
-            <span
-              className={`text-[11px] font-bold transition-colors ${
-                strictSearch
-                  ? "text-orange-600 dark:text-orange-400"
-                  : "text-gray-600 dark:text-gray-300"
-              }`}
-            >
-              Strict
-            </span>
-          </button>
+          <FilterSwitch
+            checked={strictSearch}
+            onChange={setStrictSearch}
+            label="Strict"
+            ariaLabel="Aniq moslik (strict)"
+          />
         </div>
       </div>
 
