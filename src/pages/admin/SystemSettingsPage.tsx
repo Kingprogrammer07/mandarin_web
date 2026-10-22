@@ -14,6 +14,7 @@ import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
 import DailyReportSection from '@/components/admin/DailyReportSection';
+import PartnerWebhooksSection from '@/components/admin/PartnerWebhooksSection';
 import {
   Wrench,
   CreditCard,
@@ -30,6 +31,7 @@ import {
   MapPin,
   Send,
   Truck,
+  Webhook,
 } from 'lucide-react';
 import {
   systemService,
@@ -65,6 +67,7 @@ const SYSTEM_TABS = [
   { key: 'office', label: 'Ofis', icon: MapPin },
   { key: 'payments', label: "To'lovlar", icon: CreditCard },
   { key: 'delivery', label: 'Yetkazish', icon: Truck },
+  { key: 'integrations', label: 'Integratsiyalar', icon: Webhook },
   { key: 'system', label: 'Tizim', icon: Wrench },
 ] as const;
 
@@ -951,6 +954,11 @@ export default function SystemSettingsPage() {
         </AnimatePresence>
       </div>
       </>
+      )}
+
+      {tab === 'integrations' && (
+      // Partner cargos receive their clients' China-import rows by webhook.
+      <PartnerWebhooksSection />
       )}
 
       {tab === 'delivery' && (
