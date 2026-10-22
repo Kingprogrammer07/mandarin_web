@@ -1860,7 +1860,9 @@
       "phoneHint": "Bo'sh qoldirilsa, mijoz profilidagi telefon ishlatiladi",
       "captionLabel": "Kuryer uchun izoh",
       "captionPlaceholder": "2-qavat, domofon kod: 1234",
-      "mapLabel": "Joylashuvni xaritadan tanlash"
+      "mapLabel": "Joylashuvni xaritadan tanlash",
+      "pinRequired": "Mandarin kuryeri uchun xaritada aniq joyni belgilang",
+      "pinOutside": "Nuqta Toshkent shahri ichida bo'lishi kerak"
     },
     "uzpostForm": {
       "phoneLabel": "Qabul qiluvchi telefon",

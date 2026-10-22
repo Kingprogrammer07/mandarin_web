@@ -57,7 +57,20 @@ vi.mock("@/components/admin/delivery/UzpostDeliveryForm", () => ({
   ),
 }));
 vi.mock("@/components/delivery/DeliveryMapPickerLazy", () => ({
-  DeliveryMapPickerLazy: () => null,
+  DeliveryMapPickerLazy: ({
+    onConfirm,
+  }: {
+    onConfirm: (loc: { latitude: number; longitude: number }) => void;
+  }) => (
+    <>
+      <button type="button" onClick={() => onConfirm({ latitude: 41.2856, longitude: 69.2034 })}>
+        Pin Chilonzor
+      </button>
+      <button type="button" onClick={() => onConfirm({ latitude: 39.654, longitude: 66.975 })}>
+        Pin Samarqand
+      </button>
+    </>
+  ),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -186,6 +199,10 @@ function openFormFor(flightName: string, type: RegExp) {
   return view;
 }
 
+function pin(place: "Chilonzor" | "Samarqand"): void {
+  fireEvent.click(screen.getByRole("button", { name: `Pin ${place}` }));
+}
+
 function submit(): void {
   fireEvent.click(screen.getByRole("button", { name: /Zayavkani yuborish/ }));
 }
@@ -224,6 +241,7 @@ describe("AdminDeliveryRequestPage", () => {
       target: { value: "  Vali   Aliyev " },
     });
     fireEvent.change(screen.getByLabelText("Telefon"), { target: { value: "+998935551122" } });
+    pin("Chilonzor");
     submit();
 
     expect(state.standardMutate).toHaveBeenCalledTimes(1);
@@ -234,8 +252,8 @@ describe("AdminDeliveryRequestPage", () => {
       phone_number: "+998935551122",
       recipient_name: "Vali Aliyev",
       caption: undefined,
-      latitude: null,
-      longitude: null,
+      latitude: 41.2856,
+      longitude: 69.2034,
     });
 
     const { onSuccess } = state.standardMutate.mock.calls[0][1] as {
@@ -400,8 +418,24 @@ describe("AdminDeliveryRequestPage", () => {
     expect(sentUzpostForm().has("bags")).toBe(false);
   });
 
+  it("a Mandarin request waits for a pin inside Tashkent", () => {
+    openFormFor("M249", /Mandarin Dostavka/);
+    const send = () => screen.getByRole("button", { name: /Zayavkani yuborish/ });
+
+    expect(send()).toBeDisabled();
+    expect(screen.getByText("Mandarin kuryeri uchun xaritada aniq joyni belgilang")).toBeInTheDocument();
+
+    pin("Samarqand");
+    expect(send()).toBeDisabled();
+    expect(screen.getByText("Nuqta Toshkent shahri ichida bo'lishi kerak")).toBeInTheDocument();
+
+    pin("Chilonzor");
+    expect(send()).toBeEnabled();
+  });
+
   it("sends the profile phone and no recipient name for the client's own parcel", () => {
     openFormFor("M250", /Mandarin Dostavka/);
+    pin("Chilonzor");
     submit();
 
     expect(sentPayload().phone_number).toBe("+998901112233");
@@ -411,6 +445,7 @@ describe("AdminDeliveryRequestPage", () => {
 
   it("does not file when another name was chosen but left empty", () => {
     openFormFor("M249", /Mandarin Dostavka/);
+    pin("Chilonzor");
 
     fireEvent.click(screen.getByRole("button", { name: "Boshqa ism" }));
     submit();
@@ -421,6 +456,7 @@ describe("AdminDeliveryRequestPage", () => {
 
   it("does not file when the phone was cleared", () => {
     openFormFor("M249", /Mandarin Dostavka/);
+    pin("Chilonzor");
 
     fireEvent.change(screen.getByLabelText("Telefon"), { target: { value: " " } });
     submit();

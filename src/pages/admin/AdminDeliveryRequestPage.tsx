@@ -19,6 +19,7 @@ import CargoPreviewList from "@/components/admin/delivery/CargoPreviewList";
 import DeliveryTypeSelector from "@/components/admin/delivery/DeliveryTypeSelector";
 import RecipientFields from "@/components/admin/delivery/RecipientFields";
 import StandardDeliveryForm from "@/components/admin/delivery/StandardDeliveryForm";
+import { isInCourierArea } from "@/lib/courierArea";
 import UzpostDeliveryForm from "@/components/admin/delivery/UzpostDeliveryForm";
 import UzpostBagSplitPanel from "@/components/admin/delivery/UzpostBagSplitPanel";
 import {
@@ -256,10 +257,18 @@ export default function AdminDeliveryRequestPage() {
 
   // UzPost requires a destination branch — block submit until one is picked.
   // Recipient problems do not disable the button: pressing it shows them.
+  // Our own courier drives to the pin, and only inside Tashkent; the server
+  // refuses a "mandarin" request without one, so the button waits for it.
+  const pinRequired = deliveryType === "mandarin";
+  const pinMissing = pinRequired && standardLocation === null;
+  const pinOutside = pinRequired && standardLocation !== null && !isInCourierArea(standardLocation);
+
   const canSubmit =
     Boolean(context) &&
     submittableFlights.length > 0 &&
     (isUzpost ? Boolean(uzpostBranch) : Boolean(deliveryType)) &&
+    !pinMissing &&
+    !pinOutside &&
     (!splitsUzpostParcel || uzpostBagErrors.length === 0);
 
   const handleSubmit = useCallback(() => {
@@ -645,6 +654,7 @@ export default function AdminDeliveryRequestPage() {
                       onCaptionChange={setStandardCaption}
                       location={standardLocation}
                       onLocationChange={setStandardLocation}
+                      pinRequired={pinRequired}
                     />
                   )}
 
@@ -675,6 +685,16 @@ export default function AdminDeliveryRequestPage() {
                     // chosen flights; say so instead of a button that does nothing.
                     <p role="alert" className="text-[12px] font-medium text-amber-700 dark:text-amber-400 mb-2 text-center">
                       {t("adminDeliveryRequest.form.noFlights", "Tanlangan reyslar endi mijozda yo'q — reyslarni qayta tanlang")}
+                    </p>
+                  )}
+                  {pinMissing && (
+                    <p className="text-[12px] text-amber-600 dark:text-amber-400 mb-2 text-center">
+                      {t("adminDeliveryRequest.standardForm.pinRequired", "Mandarin kuryeri uchun xaritada aniq joyni belgilang")}
+                    </p>
+                  )}
+                  {pinOutside && (
+                    <p role="alert" className="text-[12px] font-medium text-red-600 dark:text-red-400 mb-2 text-center">
+                      {t("adminDeliveryRequest.standardForm.pinOutside", "Nuqta Toshkent shahri ichida bo'lishi kerak")}
                     </p>
                   )}
                   {isUzpost && !uzpostBranch && (

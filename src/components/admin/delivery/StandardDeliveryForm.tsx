@@ -8,6 +8,8 @@ interface StandardDeliveryFormProps {
   onCaptionChange: (v: string) => void;
   location: { latitude: number; longitude: number } | null;
   onLocationChange: (loc: { latitude: number; longitude: number } | null) => void;
+  /** "mandarin": our courier drives to the pin, so it is not optional. */
+  pinRequired?: boolean;
 }
 
 /** Courier details for self_pickup, yandex, mandarin and bts. The recipient's
@@ -17,6 +19,7 @@ export default function StandardDeliveryForm({
   onCaptionChange,
   location,
   onLocationChange,
+  pinRequired = false,
 }: StandardDeliveryFormProps) {
   const { t } = useTranslation();
 
@@ -43,6 +46,9 @@ export default function StandardDeliveryForm({
       <div className="space-y-2">
         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {t("adminDeliveryRequest.standardForm.mapLabel", "Joylashuvni xaritadan tanlash")}
+          {pinRequired && (
+            <span className="ml-1 text-red-500" aria-hidden="true">*</span>
+          )}
         </Label>
         <DeliveryMapPickerLazy
           confirmedLocation={location}
