@@ -8,7 +8,8 @@ Foydalanuvchi (2026-10-22): astatka (masalan OSTATKA-21.10.2026) to'liq skanerla
 - [x] Backend: faqat `is_taken_away` o'zgaradi (sana bo'sh), to'lov, isbot, xabar, foto hisobot, astatka yozuvlariga tegilmaydi; to'lov yozuvi yo'q / chek kutilmoqda / navbat yoki yetkazish so'rovidagi yuklar tegilmaydi
 - [x] Frontend: /astatka kartasida «Reyslarni tozalash» tugmasi (o'chirish huquqi borlarga), tushuntirishli oyna, reys tanlash (yangi reyslar belgilanmagan), yuklar ro'yxati, nomni yozib tasdiqlash, oldingi tozalashlar (Excel, bekor qilish)
 - [x] Testlar: backend Postgres (faqat bitta ustun o'zgaradi, eskirgan ko'rib chiqish, bekor qilish), dialog va sahifa testlari; 320/360/390/1280px, yorug' va qorong'i
-- [ ] Commit + push main, deploy
+- [x] Commit + push main (bot 3b24bc0, web 7e3c934)
+- [ ] Serverga deploy (foydalanuvchi qiladi)
 
 ## Walkthrough / Architecture
 `GET /astatka-flights/{name}/cleanup` astatkaning o'z yuklaridan manba reyslarni oladi, har bir reysning foto hisobotidagi mijoz yuklarini (kod taxalluslari bitta mijoz) uchga ajratadi: olib ketilgan, biror astatkada (har qanday holat, `M305-M306` kabi qo'shma nom ham), hech qayerda yo'q. Oxirgilari tozalanadi yoki sababi bilan qoldiriladi. Reys astatka boshlanishidan 7 kun ichida kelgan bo'lsa «Yangi reys» — oynada belgilanmagan.
