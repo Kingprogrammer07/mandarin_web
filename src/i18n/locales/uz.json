@@ -1440,6 +1440,7 @@
       "fillButton": "Profilni to'ldirish"
     },
     "options": {
+      "self_pickup": "Ofisdan o'zingiz olasiz",
       "uzpost": "Pochta orqali yetkazish",
       "yandex": "Tez yetkazib berish",
       "mandarin": "Faqat Toshkent shahrida",
@@ -2298,6 +2299,7 @@
     "tagArrived": "Kuryer yetib keldi",
     "arrivedTitle": "Kuryer sizni kutyapti",
     "arrivedAt": "{{time}} da yetib keldi",
+    "homeOpen": "Kuzatish",
     "pay": {
       "title": "Yetkazish narxi",
       "amount": "{{amount}} so'm",

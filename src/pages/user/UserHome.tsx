@@ -268,6 +268,7 @@ export default function UserHome({
           setFullView('track');
         }}
         onOpenReports={onNavigateToReports}
+        onOpenCourierDelivery={setCourierDelivery}
       />
 
       <Suspense fallback={null}>

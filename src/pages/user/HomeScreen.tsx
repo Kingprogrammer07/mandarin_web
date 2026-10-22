@@ -12,6 +12,7 @@ import {
   PenSquare,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { CourierHomeCard } from '@/components/user/CourierHomeCard';
 import { HomeCarousel } from '@/components/user/HomeCarousel';
 import { HomeHeader } from '@/components/user/HomeHeader';
 import { HomeStatCards, type HomeSummary } from '@/components/user/HomeStatCards';
@@ -46,6 +47,8 @@ export interface HomeScreenProps {
   onOpenTracking: () => void;
   /** Absent for clients whose role has no reports screen. */
   onOpenReports?: () => void;
+  /** The courier tracking screen for one delivery. */
+  onOpenCourierDelivery: (publicId: string) => void;
 }
 
 /**
@@ -74,6 +77,7 @@ export function HomeScreen({
   onTrackSearch,
   onOpenTracking,
   onOpenReports,
+  onOpenCourierDelivery,
 }: HomeScreenProps) {
   const { t } = useTranslation();
   const { data: profile } = useProfile();
@@ -215,6 +219,10 @@ export function HomeScreen({
           onOpenTracking={onOpenTracking}
           isSearching={isSearching}
         />
+
+        {/* Above the stats: when a courier is on the way, that is the reason
+            the client opened the app. */}
+        <CourierHomeCard onOpen={onOpenCourierDelivery} />
 
         <HomeStatCards
           summary={summaryQuery.data}

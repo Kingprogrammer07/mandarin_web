@@ -105,6 +105,12 @@ describe('CourierTrackView payment', () => {
     });
   });
 
+  it('a late courier: no estimate from the past under the steps', async () => {
+    show(delivery({ arrived_at: null, eta_at: new Date(Date.now() - 10 * 60_000).toISOString() }));
+    expect(await screen.findByText('Kuryer yetib kelmoqda')).toBeInTheDocument();
+    expect(screen.queryByText(/^~/)).not.toBeInTheDocument();
+  });
+
   it('a paid fee shows how it was paid and no pay button', async () => {
     show(delivery({ paid_at: '2026-10-22T06:03:00Z', payment_method: 'nbu', can_pay_online: false }));
 

@@ -65,6 +65,22 @@ export interface CourierPayResponse {
 
 export const courierDeliveryKey = (publicId: string) => ['courier-delivery', publicId] as const;
 
+export const courierDeliveriesKey = ['courier-deliveries'] as const;
+
+/** The client's open deliveries plus the ones delivered in the last 24 hours. */
+export async function listCourierDeliveries(): Promise<CourierDelivery[]> {
+  const response = await apiClient.get<{ deliveries: CourierDelivery[] }>(
+    '/api/v1/user/courier/deliveries',
+  );
+  return response.data.deliveries;
+}
+
+/** The delivery worth showing: the one the courier is driving to, else the soonest. */
+export function pickCourierDelivery(list: CourierDelivery[]): CourierDelivery | null {
+  const open = list.filter((d) => d.status === 'on_the_way' || d.status === 'waiting');
+  return open.find((d) => d.status === 'on_the_way') ?? open[0] ?? null;
+}
+
 export async function getCourierDelivery(publicId: string): Promise<CourierDelivery> {
   const response = await apiClient.get<CourierDelivery>(
     `/api/v1/user/courier/deliveries/${encodeURIComponent(publicId)}`,

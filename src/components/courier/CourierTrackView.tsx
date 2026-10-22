@@ -122,10 +122,13 @@ function BackButton({ onClose, floating }: { onClose: () => void; floating?: boo
 }
 
 /** Set off → on the way → delivered, with the time under each step. */
-function Steps({ delivery }: { delivery: CourierDelivery }) {
+function Steps({ delivery, now }: { delivery: CourierDelivery; now: number }) {
   const { t } = useTranslation();
   const stage = delivery.status === 'delivered' ? 2 : delivery.status === 'on_the_way' ? 1 : 0;
-  const eta = timeOf(delivery.eta_at);
+  // A late courier's estimate is in the past; the headline already says
+  // "arriving", so the step shows no stale time.
+  const etaMs = delivery.eta_at ? Date.parse(delivery.eta_at) : NaN;
+  const eta = etaMs > now ? timeOf(delivery.eta_at) : null;
   const steps = [
     { label: t('courierTrack.stepDeparted'), meta: timeOf(delivery.departed_at) ?? '—' },
     { label: t('courierTrack.stepOnTheWay'), meta: '' },
@@ -489,7 +492,7 @@ function Details({ delivery, now }: { delivery: CourierDelivery; now: number }) 
   return (
     <div className="flex flex-col gap-4">
       <Headline delivery={delivery} now={now} />
-      {showSteps && <Steps delivery={delivery} />}
+      {showSteps && <Steps delivery={delivery} now={now} />}
       {delivery.courier_name && (delivery.status === 'on_the_way' || delivery.status === 'delivered') && (
         <>
           <div className="h-px bg-mc-border" />

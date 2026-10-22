@@ -48,6 +48,13 @@ naqd yoki karta deb tasdiqlaydi. Usullar va narx faqat superadmin panelida sozla
       mijozdan so'rash); backend qoidalari formada ham (kamida bitta usul, onlayn uchun ≥ 1000 so'm)
 - [x] Test: `CourierTrackView.test.tsx`; 320 px yorug'/qorong'i skrinshot bilan tekshirildi
 
+## Jonli test tuzatishlari (2026-10-22 23:30Z)
+- [x] Bosh sahifada «Kuryer yo'lda» kartasi (`CourierHomeCard`, `GET /api/v1/user/courier/deliveries`):
+      faqat ochiq yetkazish bo'lsa ko'rinadi, bosilsa kuzatuv ekrani; yo'lda bo'lganda 30 s da yangilanadi
+- [x] Kechikkan kuryer: o'tib ketgan ETA qadamlar ostida ham, kartada ham ko'rsatilmaydi
+- [x] Manager: «O'zi olib ketish» ostidagi xom `deliveryRequest.options.self_pickup` kaliti
+- [x] Test: `CourierHomeCard.test.tsx`, `CourierTrackView.test.tsx`
+
 ## Tekshirilmagan
 - OSM plitkalari va qorong'i rejim filtri haqiqiy qurilmada (sandbox `tile.openstreetmap.org` ga chiqa olmaydi).
 - Haqiqiy NBU sahifasi orqali to'lov (sandbox NBU'ga chiqa olmaydi); backend testlari soxta NBU bilan.
