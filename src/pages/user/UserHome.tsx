@@ -21,6 +21,27 @@ const CarouselMediaModal = lazy(() => import('@/components/carousel/CarouselMedi
 const NotificationCenter = lazy(
   () => import('@/components/notifications/NotificationCenter'),
 );
+const CourierTrackView = lazy(() => import('@/components/courier/CourierTrackView'));
+
+const COURIER_PARAM = 'courier';
+const PUBLIC_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The bot's "Xaritada kuzatish" button opens `/user/home?courier=<public_id>`.
+ * Anything that is not a delivery id is ignored rather than shown as "not found".
+ */
+function readCourierParam(): string | null {
+  const value = new URLSearchParams(window.location.search).get(COURIER_PARAM);
+  return value && PUBLIC_ID.test(value) ? value : null;
+}
+
+/** Drop the parameter so a reload or a later back does not reopen the map. */
+function clearCourierParam(): void {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(COURIER_PARAM)) return;
+  url.searchParams.delete(COURIER_PARAM);
+  window.history.replaceState(window.history.state, '', url.toString());
+}
 
 /**
  * Destinations of the two built-in carousel cards, keyed by their id in
@@ -69,6 +90,12 @@ export default function UserHome({
   const [fullView, setFullView] = useState<FullView>(null);
   const [mediaItem, setMediaItem] = useState<CarouselItemData | null>(null);
   const [trackCode, setTrackCode] = useState('');
+  const [courierDelivery, setCourierDelivery] = useState<string | null>(readCourierParam);
+
+  const closeCourierDelivery = useCallback(() => {
+    clearCourierParam();
+    setCourierDelivery(null);
+  }, []);
 
   /**
    * Back-button wiring.
@@ -84,6 +111,11 @@ export default function UserHome({
    */
   useBackHandler(fullView !== null, () => {
     setFullView(null);
+    return true;
+  }, BackPriority.VIEW);
+
+  useBackHandler(courierDelivery !== null, () => {
+    closeCourierDelivery();
     return true;
   }, BackPriority.VIEW);
 
@@ -141,6 +173,14 @@ export default function UserHome({
     setTrackCode(code);
     setFullView('track');
   }, []);
+
+  if (courierDelivery) {
+    return (
+      <Suspense fallback={null}>
+        <CourierTrackView publicId={courierDelivery} onClose={closeCourierDelivery} />
+      </Suspense>
+    );
+  }
 
   if (fullView === 'schedule') {
     return (

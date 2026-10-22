@@ -2,6 +2,12 @@ import { useEffect } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '@/config/config';
 import { isAdminTokenExpired } from '@/lib/adminTokenClock';
+import {
+  applyCourierLocation,
+  courierDeliveryKey,
+  type CourierDelivery,
+  type CourierLocationEvent,
+} from '@/api/services/courierService';
 
 /**
  * Single app-wide SSE connection that replaces per-resource HTTP polling.
@@ -121,6 +127,24 @@ function dispatchEvent(evt: AppEvent, qc: QueryClient): void {
     // stayed stale until a manual refresh.
     case 'bot.mode.changed':
       refreshAdminDashboard(qc);
+      break;
+
+    // The courier's position while driving to this client: patched into the
+    // open tracking map in place — a fix arrives every few seconds and a
+    // refetch for each would only repeat what the event already says.
+    case 'courier.location': {
+      const fix = evt as unknown as CourierLocationEvent;
+      if (typeof fix.public_id !== 'string') break;
+      qc.setQueryData<CourierDelivery>(courierDeliveryKey(fix.public_id), (old) =>
+        applyCourierLocation(old, fix),
+      );
+      break;
+    }
+
+    // Set off, delivered, moved to another day: the status, the times and the
+    // queue position all change, so the delivery is read again.
+    case 'courier.stop':
+      qc.invalidateQueries({ queryKey: ['courier-delivery'], refetchType: 'active' });
       break;
 
     default:

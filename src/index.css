@@ -589,3 +589,12 @@ select {
     opacity: 0;
   }
 }
+
+/* Courier tracking map. OpenStreetMap only ships light raster tiles, so the
+   dark theme darkens them here instead of switching to a second tile source. */
+.mc-live-map .leaflet-container {
+  background: var(--mc-surface-2);
+}
+.dark .mc-live-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.5);
+}

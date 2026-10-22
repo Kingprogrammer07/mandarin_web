@@ -1,19 +1,38 @@
-# TASK: Astatka "Reyslarni tozalash" tugmasi
+# TASK: Kuryer yetkazish — mijoz tomoni (Mini App)
 
 ## Objective
-Foydalanuvchi (2026-10-22): astatka (masalan OSTATKA-21.10.2026) to'liq skanerlangach, uning manba reyslaridagi (M306, M307…) na «olib ketilgan» deb belgilangan, na biror astatkada turgan yuk ombordan isbotsiz chiqib ketgan. Shularni bitta tugma bilan tozalash kerak, tugma nima qilishi oynada aniq yozilsin. M308 kabi yangi reyslar (hali tarqatilmoqda) chiqarilsin; SFFS5, SS9999 kabi kodlar oddiy mijoz.
+Foydalanuvchi (2026-10-22, "Kuryer yetkazish xizmati"): Mandarin kuryeri bilan yetkazishda
+mijoz (1) zayavkada xaritada nuqtani albatta belgilaydi (faqat Toshkent shahri ichida),
+(2) kuryer unga yo'lga chiqqanda botdagi «Xaritada kuzatish» tugmasi orqali kuryerni
+xaritada jonli ko'radi. Baho jihatlari (Nima yoqdi / Nima yoqmadi) botning o'zida
+so'raladi (backend), Mini App'da baholash sahifasi yo'q.
 
 ## Implementation Plan
-- [x] Backend: `astatka_cleanups` jadvali (jurnal), ko'rib chiqish / tozalash / bekor qilish / Excel endpointlari, flights:delete huquqi
-- [x] Backend: faqat `is_taken_away` o'zgaradi (sana bo'sh), to'lov, isbot, xabar, foto hisobot, astatka yozuvlariga tegilmaydi; to'lov yozuvi yo'q / chek kutilmoqda / navbat yoki yetkazish so'rovidagi yuklar tegilmaydi
-- [x] Frontend: /astatka kartasida «Reyslarni tozalash» tugmasi (o'chirish huquqi borlarga), tushuntirishli oyna, reys tanlash (yangi reyslar belgilanmagan), yuklar ro'yxati, nomni yozib tasdiqlash, oldingi tozalashlar (Excel, bekor qilish)
-- [x] Testlar: backend Postgres (faqat bitta ustun o'zgaradi, eskirgan ko'rib chiqish, bekor qilish), dialog va sahifa testlari; 320/360/390/1280px, yorug' va qorong'i
-- [x] Commit + push main (bot 3b24bc0, web 7e3c934)
-- [ ] Serverga deploy (foydalanuvchi qiladi)
+- [x] Backend (bot): `mandarin` zayavkada nuqta majburiy va Toshkent ichida (422), tahrirda ham;
+      «Kuryer yo'lga chiqdi» xabarida WebApp tugmasi `/user/home?courier=<public_id>`;
+      yulduzdan keyin jihat tugmalari, guruh xabari tahrirlanadi
+- [x] Zayavka formasi: `mandarin` uchun nuqta majburiy, shahar tashqarisida xato, nega yuborilmasligi yoziladi
+- [x] `courierService`: `GET /api/v1/user/courier/deliveries/{public_id}` turlari bilan
+- [x] Kuzatish sahifasi (`CourierTrackView`): xarita (Leaflet + OSM, mavjud stek), uy va kuryer belgilari,
+      ETA, bosqichlar, holatlar (kutilmoqda / yo'lda / yetkazildi / ko'chirildi / bekor / topilmadi)
+- [x] SSE: `courier.location` keshni yangilaydi, `courier.stop` qayta so'raydi; SSE uzilsa 30 s so'rov
+- [x] `UserHome`: `?courier=` bo'lsa kuzatish ochiladi, yopilganda parametr olib tashlanadi
+- [x] i18n uz/ru, 320/360/390 px, yorug' va qorong'i, testlar (`courierArea.test.ts`, `courierService.test.ts`)
+- [x] Commit + push main (bot va web)
 
 ## Walkthrough / Architecture
-`GET /astatka-flights/{name}/cleanup` astatkaning o'z yuklaridan manba reyslarni oladi, har bir reysning foto hisobotidagi mijoz yuklarini (kod taxalluslari bitta mijoz) uchga ajratadi: olib ketilgan, biror astatkada (har qanday holat, `M305-M306` kabi qo'shma nom ham), hech qayerda yo'q. Oxirgilari tozalanadi yoki sababi bilan qoldiriladi. Reys astatka boshlanishidan 7 kun ichida kelgan bo'lsa «Yangi reys» — oynada belgilanmagan.
+Bot xabaridagi WebApp tugmasi Mini App'ni `/user/home?courier=<id>` bilan ochadi. `App.tsx`
+yo'lni `user-home` ga yechadi va query'ni saqlaydi; `UserHome` boshida `courier` parametrini
+o'qib `CourierTrackView` ni to'liq ekran ko'rinishida ochadi. Sahifa
+`['courier-delivery', id]` so'rovini ishlatadi. Ilova bo'ylab yagona SSE ulanishi
+(`useGlobalEvents`) `courier.location` kelganda shu so'rov keshidagi `courier` ni
+o'zgartiradi (tarmoqqa so'rovsiz), `courier.stop` kelganda qayta yuklaydi. Kuryer
+joylashuvi faqat u aynan shu mijozga yo'lda bo'lganda keladi (backend shuni ta'minlaydi);
+yetkazilgach xarita ko'rsatilmaydi.
 
-`POST .../cleanup` hammasini qayta hisoblaydi, to'lov qatorlarini `FOR UPDATE` bilan qulflab qayta o'qiydi (shu orada olib ketilgan yuk tashlab ketiladi), `is_taken_away = true`, `taken_away_date = NULL` qiladi va har bir o'zgargan qatorni `astatka_cleanups.items` ga yozadi; audit `ASTATKA_CLEANUP`. Bekor qilish faqat hali tozalash qoldirgan holatdagi (olib ketilgan, sanasiz, isbotsiz) qatorlarni qaytaradi; audit `ASTATKA_CLEANUP_UNDONE`.
+Xarita mavjud zayavka formasi bilan bir xil: Leaflet + OpenStreetMap plitkalari (yangi
+kutubxona qo'shilmadi). Qorong'i rejimda plitkalarga CSS filtr.
 
-Oldingi vazifa (astatka web yuborish rasmsiz yukni xato deb ko'rsatadi): bot 35cc0f2, web 0851451.
+## Tekshirilmagan
+- OSM plitkalari va qorong'i rejim filtri haqiqiy qurilmada (sandbox `tile.openstreetmap.org` ga chiqa olmaydi).
+- Qo'ng'iroq tugmasi va to'lov qatori yo'q: raqam va pul savollari ochiq.

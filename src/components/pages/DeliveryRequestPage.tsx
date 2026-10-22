@@ -55,6 +55,7 @@ import {
 import { openNbuUrl } from '@/utils/nbuReturnContext';
 import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
+import { isInCourierArea } from '@/lib/courierArea';
 
 const UzpostBranchPicker = lazy(() =>
   import('@/components/delivery/UzpostBranchPicker').then((module) => ({
@@ -485,7 +486,12 @@ const StepStandardConfirm = memo(
   }: StepStandardProps) => {
     const { t } = useTranslation();
     const typeLabel = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.label ?? deliveryType;
-    const canSubmit = caption.trim().length > 0 && !submitting;
+    // Our own courier drives to the pin itself, and only inside Tashkent; the
+    // other couriers keep the pin optional.
+    const pinRequired = deliveryType === 'mandarin';
+    const pinMissing = pinRequired && mapLocation === null;
+    const pinOutside = pinRequired && mapLocation !== null && !isInCourierArea(mapLocation);
+    const canSubmit = caption.trim().length > 0 && !submitting && !pinMissing && !pinOutside;
 
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
@@ -572,14 +578,26 @@ const StepStandardConfirm = memo(
         {/* Map Picker — lazy loaded */}
         <div className="mb-4">
           <p className="text-[11px] font-bold text-mc-text-2 mb-2">
-            {t('deliveryRequest.steps.confirm.mapLabel')}
+            {pinRequired
+              ? t('deliveryRequest.steps.confirm.mapLabelRequired')
+              : t('deliveryRequest.steps.confirm.mapLabel')}
           </p>
+          {pinRequired && (
+            <p className="text-[12px] text-mc-text-2 mb-2">
+              {t('deliveryRequest.steps.confirm.mapRequiredHint')}
+            </p>
+          )}
           <DeliveryMapPickerLazy
             initialLocation={null}
             confirmedLocation={mapLocation}
             onConfirm={onMapConfirm}
             onClear={onMapClear}
           />
+          {pinOutside && (
+            <p role="alert" className="mt-2 text-[12px] font-semibold text-mc-danger">
+              {t('deliveryRequest.steps.confirm.mapOutsideCity')}
+            </p>
+          )}
         </div>
 
         {/* Summary Card */}
@@ -622,6 +640,13 @@ const StepStandardConfirm = memo(
             />
           </p>
         </div>
+
+        {/* A greyed-out button says nothing on its own: name the missing step. */}
+        {pinMissing && (
+          <p className="mb-3 text-center text-[12px] font-semibold text-mc-text-2">
+            {t('deliveryRequest.steps.confirm.mapNeededToSubmit')}
+          </p>
+        )}
 
         {/* Bottom Actions */}
         <div className="flex gap-3">
@@ -1754,6 +1779,10 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
       toast.error(t('deliveryRequest.toast.captionRequired'));
       return;
     }
+    if (deliveryType === 'mandarin' && !standardMapLocation) {
+      toast.error(t('deliveryRequest.steps.confirm.mapNeededToSubmit'));
+      return;
+    }
     // When opting to share the home address, confirm the intent explicitly.
     if (includeAddress) {
       const ok = await askConfirm(t('deliveryRequest.confirmSendAddress'));
@@ -1767,9 +1796,9 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         selectedFlights,
         phoneToSend,
         standardCaption.trim(),
-        // null, not 0. The map pin is optional here — canSubmit only requires
-        // a caption — and 0,0 is a real point in the Gulf of Guinea that every
-        // reader downstream turned into a route link for the courier.
+        // null, not 0. The pin is optional for Yandex/BTS (only "mandarin"
+        // requires one), and 0,0 is a real point in the Gulf of Guinea that
+        // every reader downstream turned into a route link for the courier.
         standardMapLocation?.latitude ?? null,
         standardMapLocation?.longitude ?? null,
         includeAddress,
