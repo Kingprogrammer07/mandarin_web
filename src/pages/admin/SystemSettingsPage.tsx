@@ -9,6 +9,7 @@ import BroadcastComposer from '@/components/admin/BroadcastComposer';
 import SmsSettingsSection from '@/components/admin/SmsSettingsSection';
 import BackupSettingsSection from '@/components/admin/BackupSettingsSection';
 import ManagerDeliveryChannelSection from '@/components/admin/ManagerDeliveryChannelSection';
+import CourierSettingsSection from '@/components/admin/CourierSettingsSection';
 import AdminLoginAlertSection from '@/components/admin/AdminLoginAlertSection';
 import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
@@ -963,6 +964,8 @@ export default function SystemSettingsPage() {
 
       {tab === 'delivery' && (
       <>
+      <CourierSettingsSection />
+
       <ManagerDeliveryChannelSection />
 
       {/* UzPost Pending Requests */}

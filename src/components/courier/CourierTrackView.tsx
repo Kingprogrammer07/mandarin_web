@@ -1,14 +1,29 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Check, Loader2, Lock, MapPinOff, PackageCheck, PackageX } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  Check,
+  CircleCheck,
+  Loader2,
+  Lock,
+  MapPinOff,
+  PackageCheck,
+  PackageX,
+  Phone,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 import {
   courierDeliveryKey,
   getCourierDelivery,
+  payCourierOnline,
   type CourierDelivery,
+  type CourierPayMethod,
 } from '@/api/services/courierService';
+import { formatUzsAmount } from '@/lib/format';
 import { triggerSoftHaptic } from '@/utils/haptics';
+import { openNbuUrl } from '@/utils/nbuReturnContext';
 
 const CourierLiveMap = lazy(() => import('./CourierLiveMap'));
 
@@ -172,8 +187,9 @@ function Steps({ delivery }: { delivery: CourierDelivery }) {
   );
 }
 
-function CourierRow({ name }: { name: string }) {
+function CourierRow({ delivery, name }: { delivery: CourierDelivery; name: string }) {
   const { t } = useTranslation();
+  const phone = delivery.courier_phone?.replace(/[^\d+]/g, '');
   return (
     <div className="flex items-center gap-3">
       <span
@@ -182,10 +198,127 @@ function CourierRow({ name }: { name: string }) {
       >
         {name.trim().charAt(0).toUpperCase()}
       </span>
-      <div className="flex min-w-0 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[15px] font-extrabold text-mc-text">{name}</span>
-        <span className="text-[13px] font-semibold text-mc-text-2">{t('courierTrack.courierRole')}</span>
+        <span className="break-words text-[13px] font-semibold text-mc-text-2">
+          {delivery.courier_car ?? t('courierTrack.courierRole')}
+        </span>
       </div>
+      {phone && (
+        <a
+          href={`tel:${phone}`}
+          onClick={() => triggerSoftHaptic()}
+          aria-label={t('courierTrack.call')}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-md bg-mc-surface-2 text-mc-text transition-transform active:scale-95"
+        >
+          <Phone className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function methodName(t: (key: string) => string, method: CourierPayMethod): string {
+  return t(`courierTrack.pay.method.${method}`);
+}
+
+function errorText(error: unknown, fallback: string): string {
+  const e = error as { message?: string; data?: { detail?: unknown } } | null;
+  const detail = e?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (detail && typeof detail === 'object' && 'message' in detail) {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return e?.message || fallback;
+}
+
+/**
+ * The delivery fee: what it is, how it stands, and — once the courier is at
+ * the door and online payment is on — the NBU button. Cash and card are taken
+ * by the courier, so for those this only says what to have ready.
+ */
+function PaymentCard({ delivery }: { delivery: CourierDelivery }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const amount = t('courierTrack.pay.amount', { amount: formatUzsAmount(delivery.fee_uzs) });
+  const pay = useMutation({
+    mutationFn: () => payCourierOnline(delivery.public_id),
+    onSuccess: (res) => {
+      openNbuUrl({
+        orderId: res.order_id,
+        kind: 'payment',
+        paymentUrl: res.payment_url,
+        homePath: `/user/home?courier=${encodeURIComponent(delivery.public_id)}`,
+      });
+      void queryClient.invalidateQueries({ queryKey: courierDeliveryKey(delivery.public_id) });
+    },
+    onError: (error) => toast.error(errorText(error, t('courierTrack.pay.error'))),
+  });
+
+  let tag: ReactNode = null;
+  let note: string;
+  if (delivery.paid_at) {
+    tag = (
+      <Tag tone="success">
+        <CircleCheck className="mr-1 h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
+        {t('courierTrack.pay.paidTag')}
+      </Tag>
+    );
+    note = delivery.payment_method
+      ? t('courierTrack.pay.paidWith', { method: methodName(t, delivery.payment_method) })
+      : t('courierTrack.pay.paidTag');
+  } else if (delivery.online_pending) {
+    tag = <Tag tone="warn">{t('courierTrack.pay.pendingTag')}</Tag>;
+    note = t('courierTrack.pay.pending');
+  } else if (delivery.can_pay_online) {
+    note = t('courierTrack.pay.atDoorOnline');
+  } else if (delivery.arrived_at) {
+    note = t('courierTrack.pay.atDoor');
+  } else {
+    note = t('courierTrack.pay.later');
+  }
+  const choice =
+    !delivery.paid_at && delivery.payment_choice && delivery.payment_choice !== 'nbu'
+      ? t('courierTrack.pay.yourChoice', { method: methodName(t, delivery.payment_choice) })
+      : null;
+  const showButton = !delivery.paid_at && (delivery.can_pay_online || delivery.online_pending);
+
+  return (
+    <div className="flex flex-col gap-3 rounded-mc-lg border border-mc-border px-3.5 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[12px] font-semibold text-mc-text-2">{t('courierTrack.pay.title')}</span>
+          <span className="text-[17px] font-extrabold text-mc-text tabular-nums">{amount}</span>
+        </div>
+        {tag}
+      </div>
+      <p className="text-[13px] font-semibold leading-[19px] text-mc-text-2">
+        {note}
+        {choice && <span className="mt-0.5 block text-mc-text">{choice}</span>}
+      </p>
+      {showButton && (
+        <button
+          type="button"
+          disabled={pay.isPending}
+          onClick={() => {
+            triggerSoftHaptic();
+            pay.mutate();
+          }}
+          className={`flex h-12 w-full items-center justify-center gap-2 rounded-mc-md px-4 text-[15px] font-extrabold transition-transform active:scale-[0.98] disabled:opacity-60 ${
+            delivery.online_pending
+              ? 'bg-mc-surface-2 text-mc-text'
+              : 'bg-mc-brand text-mc-on-brand shadow-[var(--mc-shadow-cta)]'
+          }`}
+        >
+          {pay.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          <span className="truncate">
+            {delivery.online_pending
+              ? t('courierTrack.pay.reopen')
+              : t('courierTrack.pay.button', { amount })}
+          </span>
+        </button>
+      )}
     </div>
   );
 }
@@ -208,6 +341,23 @@ function CargoCard({ delivery }: { delivery: CourierDelivery }) {
 function Headline({ delivery, now }: { delivery: CourierDelivery; now: number }) {
   const { t } = useTranslation();
   const today = tashkentToday(now);
+
+  if (delivery.status === 'on_the_way' && delivery.arrived_at) {
+    const time = timeOf(delivery.arrived_at);
+    return (
+      <div className="flex flex-col gap-1">
+        <Tag tone="brand">{t('courierTrack.tagArrived')}</Tag>
+        <span className="mt-1.5 text-[24px] font-extrabold leading-8 tracking-[-0.02em] text-mc-text">
+          {t('courierTrack.arrivedTitle')}
+        </span>
+        {time && (
+          <span className="text-[15px] font-semibold text-mc-text-2 tabular-nums">
+            {t('courierTrack.arrivedAt', { time })}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   if (delivery.status === 'on_the_way') {
     const etaMs = delivery.eta_at ? Date.parse(delivery.eta_at) : NaN;
@@ -343,9 +493,13 @@ function Details({ delivery, now }: { delivery: CourierDelivery; now: number }) 
       {delivery.courier_name && (delivery.status === 'on_the_way' || delivery.status === 'delivered') && (
         <>
           <div className="h-px bg-mc-border" />
-          <CourierRow name={delivery.courier_name} />
+          <CourierRow delivery={delivery} name={delivery.courier_name} />
         </>
       )}
+      {delivery.fee_uzs > 0 &&
+        (delivery.status === 'waiting' || delivery.status === 'on_the_way' || !!delivery.paid_at) && (
+          <PaymentCard delivery={delivery} />
+        )}
       {delivery.items.length > 0 && <CargoCard delivery={delivery} />}
       {delivery.address && (
         <p className="text-[13px] font-semibold text-mc-text-2">{delivery.address}</p>
@@ -387,7 +541,10 @@ export function CourierTrackView({ publicId, onClose }: CourierTrackViewProps) {
     queryKey: courierDeliveryKey(publicId),
     queryFn: () => getCourierDelivery(publicId),
     refetchInterval: (q) => {
-      const status = q.state.data?.status;
+      const data = q.state.data;
+      const status = data?.status;
+      // At the door a payment can land any second; show it without a pull.
+      if (status === 'on_the_way' && data?.arrived_at && !data.paid_at) return 8_000;
       if (status === 'on_the_way') return 30_000;
       if (status === 'waiting') return 60_000;
       return false;

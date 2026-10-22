@@ -56,6 +56,9 @@ import { openNbuUrl } from '@/utils/nbuReturnContext';
 import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 import { isInCourierArea } from '@/lib/courierArea';
+import { courierFeeKey, getCourierFee } from '@/api/services/courierService';
+import { formatUzsAmount } from '@/lib/format';
+import { useQuery } from '@tanstack/react-query';
 
 const UzpostBranchPicker = lazy(() =>
   import('@/components/delivery/UzpostBranchPicker').then((module) => ({
@@ -273,6 +276,25 @@ const StepTypeSelection = memo(
 // STEP 2 — Flight Selection
 // ============================================
 
+/** The courier fee as the super-admin set it; nothing until it is known. */
+function MandarinFeeNote() {
+  const { t } = useTranslation();
+  const { data: fee } = useQuery({
+    queryKey: courierFeeKey,
+    queryFn: getCourierFee,
+    staleTime: 5 * 60_000,
+  });
+  if (fee === undefined) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-mc-success mb-4 font-medium tabular-nums">
+      <Wallet className="w-4 h-4 text-mc-success inline-block mr-1" />
+      {fee > 0
+        ? t('deliveryRequest.steps.flight.mandarinNote', { amount: formatUzsAmount(fee) })
+        : t('deliveryRequest.steps.flight.mandarinNoteFree')}
+    </span>
+  );
+}
+
 interface StepFlightProps {
   deliveryType: DeliveryType | null;
   flights: FlightItem[];
@@ -294,12 +316,7 @@ const StepFlightSelection = memo(
       <p className="text-mc-text-2 text-[13px] mb-4">
         {t('deliveryRequest.steps.flight.subtitle')}
       </p>
-      {deliveryType === 'mandarin' && (
-        <span className="inline-flex items-center gap-1 text-[11px] text-mc-success mb-4 font-medium">
-          <Wallet className="w-4 h-4 text-mc-success dark:text-mc-success inline-block mr-1" />
-          {t('deliveryRequest.steps.flight.mandarinNote')}
-        </span>
-      )}
+      {deliveryType === 'mandarin' && <MandarinFeeNote />}
       {deliveryType === 'yandex' && (
         <span className="inline-flex items-center gap-1 text-[11px] text-mc-brand mb-4 font-medium">
           <Clock className="w-4 h-4 text-mc-brand dark:text-mc-brand inline-block mr-1" />

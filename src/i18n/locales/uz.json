@@ -1363,7 +1363,8 @@
       "flight": {
         "title": "Reyslarni tanlang",
         "subtitle": "Yetkazmoqchi bo'lgan reyslaringizni belgilang",
-        "mandarinNote": "Yetkazib berish narxi: 30 000 so'm",
+        "mandarinNote": "Yetkazib berish narxi: {{amount}} so'm",
+        "mandarinNoteFree": "Yetkazib berish bepul",
         "yandexNote": "Yukingiz yetib borgandan keyin to'lov qilasiz",
         "btsNote": "Yukingiz yetib borgandan keyin to'lov qilasiz",
         "empty": "Hozircha reyslar topilmadi",
@@ -2290,6 +2291,30 @@
     "liveStale": "Oxirgi joylashuv {{minutes}} daqiqa oldin",
     "homeLabel": "Uyingiz",
     "recenter": "Xaritani markazlash",
-    "noPin": "Manzilingiz xaritada belgilanmagan, kuryer yo'lga chiqishdan oldin sizga qo'ng'iroq qiladi."
+    "noPin": "Manzilingiz xaritada belgilanmagan, kuryer yo'lga chiqishdan oldin sizga qo'ng'iroq qiladi.",
+    "call": "Kuryerga qo'ng'iroq qilish",
+    "tagArrived": "Kuryer yetib keldi",
+    "arrivedTitle": "Kuryer sizni kutyapti",
+    "arrivedAt": "{{time}} da yetib keldi",
+    "pay": {
+      "title": "Yetkazish narxi",
+      "amount": "{{amount}} so'm",
+      "paidTag": "To'landi",
+      "paidWith": "To'langan: {{method}}",
+      "pendingTag": "Tekshirilmoqda",
+      "pending": "To'lov tekshirilmoqda, odatda bir necha soniya. Sahifani yopib qo'ysangiz ham to'lov o'tadi.",
+      "atDoorOnline": "Onlayn to'lashingiz yoki kuryerga naqd yoki karta bilan berishingiz mumkin.",
+      "atDoor": "Kuryerga naqd yoki karta bilan to'lang.",
+      "later": "Kuryer yetib kelganda to'laysiz.",
+      "yourChoice": "Siz tanladingiz: {{method}}",
+      "button": "Onlayn to'lash · {{amount}}",
+      "reopen": "To'lov sahifasini qayta ochish",
+      "error": "To'lovni ochib bo'lmadi. Qayta urinib ko'ring.",
+      "method": {
+        "cash": "naqd",
+        "card": "karta",
+        "nbu": "onlayn"
+      }
+    }
   }
 }

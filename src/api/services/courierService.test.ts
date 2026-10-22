@@ -29,6 +29,15 @@ function delivery(overrides: Partial<CourierDelivery> = {}): CourierDelivery {
     delivery_request_id: 7,
     items: [],
     courier: null,
+    courier_car: null,
+    courier_phone: null,
+    arrived_at: null,
+    fee_uzs: 30000,
+    payment_choice: null,
+    payment_method: null,
+    paid_at: null,
+    can_pay_online: false,
+    online_pending: false,
     ...overrides,
   };
 }
