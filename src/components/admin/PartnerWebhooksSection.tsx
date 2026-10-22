@@ -14,6 +14,8 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  RotateCw,
+  Send,
   ShieldAlert,
   Webhook,
 } from 'lucide-react';
@@ -21,6 +23,7 @@ import {
   partnerWebhookService,
   type DeliveryStatus,
   type PartnerWebhook,
+  type PartnerWebhookDelivery,
   type PartnerWebhookTestResult,
 } from '@/api/services/partnerWebhooks';
 import { Switch } from '@/components/ui/switch';
@@ -261,6 +264,99 @@ const STATUS_LABEL: Record<DeliveryStatus, { text: string; className: string }> 
   },
 };
 
+function DeliveryRow({ partnerId, row }: { partnerId: number; row: PartnerWebhookDelivery }) {
+  const queryClient = useQueryClient();
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const resend = row.status === 'sent';
+
+  const send = useMutation({
+    mutationFn: () =>
+      resend
+        ? partnerWebhookService.resendDelivery(partnerId, row.id)
+        : partnerWebhookService.retryDelivery(partnerId, row.id),
+    onSuccess: (answer) => {
+      if (answer.ok) {
+        setResult({
+          ok: true,
+          text: resend
+            ? `Yangi yuborish sifatida yetkazildi (HTTP ${answer.status_code}).`
+            : `Yetkazildi (HTTP ${answer.status_code}).`,
+        });
+      } else {
+        const why = answer.error ?? "noma'lum xato";
+        setResult({
+          ok: false,
+          text: resend
+            ? `Yetib bormadi: ${why}. Yangi yuborish navbatga qo'yildi.`
+            : `Yetib bormadi: ${why}. Navbatda qoldi, keyingi urinish ${formatTime(answer.delivery.next_attempt_at)}.`,
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+    onError: (error) => {
+      setResult({ ok: false, text: errorMessage(error, "Yuborib bo'lmadi") });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+  });
+
+  const label = STATUS_LABEL[row.status];
+  return (
+    <div className="space-y-1.5 border-b border-gray-100 px-3 py-2 text-xs last:border-b-0 dark:border-white/[0.06]">
+      <div className="flex items-start justify-between gap-3">
+        {/* Wraps instead of truncating: a cut flight name reads as another flight. */}
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-gray-800 dark:text-white/85">
+          <span className="font-mono tabular-nums text-gray-500 dark:text-white/45">
+            {formatTime(row.created_at)}
+          </span>
+          <span className="break-words">
+            <b className="font-bold">{row.flight_name ?? 'test'}</b>
+            <span className="text-gray-500 dark:text-white/45"> · {row.item_count} qator</span>
+            {row.attempts > 1 && (
+              <span className="text-gray-500 dark:text-white/45"> · {row.attempts} urinish</span>
+            )}
+          </span>
+        </p>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black ${label.className}`}>
+          {label.text}
+        </span>
+      </div>
+      {row.status !== 'sent' && row.last_error && (
+        <p className="text-[11px] text-red-600 dark:text-red-300">
+          {row.last_error}
+          {row.status === 'pending' && ` · keyingi urinish ${formatTime(row.next_attempt_at)}`}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button
+          type="button"
+          className={smallButton}
+          onClick={() => send.mutate()}
+          disabled={send.isPending}
+        >
+          {send.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : resend ? (
+            <Send className="h-3.5 w-3.5" />
+          ) : (
+            <RotateCw className="h-3.5 w-3.5" />
+          )}
+          {resend ? 'Yana yuborish' : 'Takrorlash'}
+        </button>
+        {result && (
+          <span
+            role="status"
+            className={`text-[11px] font-semibold ${
+              result.ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'
+            }`}
+          >
+            {result.text}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DeliveryHistory({ partnerId }: { partnerId: number }) {
   const query = useInfiniteQuery({
     queryKey: [...QUERY_KEY, partnerId, 'deliveries'],
@@ -290,35 +386,9 @@ function DeliveryHistory({ partnerId }: { partnerId: number }) {
   }
   return (
     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
-      {rows.map((row) => {
-        const label = STATUS_LABEL[row.status];
-        return (
-          <div
-            key={row.id}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-0.5 border-b border-gray-100 px-3 py-2 text-xs last:border-b-0 dark:border-white/[0.06]"
-          >
-            <span className="font-mono tabular-nums text-gray-500 dark:text-white/45">
-              {formatTime(row.created_at)}
-            </span>
-            <span className="min-w-0 truncate text-gray-800 dark:text-white/85">
-              <b className="font-bold">{row.flight_name ?? 'test'}</b>
-              <span className="text-gray-500 dark:text-white/45"> · {row.item_count} qator</span>
-              {row.attempts > 1 && (
-                <span className="text-gray-500 dark:text-white/45"> · {row.attempts} urinish</span>
-              )}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${label.className}`}>
-              {label.text}
-            </span>
-            {row.status !== 'sent' && row.last_error && (
-              <span className="col-span-3 text-[11px] text-red-600 dark:text-red-300">
-                {row.last_error}
-                {row.status === 'pending' && ` · keyingi urinish ${formatTime(row.next_attempt_at)}`}
-              </span>
-            )}
-          </div>
-        );
-      })}
+      {rows.map((row) => (
+        <DeliveryRow key={row.id} partnerId={partnerId} row={row} />
+      ))}
       {query.hasNextPage && (
         <button
           type="button"
@@ -417,7 +487,7 @@ function PartnerCard({
               </span>
             )}
           </div>
-          <p className="truncate font-mono text-xs text-gray-500 dark:text-white/45" title={partner.url}>
+          <p className="break-all font-mono text-xs text-gray-500 dark:text-white/45">
             {partner.url}
           </p>
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums text-gray-600 dark:text-white/60">

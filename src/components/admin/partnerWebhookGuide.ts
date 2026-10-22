@@ -146,6 +146,10 @@ async def mandarin_webhook(request: Request):
             )
     return {"ok": True}  # istalgan 2xx javob = "qabul qilindi"`;
 
+/** The same guide published on Telegraph, to send the partner one link. */
+export const GUIDE_TELEGRAPH_URL =
+  'https://telegra.ph/Mandarin-Cargo-webhook-hamkor-uchun-qollanma-10-22';
+
 export const GUIDE_TITLE = "Mandarin Cargo webhook: hamkor uchun qo'llanma";
 
 export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
@@ -249,7 +253,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
           "2xx bo'lmagan javob, timeout yoki ulanish xatosida Mandarin qayta yuboradi: 30 soniya, 1, 2, 4, 8, 16, keyin har 30 daqiqada. Bu 24 soat davom etadi.",
           "24 soatdan keyin yuborish \"xato\" holatiga o'tadi. Mandarin administratori uni paneldan qayta navbatga qo'yishi mumkin.",
           "Javobingiz yo'lda yo'qolsa, bitta yuborish ikki marta kelishi mumkin. `delivery_id` ni saqlang va takrorini o'tkazib yuboring.",
-          "Bir trek kod boshqa `delivery_id` bilan qayta kelishi ham mumkin (masalan, reys qayta yuklansa). Qatorni `(flight_name, client_code, track_code)` bo'yicha yangilang (upsert).",
+          "Bir trek kod boshqa `delivery_id` bilan qayta kelishi ham mumkin (masalan, reys qayta yuklansa yoki administrator «Yana yuborish»ni bossa). Qatorni `(flight_name, client_code, track_code)` bo'yicha yangilang (upsert).",
         ],
       },
     ],

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PartnerWebhook } from '@/api/services/partnerWebhooks';
+import type { PartnerWebhook, PartnerWebhookDelivery } from '@/api/services/partnerWebhooks';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -16,6 +16,8 @@ vi.mock('@/api/services/partnerWebhooks', () => ({
     rotateSecret: vi.fn(),
     test: vi.fn(),
     deliveries: vi.fn(),
+    retryDelivery: vi.fn(),
+    resendDelivery: vi.fn(),
     retryFailed: vi.fn(),
   },
 }));
@@ -41,6 +43,24 @@ function partner(overrides: Partial<PartnerWebhook> = {}): PartnerWebhook {
     sent_count: 5,
     last_sent_at: null,
     last_error: 'HTTP 503',
+    ...overrides,
+  };
+}
+
+function delivery(overrides: Partial<PartnerWebhookDelivery> = {}): PartnerWebhookDelivery {
+  return {
+    id: 10,
+    delivery_id: 'd-10',
+    event: 'cargo.imported',
+    flight_name: 'M314',
+    item_count: 5,
+    status: 'pending',
+    attempts: 7,
+    last_status_code: null,
+    last_error: 'Domen topilmadi',
+    created_at: '2026-10-22T17:21:00Z',
+    sent_at: null,
+    next_attempt_at: '2026-10-22T18:23:00Z',
     ...overrides,
   };
 }
@@ -91,6 +111,36 @@ describe('PartnerWebhooksSection', () => {
       }),
     );
     expect(await screen.findByText('whsec_once')).toBeInTheDocument();
+  });
+
+  it('retries a queued delivery and resends a delivered one from the history', async () => {
+    service.list.mockResolvedValue([partner()]);
+    service.deliveries.mockResolvedValue({
+      items: [delivery(), delivery({ id: 9, delivery_id: 'd-9', status: 'sent', last_error: null })],
+      next_before_id: null,
+    });
+    service.retryDelivery.mockResolvedValue({
+      ok: true,
+      status_code: 200,
+      error: null,
+      delivery: delivery({ status: 'sent', attempts: 8 }),
+    });
+    service.resendDelivery.mockResolvedValue({
+      ok: false,
+      status_code: 503,
+      error: 'HTTP 503',
+      delivery: delivery({ id: 11, delivery_id: 'd-11' }),
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Tarix/ }));
+
+    fireEvent.click(await screen.findByRole('button', { name: /Takrorlash/ }));
+    await waitFor(() => expect(service.retryDelivery).toHaveBeenCalledWith(1, 10));
+    expect(await screen.findByText('Yetkazildi (HTTP 200).')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Yana yuborish/ }));
+    await waitFor(() => expect(service.resendDelivery).toHaveBeenCalledWith(1, 9));
+    expect(await screen.findByText(/Yangi yuborish navbatga qo'yildi/)).toBeInTheDocument();
   });
 
   it('tells a non-super-admin the section is not theirs', async () => {

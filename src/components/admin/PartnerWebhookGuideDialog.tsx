@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { BookOpen, Check, Copy } from 'lucide-react';
+import { BookOpen, Check, Copy, ExternalLink, Link2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  GUIDE_TELEGRAPH_URL,
   GUIDE_TITLE,
   PARTNER_WEBHOOK_GUIDE,
   guideToMarkdown,
@@ -139,14 +140,31 @@ export default function PartnerWebhookGuideDialog({
             {GUIDE_TITLE}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Hamkor dasturchisiga shu matnni yuboring. Maxfiy kalit bu yerda yo'q: uni alohida,
-            xavfsiz kanal orqali bering.
+            Hamkor dasturchisiga Telegraph havolasini yoki shu matnni yuboring. Maxfiy kalit bu yerda
+            yo'q: uni alohida, xavfsiz kanal orqali bering.
           </DialogDescription>
-          <div className="pt-2">
+          <a
+            href={GUIDE_TELEGRAPH_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 flex items-start gap-1.5 break-all rounded-xl border border-gray-200 px-3 py-2 font-mono text-[12px] text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/[0.04]"
+          >
+            <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-white/40" />
+            {GUIDE_TELEGRAPH_URL}
+          </a>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => void copyText(GUIDE_TELEGRAPH_URL, 'Havola')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-2 text-xs font-black text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-gray-900"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Havolani nusxalash
+            </button>
             <button
               type="button"
               onClick={() => void copyText(guideToMarkdown(), "Qo'llanma (Markdown)")}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-2 text-xs font-black text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-gray-900"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-black text-gray-800 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-white/85 dark:hover:bg-white/[0.06]"
             >
               <Copy className="h-3.5 w-3.5" />
               Hammasini nusxalash (Markdown)

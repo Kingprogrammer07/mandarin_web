@@ -61,6 +61,12 @@ export interface PartnerWebhookDelivery {
   next_attempt_at: string;
 }
 
+/** Answer to "Takrorlash" / "Yana yuborish": the partner's reply and the delivery after it. */
+export interface PartnerWebhookDeliverySendResult extends PartnerWebhookTestResult {
+  /** For a resend, the new delivery (new delivery_id), not the original. */
+  delivery: PartnerWebhookDelivery;
+}
+
 export interface PartnerWebhookDeliveryPage {
   items: PartnerWebhookDelivery[];
   next_before_id: number | null;
@@ -96,6 +102,22 @@ export const partnerWebhookService = {
     const { data } = await apiClient.get<PartnerWebhookDeliveryPage>(`${BASE}/${id}/deliveries`, {
       params: { limit: 20, ...(beforeId ? { before_id: beforeId } : {}) },
     });
+    return data;
+  },
+
+  /** Send a queued or failed delivery now, with the same delivery_id. */
+  async retryDelivery(id: number, deliveryPk: number): Promise<PartnerWebhookDeliverySendResult> {
+    const { data } = await apiClient.post<PartnerWebhookDeliverySendResult>(
+      `${BASE}/${id}/deliveries/${deliveryPk}/retry`,
+    );
+    return data;
+  },
+
+  /** Send a delivered batch again as a new delivery (new delivery_id). */
+  async resendDelivery(id: number, deliveryPk: number): Promise<PartnerWebhookDeliverySendResult> {
+    const { data } = await apiClient.post<PartnerWebhookDeliverySendResult>(
+      `${BASE}/${id}/deliveries/${deliveryPk}/resend`,
+    );
     return data;
   },
 
