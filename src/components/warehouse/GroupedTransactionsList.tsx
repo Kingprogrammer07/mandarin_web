@@ -86,12 +86,13 @@ export default function GroupedTransactionsList({
   const [deselectedFlights, setDeselectedFlights] = useState<Record<string, boolean>>({});
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // Both start open (`?? true` where they render), so a first tap must close.
   const toggleClient = (clientCode: string) => {
-    setExpandedClients(prev => ({ ...prev, [clientCode]: !(prev[clientCode] ?? false) }));
+    setExpandedClients(prev => ({ ...prev, [clientCode]: !(prev[clientCode] ?? true) }));
   };
 
   const toggleFlight = (flightKey: string) => {
-    setExpandedFlights(prev => ({ ...prev, [flightKey]: !(prev[flightKey] ?? false) }));
+    setExpandedFlights(prev => ({ ...prev, [flightKey]: !(prev[flightKey] ?? true) }));
   };
 
   if (isLoading) {
@@ -194,10 +195,16 @@ export default function GroupedTransactionsList({
                       {client.flights.map(f => (
                         <span
                           key={f.flight_name}
-                          className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold border border-orange-100 dark:border-orange-500/20"
+                          className="inline-flex max-w-full flex-wrap items-center gap-x-1 text-[11px] px-2 py-0.5 rounded-md bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold border border-orange-100 dark:border-orange-500/20"
                         >
-                          <Plane className="w-3 h-3" />
-                          {f.flight_name}
+                          {/* Each name kept whole: a flight split as "M286-" / "M287" reads as two. */}
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            <Plane className="w-3 h-3" />
+                            {f.flight_name}
+                          </span>
+                          {f.astatka_flight_name && (
+                            <span className="whitespace-nowrap font-medium">· {f.astatka_flight_name}</span>
+                          )}
                         </span>
                       ))}
                     </div>
@@ -282,20 +289,21 @@ export default function GroupedTransactionsList({
                           <div className="flex items-center gap-3.5 flex-1 group/flight">
                             {/* Checkbox */}
                             {hasPending && canMarkTaken && (
-                              <div 
+                              <label
                                 onClick={(e) => e.stopPropagation()}
-                                className="flex items-center justify-center cursor-pointer p-1"
+                                className="-mx-2 flex size-11 shrink-0 cursor-pointer items-center justify-center"
                               >
-                                <input 
-                                  type="checkbox" 
-                                  checked={isChecked} 
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  aria-label={`${flight.flight_name} reysini tanlash`}
                                   onChange={(e) => {
                                     const checked = e.target.checked;
                                     setDeselectedFlights(prev => ({ ...prev, [flightKey]: !checked }));
                                   }}
-                                  className="w-5 h-5 rounded border-gray-300 text-orange-500 focus:ring-orange-500 dark:border-gray-600 dark:bg-[#222]"
+                                  className="size-5 cursor-pointer accent-orange-500"
                                 />
-                              </div>
+                              </label>
                             )}
 
                             <div 
@@ -305,8 +313,18 @@ export default function GroupedTransactionsList({
                               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-100 to-amber-50 dark:from-orange-500/20 dark:to-amber-500/5 flex items-center justify-center shrink-0 border border-orange-200/50 dark:border-orange-500/20 group-hover/flight:scale-105 transition-transform">
                                 <Plane className="w-6 h-6 text-orange-500 dark:text-orange-400" strokeWidth={1.5} />
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <h4 className="text-[15px] font-bold text-gray-900 dark:text-white tracking-tight">{flight.flight_name}</h4>
+                                {flight.astatka_flight_name && (
+                                  // The heading is the flight the bag came on; the
+                                  // bag itself now sits on the astatka's shelf.
+                                  <p className="mt-1 inline-flex max-w-full flex-wrap items-center gap-x-1 rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 text-[12px] font-semibold text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                                    <Package className="h-3.5 w-3.5 shrink-0" />
+                                    Ostatkada:
+                                    {/* Breaks at its hyphen if it must, never inside the date. */}
+                                    <span className="break-words font-bold">{flight.astatka_flight_name}</span>
+                                  </p>
+                                )}
                                 <div className="flex items-center gap-2 text-[12px] font-medium text-gray-500 dark:text-gray-400 mt-1">
                                   <span className="bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 rounded-md">{flight.transactions.length} ta yuk</span>
                                   <span className="text-gray-300 dark:text-gray-700">•</span>

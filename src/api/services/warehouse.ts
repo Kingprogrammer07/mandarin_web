@@ -315,6 +315,8 @@ export interface FlightGroup {
   delivery_request_type: string | null;
   delivery_request_status: string | null;
   transactions: GroupedTransactionItem[];
+  /** The astatka whose shelf holds this client's bag from this flight. */
+  astatka_flight_name?: string | null;
 }
 
 export interface ClientGroup {

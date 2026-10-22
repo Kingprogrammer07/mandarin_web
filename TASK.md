@@ -1,18 +1,21 @@
-# TASK: "Boshqa astatkada" qatorini Tasdiqlash bilan qayta tekshirish
+# TASK: Warehouse qidiruvida astatka yukining asl reysi
 
 ## Objective
-Foydalanuvchi (2026-10-21): OSTATKA-21.10.2026 da ishlayapti. Eski OSTATKA 16.10 ni o'chirgandan keyin ham ish ro'yxatidagi qatorlar "Bu yuk OSTATKA 16.10 astatkasida turibdi" deb qolyapti va Tasdiqlash tugmasi o'chiq. So'rov: "tasdiqlash bosilganda qayta tekshirib tasdiqlasa bo'lmaydimi?"
+Foydalanuvchi (2026-10-22): astatka xabaridagidek, warehouse sahifasidan yuk qidirilganda ham asl nomi chiqsin.
 
-Sabab: ish ro'yxatidagi qator serverning skanerlash paytidagi javobini saqlab qoladi; "Boshqa astatkada" holati Tasdiqlash ham, Qayta tekshirish ham bermasdi, qayta skanerlash esa faqat "allaqachon skanerlangan" deydi.
+Hozir warehouse mijozning yuklarini to'lov qatorlaridan ko'rsatadi. Astatka yukining to'lovi u kelgan reysda turadi, shuning uchun yuk asl reysi (masalan M286-M287) ostida chiqadi. Lekin uning qaysi astatka javonida turgani hech qayerda yozilmaydi. "Reys" maydoniga astatka nomi yozilsa esa hech narsa topilmaydi.
 
 ## Implementation Plan
-- [x] `CONFIRMABLE` ga `other_astatka` qo'shildi: qatorning Tasdiqlash tugmasi yoqiladi
-- [x] "Hammasini tasdiqlash" va Ctrl+Enter o'zgarmadi: ular faqat tayyor qatorlarni yuboradi, boshqa astatkadagi yuk faqat o'z tugmasi bilan yuboriladi
-- [x] Testlar: lib (tugma yoqiladi, so'rov mijoz va reys bilan) va hook (server tasdiqlasa yashil, rad etsa xabari bilan qizil; ommaviy tasdiqlashga kirmaydi)
-- [x] Lint, typecheck, build, testlar
-- [x] Commit + push main
+- [x] Backend `search-grouped`: "Reys" maydonida astatka nomi (O…) bo'lsa, shu astatkada tasdiqlangan yuklarning (mijoz, asl reys) juftlari bo'yicha to'lov qatorlari qidiriladi; mijoz kodi bilan birga ham ishlaydi
+- [x] Backend: har bir reys guruhiga `astatka_flight_name` qo'shildi (shu mijozning shu reysdagi yuki qaysi astatkada tasdiqlangan)
+- [x] Frontend: reys kartasida asl reys nomi sarlavha, ostida "Ostatkada: OSTATKA-…" belgisi; yig'ilgan ko'rinishdagi reys chipida ham astatka nomi
+- [x] Yo'lda topilgan xato: mijoz va reys kartalari birinchi bosishda yopilmas edi (ikki marta bosish kerak edi)
+- [x] Testlar: backend Postgres (astatka nomi bilan qidirish, alias kod, boshqa reys va boshqa mijoz chiqmasligi), frontend komponent testi; 320/360/390/1280 px skrinshot va overflow tekshiruvi
+- [x] Warehouse checkboxlari ko'rinmas edi: `index.css` dagi `appearance: none` checkbox va radioga ham tushardi (qutisi ham, belgisi ham chizilmasdi). Endi faqat matn maydonlariga tushadi; reys tanlash checkboxi 44px bosish joyi bilan, "Isbot yuborilganlarni ko'rsatish" esa toggle (switch)
+- [x] Asl reys nomi bilan qidirishda ham shu guruh "Ostatkada" belgisi bilan chiqadi (backend testi)
+- [x] Commit + push main (backend, frontend)
 
 ## Walkthrough / Architecture
-Server tasdiqlashda yukni o'zi qayta tekshiradi (`astatka_flight.py` confirm). Yuk boshqa astatkada hali tasdiqlangan bo'lsa, javob `conflict` bo'ladi: "Bu yuk X astatkasida tasdiqlangan. Avval u yerdagi tasdiqni bekor qiling." Qator qizil bo'lib, shu xabarni ko'rsatadi. Yuk u yerda faqat kutilmoqda ro'yxatida bo'lsa, server uni shu astatkaga o'tkazadi va ogohlantirish beradi. U astatka o'chirilgan bo'lsa, yuk oddiy tasdiqlanadi.
+Astatka 2026-10-16 dan beri faqat `astatka_packages` ga yozadi: to'lov qatori eski reysda qoladi. Backenddagi `src/api/services/astatka_warehouse.py` ikki narsani beradi: astatkadagi yuklarning (mijoz kodi va uning barcha aliaslari, asl reys) juftlari, va berilgan (mijoz, reys) guruhlari uchun astatka nomi. Faqat bizning tasdiqlangan yuklar hisoblanadi: "kutilmoqda" yuk javonda ekani aniq emas, AKB yukining bizda to'lov qatori yo'q.
 
-Ommaviy tasdiqlash bunday qatorlarni olmaydi. Aks holda bitta bosish bilan boshqa astatkalarning ro'yxatidagi yuklar ko'chib ketishi mumkin edi.
+`ClientTransactionDAO.get_filtered_transactions` va `count_filtered_transactions_by_client_code` ga ixtiyoriy `client_flight_pairs` filtri qo'shildi (`(UPPER(TRIM(client_code)), UPPER(TRIM(reys))) IN (...)`). Excel eksport astatka nomini hali bilmaydi.

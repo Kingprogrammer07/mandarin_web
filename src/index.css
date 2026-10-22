@@ -308,11 +308,13 @@
     touch-action: manipulation;
   }
 
-  input,
+  input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
     /* Safari draws its own inset shadow, gradient and corner radius on text
-     * controls; rounded-* and bg-* utilities land on top of this reset. */
+     * controls; rounded-* and bg-* utilities land on top of this reset.
+     * Checkboxes and radios are left out: with no appearance they draw no box
+     * and no tick at all, so a plain checkbox toggles invisibly. */
     -webkit-appearance: none;
     appearance: none;
   }

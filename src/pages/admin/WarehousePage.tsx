@@ -611,13 +611,18 @@ export default function WarehousePage({ onNavigate, onLogout }: WarehousePagePro
           ) : (
             <div className="space-y-4">
               {/* Show-proved toggle */}
-              <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
-                <input
-                  type="checkbox"
-                  checked={showProved}
-                  onChange={e => setShowProved(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500 dark:border-gray-600 dark:bg-[#222]"
-                />
+              <label className="flex min-h-11 w-fit cursor-pointer select-none items-center gap-3">
+                <span className="relative shrink-0">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={showProved}
+                    onChange={e => setShowProved(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <span aria-hidden="true" className="block h-6 w-11 rounded-full border border-gray-300 bg-gray-200 transition-colors peer-checked:border-orange-500/50 peer-checked:bg-orange-500 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-500/40 dark:border-gray-700 dark:bg-gray-800 dark:peer-checked:bg-orange-600" />
+                  <span aria-hidden="true" className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
+                </span>
                 <span className="text-[13px] font-medium text-gray-600 dark:text-gray-400">
                   Isbot yuborilganlarni ko'rsatish
                 </span>
