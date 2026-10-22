@@ -42,6 +42,10 @@ export interface ShipmentItem {
   scanned_at: string | null;
   taken_away_date: string | null;
   last_update: string | null;
+
+  /** Astatka (O…) that now holds this flight's bag; null once collected or
+   *  when the backend predates it. */
+  astatka_flight_name?: string | null;
 }
 
 export interface ShipmentListResponse {

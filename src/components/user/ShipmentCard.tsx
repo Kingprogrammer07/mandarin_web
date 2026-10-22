@@ -2,6 +2,7 @@ import { ChevronRight, Plane } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ShipmentItem } from '@/api/services/shipmentService';
 import { formatUzsAmount, formatWeightKg } from '@/lib/format';
+import { AstatkaShelfNote } from '@/components/user/AstatkaShelfNote';
 import { triggerSoftHaptic } from '@/utils/haptics';
 
 interface ShipmentCardProps {
@@ -83,11 +84,16 @@ export function ShipmentCard({ shipment, onOpen }: ShipmentCardProps) {
           triggerSoftHaptic();
           onOpen();
         }}
-        aria-label={
-          hasDebt
-            ? `${shipment.flight_name}, ${stageLabel}, ${t('reports.status.unpaid')}`
-            : `${shipment.flight_name}, ${stageLabel}`
-        }
+        aria-label={[
+          shipment.flight_name,
+          stageLabel,
+          hasDebt ? t('reports.status.unpaid') : null,
+          shipment.astatka_flight_name
+            ? `${t('shipments.inAstatka', 'Ostatkada:')} ${shipment.astatka_flight_name}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(', ')}
         className="w-full rounded-mc-lg border border-mc-border bg-mc-surface p-3 text-left
                    shadow-[var(--mc-shadow-card)] transition-transform duration-150
                    active:scale-[0.99]"
@@ -129,6 +135,10 @@ export function ShipmentCard({ shipment, onOpen }: ShipmentCardProps) {
                   name: shipment.manifest_flight_name,
                 })}
               </span>
+            )}
+
+            {shipment.astatka_flight_name && (
+              <AstatkaShelfNote astatkaFlightName={shipment.astatka_flight_name} />
             )}
 
             {moment && (

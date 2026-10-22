@@ -2242,6 +2242,7 @@
     "stageWarehouse": "На складе в Ташкенте",
     "stageCollected": "Забрано",
     "manifestName": "В Китае: {{name}}",
+    "inAstatka": "На остатке:",
     "parcels": "Грузы",
     "pcs": "шт",
     "searchPlaceholder": "Номер рейса",

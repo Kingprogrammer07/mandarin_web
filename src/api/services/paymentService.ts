@@ -9,6 +9,8 @@ export interface AvailableFlightItem {
   total_payment: number | null;
   payment_status: 'unpaid' | 'partial';
   remaining_amount: number | null;
+  /** Astatka (O…) that now holds this flight's bag; the debt stays here. */
+  astatka_flight_name?: string | null;
 }
 
 export interface AvailableFlightsResponse {

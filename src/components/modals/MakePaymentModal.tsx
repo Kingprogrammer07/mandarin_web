@@ -59,6 +59,7 @@ import { useMaintenanceWatcher } from '@/hooks/useMaintenanceWatcher';
 import { useGuideTour } from '@/hooks/useGuideTour';
 import { pickVisible } from '@/utils/tour';
 import type { DriveStep } from 'driver.js';
+import { AstatkaShelfNote } from '@/components/user/AstatkaShelfNote';
 
 // ============================================================================
 // Helpers
@@ -981,9 +982,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                        text-left shadow-[var(--mc-shadow-card)] transition-transform
                        duration-150"
           >
-            <div className="flex items-center justify-between gap-3">
+            {/* Wraps the amount under the name when both do not fit (320px with
+                a seven-digit sum) rather than squeezing the flight name: a
+                truncated "M286-M..." names no flight at all. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               {/* Left */}
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex items-center gap-2.5">
                 {/* Blue appeared nowhere else in the client app; the chip now
                     carries the same warn/brand pair the cargo list uses. */}
                 <div
@@ -995,8 +999,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 >
                   <Plane className="h-[18px] w-[18px]" strokeWidth={2} />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[14px] font-extrabold text-mc-text">
+                <div>
+                  <p className="break-words text-[14px] font-extrabold text-mc-text">
                     {flight.flight_name}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -1016,7 +1020,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               </div>
 
               {/* Right – amount */}
-              <div className="text-right flex-shrink-0">
+              <div className="ml-auto text-right flex-shrink-0">
                 {flight.total_payment != null ? (
                   <>
                     {flight.payment_status === 'partial' &&
@@ -1049,6 +1053,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 <ChevronRight className="ml-auto mt-0.5 h-3.5 w-3.5 text-mc-text-3" />
               </div>
             </div>
+            {/* Under the whole row, not in the name column: a large amount
+                squeezes that column to a few dozen pixels. Indented to the
+                name (36px chip + 10px gap). */}
+            {flight.astatka_flight_name && (
+              <span className="mt-1.5 block pl-[46px]">
+                <AstatkaShelfNote astatkaFlightName={flight.astatka_flight_name} />
+              </span>
+            )}
           </motion.button>
           ))
         )}

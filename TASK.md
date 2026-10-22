@@ -1,22 +1,20 @@
-# TASK: Warehouse qidiruvida astatka yukining asl reysi
+# TASK: Mijoz ilovasida astatkadagi yuk uchun "Ostatkada" belgisi
 
 ## Objective
-Foydalanuvchi (2026-10-22): astatka xabaridagidek, warehouse sahifasidan yuk qidirilganda ham asl nomi chiqsin.
+Foydalanuvchi (2026-10-22) astatkadagi yukning asl reys qarzini mijozdan yashirishni taklif qildi. Muhokamadan keyin "Belgi qo'yish" tanlandi: qarz asl reysda qoladi (mijoz uni ko'radi va to'laydi), yonida "Ostatkada: OSTATKA-…" yoziladi.
 
-Hozir warehouse mijozning yuklarini to'lov qatorlaridan ko'rsatadi. Astatka yukining to'lovi u kelgan reysda turadi, shuning uchun yuk asl reysi (masalan M286-M287) ostida chiqadi. Lekin uning qaysi astatka javonida turgani hech qayerda yozilmaydi. "Reys" maydoniga astatka nomi yozilsa esa hech narsa topilmaydi.
+Sabab: 16.10 dan beri astatka yuborilganda qarz yozilmaydi, qarz faqat asl reysda turadi. Yashirsak mijoz qarzni ko'rmaydi va ilovadan to'lay olmaydi; qarz reys bo'yicha bitta qator bo'lgani uchun reysdagi boshqa yuklar qarzi ham yashirinib qolardi.
 
 ## Implementation Plan
-- [x] Backend `search-grouped`: "Reys" maydonida astatka nomi (O…) bo'lsa, shu astatkada tasdiqlangan yuklarning (mijoz, asl reys) juftlari bo'yicha to'lov qatorlari qidiriladi; mijoz kodi bilan birga ham ishlaydi
-- [x] Backend: har bir reys guruhiga `astatka_flight_name` qo'shildi (shu mijozning shu reysdagi yuki qaysi astatkada tasdiqlangan)
-- [x] Frontend: reys kartasida asl reys nomi sarlavha, ostida "Ostatkada: OSTATKA-…" belgisi; yig'ilgan ko'rinishdagi reys chipida ham astatka nomi
-- [x] Yo'lda topilgan xato: mijoz va reys kartalari birinchi bosishda yopilmas edi (ikki marta bosish kerak edi)
-- [x] Testlar: backend Postgres (astatka nomi bilan qidirish, alias kod, boshqa reys va boshqa mijoz chiqmasligi), frontend komponent testi; 320/360/390/1280 px skrinshot va overflow tekshiruvi
-- [x] Warehouse checkboxlari ko'rinmas edi: `index.css` dagi `appearance: none` checkbox va radioga ham tushardi (qutisi ham, belgisi ham chizilmasdi). Endi faqat matn maydonlariga tushadi; reys tanlash checkboxi 44px bosish joyi bilan, "Isbot yuborilganlarni ko'rsatish" esa toggle (switch)
-- [x] "Strict" qidiruv: "Mening faolligim" bo'limidagi "Aniq" checkboxi ko'rinmas edi; endi asosiy qidiruvdagi kabi switch. Ikkalasi bitta `FilterSwitch` komponentidan; faollik qatoridagi input 16px (iPhone zoom qilmasin), qator 42px
-- [x] Asl reys nomi bilan qidirishda ham shu guruh "Ostatkada" belgisi bilan chiqadi (backend testi)
+- [x] Backend: `astatka_warehouse.client_astatka_shelves(codes, flights)` — mijozning qaysi reysdagi yuki qaysi astatkada (faqat bizning tasdiqlangan yuklar, aliaslar bilan)
+- [x] Backend: `GET /payments/available-flights` (to'lov uchun reys tanlash) har bir reysga `astatka_flight_name`
+- [x] Backend: `GET /shipments` ("Yuklarim" kartalari) har bir reysga `astatka_flight_name`; olib ketilgan yukda yo'q
+- [x] Frontend: `AstatkaShelfNote` — "📦 Ostatkada: OSTATKA-…" qatori (uz/ru), to'lov ro'yxatida va `ShipmentCard` da; nom kesilmaydi, butunligicha keyingi qatorga o'tadi
+- [x] Yo'lda: to'lov ro'yxatida 320px da katta summa reys nomini "M286-M..." qilib kesardi; endi summa kerak bo'lsa pastki qatorga tushadi
+- [x] Testlar: backend Postgres (ikkala endpoint, boshqa mijozga chiqmasligi), `ShipmentCard` komponent testi; 320/360/390 light/dark skrinshot, overflow 0
 - [x] Commit + push main (backend, frontend)
 
 ## Walkthrough / Architecture
-Astatka 2026-10-16 dan beri faqat `astatka_packages` ga yozadi: to'lov qatori eski reysda qoladi. Backenddagi `src/api/services/astatka_warehouse.py` ikki narsani beradi: astatkadagi yuklarning (mijoz kodi va uning barcha aliaslari, asl reys) juftlari, va berilgan (mijoz, reys) guruhlari uchun astatka nomi. Faqat bizning tasdiqlangan yuklar hisoblanadi: "kutilmoqda" yuk javonda ekani aniq emas, AKB yukining bizda to'lov qatori yo'q.
+Astatka yuki `astatka_packages` da (status confirmed, source_company = own) asl reys nomi bilan turadi. `client_astatka_shelves` mijozning barcha kodlari va sahifadagi reys nomlari bo'yicha bitta so'rov qiladi va `{reys: astatka}` qaytaradi. Endpointlar bu nomni javobga qo'shadi; eski frontend yangi maydonni e'tiborsiz qoldiradi, yangi frontend eski backendda maydon bo'lmasa hech narsa ko'rsatmaydi, shuning uchun deploy tartibi muhim emas.
 
-`ClientTransactionDAO.get_filtered_transactions` va `count_filtered_transactions_by_client_code` ga ixtiyoriy `client_flight_pairs` filtri qo'shildi (`(UPPER(TRIM(client_code)), UPPER(TRIM(reys))) IN (...)`). Excel eksport astatka nomini hali bilmaydi.
+Oldingi vazifa (warehouse astatka qidiruvi, checkboxlar, strict switch): web 771244e, 1210b1c; bot 381f519.
