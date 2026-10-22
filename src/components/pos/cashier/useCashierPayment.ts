@@ -47,6 +47,8 @@ export interface FlightGroup {
   items: UnpaidCargoItem[];
   totalWeight: number;
   totalAmount: number;
+  /** Astatka (O…) holding this flight's bag; it is still paid on this flight. */
+  astatkaFlightName: string | null;
 }
 
 interface PosApiError {
@@ -166,6 +168,8 @@ export function useCashierPayment(
       items,
       totalWeight: items.reduce((sum, c) => sum + (c.weight ?? 0), 0),
       totalAmount: items.reduce((sum, c) => sum + (c.total_payment ?? 0), 0),
+      astatkaFlightName:
+        items.find((c) => c.astatka_flight_name)?.astatka_flight_name ?? null,
     }));
   }, [cargos]);
 

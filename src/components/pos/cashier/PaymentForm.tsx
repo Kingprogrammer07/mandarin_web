@@ -16,7 +16,7 @@
  * read past on every payment.
  */
 
-import { ChevronDown, CreditCard, Loader2, Pencil, Wallet } from 'lucide-react';
+import { ChevronDown, CreditCard, Loader2, Package, Pencil, Wallet } from 'lucide-react';
 
 import { formatCurrencySum } from '@/lib/format';
 import { formatCard, PAYMENT_TYPES } from '@/pages/pos/components/utils';
@@ -194,6 +194,7 @@ export function PaymentForm({
             To‘lanmagan yuk yo‘q
           </p>
         ) : (
+          <>
           <span className="relative flex items-center">
             <select
               id="kassa-flight"
@@ -211,6 +212,7 @@ export function PaymentForm({
                 <option key={group.flightName} value={group.flightName}>
                   {group.flightName} · {group.items.length} ta ·{' '}
                   {formatCurrencySum(group.totalAmount)}
+                  {group.astatkaFlightName ? ` · Ostatkada` : ''}
                 </option>
               ))}
             </select>
@@ -220,6 +222,26 @@ export function PaymentForm({
               aria-hidden="true"
             />
           </span>
+          {/* The bag is paid on its own flight but waits on an astatka shelf:
+              the cashier should know where to send the client. */}
+          {groups
+            .filter(
+              (group) =>
+                group.astatkaFlightName &&
+                group.items.some((item) => selectedIds.has(item.cargo_id)),
+            )
+            .map((group) => (
+              <p
+                key={group.flightName}
+                className="mt-1 flex flex-wrap items-center gap-x-1 text-[11px] font-semibold text-mc-text-2"
+              >
+                <Package className="h-3 w-3 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                <span className="font-bold text-mc-text">{group.flightName}</span>
+                yuki ostatkada:
+                <span className="font-bold text-mc-text">{group.astatkaFlightName}</span>
+              </p>
+            ))}
+          </>
         )}
       </div>
 

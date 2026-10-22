@@ -11,6 +11,7 @@ Sabab: 16.10 dan beri astatka yuborilganda qarz yozilmaydi, qarz faqat asl reysd
 - [x] Backend: `GET /shipments` ("Yuklarim" kartalari) har bir reysga `astatka_flight_name`; olib ketilgan yukda yo'q
 - [x] Frontend: `AstatkaShelfNote` — "📦 Ostatkada: OSTATKA-…" qatori (uz/ru), to'lov ro'yxatida va `ShipmentCard` da; nom kesilmaydi, butunligicha keyingi qatorga o'tadi
 - [x] Yo'lda: to'lov ro'yxatida 320px da katta summa reys nomini "M286-M..." qilib kesardi; endi summa kerak bo'lsa pastki qatorga tushadi
+- [x] /pos va /kassa (2026-10-22, foydalanuvchi so'radi): `GET /verification/{kod}/cargo/unpaid` har bir yukka `astatka_flight_name`; /pos ning ikkala reys ro'yxatida reys nomi ostida "Ostatkada: …" (nom endi kesilmaydi), /kassa da reys tanlovida "· Ostatkada" va tanlangan reys uchun "M286-M287 yuki ostatkada: OSTATKA-…" qatori
 - [x] Testlar: backend Postgres (ikkala endpoint, boshqa mijozga chiqmasligi), `ShipmentCard` komponent testi; 320/360/390 light/dark skrinshot, overflow 0
 - [x] Commit + push main (backend, frontend)
 

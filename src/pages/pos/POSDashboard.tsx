@@ -96,6 +96,18 @@ import { useAppTheme } from '@/hooks/useAppTheme';
 // every render (would defeat their memoization once they are memoized).
 const EMPTY_TAB_COUNTS = { flight: 0, zayafka: 0 } as const;
 
+/** The bag is owed on this flight but sits on an astatka shelf; the name wraps
+ *  whole rather than truncating, since a clipped date names another astatka. */
+function PosAstatkaNote({ name }: { name: string }) {
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+      <Package className="h-3 w-3 shrink-0" aria-hidden="true" />
+      Ostatkada:
+      <span className="font-bold">{name}</span>
+    </span>
+  );
+}
+
 interface POSDashboardProps {
   onNavigate: (page: string) => void;
   onLogout: () => void;
@@ -633,6 +645,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
       items,
       totalWeight: items.reduce((s, c) => s + c.weight, 0),
       totalAmount: items.reduce((s, c) => s + c.total_payment, 0),
+      astatkaFlightName: items.find((c) => c.astatka_flight_name)?.astatka_flight_name ?? null,
     }));
   }, [cargos]);
 
@@ -1675,7 +1688,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                           </button>
                                         </div>
                                         <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
-                                          {flightGroups.map(({ flightName, items, totalWeight, totalAmount }) => {
+                                          {flightGroups.map(({ flightName, items, totalWeight, totalAmount, astatkaFlightName }) => {
                                             const allSelected = items.every(c => selectedIds.has(c.cargo_id));
                                             return (
                                               <button
@@ -1684,11 +1697,14 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                                 onClick={() => toggleFlight(flightName)}
                                                 className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors text-left"
                                               >
-                                                <div className="flex items-center gap-2.5">
+                                                <div className="flex min-w-0 items-center gap-2.5">
                                                   <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${allSelected ? "bg-orange-500 border-orange-500" : "border-gray-300 dark:border-gray-600"}`}>
                                                     {allSelected && <CheckCheck className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
                                                   </div>
-                                                  <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{flightName}</span>
+                                                  <span className="min-w-0">
+                                                    <span className="block break-words text-[12px] font-semibold text-gray-700 dark:text-gray-300">{flightName}</span>
+                                                    {astatkaFlightName && <PosAstatkaNote name={astatkaFlightName} />}
+                                                  </span>
                                                 </div>
                                                 <span className="text-[11px] text-gray-400 dark:text-gray-500">
                                                   {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(2)} kg · {formatCurrencySum(totalAmount)}
@@ -1858,7 +1874,7 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                 </span>
                               </div>
                               <div className="max-h-40 overflow-y-auto space-y-0.5 pr-0.5">
-                                {flightGroups.map(({ flightName, items, totalAmount }) => {
+                                {flightGroups.map(({ flightName, items, totalAmount, astatkaFlightName }) => {
                                   const allSelected = items.every((c) => selectedIds.has(c.cargo_id));
                                   return (
                                     <button
@@ -1882,8 +1898,11 @@ export default function POSDashboard({ onNavigate, onLogout }: POSDashboardProps
                                       >
                                         {allSelected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
                                       </span>
-                                      <span className="flex-1 min-w-0 truncate text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                                        {flightName}
+                                      <span className="flex-1 min-w-0">
+                                        <span className="block break-words text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                                          {flightName}
+                                        </span>
+                                        {astatkaFlightName && <PosAstatkaNote name={astatkaFlightName} />}
                                       </span>
                                       <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 shrink-0 tabular-nums">
                                         {formatCurrencySum(totalAmount)}

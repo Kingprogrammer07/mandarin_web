@@ -189,6 +189,8 @@ export interface UnpaidCargoItem {
   currency: string;
   payment_status: 'pending';
   created_at: string;
+  /** Astatka (O…) that now holds this bag; the debt stays on `flight_name`. */
+  astatka_flight_name?: string | null;
 }
 
 // Backend UnpaidCargoListResponse
