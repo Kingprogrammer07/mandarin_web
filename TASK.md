@@ -10,7 +10,7 @@ Sabab (server ma'lumoti bilan tasdiqlandi): SSSS77 yuki M306 dan tasdiqlangan, l
 - [x] Backend: web yuborish bu holatni "Xato" deb sanaydi, sababi ro'yxatda chiqadi, logga yoziladi; yuk "Kutmoqda" bo'lib qoladi
 - [x] Frontend: hech kimga yetmagan yuborishda oyna sarlavhasi "Hech kimga yuborilmadi"
 - [x] Testlar: backend Postgres (rasmsiz yuk → xato, yuborilmaydi, belgilanmaydi), dialog testi
-- [ ] Commit + push main (backend, frontend)
+- [x] Commit + push main (bot 35cc0f2, web 0851451)
 
 ## Walkthrough / Architecture
 Astatka yuborishda har bir mijoz uchun `build_web_report` xabar yig'adi. Rasm yo'q bo'lsa endi `None` emas, `NoPhotoError` qaytadi; `_run_send_task` uni ushlab `failed` natija yozadi, Redis'dagi vazifa holatida `errors` ro'yxatiga sabab tushadi va `SendProgressDialog` uni qizil "Xatolar" qutisida ko'rsatadi. Oddiy reyslar o'zgarmadi.
