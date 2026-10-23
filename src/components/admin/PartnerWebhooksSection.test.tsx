@@ -169,7 +169,9 @@ describe('PartnerWebhooksSection', () => {
 
     service.list.mockResolvedValue([partner({ id: 7, courier_enabled: true })]);
     renderSection();
-    expect(await screen.findByText('Kuryer API · ID 7')).toBeInTheDocument();
+    expect(await screen.findByText('ID 7')).toBeInTheDocument();
+    // The header button plus the card's courier chip.
+    expect(screen.getAllByText('Kuryer API').length).toBeGreaterThanOrEqual(2);
   });
 
   it('labels courier status events in the history', async () => {
@@ -192,6 +194,14 @@ describe('PartnerWebhooksSection', () => {
 });
 
 describe('partner guide', () => {
+  it('includes the pull API with its signed paths and the Python client', () => {
+    const markdown = guideToMarkdown();
+    expect(markdown).toContain('GET /api/v1/partner/cargo/flights');
+    expect(markdown).toContain('POST /api/v1/partner/cargo/items');
+    expect(markdown).toContain('next_after_id');
+    expect(markdown).toContain('def pull(flights');
+  });
+
   it('copies as Markdown with the Python example and the signature headers', () => {
     const markdown = guideToMarkdown();
     expect(markdown).toContain('```python');

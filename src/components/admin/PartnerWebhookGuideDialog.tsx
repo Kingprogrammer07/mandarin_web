@@ -41,7 +41,7 @@ function Inline({ text }: { text: string }) {
         index % 2 === 1 ? (
           <code
             key={index}
-            className="rounded-md bg-gray-100 px-1 py-0.5 font-mono text-[0.85em] text-gray-800 dark:bg-white/10 dark:text-white/85"
+            className="rounded-md bg-gray-100 px-1 py-0.5 font-mono text-[0.85em] text-gray-800 [overflow-wrap:anywhere] dark:bg-white/10 dark:text-white/85"
           >
             {part}
           </code>

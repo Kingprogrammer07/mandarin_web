@@ -8,6 +8,8 @@
  * here. The Python example was run against that sender's signing code.
  */
 
+import { PARTNER_PULL_GUIDE } from './partnerPullGuide';
+
 export type GuideBlock =
   | { kind: 'p'; text: string }
   | { kind: 'list'; items: string[] }
@@ -150,7 +152,7 @@ async def mandarin_webhook(request: Request):
 export const GUIDE_TELEGRAPH_URL =
   'https://telegra.ph/Mandarin-Cargo-webhook-hamkor-uchun-qollanma-10-22';
 
-export const GUIDE_TITLE = "Mandarin Cargo webhook: hamkor uchun qo'llanma";
+export const GUIDE_TITLE = "Mandarin Cargo: webhook va yuk API, hamkor uchun qo'llanma";
 
 export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
   {
@@ -165,6 +167,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
         kind: 'list',
         items: [
           "Faqat shu yuklashda qo'shilgan qatorlar keladi. Avval yuborilgan va eski qatorlar qayta yuborilmaydi.",
+          "Eski qatorlar yoki butun reys kerak bo'lsa, ularni API orqali o'zingiz so'rab olasiz (pastda, «Yuklarni o'zingiz so'rab olish»).",
           "Narx va to'lov ma'lumotlari yuborilmaydi.",
           "Har bir so'rov maxfiy kalit bilan imzolanadi: soxta so'rovni ajratib olasiz.",
         ],
@@ -279,6 +282,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
       { kind: 'code', lang: 'python', code: PYTHON_RECEIVER },
     ],
   },
+  ...PARTNER_PULL_GUIDE,
   {
     title: 'Xavfsizlik',
     blocks: [

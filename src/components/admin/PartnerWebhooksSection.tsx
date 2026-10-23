@@ -535,10 +535,14 @@ function PartnerCard({
                 To'xtatilgan
               </span>
             )}
+            {/* The partner signs its API calls with this id (yuk API and kuryer API). */}
+            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-gray-700 dark:bg-white/10 dark:text-white/80">
+              ID {partner.id}
+            </span>
             {partner.courier_enabled && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-black text-gray-700 dark:bg-white/10 dark:text-white/80">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: partner.color }} />
-                Kuryer API · ID {partner.id}
+                Kuryer API
               </span>
             )}
           </div>
@@ -641,10 +645,10 @@ export default function PartnerWebhooksSection() {
           <p className="text-base font-bold text-gray-900 dark:text-white">Hamkor kargolar</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Xitoy importidagi hamkor mijozlarining yangi qatorlari ularning serveriga avtomatik
-            yuboriladi. Narxlar yuborilmaydi.
+            yuboriladi, eskilarini ular API orqali o'zlari so'rab oladi. Narxlar berilmaydi.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setGuide('webhook')}
