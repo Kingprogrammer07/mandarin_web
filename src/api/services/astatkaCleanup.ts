@@ -48,6 +48,35 @@ export interface CleanupPreview {
   skipped: CleanupBag[];
 }
 
+/**
+ * Why a bag of a run keeps its debt when the run's debt is closed:
+ * handed out or changed since, a receipt waiting, in a queue or delivery, or
+ * a credit on the same flight that closing the debt would make spendable.
+ */
+export type WriteOffSkipReason = "changed" | "receipt_pending" | "in_delivery" | "flight_credit";
+
+export interface WriteOffPlan {
+  bags: number;
+  transactions: number;
+  amount: number;
+  skipped: { flight_name: string; client_code: string; debt: number; reason: WriteOffSkipReason }[];
+}
+
+/** One closing of a run's debt; `undone_at` set once it was brought back. */
+export interface CleanupWriteOff {
+  id: number;
+  created_at: string | null;
+  admin_username: string | null;
+  bags: number;
+  transactions: number;
+  amount: number;
+  skipped: number;
+  undone_at: string | null;
+  undone_by_username: string | null;
+  reverted: number | null;
+  kept: number | null;
+}
+
 export interface CleanupRun {
   id: number;
   astatka_flight_name: string;
@@ -62,6 +91,8 @@ export interface CleanupRun {
   undone_by_username: string | null;
   reverted: number | null;
   kept: number | null;
+  /** The latest write-off of this run's debt, undone ones included. */
+  write_off?: CleanupWriteOff | null;
 }
 
 export interface CleanupApplyResult {
@@ -101,6 +132,37 @@ export async function getAstatkaCleanupRuns(flightName: string): Promise<Cleanup
 export async function undoAstatkaCleanup(flightName: string, runId: number): Promise<CleanupRun> {
   const { data } = await apiClient.post<CleanupRun>(
     `${base(flightName)}/cleanups/${runId}/undo`,
+  );
+  return data;
+}
+
+/** What closing the run's debt would do; writes nothing. */
+export async function getAstatkaWriteOffPlan(flightName: string, runId: number): Promise<WriteOffPlan> {
+  const { data } = await apiClient.get<WriteOffPlan>(
+    `${base(flightName)}/cleanups/${runId}/write-off`,
+  );
+  return data;
+}
+
+/**
+ * Close the debt of the bags the run marked taken: the kassa and the client's
+ * balance stop showing it. `confirmName` is the astatka's name typed again.
+ */
+export async function writeOffAstatkaCleanupDebt(
+  flightName: string,
+  runId: number,
+  confirmName: string,
+): Promise<CleanupRun> {
+  const { data } = await apiClient.post<CleanupRun>(
+    `${base(flightName)}/cleanups/${runId}/write-off`,
+    { confirm: confirmName },
+  );
+  return data;
+}
+
+export async function undoAstatkaWriteOff(flightName: string, runId: number): Promise<CleanupRun> {
+  const { data } = await apiClient.post<CleanupRun>(
+    `${base(flightName)}/cleanups/${runId}/write-off/undo`,
   );
   return data;
 }

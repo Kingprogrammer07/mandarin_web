@@ -28,6 +28,7 @@ import {
   type CleanupSkipReason,
 } from "@/api/services/astatkaCleanup";
 import type { AstatkaFlightStats } from "@/api/services/astatkaFlights";
+import { CleanupWriteOff } from "@/components/astatka/CleanupWriteOff";
 import { WorkspaceDialog } from "@/components/astatka/workspace/WorkspaceDialog";
 import { formatDateTime, formatKg, paymentLabel } from "@/lib/astatkaFormat";
 import { formatUzs, TASHKENT_TZ } from "@/lib/format";
@@ -686,6 +687,7 @@ function CleanupHistory({
             <div className="mt-2 flex flex-wrap gap-2">
               <ExcelButton flightName={flightName} run={run} />
               {!run.undone_at &&
+                !(run.write_off && !run.write_off.undone_at) &&
                 (armed === run.id ? (
                   <>
                     <button
@@ -717,6 +719,7 @@ function CleanupHistory({
                   </button>
                 ))}
             </div>
+            <CleanupWriteOff flightName={flightName} run={run} onChanged={onUndone} />
           </li>
         ))}
       </ul>

@@ -11,13 +11,19 @@ vi.mock("@/api/services/astatkaCleanup", () => ({
   undoAstatkaCleanup: vi.fn(),
   downloadAstatkaCleanupExcel: vi.fn(),
   downloadAstatkaInventoryReport: vi.fn(),
+  getAstatkaWriteOffPlan: vi.fn(),
+  writeOffAstatkaCleanupDebt: vi.fn(),
+  undoAstatkaWriteOff: vi.fn(),
 }));
 
 import {
   cleanAstatkaFlights,
   getAstatkaCleanupPreview,
   getAstatkaCleanupRuns,
+  getAstatkaWriteOffPlan,
   undoAstatkaCleanup,
+  undoAstatkaWriteOff,
+  writeOffAstatkaCleanupDebt,
   type CleanupPreview,
   type CleanupRun,
 } from "@/api/services/astatkaCleanup";
@@ -27,6 +33,9 @@ const previewApi = vi.mocked(getAstatkaCleanupPreview);
 const runsApi = vi.mocked(getAstatkaCleanupRuns);
 const cleanApi = vi.mocked(cleanAstatkaFlights);
 const undoApi = vi.mocked(undoAstatkaCleanup);
+const planApi = vi.mocked(getAstatkaWriteOffPlan);
+const writeOffApi = vi.mocked(writeOffAstatkaCleanupDebt);
+const undoWriteOffApi = vi.mocked(undoAstatkaWriteOff);
 
 const NAME = "OSTATKA-21.10.2026";
 
@@ -180,5 +189,79 @@ describe("AstatkaCleanupDialog", () => {
     expect(undoApi).not.toHaveBeenCalled();
     fireEvent.click(within(history).getByRole("button", { name: /Ha, 2 ta yukni qaytarish/ }));
     await waitFor(() => expect(undoApi).toHaveBeenCalledWith(NAME, 7));
+  });
+
+  it("closes a run's debt after the name is typed, and shows what stays", async () => {
+    runsApi.mockResolvedValue([run]);
+    planApi.mockResolvedValue({
+      bags: 1,
+      transactions: 1,
+      amount: 150000,
+      skipped: [{ flight_name: "M300", client_code: "SS9", debt: 50000, reason: "receipt_pending" }],
+    });
+    writeOffApi.mockResolvedValue({
+      ...run,
+      write_off: {
+        id: 1,
+        created_at: "2026-10-23T08:00:00Z",
+        admin_username: "boss",
+        bags: 1,
+        transactions: 1,
+        amount: 150000,
+        skipped: 1,
+        undone_at: null,
+        undone_by_username: null,
+        reverted: null,
+        kept: null,
+      },
+    });
+    renderDialog();
+
+    const history = (await screen.findByText("Oldingi tozalashlar")).closest("section") as HTMLElement;
+    fireEvent.click(within(history).getByRole("button", { name: "Qarzni o'chirish" }));
+    const panel = await within(history).findByRole("region", { name: "№7 qarzini o'chirish" });
+    expect(panel.textContent).toContain("kassaga pul tushgan deb hisoblanmaydi");
+    expect(await within(panel).findByText(/SS9 · M300/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Kassada chek kutilmoqda/)).toBeInTheDocument();
+
+    const submit = within(panel).getByRole("button", { name: /qarzni o'chirish$/ });
+    expect(submit).toBeDisabled();
+    fireEvent.change(within(panel).getByLabelText(/astatka nomini yozing/), {
+      target: { value: NAME.toLowerCase() },
+    });
+    fireEvent.click(submit);
+    await waitFor(() => expect(writeOffApi).toHaveBeenCalledWith(NAME, 7, NAME.toLowerCase()));
+  });
+
+  it("brings the debt back, and hides the cleanup undo while it is closed", async () => {
+    const closed: CleanupRun = {
+      ...run,
+      write_off: {
+        id: 1,
+        created_at: "2026-10-23T08:00:00Z",
+        admin_username: "boss",
+        bags: 1,
+        transactions: 1,
+        amount: 150000,
+        skipped: 0,
+        undone_at: null,
+        undone_by_username: null,
+        reverted: null,
+        kept: null,
+      },
+    };
+    runsApi.mockResolvedValue([closed]);
+    undoWriteOffApi.mockResolvedValue({
+      ...closed,
+      write_off: { ...closed.write_off!, undone_at: "2026-10-23T09:00:00Z", reverted: 1, kept: 0 },
+    });
+    renderDialog();
+
+    const history = (await screen.findByText("Oldingi tozalashlar")).closest("section") as HTMLElement;
+    expect(await within(history).findByText(/Qarz o'chirilgan/)).toBeInTheDocument();
+    expect(within(history).queryByRole("button", { name: /Bekor qilish/ })).not.toBeInTheDocument();
+    fireEvent.click(within(history).getByRole("button", { name: /Qarzni qaytarish/ }));
+    fireEvent.click(within(history).getByRole("button", { name: /Ha, qarzni qaytarish/ }));
+    await waitFor(() => expect(undoWriteOffApi).toHaveBeenCalledWith(NAME, 7));
   });
 });
