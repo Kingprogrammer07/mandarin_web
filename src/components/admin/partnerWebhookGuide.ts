@@ -295,8 +295,11 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
 ];
 
 /** The whole guide as Markdown, to paste into Telegram, Telegraph or an email. */
-export function guideToMarkdown(sections: GuideSection[] = PARTNER_WEBHOOK_GUIDE): string {
-  const out: string[] = [`# ${GUIDE_TITLE}`];
+export function guideToMarkdown(
+  sections: readonly GuideSection[] = PARTNER_WEBHOOK_GUIDE,
+  title: string = GUIDE_TITLE,
+): string {
+  const out: string[] = [`# ${title}`];
   for (const section of sections) {
     out.push('', `## ${section.title}`);
     for (const block of section.blocks) {

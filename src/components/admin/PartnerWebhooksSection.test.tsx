@@ -25,8 +25,16 @@ vi.mock('@/api/services/partnerWebhooks', () => ({
 import { partnerWebhookService } from '@/api/services/partnerWebhooks';
 import PartnerWebhooksSection from './PartnerWebhooksSection';
 import { guideToMarkdown, splitInlineCode } from './partnerWebhookGuide';
+import { COURIER_GUIDE_TITLE, PARTNER_COURIER_GUIDE } from './partnerCourierGuide';
 
 const service = vi.mocked(partnerWebhookService);
+
+// Radix Switch measures itself inside a form (the courier API switch).
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 
 function partner(overrides: Partial<PartnerWebhook> = {}): PartnerWebhook {
   return {
@@ -35,6 +43,8 @@ function partner(overrides: Partial<PartnerWebhook> = {}): PartnerWebhook {
     client_code_prefixes: ['U'],
     url: 'https://u.uz/hook',
     is_active: true,
+    courier_enabled: false,
+    color: '#2563EB',
     created_at: null,
     created_by: 'boss',
     updated_by: 'boss',
@@ -108,6 +118,8 @@ describe('PartnerWebhooksSection', () => {
         name: 'U kargo',
         client_code_prefixes: ['U', 'UZ'],
         url: 'https://u.uz/hook',
+        courier_enabled: false,
+        color: '#2563EB',
       }),
     );
     expect(await screen.findByText('whsec_once')).toBeInTheDocument();
@@ -143,6 +155,35 @@ describe('PartnerWebhooksSection', () => {
     expect(await screen.findByText(/Yangi yuborish navbatga qo'yildi/)).toBeInTheDocument();
   });
 
+  it('switches the courier API on with a colour and shows the partner id', async () => {
+    service.list.mockResolvedValue([partner({ id: 7 })]);
+    service.update.mockResolvedValue(partner({ id: 7, courier_enabled: true, color: '#0D9488' }));
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Tahrirlash/ }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Kuryer API' }));
+    fireEvent.click(screen.getByRole('radio', { name: '#0D9488' }));
+    fireEvent.click(screen.getByRole('button', { name: /Saqlash/ }));
+    await waitFor(() =>
+      expect(service.update).toHaveBeenCalledWith(7, expect.objectContaining({ courier_enabled: true, color: '#0D9488' })),
+    );
+
+    service.list.mockResolvedValue([partner({ id: 7, courier_enabled: true })]);
+    renderSection();
+    expect(await screen.findByText('Kuryer API · ID 7')).toBeInTheDocument();
+  });
+
+  it('labels courier status events in the history', async () => {
+    service.list.mockResolvedValue([partner()]);
+    service.deliveries.mockResolvedValue({
+      items: [delivery({ event: 'courier.status', flight_name: null, item_count: 0 })],
+      next_before_id: null,
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Tarix/ }));
+    expect(await screen.findByText('Kuryer holati')).toBeInTheDocument();
+    expect(screen.queryByText(/0 qator/)).not.toBeInTheDocument();
+  });
+
   it('tells a non-super-admin the section is not theirs', async () => {
     service.list.mockRejectedValue({ message: 'Forbidden', status: 403 });
     renderSection();
@@ -156,6 +197,16 @@ describe('partner guide', () => {
     expect(markdown).toContain('```python');
     expect(markdown).toContain('X-Mandarin-Signature');
     expect(markdown).toContain('hmac.compare_digest(expected, signature)');
+  });
+
+  it('the courier API guide states the signed string and the status events', () => {
+    const markdown = guideToMarkdown(PARTNER_COURIER_GUIDE, COURIER_GUIDE_TITLE);
+    expect(markdown).toContain(`# ${COURIER_GUIDE_TITLE}`);
+    expect(markdown).toContain('f"{ts}.{method}.{path}."');
+    expect(markdown).toContain('/api/v1/partner/courier/orders');
+    for (const status of ['planned', 'on_the_way', 'arrived', 'delivered', 'postponed']) {
+      expect(markdown).toContain(`| ${status} |`);
+    }
   });
 
   it('splits inline code spans', () => {

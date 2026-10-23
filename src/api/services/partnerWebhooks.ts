@@ -13,6 +13,10 @@ export interface PartnerWebhook {
   client_code_prefixes: string[];
   url: string;
   is_active: boolean;
+  /** May send delivery orders to our courier (partner courier API). */
+  courier_enabled: boolean;
+  /** Its stops' colour in the courier app, "#RRGGBB". */
+  color: string;
   created_at: string | null;
   created_by: string | null;
   updated_by: string | null;
@@ -32,6 +36,8 @@ export interface PartnerWebhookInput {
   name: string;
   client_code_prefixes: string[];
   url: string;
+  courier_enabled?: boolean;
+  color?: string;
 }
 
 export interface PartnerWebhookPatch extends Partial<PartnerWebhookInput> {

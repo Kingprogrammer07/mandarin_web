@@ -16,6 +16,12 @@ import {
   splitInlineCode,
   type GuideBlock,
 } from './partnerWebhookGuide';
+import { COURIER_GUIDE_TITLE, PARTNER_COURIER_GUIDE } from './partnerCourierGuide';
+
+const GUIDES = {
+  webhook: { title: GUIDE_TITLE, sections: PARTNER_WEBHOOK_GUIDE, telegraph: GUIDE_TELEGRAPH_URL },
+  courier: { title: COURIER_GUIDE_TITLE, sections: PARTNER_COURIER_GUIDE, telegraph: null },
+} as const;
 
 async function copyText(text: string, label: string): Promise<boolean> {
   try {
@@ -127,43 +133,51 @@ function Block({ block }: { block: GuideBlock }) {
 export default function PartnerWebhookGuideDialog({
   open,
   onOpenChange,
+  guide = 'webhook',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** "webhook": import rows we push; "courier": orders they send our courier. */
+  guide?: keyof typeof GUIDES;
 }) {
+  const { title, sections, telegraph } = GUIDES[guide];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[88vh] flex-col gap-0 p-0 sm:max-w-3xl">
         <DialogHeader className="border-b border-gray-100 px-5 pb-4 pt-5 text-left dark:border-white/10">
           <DialogTitle className="flex items-center gap-2 pr-8 text-base font-black">
             <BookOpen className="h-5 w-5 shrink-0 text-orange-500" />
-            {GUIDE_TITLE}
+            {title}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Hamkor dasturchisiga Telegraph havolasini yoki shu matnni yuboring. Maxfiy kalit bu yerda
-            yo'q: uni alohida, xavfsiz kanal orqali bering.
+            Hamkor dasturchisiga {telegraph ? 'Telegraph havolasini yoki ' : ''}shu matnni yuboring.
+            Maxfiy kalit bu yerda yo'q: uni alohida, xavfsiz kanal orqali bering.
           </DialogDescription>
+          {telegraph && (
           <a
-            href={GUIDE_TELEGRAPH_URL}
+            href={telegraph}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 flex items-start gap-1.5 break-all rounded-xl border border-gray-200 px-3 py-2 font-mono text-[12px] text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/[0.04]"
           >
             <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-white/40" />
-            {GUIDE_TELEGRAPH_URL}
+            {telegraph}
           </a>
+          )}
           <div className="flex flex-wrap gap-2 pt-2">
+            {telegraph && (
+              <button
+                type="button"
+                onClick={() => void copyText(telegraph, 'Havola')}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-2 text-xs font-black text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-gray-900"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                Havolani nusxalash
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => void copyText(GUIDE_TELEGRAPH_URL, 'Havola')}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3 py-2 text-xs font-black text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-gray-900"
-            >
-              <Link2 className="h-3.5 w-3.5" />
-              Havolani nusxalash
-            </button>
-            <button
-              type="button"
-              onClick={() => void copyText(guideToMarkdown(), "Qo'llanma (Markdown)")}
+              onClick={() => void copyText(guideToMarkdown(sections, title), "Qo'llanma (Markdown)")}
               className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-black text-gray-800 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-white/85 dark:hover:bg-white/[0.06]"
             >
               <Copy className="h-3.5 w-3.5" />
@@ -172,7 +186,7 @@ export default function PartnerWebhookGuideDialog({
           </div>
         </DialogHeader>
         <div className="space-y-6 overflow-y-auto px-5 py-5">
-          {PARTNER_WEBHOOK_GUIDE.map((section, index) => (
+          {sections.map((section, index) => (
             <section key={section.title} className="space-y-2.5">
               <h3 className="flex items-baseline gap-2 text-sm font-black text-gray-900 dark:text-white">
                 <span className="font-mono text-[11px] text-gray-400 dark:text-white/35">

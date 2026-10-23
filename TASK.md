@@ -60,6 +60,14 @@ naqd yoki karta deb tasdiqlaydi. Usullar va narx faqat superadmin panelida sozla
       10 versiya, joriysi belgilangan. Server APK'ni o'zi o'qiydi (paket, versiya), eskisini rad etadi.
 - [x] Yuklash vaqti 20 daqiqagacha (sekin internet); test `CourierAppReleases.test.tsx`
 
+## Hamkor kargolar kuryer API'si (2026-10-23)
+- [x] Integratsiyalar → hamkor tahriri: «Kuryer API» kaliti va kuryer ilovasidagi rang (6 ta rang);
+      kartada «Kuryer API · ID N» (hamkorga ID kerak)
+- [x] «Kuryer API» qo'llanmasi (`partnerCourierGuide.ts`): imzo `<ts>.<METHOD>.<path>.` + tana, zayavka
+      maydonlari, holat webhooklari, xatolar, Python misol; Markdown nusxa. Telegraph sahifasi hali yo'q.
+- [x] Tarixda `courier.status` yuborishlari «Kuryer holati» deb ko'rinadi
+- [x] Test: `PartnerWebhooksSection.test.tsx`
+
 ## Tekshirilmagan
 - OSM plitkalari va qorong'i rejim filtri haqiqiy qurilmada (sandbox `tile.openstreetmap.org` ga chiqa olmaydi).
 - Haqiqiy NBU sahifasi orqali to'lov (sandbox NBU'ga chiqa olmaydi); backend testlari soxta NBU bilan.
