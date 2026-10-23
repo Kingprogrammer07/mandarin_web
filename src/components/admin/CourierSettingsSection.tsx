@@ -10,6 +10,8 @@ import {
 } from '@/api/services/courierService';
 import { formatUzsAmount } from '@/lib/format';
 
+import CourierAppReleases from './CourierAppReleases';
+
 /**
  * «Yetkazish xizmati»: the courier delivery fee and how it may be paid.
  *
@@ -256,6 +258,8 @@ export default function CourierSettingsSection() {
       {settings && !isLoading && (
         <CourierSettingsForm key={settings.updated_at ?? 'new'} initial={settings} />
       )}
+
+      <CourierAppReleases />
     </div>
   );
 }

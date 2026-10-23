@@ -55,6 +55,11 @@ naqd yoki karta deb tasdiqlaydi. Usullar va narx faqat superadmin panelida sozla
 - [x] Manager: «O'zi olib ketish» ostidagi xom `deliveryRequest.options.self_pickup` kaliti
 - [x] Test: `CourierHomeCard.test.tsx`, `CourierTrackView.test.tsx`
 
+## Kuryer ilovasini Play Market'siz yangilash (2026-10-23)
+- [x] Tizim sozlamalari → Kuryer xizmati → «Kuryer ilovasi»: APK yuklash (izoh bilan), oxirgi
+      10 versiya, joriysi belgilangan. Server APK'ni o'zi o'qiydi (paket, versiya), eskisini rad etadi.
+- [x] Yuklash vaqti 20 daqiqagacha (sekin internet); test `CourierAppReleases.test.tsx`
+
 ## Tekshirilmagan
 - OSM plitkalari va qorong'i rejim filtri haqiqiy qurilmada (sandbox `tile.openstreetmap.org` ga chiqa olmaydi).
 - Haqiqiy NBU sahifasi orqali to'lov (sandbox NBU'ga chiqa olmaydi); backend testlari soxta NBU bilan.

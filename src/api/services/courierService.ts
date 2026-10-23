@@ -1,4 +1,4 @@
-import { apiClient } from '@/api/client';
+import { apiClient, apiClientFormData } from '@/api/client';
 
 /** Mirrors `ClientDeliveryOut` in the backend (`src/api/schemas/courier.py`). */
 export type CourierStopStatus = 'waiting' | 'on_the_way' | 'delivered' | 'cancelled';
@@ -127,6 +127,53 @@ export const courierSettingsService = {
   },
   async update(body: CourierSettingsUpdate): Promise<CourierSettings> {
     const response = await apiClient.put<CourierSettings>('/api/v1/system/courier', body);
+    return response.data;
+  },
+};
+
+/** One uploaded courier app build (`CourierAppReleaseOut`). */
+export interface CourierAppRelease {
+  /** Pubspec build number; split-per-ABI version codes are reduced to it. */
+  build: number;
+  version_code: number;
+  version_name: string;
+  notes: string | null;
+  size_bytes: number;
+  sha256: string;
+  published_at: string;
+  uploaded_by: string | null;
+}
+
+/** An APK over a slow line takes minutes; the shared 60 s upload timeout is too short. */
+const APP_UPLOAD_TIMEOUT_MS = 20 * 60_000;
+
+export const courierAppService = {
+  async list(): Promise<CourierAppRelease[]> {
+    const response = await apiClient.get<{ releases: CourierAppRelease[] }>(
+      '/api/v1/system/courier/app',
+    );
+    return response.data.releases;
+  },
+  async upload(
+    file: File,
+    notes: string,
+    onProgress?: (percent: number) => void,
+  ): Promise<CourierAppRelease> {
+    const form = new FormData();
+    form.append('file', file);
+    if (notes.trim()) form.append('notes', notes.trim());
+    const response = await apiClientFormData.post<CourierAppRelease>(
+      '/api/v1/system/courier/app',
+      form,
+      {
+        timeout: APP_UPLOAD_TIMEOUT_MS,
+        onUploadProgress: (event) => {
+          if (event.total && onProgress) {
+            onProgress(Math.min(Math.round((event.loaded * 100) / event.total), 99));
+          }
+        },
+      },
+    );
     return response.data;
   },
 };
