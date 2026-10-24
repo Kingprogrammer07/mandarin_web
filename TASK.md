@@ -30,3 +30,15 @@ uzilishlar to'g'ri chiziq). 1 km narxi faqat shu brauzerdagi qulaylik (localStor
 Ikki ustunli joylashuv `xl` dan (1024 px da sidebar bilan xarita juda tor bo'lardi). So'm summalari bo'sh
 joy bilan guruhlanadi (`formatSom`): Chrome'da `formatUzs` vergul qo'yadi va «84,2 km» yonida «1,017»
 o'nlik kasr bo'lib o'qilardi.
+
+## 2026-10-24 (2): narxsiz km, tanaffuslar, rozilik
+Foydalanuvchi: faqat Toshkent ichida ishlaymiz, yetkazish narxi superadmin sozlagan qat'iy summa
+(sukut 30 000), shuning uchun 1 km narxi kerak emas. Backend (bot e93e493, 90f909b): smena
+tanaffuslari (`run.breaks`), kuryerning ilovadagi roziligi (`consent_at`), GPS uzilishlari yo'l
+xaritasi (OSRM) bo'yicha, sklad hamma kuryer uchun umumiy.
+- [x] «Kilometrlar»: 1 km narxi, so'm summalari va localStorage `courier_km_rate` olib tashlandi; CSV faqat km
+- [x] Kun tafsiloti: «Smena to'xtatildi · N daq» qatori (bu vaqt km'ga kirmaydi); xaritada yo'l
+      tanaffus ustidan chizilmaydi (`splitTrail`)
+- [x] Kuryer sarlavhasida rozilik vaqti yoki «Ilovada rozilik hali berilmagan»
+- [x] Uzilish matni: «yo'l bo'yicha qo'shildi»; skladdagi manzillar: «Skladda N ta manzil kutmoqda»
+- [x] Testlar, `scripts/check.sh`, 320/390/1440 px da ko'rib chiqildi (Playwright, soxta API)

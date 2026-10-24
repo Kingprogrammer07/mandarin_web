@@ -50,6 +50,7 @@ const AZIZ: MonitorLiveCourier = {
   name: 'Aziz Karimov',
   phone: '+998901234567',
   car: 'Cobalt · 01 A 123 BC',
+  consent_at: '2026-10-24T04:12:00Z',
   run: {
     run_date: TODAY,
     status: 'on_route',
@@ -182,7 +183,8 @@ describe('CouriersPage', () => {
     expect(rows[0]).toHaveTextContent('1/3 yetkazildi');
     expect(rows[1]).toHaveTextContent('vali');
     expect(rows[1]).toHaveTextContent('Ishda emas');
-    expect(screen.getByText(/3 ta manzil hali hech bir kuryerga biriktirilmagan/)).toBeInTheDocument();
+    expect(screen.getByText(/Skladda 3 ta manzil kutmoqda/)).toBeInTheDocument();
+    expect(screen.getByText('Joylashuvga rozilik: 24 okt 09:12')).toBeInTheDocument();
 
     await waitFor(() => expect(courierMonitorService.track).toHaveBeenCalledWith(7, TODAY));
     expect(await screen.findByText('Ish boshlandi')).toBeInTheDocument();
@@ -216,7 +218,22 @@ describe('CouriersPage', () => {
     expect(screen.getByRole('button', { name: 'Keyingi kun' })).toBeEnabled();
   });
 
-  it('adds up the month, prices it, remembers the price and exports a CSV', async () => {
+  it('says when a courier has not agreed to the recording, and shows a shift break', async () => {
+    asAdmin([], true);
+    const unsigned = { ...AZIZ, consent_at: null };
+    vi.mocked(courierMonitorService.live).mockResolvedValue({ ...LIVE, couriers: [unsigned] });
+    vi.mocked(courierMonitorService.track).mockResolvedValue({
+      ...TRACK,
+      courier: unsigned,
+      run: TRACK.run && { ...TRACK.run, breaks: [{ started_at: D('13:00'), ended_at: D('14:10') }] },
+    });
+    renderPage();
+    expect(await screen.findByText('Ilovada rozilik hali berilmagan')).toBeInTheDocument();
+    expect(await screen.findByText("Smena to'xtatildi · 1 soat 10 daq")).toBeInTheDocument();
+    expect(screen.getByText("13:00–14:10 · bu vaqt km'ga kirmaydi")).toBeInTheDocument();
+  });
+
+  it('adds up the month in kilometres and exports a CSV', async () => {
     asAdmin([], true);
     const createObjectURL = vi.fn((blob: Blob) => {
       void blob;
@@ -234,14 +251,13 @@ describe('CouriersPage', () => {
     expect(screen.getByText('84,3 km')).toBeInTheDocument();
     expect(screen.getByText('09:00–18:40 · 6 ta yetkazildi')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText('masalan 1500'), { target: { value: '1000' } });
-    expect(localStorage.getItem('courier_km_rate')).toBe('1000');
-    expect(screen.getByText(/^107\s650 so'm$/)).toBeInTheDocument();
+    // Inside Tashkent the fee is a fixed price; no money per kilometre here.
+    expect(screen.queryByText(/so'm/)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /Excel \(CSV\)/ }));
     expect(click).toHaveBeenCalledTimes(1);
     const blob = createObjectURL.mock.calls[0][0];
     const text = await blob.text();
-    expect(text).toContain('Jami;Aziz Karimov;Cobalt;;;7;107,7;107650');
+    expect(text).toContain('Jami;Aziz Karimov;Cobalt;;;7;107,7\r\n');
   });
 });

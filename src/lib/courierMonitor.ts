@@ -4,6 +4,7 @@
  */
 import { TASHKENT_TZ } from '@/lib/format';
 import type {
+  MonitorBreak,
   MonitorLiveCourier,
   MonitorMileageCourier,
   MonitorTrack,
@@ -36,14 +37,6 @@ export function formatKm(meters: number): string {
   const safe = Math.max(0, Number.isFinite(meters) ? meters : 0);
   if (safe >= 100_000) return `${groupThousands(String(Math.round(safe / 1000)))} km`;
   return `${kmTenths(safe)} km`;
-}
-
-/**
- * «1 526 161 so'm». Not `formatUzs`: in Chrome its uz-UZ grouping is a comma,
- * and next to «84,2 km» (comma decimal) a «1,017» would read as one kilometre.
- */
-export function formatSom(value: number): string {
-  return `${groupThousands(String(Math.round(Math.max(0, value))))} so'm`;
 }
 
 /** Kilometres as a number for the CSV: comma decimal, what Excel in uz/ru expects. */
@@ -83,6 +76,11 @@ function parseIsoDay(day: string): { year: number; month: number; date: number }
 export function dayShort(day: string): string {
   const { month, date } = parseIsoDay(day);
   return `${date} ${MONTHS_SHORT[month - 1]}`;
+}
+
+/** «23 okt 18:40» in Tashkent. */
+export function momentTashkent(value: string): string {
+  return `${dayShort(tashkentDayOf(value))} ${clockTashkent(value)}`;
 }
 
 /** «24 okt, Shan» */
@@ -210,6 +208,7 @@ export type TimelineEvent =
       /** A client whose door it was next to, or the office. */
       place: { type: 'office' } | { type: 'stop'; name: string } | null;
     }
+  | { kind: 'break'; at: string; endedAt: string }
   | {
       kind: 'gap';
       at: string;
@@ -235,6 +234,9 @@ export function dayTimeline(track: MonitorTrack): TimelineEvent[] {
   if (run?.started_at) events.push({ kind: 'route_start', at: run.started_at });
   if (run?.finished_at) events.push({ kind: 'route_end', at: run.finished_at });
   if (run?.shift_ended_at) events.push({ kind: 'shift_end', at: run.shift_ended_at });
+  for (const pause of run?.breaks ?? []) {
+    events.push({ kind: 'break', at: pause.started_at, endedAt: pause.ended_at });
+  }
 
   const placedStops = track.stops.filter(
     (stop): stop is typeof stop & { latitude: number; longitude: number } =>
@@ -289,11 +291,38 @@ export function dayTimeline(track: MonitorTrack): TimelineEvent[] {
   }
   // Same minute: the shift opens before anything in it and closes after.
   const order: Record<TimelineEvent['kind'], number> = {
-    shift_start: 0, route_start: 1, stay: 2, gap: 2, delivered: 3, route_end: 4, shift_end: 5,
+    shift_start: 0, route_start: 1, break: 2, stay: 2, gap: 2, delivered: 3, route_end: 4, shift_end: 5,
   };
   return events.sort(
     (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime() || order[a.kind] - order[b.kind],
   );
+}
+
+/**
+ * The trail as lines to draw: a new one after each shift break, so the time
+ * off the shift (not counted) is not drawn as a road driven.
+ */
+export function splitTrail(
+  trail: readonly [number, number, number][],
+  breaks: readonly MonitorBreak[] = [],
+): [number, number][][] {
+  const spans = breaks.map((b) => [Date.parse(b.started_at) / 1000, Date.parse(b.ended_at) / 1000] as const);
+  const lines: [number, number][][] = [];
+  let line: [number, number][] = [];
+  let previous: number | null = null;
+  for (const [latitude, longitude, at] of trail) {
+    const since = previous;
+    // The step from the last point to this one overlaps a break.
+    const crossed = since !== null && spans.some(([from, to]) => since <= to && at >= from);
+    if (crossed && line.length) {
+      lines.push(line);
+      line = [];
+    }
+    line.push([latitude, longitude]);
+    previous = at;
+  }
+  if (line.length) lines.push(line);
+  return lines.filter((l) => l.length > 1);
 }
 
 /** Total minutes the car stood still during the day. */
@@ -306,24 +335,6 @@ export function safeColor(color: string | null | undefined): string | null {
   return color && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? color : null;
 }
 
-/** The 1 km price typed in the form: digits only, «12 500» → 12500; empty or junk → null. */
-export function parseRate(text: string): number | null {
-  const digits = text.replace(/[\s\u00a0]/g, '');
-  if (!/^\d{1,9}$/.test(digits)) return null;
-  const value = Number(digits);
-  return value > 0 ? value : null;
-}
-
-/** The money for a distance at a 1 km price, rounded to whole so'm. */
-export function costFor(meters: number, ratePerKm: number): number {
-  return Math.round((Math.max(0, meters) / 1000) * ratePerKm);
-}
-
-/** A courier's month at a 1 km price: the sum of the days, so it adds up to the rows shown. */
-export function courierCost(courier: Pick<MonitorMileageCourier, 'days'>, ratePerKm: number): number {
-  return courier.days.reduce((sum, day) => sum + costFor(day.driven_m, ratePerKm), 0);
-}
-
 function csvCell(value: string | number): string {
   const text = String(value);
   return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -334,14 +345,14 @@ function csvCell(value: string | number): string {
  * courier. `;` and a comma decimal because that is what Excel opens correctly
  * on a uz/ru Windows; the BOM keeps «O'zbek» letters intact.
  */
-export function buildMileageCsv(couriers: readonly MonitorMileageCourier[], ratePerKm: number | null): string {
-  const header = ['Sana', 'Kuryer', 'Mashina', 'Smena boshlandi', 'Smena tugadi', 'Yetkazildi', 'Km'];
-  if (ratePerKm) header.push(`Summa (1 km = ${ratePerKm} so'm)`);
-  const rows: (string | number)[][] = [header];
+export function buildMileageCsv(couriers: readonly MonitorMileageCourier[]): string {
+  const rows: (string | number)[][] = [
+    ['Sana', 'Kuryer', 'Mashina', 'Smena boshlandi', 'Smena tugadi', 'Yetkazildi', 'Km'],
+  ];
   for (const courier of couriers) {
     const name = courierName(courier);
     for (const day of courier.days) {
-      const row: (string | number)[] = [
+      rows.push([
         day.date,
         name,
         courier.car ?? '',
@@ -349,11 +360,9 @@ export function buildMileageCsv(couriers: readonly MonitorMileageCourier[], rate
         day.shift_ended_at ? clockTashkent(day.shift_ended_at) : '',
         day.delivered,
         kmForCsv(day.driven_m),
-      ];
-      if (ratePerKm) row.push(costFor(day.driven_m, ratePerKm));
-      rows.push(row);
+      ]);
     }
-    const total: (string | number)[] = [
+    rows.push([
       'Jami',
       name,
       courier.car ?? '',
@@ -361,9 +370,7 @@ export function buildMileageCsv(couriers: readonly MonitorMileageCourier[], rate
       '',
       courier.days.reduce((sum, day) => sum + day.delivered, 0),
       kmForCsv(courier.total_m),
-    ];
-    if (ratePerKm) total.push(courierCost(courier, ratePerKm));
-    rows.push(total);
+    ]);
   }
   return `\ufeff${rows.map((row) => row.map(csvCell).join(';')).join('\r\n')}\r\n`;
 }

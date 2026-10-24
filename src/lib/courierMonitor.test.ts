@@ -4,21 +4,20 @@ import type { MonitorMileageCourier, MonitorRun, MonitorTrack } from '@/api/serv
 import {
   buildMileageCsv,
   clockTashkent,
-  courierCost,
   courierState,
   dayLabel,
   dayTimeline,
   formatKm,
   formatMinutes,
-  formatSom,
   lastSeen,
+  momentTashkent,
   monthLabel,
   monthRange,
-  parseRate,
   safeColor,
   shiftDay,
   shiftMonth,
   shiftSpan,
+  splitTrail,
 } from './courierMonitor';
 
 const RUN: MonitorRun = {
@@ -59,8 +58,6 @@ describe('numbers and clocks', () => {
     expect(formatKm(450)).toBe('0,5 km');
     expect(formatKm(146_400)).toBe('146 km');
     expect(formatKm(1_234_000)).toBe('1\u00a0234 km');
-    // Space grouping, never a comma that would read as a decimal next to «84,2 km».
-    expect(formatSom(1_526_161)).toBe("1\u00a0526\u00a0161 so'm");
   });
 
   it('reads every time in Tashkent', () => {
@@ -77,6 +74,7 @@ describe('numbers and clocks', () => {
     expect(lastSeen('2026-10-24T09:53:00Z', now)).toBe('7 daq oldin');
     expect(lastSeen('2026-10-24T05:00:00Z', now)).toBe('10:00 da');
     expect(lastSeen('2026-10-23T13:40:00Z', now)).toBe('23 okt 18:40');
+    expect(momentTashkent('2026-10-24T04:12:00Z')).toBe('24 okt 09:12');
   });
 
   it('walks days and months as plain dates', () => {
@@ -144,8 +142,48 @@ describe('dayTimeline', () => {
     expect(stays.map((s) => s.place)).toEqual([{ type: 'stop', name: 'Dilnoza' }, { type: 'office' }, null]);
   });
 
+  it('shows a shift break where it was, between the start and the end', () => {
+    const events = dayTimeline(
+      track({
+        run: { ...RUN, breaks: [{ started_at: '2026-10-24T08:00:00Z', ended_at: '2026-10-24T09:30:00Z' }] },
+      }),
+    );
+    expect(events.map((e) => e.kind)).toEqual(['shift_start', 'route_start', 'break', 'route_end', 'shift_end']);
+    expect(events[2]).toEqual({ kind: 'break', at: '2026-10-24T08:00:00Z', endedAt: '2026-10-24T09:30:00Z' });
+  });
+
   it('is empty for a day with no run', () => {
     expect(dayTimeline(track({ run: null }))).toEqual([]);
+  });
+});
+
+describe('splitTrail', () => {
+  const at = (iso: string) => Date.parse(iso) / 1000;
+  const trail: [number, number, number][] = [
+    [41.3, 69.25, at('2026-10-24T07:00:00Z')],
+    [41.31, 69.26, at('2026-10-24T07:50:00Z')],
+    // Inside the break: not drawn.
+    [41.4, 69.4, at('2026-10-24T08:30:00Z')],
+    [41.32, 69.27, at('2026-10-24T09:40:00Z')],
+    [41.33, 69.28, at('2026-10-24T09:50:00Z')],
+  ];
+
+  it('draws one line without breaks', () => {
+    expect(splitTrail(trail)).toHaveLength(1);
+    expect(splitTrail(trail)[0]).toHaveLength(5);
+  });
+
+  it('never draws a road across a shift break', () => {
+    expect(splitTrail(trail, [{ started_at: '2026-10-24T08:00:00Z', ended_at: '2026-10-24T09:30:00Z' }])).toEqual([
+      [
+        [41.3, 69.25],
+        [41.31, 69.26],
+      ],
+      [
+        [41.32, 69.27],
+        [41.33, 69.28],
+      ],
+    ]);
   });
 });
 
@@ -164,33 +202,16 @@ describe('the km sheet', () => {
     ],
   };
 
-  it('reads the 1 km price leniently and refuses junk', () => {
-    expect(parseRate('1 500')).toBe(1500);
-    expect(parseRate(' 2000 ')).toBe(2000);
-    expect(parseRate('')).toBeNull();
-    expect(parseRate('0')).toBeNull();
-    expect(parseRate('12,5')).toBeNull();
-    expect(parseRate('-3')).toBeNull();
-  });
-
-  it('adds the month up from the days so the total matches the rows', () => {
-    // 84,25 km × 1 000 = 84 250; 12,3 km × 1 000 = 12 300.
-    expect(courierCost(courier, 1000)).toBe(96_550);
-    // Rounded per day: 126,375 → 126 and 18,45 → 18.
-    expect(courierCost(courier, 1.5)).toBe(144);
-  });
-
-  it('builds a semicolon CSV Excel opens in uz/ru', () => {
-    const csv = buildMileageCsv([courier], 1000);
+  it('builds a semicolon CSV Excel opens in uz/ru, kilometres only', () => {
+    const csv = buildMileageCsv([courier]);
     expect(csv.startsWith('\ufeff')).toBe(true);
     const lines = csv.slice(1).trimEnd().split('\r\n');
     expect(lines).toEqual([
-      "Sana;Kuryer;Mashina;Smena boshlandi;Smena tugadi;Yetkazildi;Km;Summa (1 km = 1000 so'm)",
-      '2026-10-23;"Aziz; Karimov";Cobalt;09:00;18:40;6;84,3;84250',
-      '2026-10-24;"Aziz; Karimov";Cobalt;09:30;;1;12,3;12300',
-      'Jami;"Aziz; Karimov";Cobalt;;;7;96,6;96550',
+      'Sana;Kuryer;Mashina;Smena boshlandi;Smena tugadi;Yetkazildi;Km',
+      '2026-10-23;"Aziz; Karimov";Cobalt;09:00;18:40;6;84,3',
+      '2026-10-24;"Aziz; Karimov";Cobalt;09:30;;1;12,3',
+      'Jami;"Aziz; Karimov";Cobalt;;;7;96,6',
     ]);
-    expect(buildMileageCsv([courier], null).split('\r\n')[0]).not.toContain('Summa');
   });
 
   it('only lets a hex partner colour into a style', () => {

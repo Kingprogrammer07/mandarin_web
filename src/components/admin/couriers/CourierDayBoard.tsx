@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleCheck,
   CircleParking,
+  CirclePause,
   Flag,
   MapPin,
   Navigation,
@@ -36,6 +37,7 @@ import {
   formatKm,
   formatMinutes,
   lastSeen,
+  momentTashkent,
   shiftDay,
   shiftSpan,
   sortCouriers,
@@ -190,7 +192,7 @@ function CourierList({
       {unassigned > 0 && (
         <div className="mx-2 mb-2 flex items-start gap-2 rounded-mc-md bg-mc-warn-soft px-3 py-2.5 text-[12px] font-semibold text-mc-warn">
           <TriangleAlert className="mt-px h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-          <span>Bugungi {unassigned} ta manzil hali hech bir kuryerga biriktirilmagan.</span>
+          <span>Skladda {unassigned} ta manzil kutmoqda: hali hech bir kuryer olib ketmagan.</span>
         </div>
       )}
       {isLoading && (
@@ -347,6 +349,16 @@ function MapPanel({
           <div className="min-w-0">
             <h2 className="break-words text-[15px] font-extrabold tracking-tight text-mc-text">{name}</h2>
             {courier?.car && <p className="mt-0.5 break-words text-[11px] font-medium text-mc-text-3">{courier.car}</p>}
+            {courier?.consent_at && (
+              <p className="mt-0.5 text-[11px] font-medium text-mc-text-3">
+                Joylashuvga rozilik: {momentTashkent(courier.consent_at)}
+              </p>
+            )}
+            {courier?.consent_at === null && (
+              <p className="mt-1 inline-flex rounded-full bg-mc-warn-soft px-2 py-0.5 text-[11px] font-bold text-mc-warn">
+                Ilovada rozilik hali berilmagan
+              </p>
+            )}
           </div>
           {courier?.phone && (
             <a
@@ -430,6 +442,17 @@ function viewOf(event: TimelineEvent): EventView {
       return { Icon: Flag, tone: 'bg-mc-brand-soft text-mc-brand', title: 'Kunni yakunladi', meta: null, time, focus: null };
     case 'shift_end':
       return { Icon: Square, tone: 'bg-mc-surface-2 text-mc-text-2', title: 'Ish tugadi', meta: null, time, focus: null };
+    case 'break': {
+      const minutes = (new Date(event.endedAt).getTime() - new Date(event.at).getTime()) / 60_000;
+      return {
+        Icon: CirclePause,
+        tone: 'bg-mc-surface-2 text-mc-text-2',
+        title: `Smena to'xtatildi · ${formatMinutes(minutes)}`,
+        meta: `${time}–${clockTashkent(event.endedAt)} · bu vaqt km'ga kirmaydi`,
+        time,
+        focus: null,
+      };
+    }
     case 'stay': {
       const where =
         event.place?.type === 'office'
@@ -452,7 +475,7 @@ function viewOf(event: TimelineEvent): EventView {
         Icon: WifiOff,
         tone: 'bg-mc-surface-2 text-mc-text-2',
         title: `GPS signal yo'q · ${formatMinutes(minutes)}`,
-        meta: `${formatKm(event.distanceM)} to'g'ri chiziq bilan qo'shildi`,
+        meta: `${formatKm(event.distanceM)} yo'l bo'yicha qo'shildi`,
         time,
         focus: { latitude: event.latitude, longitude: event.longitude },
       };
@@ -572,8 +595,8 @@ function DayDetails({
 
           {gapsM > 0 && (
             <p className="rounded-mc-md bg-mc-surface-2 px-3 py-2 text-[11px] font-medium text-mc-text-2">
-              GPS {track.gaps.length} marta uzilgan; o'sha joylar to'g'ri chiziq bilan qo'shildi ({formatKm(gapsM)}).
-              Haqiqiy yo'l biroz uzunroq bo'lishi mumkin.
+              GPS {track.gaps.length} marta uzilgan; o'sha joylar yo'l xaritasi bo'yicha qo'shildi ({formatKm(gapsM)}).
+              Uzilish paytida boshqa ko'chadan yurgan bo'lsa, ozgina farq bo'lishi mumkin.
             </p>
           )}
 

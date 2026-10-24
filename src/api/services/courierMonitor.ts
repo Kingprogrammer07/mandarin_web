@@ -8,6 +8,12 @@ import { apiClient } from '@/api/client';
 
 export type MonitorRunStatus = 'planning' | 'on_route' | 'returning' | 'finished';
 
+/** The shift was ended and started again the same day: not work, not in the kilometres. */
+export interface MonitorBreak {
+  started_at: string;
+  ended_at: string;
+}
+
 export interface MonitorRun {
   run_date: string;
   status: MonitorRunStatus;
@@ -22,6 +28,8 @@ export interface MonitorRun {
   postponed: number;
   /** Stops still to deliver. */
   open: number;
+  /** Missing on a server from before shift breaks. */
+  breaks?: MonitorBreak[];
 }
 
 export interface MonitorPosition {
@@ -41,6 +49,8 @@ export interface MonitorCourier {
   name: string | null;
   phone: string | null;
   car: string | null;
+  /** When the courier agreed in the app to the location recording; null: not yet. Missing on an older server. */
+  consent_at?: string | null;
 }
 
 export interface MonitorLiveCourier extends MonitorCourier {
@@ -53,7 +63,7 @@ export interface MonitorLiveCourier extends MonitorCourier {
 
 export interface MonitorLive {
   date: string;
-  /** Today's open stops no courier has taken yet. */
+  /** Today's stops still at the warehouse: no courier has set off with them yet. */
   unassigned: number;
   couriers: MonitorLiveCourier[];
 }
@@ -71,7 +81,7 @@ export interface MonitorGap {
   end: [number, number];
   started_at: string;
   ended_at: string;
-  /** Straight line; counted in the kilometres. */
+  /** Along the roads (our OSRM), or the usual detour over the straight line when it is down; counted in the kilometres. */
   distance_m: number;
 }
 

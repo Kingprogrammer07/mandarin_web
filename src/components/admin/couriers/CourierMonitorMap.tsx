@@ -5,7 +5,7 @@ import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMa
 import { Maximize2 } from 'lucide-react';
 
 import type { MonitorLiveCourier, MonitorStop, MonitorTrack } from '@/api/services/courierMonitor';
-import { clockTashkent, courierName, formatMinutes, safeColor } from '@/lib/courierMonitor';
+import { clockTashkent, courierName, formatMinutes, safeColor, splitTrail } from '@/lib/courierMonitor';
 
 /** Tashkent centre, for the moment before anything is known. */
 const TASHKENT: [number, number] = [41.3111, 69.2797];
@@ -160,6 +160,7 @@ export const CourierMonitorMap = memo(function CourierMonitorMap({
     () => (track?.trail ?? []).map(([latitude, longitude]) => [latitude, longitude]),
     [track],
   );
+  const trailLines = useMemo(() => splitTrail(track?.trail ?? [], track?.run?.breaks), [track]);
   const placedStops = useMemo(
     () =>
       (track?.stops ?? []).flatMap((stop, i) =>
@@ -209,10 +210,10 @@ export const CourierMonitorMap = memo(function CourierMonitorMap({
           </Marker>
         )}
 
-        {trail.length > 1 && (
+        {trailLines.length > 0 && (
           <>
-            <Polyline positions={trail} className="mc-trail-casing" interactive={false} />
-            <Polyline positions={trail} className="mc-trail" interactive={false} />
+            <Polyline positions={trailLines} className="mc-trail-casing" interactive={false} />
+            <Polyline positions={trailLines} className="mc-trail" interactive={false} />
           </>
         )}
         {trailStart && (
