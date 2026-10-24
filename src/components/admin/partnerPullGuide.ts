@@ -5,10 +5,11 @@
  * Kept in step with the backend (src/api/routers/partner_cargo.py,
  * src/api/partner_signature.py): paths, the signed string, body fields,
  * limits and errors are stated here. The Python example was run against that
- * router.
+ * router, photo reports included.
  */
 
 import { COURIER_API_BASE as API_BASE } from './partnerCourierGuide';
+import { PHOTO_REPORTS_ANSWER } from './partnerPhotoGuide';
 import type { GuideSection } from './partnerWebhookGuide';
 
 const FLIGHTS_ANSWER = `{
@@ -19,13 +20,15 @@ const FLIGHTS_ANSWER = `{
       "flight_name": "M314",
       "item_count": 184,
       "first_imported_at": "2026-10-22T17:21:04.512000Z",
-      "last_imported_at": "2026-10-22T17:21:04.512000Z"
+      "last_imported_at": "2026-10-22T17:21:04.512000Z",
+      "photo_report_count": 41
     },
     {
       "flight_name": "M313",
       "item_count": 97,
       "first_imported_at": "2026-10-19T09:02:11.104000Z",
-      "last_imported_at": "2026-10-19T11:40:52.871000Z"
+      "last_imported_at": "2026-10-19T11:40:52.871000Z",
+      "photo_report_count": 0
     }
   ]
 }`;
@@ -55,7 +58,8 @@ const ITEMS_ANSWER = `{
   "next_after_id": 845211
 }`;
 
-export const PYTHON_PULL = `"""Mandarin Cargo'dan o'z yuklaringizni tortib olish (Python, requests + SQLite).
+export const PYTHON_PULL = `"""Mandarin Cargo'dan o'z yuklaringiz va foto hisobotlaringizni tortib olish
+(Python, requests + SQLite).
 
 O'rnatish:  pip install requests
 Muhit o'zgaruvchilari:
@@ -63,7 +67,7 @@ Muhit o'zgaruvchilari:
     MANDARIN_WEBHOOK_SECRET=whsec_...  # webhook bilan bir xil kalit
 Ishga tushirish:
     python pull.py             # reyslar ro'yxati
-    python pull.py M314 M313   # shu reyslarning yuklarini mandarin.db ga yozadi
+    python pull.py M314 M313   # shu reyslarning yuklari va foto hisobotlari mandarin.db ga
 """
 
 import hashlib
@@ -103,17 +107,17 @@ def call(method: str, path: str, payload: dict | None = None) -> dict:
     return response.json()
 
 
-def pull(flights: list[str]):
-    """Reyslarning hamma qatorlari, sahifama-sahifa."""
+def pages(path: str, key: str, flights: list[str]):
+    """Reyslarning hamma yozuvlari, sahifama-sahifa."""
     for start in range(0, len(flights), 20):  # bir so'rovda ko'pi bilan 20 reys
         after_id = 0
         while True:
-            page = call("POST", "/api/v1/partner/cargo/items", {
+            page = call("POST", path, {
                 "flights": flights[start:start + 20],
                 "after_id": after_id,
                 "limit": 1000,
             })
-            yield from page["items"]
+            yield from page[key]
             if page["next_after_id"] is None:
                 break
             after_id = page["next_after_id"]
@@ -121,11 +125,15 @@ def pull(flights: list[str]):
 
 if len(sys.argv) == 1:
     for flight in call("GET", "/api/v1/partner/cargo/flights")["flights"]:
-        print(f"{flight['flight_name']:<14} {flight['item_count']:>6} ta   {flight['last_imported_at']}")
+        print(
+            f"{flight['flight_name']:<14} {flight['item_count']:>6} ta yuk"
+            f"  {flight['photo_report_count']:>5} ta foto hisobot"
+        )
     sys.exit()
 
+flights = sys.argv[1:]
 db = sqlite3.connect("mandarin.db")
-db.execute(
+db.executescript(
     """
     CREATE TABLE IF NOT EXISTS mandarin_cargo (
         flight_name   TEXT NOT NULL,
@@ -140,12 +148,24 @@ db.execute(
         received_date TEXT,
         mandarin_id   INTEGER,
         PRIMARY KEY (flight_name, client_code, track_code)
-    )
+    );
+    CREATE TABLE IF NOT EXISTS mandarin_photo_reports (
+        id               INTEGER PRIMARY KEY,
+        flight_name      TEXT NOT NULL,
+        client_code      TEXT NOT NULL,
+        weight_kg        TEXT,
+        comment          TEXT,
+        track_codes      TEXT,
+        photos           TEXT,
+        photos_expire_at TEXT,
+        deleted          INTEGER NOT NULL DEFAULT 0,
+        occurred_at      TEXT NOT NULL
+    );
     """
 )
-saved = 0
-with db:  # webhook qabul qiluvchi bilan bir xil jadval: takror yozuv bo'lmaydi
-    for item in pull(sys.argv[1:]):
+items = reports = 0
+with db:  # webhook qabul qiluvchi bilan bir xil jadvallar: takror yozuv bo'lmaydi
+    for item in pages("/api/v1/partner/cargo/items", "items", flights):
         db.execute(
             "INSERT OR REPLACE INTO mandarin_cargo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
@@ -162,8 +182,39 @@ with db:  # webhook qabul qiluvchi bilan bir xil jadval: takror yozuv bo'lmaydi
                 item["id"],
             ),
         )
-        saved += 1
-print(saved, "ta qator saqlandi")`;
+        items += 1
+    for report in pages("/api/v1/partner/cargo/photo-reports", "reports", flights):
+        # updated_at = webhook dagi occurred_at: eski holat yangisini bosmaydi,
+        # bir xil holat esa havolalarni yangilaydi.
+        db.execute(
+            """
+            INSERT INTO mandarin_photo_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                flight_name = excluded.flight_name,
+                client_code = excluded.client_code,
+                weight_kg = excluded.weight_kg,
+                comment = excluded.comment,
+                track_codes = excluded.track_codes,
+                photos = excluded.photos,
+                photos_expire_at = excluded.photos_expire_at,
+                deleted = 0,
+                occurred_at = excluded.occurred_at
+            WHERE excluded.occurred_at >= mandarin_photo_reports.occurred_at
+            """,
+            (
+                report["id"],
+                report["flight_name"],
+                report["client_code"],
+                report["weight_kg"],
+                report["comment"],
+                json.dumps(report["track_codes"], ensure_ascii=False),
+                json.dumps(report["photos"]),
+                report["photos_expire_at"],
+                report["updated_at"],
+            ),
+        )
+        reports += 1
+print(items, "ta yuk,", reports, "ta foto hisobot saqlandi")`;
 
 export const PARTNER_PULL_GUIDE: GuideSection[] = [
   {
@@ -172,13 +223,13 @@ export const PARTNER_PULL_GUIDE: GuideSection[] = [
       {
         kind: 'p',
         text:
-          "Webhook faqat yangi qo'shilgan qatorlarni yuboradi. Eski qatorlar yoki bir reysning hamma qatorlari kerak bo'lsa, ularni o'zingiz so'rab olasiz: avval reyslar ro'yxatini olasiz, keyin kerakli reyslarni tanlab, ularning qatorlarini olasiz.",
+          "Webhook faqat yangi qo'shilgan qatorlarni yuboradi. Eski qatorlar, foto hisobotlar yoki bir reysning hammasi kerak bo'lsa, ularni o'zingiz so'rab olasiz: avval reyslar ro'yxatini olasiz, keyin kerakli reyslarni tanlab, ularning qatorlari va foto hisobotlarini olasiz.",
       },
       {
         kind: 'list',
         items: [
           "Faqat sizning prefiksingizdagi mijozlar qatorlari keladi. Prefiks Mandarin panelida belgilanadi, so'rovda uni o'zgartirib bo'lmaydi.",
-          "Webhook bilan bir xil ma'lumot: Xitoy importi qatorlari, o'sha maydonlar, narxlarsiz.",
+          "Webhook bilan bir xil ma'lumot: Xitoy importi qatorlari va foto hisobotlar, o'sha maydonlar, narxlarsiz.",
           `API manzili: \`${API_BASE}\`. Hamkor ID si va kalit (\`whsec_...\`) webhook va kuryer API dagi bilan bir xil.`,
         ],
       },
@@ -218,7 +269,7 @@ export const PARTNER_PULL_GUIDE: GuideSection[] = [
       {
         kind: 'p',
         text:
-          "Kamida bitta sizning qatoringiz bor reyslar, eng yangi importi birinchi. `item_count` shu reysdagi sizning qatorlaringiz soni. Ro'yxat bir daqiqagacha keshlanadi: yangi import ko'pi bilan bir daqiqada ko'rinadi.",
+          "Kamida bitta sizning qatoringiz yoki foto hisobotingiz bor reyslar, eng yangi importi birinchi. `item_count` shu reysdagi sizning qatorlaringiz, `photo_report_count` foto hisobotlaringiz soni. Faqat foto hisoboti bor reyslar (`item_count` 0) ro'yxat oxirida. Ro'yxat bir daqiqagacha keshlanadi: yangi import ko'pi bilan bir daqiqada ko'rinadi.",
       },
       { kind: 'code', lang: 'json', code: FLIGHTS_ANSWER },
     ],
@@ -244,6 +295,26 @@ export const PARTNER_PULL_GUIDE: GuideSection[] = [
           "Qator maydonlari webhook dagidek, ustiga `flight_name`. `id` Mandarin dagi qator raqami: o'zgarmaydi.",
           "`next_after_id` `null` bo'lsa, oxirgi sahifa. Aks holda uni `after_id` qilib, xuddi shu reyslar bilan qayta so'rang.",
           "Webhook bilan kelgan qatorlar ham shu yerda bor. `(flight_name, client_code, track_code)` bo'yicha upsert qilsangiz, takror yozuv bo'lmaydi.",
+        ],
+      },
+    ],
+  },
+  {
+    title: "Foto hisobotlarni so'rab olish",
+    blocks: [
+      { kind: 'p', text: '`POST /api/v1/partner/cargo/photo-reports`' },
+      {
+        kind: 'p',
+        text:
+          "Tana va sahifalash «Reys yuklari» dagi kabi (`flights`, `after_id`, `limit`). Javobda `reports` (webhook dagi bilan bir xil maydonlar) va `next_after_id`:",
+      },
+      { kind: 'code', lang: 'json', code: PHOTO_REPORTS_ANSWER },
+      {
+        kind: 'list',
+        items: [
+          "O'chirilgan hisobotlar kelmaydi. Reysni to'liq so'rab olgandan keyin javobda yo'q hisobot o'chirilgan.",
+          "Har so'rovda rasm havolalari yangidan, bugundan 6 oyga beriladi. Havolasi eskirayotgan hisobotni qayta so'rab oling.",
+          "`updated_at` webhook dagi `occurred_at` bilan bir soat: saqlashda shuni versiya qilib yozing (Python misolida shunday).",
         ],
       },
     ],

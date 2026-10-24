@@ -292,6 +292,13 @@ function SecretDialog({
 
 // ── Delivery history ────────────────────────────────────────────────────────
 
+/** History label of the photo-report webhooks (backend partner_photo_reports.py). */
+const PHOTO_EVENT_LABEL: Record<string, string> = {
+  'photo_report.created': "foto hisobot qo'shildi",
+  'photo_report.updated': "foto hisobot o'zgardi",
+  'photo_report.deleted': "foto hisobot o'chirildi",
+};
+
 const STATUS_LABEL: Record<DeliveryStatus, { text: string; className: string }> = {
   sent: {
     text: 'Yetkazildi',
@@ -357,7 +364,12 @@ function DeliveryRow({ partnerId, row }: { partnerId: number; row: PartnerWebhoo
             ) : (
               <>
                 <b className="font-bold">{row.flight_name ?? 'test'}</b>
-                <span className="text-gray-500 dark:text-white/45"> · {row.item_count} qator</span>
+                <span className="text-gray-500 dark:text-white/45">
+                  {' · '}
+                  {PHOTO_EVENT_LABEL[row.event]
+                    ? `${PHOTO_EVENT_LABEL[row.event]}${row.item_count > 1 ? ` (${row.item_count} ta)` : ''}`
+                    : `${row.item_count} qator`}
+                </span>
               </>
             )}
             {row.attempts > 1 && (

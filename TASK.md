@@ -1,44 +1,29 @@
-# TASK: Admin «Kuryerlar» — jonli xarita, kunlik yo'l va kilometrlar
+# TASK: Foto hisobotlar hamkorga — webhook, pull API va 6 oylik rasm havolalari
 
 ## Objective
-Foydalanuvchi (2026-10-24): superadmin kuryer qayerdaligini xohlagan vaqtda ko'rsin; telefon qayerga
-borgani, qayerda turgani va kunlik km aniq ko'rinsin (mashina xarajatlari uchun). Backend tayyor
-(bot 5db0ae7: `/api/v1/admin/couriers/live|{id}/track|mileage`, `courier:monitor` huquqi, superadmin
-sukut bo'yicha). Panelda shu ma'lumotni ko'rsatadigan sahifa kerak.
+Foydalanuvchi (2026-10-24, "Boshqa kargolar uchun import API"): hamkor kargo o'z prefiksidagi
+mijozlarning foto hisobotlarini (`flight_cargos`) va mijozning trek kodlarini webhook orqali
+olsin; rasm havolalari 6 oy amal qilsin. Tasdiqlangan: narx yuborilmaydi; ombor formasi hamkor
+prefiksidagi kodni «Ro'yxatdan o'tmagan mijoz» belgisisiz qabul qiladi.
 
 ## Implementation Plan
-- [x] API servisi `src/api/services/courierMonitor.ts` (turlar backend sxemasi bilan bir xil)
-- [x] Sof yordamchilar `src/lib/courierMonitor.ts`: km, vaqt, smena oralig'i, oy oralig'i, kun voqealari, CSV
-- [x] `CourierMonitorMap`: OSM + Leaflet; yo'l chizig'i, uzilishlar (punktir), to'xtashlar, manzillar,
-      ofis, kuryerlarning hozirgi joyi; kun/kuryer almashganda ramkaga oladi (ranglar CSS sinfi orqali,
-      sinf Leaflet'ga yaratilishda beriladi: `pathOptions.className` keyin qo'llanmaydi)
-- [x] «Xarita» bo'limi: kuryerlar ro'yxati (15 s da yangilanadi), sana tanlash, kun tafsiloti
-      (smena, km, yetkazilgan, to'xtashlar va uzilishlar vaqt bo'yicha, bosilsa xaritada ko'rsatadi)
-- [x] «Kilometrlar» bo'limi: oy bo'yicha har kun km, 1 km narxi (shu brauzerda saqlanadi), CSV
-- [x] Yo'nalish: `/admin/couriers`, admin/super-admin, menyuda «Kuryerlar»; huquq yo'q bo'lsa tushuntirish
-- [x] Testlar (yordamchilar va sahifa), tsc, eslint, vitest
-- [x] 320/390/1024/1440 px va tungi rejimda ko'rib chiqish (Playwright, soxta API), commit + push main
+- [x] Backend: 6 oylik imzolangan rasm havolasi `/api/v1/partner/cargo/photos/{report}/{index}`
+      (hamkor ID + muddat + HMAC; S3 → qisqa presigned, Telegram → mavjud `/files` havolasi)
+- [x] Backend: `photo_report.created/updated/deleted` webhooklari (outbox, o'sha tranzaksiyada):
+      qo'shish, unutilgan yuk, tahrirlash (mijoz kodi boshqa hamkorga o'tsa ham), o'chirish, reysni tozalash
+- [x] Backend: pull API — `POST /api/v1/partner/cargo/photo-reports`; `/flights` ga `photo_report_count`
+- [x] Backend: `client-code-suggestions` hamkor prefiksidagi kodni "bor" deb javob beradi
+- [x] Backend testlari: havola imzosi, voqealar, egasi almashishi, pull, rasm endpointi
+- [x] Panel: Tarix qatorida foto hisobot voqeasi; Qo'llanmaga foto hisobot bo'limlari va Python misoli
+- [x] 320/360/390 px tekshiruv (Tarix va Qo'llanma bo'limlari, overflow probe toza)
+- [x] `/mnt/project-files/partner-api/` ga .md hujjat, Telegraph skripti
+- [x] Commit + push main (bot va web)
 
 ## Walkthrough / Architecture
-Sahifa AdminLayout ichida. Huquq JWT dan o'qiladi (`isSuperAdmin` yoki `courier:monitor`), so'rov
-yuborib 403 kutilmaydi. «Xarita»: `live` har 15 s da (ochiq oynada), tanlangan kuryerning `track`i
-bugun va kuryer ishda bo'lsa har 30 s da qayta o'qiladi. Xarita ramkasi faqat kuryer yoki sana
-almashganda o'rnatiladi, yangilanishlar admin surib qo'ygan xaritani qaytarmaydi. Kilometrlar
-backend hisoblaganidek ko'rsatiladi (GPS sakrashlari va turgan joydagi tebranish chiqarilgan,
-uzilishlar to'g'ri chiziq). 1 km narxi faqat shu brauzerdagi qulaylik (localStorage), summa
-`km × narx` sifatida hisoblanadi.
-Ikki ustunli joylashuv `xl` dan (1024 px da sidebar bilan xarita juda tor bo'lardi). So'm summalari bo'sh
-joy bilan guruhlanadi (`formatSom`): Chrome'da `formatUzs` vergul qo'yadi va «84,2 km» yonida «1,017»
-o'nlik kasr bo'lib o'qilardi.
-
-## 2026-10-24 (2): narxsiz km, tanaffuslar, rozilik
-Foydalanuvchi: faqat Toshkent ichida ishlaymiz, yetkazish narxi superadmin sozlagan qat'iy summa
-(sukut 30 000), shuning uchun 1 km narxi kerak emas. Backend (bot e93e493, 90f909b): smena
-tanaffuslari (`run.breaks`), kuryerning ilovadagi roziligi (`consent_at`), GPS uzilishlari yo'l
-xaritasi (OSRM) bo'yicha, sklad hamma kuryer uchun umumiy.
-- [x] «Kilometrlar»: 1 km narxi, so'm summalari va localStorage `courier_km_rate` olib tashlandi; CSV faqat km
-- [x] Kun tafsiloti: «Smena to'xtatildi · N daq» qatori (bu vaqt km'ga kirmaydi); xaritada yo'l
-      tanaffus ustidan chizilmaydi (`splitTrail`)
-- [x] Kuryer sarlavhasida rozilik vaqti yoki «Ilovada rozilik hali berilmagan»
-- [x] Uzilish matni: «yo'l bo'yicha qo'shildi»; skladdagi manzillar: «Skladda N ta manzil kutmoqda»
-- [x] Testlar, `scripts/check.sh`, 320/390/1440 px da ko'rib chiqildi (Playwright, soxta API)
+Foto hisobot yozilgan joyning o'zida (o'sha tranzaksiyada) `partner_webhook_deliveries` ga
+voqea qo'shiladi, mavjud yuboruvchi uni imzolab yuboradi va qayta urinadi. Voqeada hisobotning
+to'liq holati (`reports: [...]`) va `occurred_at` bor: hamkor eskisini e'tiborsiz qoldiradi,
+o'chirishda qatorni belgilab qo'yadi. Rasm havolasini AWS S3 6 oy bera olmaydi (presigned
+ko'pi bilan 7 kun), shuning uchun havola bizning serverga keladi: server imzo, muddat,
+hamkor faolligi va hisobot hali shu hamkorniki ekanini tekshirib, rasmga qisqa muddatli
+havola bilan yo'naltiradi. Hamkor to'xtatilsa, barcha havolalari yopiladi.

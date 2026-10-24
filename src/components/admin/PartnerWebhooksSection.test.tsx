@@ -186,6 +186,22 @@ describe('PartnerWebhooksSection', () => {
     expect(screen.queryByText(/0 qator/)).not.toBeInTheDocument();
   });
 
+  it('labels photo report events in the history', async () => {
+    service.list.mockResolvedValue([partner()]);
+    service.deliveries.mockResolvedValue({
+      items: [
+        delivery({ id: 1, event: 'photo_report.created', flight_name: 'M314', item_count: 1 }),
+        delivery({ id: 2, event: 'photo_report.deleted', flight_name: 'M315', item_count: 12 }),
+      ],
+      next_before_id: null,
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: /Tarix/ }));
+    expect(await screen.findByText(/foto hisobot qo'shildi/)).toBeInTheDocument();
+    expect(screen.getByText(/foto hisobot o'chirildi \(12 ta\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ qator/)).not.toBeInTheDocument();
+  });
+
   it('tells a non-super-admin the section is not theirs', async () => {
     service.list.mockRejectedValue({ message: 'Forbidden', status: 403 });
     renderSection();
@@ -199,7 +215,22 @@ describe('partner guide', () => {
     expect(markdown).toContain('GET /api/v1/partner/cargo/flights');
     expect(markdown).toContain('POST /api/v1/partner/cargo/items');
     expect(markdown).toContain('next_after_id');
-    expect(markdown).toContain('def pull(flights');
+    expect(markdown).toContain('POST /api/v1/partner/cargo/photo-reports');
+    expect(markdown).toContain('photo_report_count');
+    expect(markdown).toContain('def pages(path');
+    expect(markdown).not.toContain('${API_BASE}');
+  });
+
+  it('covers the photo report webhooks, their versioning and the photo links', () => {
+    const markdown = guideToMarkdown();
+    for (const event of ['photo_report.created', 'photo_report.updated', 'photo_report.deleted']) {
+      expect(markdown).toContain(event);
+    }
+    expect(markdown).toContain('/api/v1/partner/cargo/photos/55120/0?partner=7');
+    expect(markdown).toContain('def save_photo_reports(event');
+    expect(markdown).toContain('WHERE excluded.occurred_at >= mandarin_photo_reports.occurred_at');
+    // The receiver answers 2xx to events it does not know, so new ones never pile up.
+    expect(markdown).toContain('event["event"] not in PHOTO_EVENTS');
   });
 
   it('copies as Markdown with the Python example and the signature headers', () => {

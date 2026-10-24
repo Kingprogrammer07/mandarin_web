@@ -3,11 +3,13 @@
  * super-admin panel and copied from there as Markdown to send to the partner.
  *
  * Kept in step with the backend sender
- * (backend: src/infrastructure/services/partner_webhooks.py): header names,
- * signature format, retry schedule and the 500-item chunk size are all stated
- * here. The Python example was run against that sender's signing code.
+ * (backend: src/infrastructure/services/partner_webhooks.py,
+ * partner_photo_reports.py): header names, signature format, retry schedule
+ * and the 500-item chunk size are all stated here. The Python example was run
+ * against that sender's signing code and its photo-report payloads.
  */
 
+import { PARTNER_PHOTO_GUIDE } from './partnerPhotoGuide';
 import { PARTNER_PULL_GUIDE } from './partnerPullGuide';
 
 export type GuideBlock =
@@ -83,8 +85,23 @@ db.executescript(
         mandarin_id   INTEGER,
         PRIMARY KEY (flight_name, client_code, track_code)
     );
+    CREATE TABLE IF NOT EXISTS mandarin_photo_reports (
+        id               INTEGER PRIMARY KEY,  -- Mandarin hisobot raqami
+        flight_name      TEXT NOT NULL,
+        client_code      TEXT NOT NULL,
+        weight_kg        TEXT,
+        comment          TEXT,
+        track_codes      TEXT,                 -- JSON ro'yxat
+        photos           TEXT,                 -- JSON ro'yxat, 6 oylik havolalar
+        photos_expire_at TEXT,
+        deleted          INTEGER NOT NULL DEFAULT 0,
+        occurred_at      TEXT NOT NULL         -- eski voqea yangisini bosmasin
+    );
     """
 )
+
+CARGO_EVENT = "cargo.imported"
+PHOTO_EVENTS = ("photo_report.created", "photo_report.updated", "photo_report.deleted")
 
 app = FastAPI()
 
@@ -115,7 +132,9 @@ async def mandarin_webhook(request: Request):
     )
     event = json.loads(body)
 
-    if event["event"] == "ping":  # paneldagi "Test" tugmasi
+    # ping (paneldagi "Test" tugmasi) va hali tanimaydigan voqealarga ham 2xx:
+    # aks holda Mandarin ularni 24 soat qayta yuboradi.
+    if event["event"] != CARGO_EVENT and event["event"] not in PHOTO_EVENTS:
         return {"ok": True}
 
     with db:  # bitta tranzaksiya: hammasi yoziladi yoki hech narsa
@@ -126,27 +145,81 @@ async def mandarin_webhook(request: Request):
         if seen.rowcount == 0:
             return {"ok": True}  # bu yuborish avval qabul qilingan
 
-        for item in event["items"]:
+        if event["event"] == CARGO_EVENT:
+            save_cargo(event)
+        else:
+            save_photo_reports(event)
+    return {"ok": True}  # istalgan 2xx javob = "qabul qilindi"
+
+
+def save_cargo(event: dict) -> None:
+    for item in event["items"]:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO mandarin_cargo VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event["flight_name"],
+                item["client_code"],
+                item["track_code"],
+                item["track_code_2"],
+                item["item_name_cn"],
+                item["item_name_ru"],
+                item["quantity"],
+                item["weight_kg"],
+                item["box_number"],
+                item["received_date"],
+                item["id"],
+            ),
+        )
+
+
+def save_photo_reports(event: dict) -> None:
+    """Yangisini yozadi; eskirog'i (occurred_at kichikroq) hech narsani o'zgartirmaydi."""
+    for report in event["reports"]:
+        if event["event"] == "photo_report.deleted":
             db.execute(
                 """
-                INSERT OR REPLACE INTO mandarin_cargo VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO mandarin_photo_reports (id, flight_name, client_code, deleted, occurred_at)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT (id) DO UPDATE SET deleted = 1, occurred_at = excluded.occurred_at
+                WHERE excluded.occurred_at >= mandarin_photo_reports.occurred_at
                 """,
-                (
-                    event["flight_name"],
-                    item["client_code"],
-                    item["track_code"],
-                    item["track_code_2"],
-                    item["item_name_cn"],
-                    item["item_name_ru"],
-                    item["quantity"],
-                    item["weight_kg"],
-                    item["box_number"],
-                    item["received_date"],
-                    item["id"],
-                ),
+                (report["id"], report["flight_name"], report["client_code"], event["occurred_at"]),
             )
-    return {"ok": True}  # istalgan 2xx javob = "qabul qilindi"`;
+        else:
+            save_photo_report(report, event["occurred_at"])
+
+
+def save_photo_report(report: dict, occurred_at: str) -> None:
+    db.execute(
+        """
+        INSERT INTO mandarin_photo_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        ON CONFLICT (id) DO UPDATE SET
+            flight_name = excluded.flight_name,
+            client_code = excluded.client_code,
+            weight_kg = excluded.weight_kg,
+            comment = excluded.comment,
+            track_codes = excluded.track_codes,
+            photos = excluded.photos,
+            photos_expire_at = excluded.photos_expire_at,
+            deleted = 0,
+            occurred_at = excluded.occurred_at
+        WHERE excluded.occurred_at >= mandarin_photo_reports.occurred_at
+        """,
+        (
+            report["id"],
+            report["flight_name"],
+            report["client_code"],
+            report["weight_kg"],
+            report["comment"],
+            json.dumps(report["track_codes"], ensure_ascii=False),
+            json.dumps(report["photos"]),
+            report["photos_expire_at"],
+            occurred_at,
+        ),
+    )`;
 
 /** The same guide published on Telegraph, to send the partner one link. */
 export const GUIDE_TELEGRAPH_URL =
@@ -168,6 +241,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
         items: [
           "Faqat shu yuklashda qo'shilgan qatorlar keladi. Avval yuborilgan va eski qatorlar qayta yuborilmaydi.",
           "Eski qatorlar yoki butun reys kerak bo'lsa, ularni API orqali o'zingiz so'rab olasiz (pastda, «Yuklarni o'zingiz so'rab olish»).",
+          "Ombor sizning mijozingizga foto hisobot qo'shsa, o'zgartirsa yoki o'chirsa, u ham keladi: og'irlik, izoh, trek kodlar va 6 oy ishlaydigan rasm havolalari bilan (pastda, «Foto hisobotlar»).",
           "Narx va to'lov ma'lumotlari yuborilmaydi.",
           "Har bir so'rov maxfiy kalit bilan imzolanadi: soxta so'rovni ajratib olasiz.",
         ],
@@ -196,7 +270,10 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
         head: ['Sarlavha', "Ma'nosi"],
         rows: [
           ['Content-Type', '`application/json; charset=utf-8`'],
-          ['X-Mandarin-Event', '`cargo.imported` (yangi qatorlar) yoki `ping` (test)'],
+          [
+            'X-Mandarin-Event',
+            '`cargo.imported` (yangi qatorlar), `photo_report.created` / `photo_report.updated` / `photo_report.deleted` (foto hisobotlar) yoki `ping` (test)',
+          ],
           ['X-Mandarin-Delivery', "Yuborishning noyob ID si. Qayta urinishda o'zgarmaydi"],
           ['X-Mandarin-Timestamp', 'Yuborilgan vaqt, Unix soniyalarda'],
           ['X-Mandarin-Signature', '`sha256=<hex>`: imzo, pastda qanday tekshirilishi yozilgan'],
@@ -232,6 +309,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
       },
     ],
   },
+  ...PARTNER_PHOTO_GUIDE,
   {
     title: 'Imzoni tekshirish',
     blocks: [
@@ -257,6 +335,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
           "24 soatdan keyin yuborish \"xato\" holatiga o'tadi. Mandarin administratori uni paneldan qayta navbatga qo'yishi mumkin.",
           "Javobingiz yo'lda yo'qolsa, bitta yuborish ikki marta kelishi mumkin. `delivery_id` ni saqlang va takrorini o'tkazib yuboring.",
           "Bir trek kod boshqa `delivery_id` bilan qayta kelishi ham mumkin (masalan, reys qayta yuklansa yoki administrator «Yana yuborish»ni bossa). Qatorni `(flight_name, client_code, track_code)` bo'yicha yangilang (upsert).",
+          "Tanimaydigan `event` kelsa ham 2xx qaytaring: Mandarin keyinchalik yangi voqealar qo'shishi mumkin, 2xx bo'lmasa ular 24 soat qayta yuboriladi.",
         ],
       },
     ],
@@ -277,7 +356,7 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
       {
         kind: 'p',
         text:
-          "Imzoni tekshiradi, takroriy yuborishni o'tkazib yuboradi va qatorlarni bitta tranzaksiyada saqlaydi. SQLite o'rniga o'zingizning bazangizni qo'yishingiz mumkin.",
+          "Imzoni tekshiradi, takroriy yuborishni o'tkazib yuboradi, yuk qatorlarini va foto hisobotlarni bitta tranzaksiyada saqlaydi. SQLite o'rniga o'zingizning bazangizni qo'yishingiz mumkin.",
       },
       { kind: 'code', lang: 'python', code: PYTHON_RECEIVER },
     ],
