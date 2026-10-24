@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CalendarDays, LayoutGrid, LogOut, RotateCcw, ScanLine } from 'lucide-react';
+import { Bell, CalendarDays, ChevronDown, LayoutGrid, LogOut, RotateCcw, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -84,6 +84,7 @@ import {
   type PeriodKey,
   type PeriodRange,
 } from '@/components/pos/cashier/periods';
+import { useStoredFlag } from '@/hooks/useStoredFlag';
 import { usePaymentNotifications } from '@/hooks/usePaymentNotifications';
 import { ClientProfileDrawer } from '@/pages/pos/components/ClientProfileDrawer';
 import { ConfirmModal } from '@/pages/pos/components/ConfirmModal';
@@ -223,6 +224,7 @@ export default function CashierPage({ onNavigate, onLogout }: CashierPageProps) 
   );
 
   /** Which provider the history table is narrowed to — set by the stat cards. */
+  const [totalsOpen, setTotalsOpen] = useStoredFlag('kassa.totalsOpen', true);
   const [historyProvider, setHistoryProvider] = useState<
     CashierLogProvider | 'all'
   >('all');
@@ -957,12 +959,25 @@ export default function CashierPage({ onNavigate, onLogout }: CashierPageProps) 
           adjust-only admin would have no reason to disbelieve.
         */}
         {access.read && (
-        <section className="shrink-0 space-y-2.5 rounded-mc-lg border border-mc-border bg-mc-surface p-3 shadow-[var(--mc-shadow-card)]">
+        <section className={`shrink-0 rounded-mc-lg border border-mc-border bg-mc-surface p-3 shadow-[var(--mc-shadow-card)] ${totalsOpen ? 'space-y-2.5' : ''}`}>
           {/* Title, window and control on one line — three stacked rows of
               chrome above six cards was most of what pushed the grid off the
               first screen. */}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <button
+              type="button"
+              onClick={() => setTotalsOpen((open) => !open)}
+              aria-expanded={totalsOpen}
+              aria-controls="kassa-totals-body"
+              aria-label={totalsOpen ? 'Summalarni yig\'ish' : 'Summalarni ochish'}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-mc-sm border border-mc-border text-mc-text-2 transition-transform active:scale-95"
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-200 ${totalsOpen ? '' : '-rotate-90'}`}
+                strokeWidth={2}
+              />
+            </button>
+            <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
               <h2 className="text-[15px] font-extrabold tracking-tight text-mc-text">
                 {periodKey === 'today'
                   ? 'Bugun tasdiqlangan summalar'
@@ -976,9 +991,16 @@ export default function CashierPage({ onNavigate, onLogout }: CashierPageProps) 
               </span>
             </span>
 
-            <PeriodPicker activeKey={periodKey} range={range} onChange={handlePeriod} />
+            {totalsOpen && (
+              <PeriodPicker activeKey={periodKey} range={range} onChange={handlePeriod} />
+            )}
           </div>
 
+          <div
+            id="kassa-totals-body"
+            className={`grid transition-[grid-template-rows] duration-200 ease-out ${totalsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          >
+            <div className="min-h-0 overflow-hidden" inert={!totalsOpen}>
           <ProviderCards
             series={series.data}
             isLoading={series.isLoading}
@@ -989,6 +1011,8 @@ export default function CashierPage({ onNavigate, onLogout }: CashierPageProps) 
               setHistoryProvider((next as CashierLogProvider) ?? 'all')
             }
           />
+            </div>
+          </div>
         </section>
         )}
 
