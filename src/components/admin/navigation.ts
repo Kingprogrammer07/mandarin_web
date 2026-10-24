@@ -14,6 +14,7 @@
  */
 
 import {
+  Activity,
   BarChart3,
   CalendarDays,
   Clock,
@@ -170,6 +171,13 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         description: 'Navbat televizor ekrani',
         icon: Tv,
         shell: 'standalone',
+      },
+      {
+        id: 'admin-client-activity',
+        label: 'Mijozlar faolligi',
+        description: 'Online, gavjum vaqtlar, har bir mijoz',
+        icon: Activity,
+        shell: 'shell',
       },
       {
         id: 'statistics',

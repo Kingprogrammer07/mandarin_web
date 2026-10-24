@@ -38,6 +38,9 @@ import type {
   RoleResponse,
 } from '../../api/services/adminManagement';
 import { isCapabilityRole } from '../../lib/adminRoles';
+import { getAdminPresence } from '../../api/services/presence';
+import type { AdminPresenceItem } from '../../api/services/presence';
+import { AdminPresenceCell, OnlineAdminsStrip } from '../../components/admin/presence/AdminPresence';
 
 /**
  * The role the backend stores as primary: the first picked role that has a
@@ -148,13 +151,14 @@ StatusBadge.displayName = 'StatusBadge';
 
 interface AdminTableRowProps {
   admin: AdminAccountResponse;
+  presence?: AdminPresenceItem;
   onRowClick: (admin: AdminAccountResponse) => void;
   onToggleStatus: (admin: AdminAccountResponse) => void;
   isToggling: boolean;
 }
 
 const AdminTableRow = memo(({
-  admin, onRowClick, onToggleStatus, isToggling
+  admin, presence, onRowClick, onToggleStatus, isToggling
 }: AdminTableRowProps) => (
   <tr
     className="border-b border-black/[0.04] dark:border-white/[0.04] hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer transition-colors"
@@ -194,6 +198,9 @@ const AdminTableRow = memo(({
     <td className="px-4 py-3">
       <StatusBadge isActive={admin.is_active} />
     </td>
+    <td className="px-4 py-3">
+      <AdminPresenceCell presence={presence} />
+    </td>
     <td className="px-4 py-3 text-[13px] text-gray-500 dark:text-gray-500">
       {formatDate(admin.created_at)}
     </td>
@@ -213,13 +220,14 @@ AdminTableRow.displayName = 'AdminTableRow';
 
 interface AdminMobileCardProps {
   admin: AdminAccountResponse;
+  presence?: AdminPresenceItem;
   onCardClick: (admin: AdminAccountResponse) => void;
   onToggleStatus: (admin: AdminAccountResponse) => void;
   isToggling: boolean;
 }
 
 const AdminMobileCard = memo(({
-  admin, onCardClick, onToggleStatus, isToggling
+  admin, presence, onCardClick, onToggleStatus, isToggling
 }: AdminMobileCardProps) => (
   <div
     className="bg-white dark:bg-[#111] rounded-[18px] border border-black/[0.05] dark:border-white/[0.06] p-4 cursor-pointer active:opacity-80 transition-opacity"
@@ -269,9 +277,12 @@ const AdminMobileCard = memo(({
         </span>
       )}
     </div>
-    <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-600">
-      {formatDate(admin.created_at)}
-    </p>
+    <div className="mt-3 flex items-end justify-between gap-3">
+      <AdminPresenceCell presence={presence} />
+      <p className="shrink-0 text-[11px] text-gray-400 dark:text-gray-600">
+        {formatDate(admin.created_at)}
+      </p>
+    </div>
   </div>
 ));
 AdminMobileCard.displayName = 'AdminMobileCard';
@@ -1202,6 +1213,15 @@ export default function AdminAccountsPage() {
     queryFn: getRoles,
   });
 
+  // Polled: "online" goes stale in minutes, and the backend read is Redis only.
+  const { data: presenceData } = useQuery({
+    queryKey: ['admin-presence'],
+    queryFn: getAdminPresence,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  });
+  const presenceById = new Map((presenceData?.items ?? []).map((p) => [p.admin_id, p]));
+
   const roles = rolesData ?? [];
   const admins = accountsData?.items ?? [];
   const totalPages = accountsData?.total_pages ?? 0;
@@ -1252,6 +1272,7 @@ export default function AdminAccountsPage() {
           </h1>
           <p className="text-[13px] text-gray-500 dark:text-gray-500 mt-1">
             {accountsData?.total_count ?? 0} ta admin
+            {presenceData ? ` · ${presenceData.online_count} tasi hozir online` : ''}
           </p>
         </div>
         <button
@@ -1304,6 +1325,8 @@ export default function AdminAccountsPage() {
         </div>
       </div>
 
+      <OnlineAdminsStrip data={presenceData} />
+
       {/* Content */}
       <div className="space-y-4">
         {/* Desktop table */}
@@ -1311,7 +1334,7 @@ export default function AdminAccountsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-black/[0.06] dark:border-white/[0.06]">
-                {['Admin', 'Mijoz kodi', 'Rol', 'Status', 'Yaratilgan', 'Holat'].map((h) => (
+                {['Admin', 'Mijoz kodi', 'Rol', 'Status', 'Faollik', 'Yaratilgan', 'Holat'].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider"
@@ -1325,7 +1348,7 @@ export default function AdminAccountsPage() {
               {isLoadingAccounts
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-b border-black/[0.04] dark:border-white/[0.04]">
-                      {Array.from({ length: 6 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <td key={j} className="px-4 py-3">
                           <Skeleton className="h-4 w-full rounded-lg" />
                         </td>
@@ -1336,6 +1359,7 @@ export default function AdminAccountsPage() {
                     <AdminTableRow
                       key={admin.id}
                       admin={admin}
+                      presence={presenceById.get(admin.id)}
                       onRowClick={handleRowClick}
                       onToggleStatus={handleToggleStatus}
                       isToggling={isTogglingStatus}
@@ -1363,6 +1387,7 @@ export default function AdminAccountsPage() {
                 <AdminMobileCard
                   key={admin.id}
                   admin={admin}
+                  presence={presenceById.get(admin.id)}
                   onCardClick={handleRowClick}
                   onToggleStatus={handleToggleStatus}
                   isToggling={isTogglingStatus}
