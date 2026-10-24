@@ -15,6 +15,7 @@ import VideoGuidesSection from '@/components/admin/VideoGuidesSection';
 import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
 import DailyReportSection from '@/components/admin/DailyReportSection';
+import PaymeClickAutoApproveSection from '@/components/admin/PaymeClickAutoApproveSection';
 import PartnerWebhooksSection from '@/components/admin/PartnerWebhooksSection';
 import {
   Wrench,
@@ -598,6 +599,9 @@ export default function SystemSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* The bot's own approval of clear Payme / Click receipts */}
+      <PaymeClickAutoApproveSection />
       </>
       )}
 

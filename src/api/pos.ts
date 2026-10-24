@@ -112,6 +112,9 @@ export interface CashierLogItem {
   /** Resolved system_username of the cashier. Null for automatic NBU entries
    *  or when the id has no matching admin account. */
   cashier_name: string | null;
+  /** The bot booked this Payme / Click payment itself, or this row reverses
+   *  such a booking; `cashier_name` then reads «🤖 Bot» / «↩️ Bot bekor». */
+  by_bot?: boolean;
   created_at: string;
 }
 

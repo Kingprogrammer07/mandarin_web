@@ -104,7 +104,7 @@ function Row({
   isResolving: boolean;
   onEdit: (item: CashierLogItem) => void;
 }) {
-  // A wallet correction can be negative; nothing else in this table can.
+  // Negative: a wallet correction, or the reversal of an undone bot approval.
   const isNegative = item.paid_amount < 0;
   const editable = canEdit && isEditableRow(item);
   return (
