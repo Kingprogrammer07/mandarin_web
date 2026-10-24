@@ -21,6 +21,7 @@ import {
   Layers,
   LayoutDashboard,
   Monitor,
+  Navigation,
   PackageSearch,
   Plane,
   Settings,
@@ -154,6 +155,13 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         label: 'Zayavka',
         description: 'Yetkazib berish so‘rovlari',
         icon: Truck,
+        shell: 'shell',
+      },
+      {
+        id: 'admin-couriers',
+        label: 'Kuryerlar',
+        description: 'Jonli xarita va kilometrlar',
+        icon: Navigation,
         shell: 'shell',
       },
       {

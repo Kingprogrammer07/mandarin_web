@@ -75,6 +75,7 @@ const SavedCardsPage = lazy(() => import("./pages/payment/SavedCardsPage"));
 const ReferralPage = lazy(() => import("./pages/user/ReferralPage"));
 const SystemSettingsPage = lazy(() => import("./pages/admin/SystemSettingsPage"));
 const AdminLandingPage = lazy(() => import("./pages/admin/AdminLandingPage"));
+const CouriersPage = lazy(() => import("./pages/admin/CouriersPage"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ type Page =
   | "flight-schedule-admin"
   | "pickup-tv"
   | "admin-delivery-request"
+  | "admin-couriers"
   | "admin-flight-notifications"
   | "admin-expenses"
   | "payment_nbu_success"
@@ -192,6 +194,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "manager-page",
       "pickup-tv",
       "admin-delivery-request",
+      "admin-couriers",
       "admin-flight-notifications",
       "admin-expenses",
       "saved_cards",
@@ -235,6 +238,7 @@ const ROLE_CONFIG: Record<string, { default: Page; allowed: Page[] }> = {
       "flight-schedule-admin",
       "pickup-tv",
       "admin-delivery-request",
+      "admin-couriers",
       "admin-flight-notifications",
       "admin-expenses",
       "saved_cards",
@@ -368,6 +372,7 @@ function getPathForPage(
   if (page === "expected-cargo") return "/admin/expected-cargo";
   if (page === "flight-schedule-admin") return "/admin/flight-schedule";
   if (page === "admin-delivery-request") return "/admin/delivery-request";
+  if (page === "admin-couriers") return "/admin/couriers";
   if (page === "pickup-tv") return "/pickup-tv";
   if (page === "admin-expenses") return "/admin/expenses";
   if (page === "system-settings") return "/admin/system-settings";
@@ -450,6 +455,7 @@ function resolvePageFromPath(rawPath: string): RouteInfo {
   if (path === "/pos") return { page: "pos-dashboard" };
   if (path === "/kassa") return { page: "kassa" };
   if (path === "/admin/expenses") return { page: "admin-expenses" };
+  if (path === "/admin/couriers") return { page: "admin-couriers" };
   if (path === "/pickup-tv") return { page: "pickup-tv" };
   if (path === "/payment/nbu/success") return { page: "payment_nbu_success" };
   if (path === "/payment/nbu/failure") return { page: "payment_nbu_failure" };
@@ -957,6 +963,7 @@ function AppContent() {
     "admin-carousel",
     "flight-schedule-admin",
     "admin-delivery-request",
+    "admin-couriers",
     "admin-expenses",
     "system-settings",
     "admin-landing",
@@ -1159,6 +1166,7 @@ function AppContent() {
           {currentPage === "admin-carousel" && <AdminCarouselPage />}
           {currentPage === "flight-schedule-admin" && <FlightScheduleAdminPage />}
           {currentPage === "admin-delivery-request" && <AdminDeliveryRequestPage />}
+          {currentPage === "admin-couriers" && <CouriersPage />}
           {currentPage === "admin-expenses" && <ExpensesPage />}
           {currentPage === "system-settings" && <SystemSettingsPage />}
           {currentPage === "admin-landing" && <AdminLandingPage />}
