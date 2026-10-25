@@ -636,8 +636,11 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     };
   }, [finalPayable]);
 
-  // 1-3 digits typed: neither a card nor empty, so the receipt waits for 4.
-  const cardLast4Incomplete = cardLast4.length > 0 && cardLast4.length < 4;
+  // Required with an online receipt: the server compares them with the
+  // Payme / Click payment's card. The reminder shows once a receipt is chosen
+  // or digits are being typed, so an untouched form does not look wrong.
+  const cardLast4Ready = cardLast4.length === 4;
+  const cardLast4Warn = !cardLast4Ready && (receiptFile !== null || cardLast4.length > 0);
 
   const paymentMode = useMemo((): 'full' | 'partial' | 'full_remaining' => {
     if (isPartial) return 'partial'; // Always "partial" if the custom toggle is activated
@@ -859,14 +862,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         flight_name: selectedFlightName,
         wallet_used: walletDeduction,
       });
-    } else if (paymentMethod === 'online' && receiptFile) {
+    } else if (paymentMethod === 'online' && receiptFile && cardLast4Ready) {
       onlineMutation.mutate({
         flight_name: selectedFlightName,
         payment_mode: paymentMode,
         paid_amount: effectiveAmount,
         wallet_used: walletDeduction,
         receipt_file: receiptFile,
-        card_last4: cardLast4.length === 4 ? cardLast4 : undefined,
+        card_last4: cardLast4,
       });
     }
   }, [
@@ -877,6 +880,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     walletDeduction,
     receiptFile,
     cardLast4,
+    cardLast4Ready,
     walletMutation,
     cashMutation,
     onlineMutation,
@@ -1917,7 +1921,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             )}
           </div>
 
-          {/* Card's last 4 digits (optional) */}
+          {/* Card's last 4 digits (required) */}
           <label className="flex items-center justify-between gap-3 p-3.5 rounded-mc-md border border-mc-border bg-mc-surface">
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-mc-text">
@@ -1925,10 +1929,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               </span>
               <span
                 className={`block text-xs mt-0.5 ${
-                  cardLast4Incomplete ? 'text-mc-warn' : 'text-mc-text-3'
+                  cardLast4Warn ? 'text-mc-warn' : 'text-mc-text-3'
                 }`}
               >
-                {cardLast4Incomplete
+                {cardLast4Warn
                   ? t('makePayment.cardLast4Incomplete')
                   : t('makePayment.cardLast4Hint')}
               </span>
@@ -1953,7 +1957,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           {/* Submit Button */}
           <button
             onClick={handleConfirm}
-            disabled={!receiptFile || cardLast4Incomplete || isSubmitting}
+            disabled={!receiptFile || !cardLast4Ready || isSubmitting}
             className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-mc-on-brand shadow-xl shadow-blue-500/25
