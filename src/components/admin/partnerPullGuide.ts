@@ -154,6 +154,10 @@ db.executescript(
         flight_name      TEXT NOT NULL,
         client_code      TEXT NOT NULL,
         weight_kg        TEXT,
+        price_per_kg_usd TEXT,
+        price_usd        TEXT,
+        price_uzs        TEXT,                 -- usd_rate kursi bilan
+        usd_rate         TEXT,
         comment          TEXT,
         track_codes      TEXT,
         photos           TEXT,
@@ -188,11 +192,15 @@ with db:  # webhook qabul qiluvchi bilan bir xil jadvallar: takror yozuv bo'lmay
         # bir xil holat esa havolalarni yangilaydi.
         db.execute(
             """
-            INSERT INTO mandarin_photo_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+            INSERT INTO mandarin_photo_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
             ON CONFLICT (id) DO UPDATE SET
                 flight_name = excluded.flight_name,
                 client_code = excluded.client_code,
                 weight_kg = excluded.weight_kg,
+                price_per_kg_usd = excluded.price_per_kg_usd,
+                price_usd = excluded.price_usd,
+                price_uzs = excluded.price_uzs,
+                usd_rate = excluded.usd_rate,
                 comment = excluded.comment,
                 track_codes = excluded.track_codes,
                 photos = excluded.photos,
@@ -206,6 +214,10 @@ with db:  # webhook qabul qiluvchi bilan bir xil jadvallar: takror yozuv bo'lmay
                 report["flight_name"],
                 report["client_code"],
                 report["weight_kg"],
+                report["price_per_kg_usd"],
+                report["price_usd"],
+                report["price_uzs"],
+                report["usd_rate"],
                 report["comment"],
                 json.dumps(report["track_codes"], ensure_ascii=False),
                 json.dumps(report["photos"]),
@@ -229,7 +241,7 @@ export const PARTNER_PULL_GUIDE: GuideSection[] = [
         kind: 'list',
         items: [
           "Faqat sizning prefiksingizdagi mijozlar qatorlari keladi. Prefiks Mandarin panelida belgilanadi, so'rovda uni o'zgartirib bo'lmaydi.",
-          "Webhook bilan bir xil ma'lumot: Xitoy importi qatorlari va foto hisobotlar, o'sha maydonlar, narxlarsiz.",
+          "Webhook bilan bir xil ma'lumot: Xitoy importi qatorlari (narxsiz) va foto hisobotlar (narx bilan), o'sha maydonlar.",
           `API manzili: \`${API_BASE}\`. Hamkor ID si va kalit (\`whsec_...\`) webhook va kuryer API dagi bilan bir xil.`,
         ],
       },

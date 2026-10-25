@@ -231,6 +231,11 @@ describe('partner guide', () => {
     expect(markdown).toContain('WHERE excluded.occurred_at >= mandarin_photo_reports.occurred_at');
     // The receiver answers 2xx to events it does not know, so new ones never pile up.
     expect(markdown).toContain('event["event"] not in PHOTO_EVENTS');
+    // The price goes as in our client's message; our card and links never do.
+    for (const field of ['price_per_kg_usd', 'price_usd', 'price_uzs', 'usd_rate']) {
+      expect(markdown).toContain(`report["${field}"]`);
+    }
+    expect(markdown).not.toContain('Narx va to\'lov ma\'lumotlari yuborilmaydi');
   });
 
   it('copies as Markdown with the Python example and the signature headers', () => {

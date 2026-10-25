@@ -90,6 +90,10 @@ db.executescript(
         flight_name      TEXT NOT NULL,
         client_code      TEXT NOT NULL,
         weight_kg        TEXT,
+        price_per_kg_usd TEXT,
+        price_usd        TEXT,
+        price_uzs        TEXT,                 -- usd_rate kursi bilan
+        usd_rate         TEXT,
         comment          TEXT,
         track_codes      TEXT,                 -- JSON ro'yxat
         photos           TEXT,                 -- JSON ro'yxat, 6 oylik havolalar
@@ -195,11 +199,15 @@ def save_photo_reports(event: dict) -> None:
 def save_photo_report(report: dict, occurred_at: str) -> None:
     db.execute(
         """
-        INSERT INTO mandarin_photo_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        INSERT INTO mandarin_photo_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
         ON CONFLICT (id) DO UPDATE SET
             flight_name = excluded.flight_name,
             client_code = excluded.client_code,
             weight_kg = excluded.weight_kg,
+            price_per_kg_usd = excluded.price_per_kg_usd,
+            price_usd = excluded.price_usd,
+            price_uzs = excluded.price_uzs,
+            usd_rate = excluded.usd_rate,
             comment = excluded.comment,
             track_codes = excluded.track_codes,
             photos = excluded.photos,
@@ -213,6 +221,10 @@ def save_photo_report(report: dict, occurred_at: str) -> None:
             report["flight_name"],
             report["client_code"],
             report["weight_kg"],
+            report["price_per_kg_usd"],
+            report["price_usd"],
+            report["price_uzs"],
+            report["usd_rate"],
             report["comment"],
             json.dumps(report["track_codes"], ensure_ascii=False),
             json.dumps(report["photos"]),
@@ -241,8 +253,8 @@ export const PARTNER_WEBHOOK_GUIDE: GuideSection[] = [
         items: [
           "Faqat shu yuklashda qo'shilgan qatorlar keladi. Avval yuborilgan va eski qatorlar qayta yuborilmaydi.",
           "Eski qatorlar yoki butun reys kerak bo'lsa, ularni API orqali o'zingiz so'rab olasiz (pastda, «Yuklarni o'zingiz so'rab olish»).",
-          "Ombor sizning mijozingizga foto hisobot qo'shsa, o'zgartirsa yoki o'chirsa, u ham keladi: og'irlik, izoh, trek kodlar va 6 oy ishlaydigan rasm havolalari bilan (pastda, «Foto hisobotlar»).",
-          "Narx va to'lov ma'lumotlari yuborilmaydi.",
+          "Ombor sizning mijozingizga foto hisobot qo'shsa, o'zgartirsa yoki o'chirsa, u ham keladi: og'irlik, narx, izoh, trek kodlar va 6 oy ishlaydigan rasm havolalari bilan (pastda, «Foto hisobotlar»).",
+          "Import qatorlarida narx yo'q. Foto hisobotda shu yukning narxi bor. Bizning karta va to'lov havolalari yuborilmaydi.",
           "Har bir so'rov maxfiy kalit bilan imzolanadi: soxta so'rovni ajratib olasiz.",
         ],
       },
