@@ -170,12 +170,15 @@ export const paymentService = {
     paid_amount: number;
     wallet_used: number;
     receipt_file: File;
+    /** Optional: the last 4 digits of the card the client paid with. */
+    card_last4?: string;
   }): Promise<PaymentSubmissionResponse> => {
     const formData = new FormData();
     formData.append('flight_name', params.flight_name);
     formData.append('payment_mode', params.payment_mode);
     formData.append('paid_amount', String(params.paid_amount));
     formData.append('wallet_used', String(params.wallet_used));
+    if (params.card_last4) formData.append('card_last4', params.card_last4);
     formData.append('receipt_file', params.receipt_file);
 
     const response = await apiClientFormData.post<PaymentSubmissionResponse>(

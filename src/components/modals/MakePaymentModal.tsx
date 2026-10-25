@@ -313,6 +313,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [customAmount, setCustomAmount] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  // Optional: the last 4 digits of the card the client paid with. The server
+  // compares them with the Payme / Click payment's card.
+  const [cardLast4, setCardLast4] = useState('');
   const [copied, setCopied] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showTrackCodes, setShowTrackCodes] = useState(false);
@@ -371,6 +374,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setCustomAmount('');
     setReceiptFile(null);
     setReceiptPreview(null);
+    setCardLast4('');
     setCopied(false);
     setShowSuccess(false);
     setSelectedTrackCode(null);
@@ -632,6 +636,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     };
   }, [finalPayable]);
 
+  // 1-3 digits typed: neither a card nor empty, so the receipt waits for 4.
+  const cardLast4Incomplete = cardLast4.length > 0 && cardLast4.length < 4;
+
   const paymentMode = useMemo((): 'full' | 'partial' | 'full_remaining' => {
     if (isPartial) return 'partial'; // Always "partial" if the custom toggle is activated
     if (details?.has_existing_partial) return 'full_remaining'; // Paying the rest fully
@@ -859,6 +866,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         paid_amount: effectiveAmount,
         wallet_used: walletDeduction,
         receipt_file: receiptFile,
+        card_last4: cardLast4.length === 4 ? cardLast4 : undefined,
       });
     }
   }, [
@@ -868,6 +876,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     paymentMode,
     walletDeduction,
     receiptFile,
+    cardLast4,
     walletMutation,
     cashMutation,
     onlineMutation,
@@ -1908,10 +1917,43 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             )}
           </div>
 
+          {/* Card's last 4 digits (optional) */}
+          <label className="flex items-center justify-between gap-3 p-3.5 rounded-mc-md border border-mc-border bg-mc-surface">
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-mc-text">
+                {t('makePayment.cardLast4')}
+              </span>
+              <span
+                className={`block text-xs mt-0.5 ${
+                  cardLast4Incomplete ? 'text-mc-warn' : 'text-mc-text-3'
+                }`}
+              >
+                {cardLast4Incomplete
+                  ? t('makePayment.cardLast4Incomplete')
+                  : t('makePayment.cardLast4Hint')}
+              </span>
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              value={cardLast4}
+              onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="0000"
+              aria-label={t('makePayment.cardLast4')}
+              className="w-24 shrink-0 px-3 py-2.5 rounded-mc-md text-center text-lg font-bold tabular-nums tracking-[0.25em]
+                bg-mc-surface-2 border border-mc-border text-mc-text
+                placeholder:text-mc-text-3 placeholder:font-semibold
+                focus:outline-none focus:ring-2 focus:ring-mc-brand/40 focus:border-mc-brand
+                transition-all"
+            />
+          </label>
+
           {/* Submit Button */}
           <button
             onClick={handleConfirm}
-            disabled={!receiptFile || isSubmitting}
+            disabled={!receiptFile || cardLast4Incomplete || isSubmitting}
             className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-gradient-to-r from-mc-brand to-mc-brand-strong
               text-mc-on-brand shadow-xl shadow-blue-500/25
