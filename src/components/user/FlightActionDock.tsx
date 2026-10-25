@@ -57,13 +57,7 @@ export function FlightActionDock({
 
   return (
     <div className="fixed inset-x-0 bottom-[calc(var(--mc-nav-h)+env(safe-area-inset-bottom))] z-30">
-      {/* Fades the list out under the dock instead of letting a card end
-          abruptly behind it. */}
-      <div
-        className="h-6 bg-gradient-to-t from-mc-bg to-transparent"
-        aria-hidden="true"
-      />
-      <div className="bg-mc-bg px-4 pb-3">
+      <div className="border-t border-mc-border bg-mc-bg px-4 pb-3 pt-3">
         <div className="mx-auto max-w-lg">
           <button
             type="button"
@@ -72,9 +66,8 @@ export function FlightActionDock({
               handler();
             }}
             className="flex h-14 w-full items-center justify-center gap-3 rounded-mc-lg
-                       bg-gradient-to-r from-mc-brand to-mc-brand-strong px-4
-                       text-[16px] font-extrabold text-mc-on-brand
-                       shadow-[var(--mc-shadow-cta)] transition-transform duration-150
+                       bg-mc-brand px-4 text-[16px] font-extrabold text-mc-on-brand
+                       transition-transform duration-150
                        active:scale-[0.98]"
           >
             <span className="flex-1 text-center">

@@ -38,25 +38,22 @@ export function ConsentCard({ acceptedVersion, acceptedAt, onOpenDocument }: Con
 
   return (
     <div className="px-4">
-      <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
-        <div className="flex items-start gap-2.5 p-3">
-          <span
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-mc-sm bg-mc-brand-soft text-mc-brand"
-            aria-hidden="true"
-          >
+      <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface">
+        <div className="flex items-start gap-3 px-3.5 py-3">
+          <span className="mt-0.5 shrink-0 text-mc-text-2" aria-hidden="true">
             {hasConsent ? (
-              <FileCheck2 className="h-[18px] w-[18px]" strokeWidth={2} />
+              <FileCheck2 className="h-[18px] w-[18px]" strokeWidth={1.8} />
             ) : (
-              <ScrollText className="h-[18px] w-[18px]" strokeWidth={2} />
+              <ScrollText className="h-[18px] w-[18px]" strokeWidth={1.8} />
             )}
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-[13px] font-extrabold leading-tight text-mc-text">
+            <h2 className="text-[13px] font-bold leading-tight text-mc-text">
               {hasConsent
                 ? t('profile.consent.title', 'Siz rozilik bergan hujjatlar')
                 : t('profile.consent.titleNeutral', 'Huquqiy hujjatlar')}
             </h2>
-            <p className="mt-0.5 text-[11px] font-medium leading-snug text-mc-text-2">
+            <p className="mt-0.5 text-[11px] leading-snug text-mc-text-2">
               {hasConsent && acceptedAt
                 ? t('profile.consent.acceptedOn', {
                     date: acceptedAt,
@@ -88,11 +85,11 @@ export function ConsentCard({ acceptedVersion, acceptedAt, onOpenDocument }: Con
                 triggerSoftHaptic();
                 onOpenDocument(id);
               }}
-              className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left
+              className={`flex min-h-[46px] w-full items-center gap-2.5 px-3.5 text-left
                           transition-transform duration-150 active:scale-[0.99]
                           ${index > 0 ? 'border-t border-mc-border' : ''}`}
             >
-              <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-mc-text">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-mc-text">
                 {LEGAL_DOC_LABELS[id][lang]}
               </span>
               <ChevronRight

@@ -249,6 +249,10 @@ const UserPage = ({
 
                   {view === 'menu' ? (
                      <div className="space-y-2.5 pb-5 pt-3">
+                        {/* The name card below is the visible title. */}
+                        <h1 className="sr-only">
+                           {t('bottomNav.profile', 'Profil')}
+                        </h1>
                         <ProfileCard
                            fullName={user.full_name}
                            clientCode={user.extra_code || user.client_code}
@@ -266,7 +270,7 @@ const UserPage = ({
                             the navigation rows above. Email is absent on purpose:
                             `ProfileResponse` has no email field, and a row that
                             can only ever be blank is worse than no row. */}
-                        <MenuList items={contactMenu} variant="chip" />
+                        <MenuList items={contactMenu} />
 
                         <ConsentCard
                            acceptedVersion={user.privacy_policy_version}
@@ -279,10 +283,11 @@ const UserPage = ({
                               type="button"
                               onClick={handleEditOpen}
                               disabled={isModalLoading}
-                              className="flex h-13 w-full items-center justify-center gap-2 rounded-mc-lg
-                                         bg-gradient-to-r from-mc-brand to-mc-brand-strong py-3
-                                         text-[14px] font-extrabold text-mc-on-brand
-                                         shadow-[var(--mc-shadow-cta)] transition-transform
+                              // Secondary, not orange: on this screen nothing is
+                              // urgent, and the brand fill is kept for paying.
+                              className="flex h-11 w-full items-center justify-center gap-2 rounded-mc-lg
+                                         border border-mc-border bg-mc-surface
+                                         text-[14px] font-bold text-mc-text transition-transform
                                          duration-150 active:scale-[0.98] disabled:opacity-60"
                            >
                               {isModalLoading ? (
@@ -296,16 +301,15 @@ const UserPage = ({
                            <button
                               type="button"
                               onClick={() => setIsLogoutModalOpen(true)}
-                              className="flex w-full items-center justify-center gap-2 rounded-mc-lg
-                                         border border-mc-danger/25 bg-mc-surface py-3
-                                         text-[14px] font-extrabold text-mc-danger
+                              className="flex h-11 w-full items-center justify-center gap-2 rounded-mc-lg
+                                         text-[14px] font-bold text-mc-danger
                                          transition-transform duration-150 active:scale-[0.98]"
                            >
                               <LogOut className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden="true" />
                               {t('profile.logout')}
                            </button>
 
-                           <p className="pt-1 text-center text-[11px] font-medium text-mc-text-3">
+                           <p className="text-center text-[11px] font-medium text-mc-text-3">
                               {t('profile.version')}
                            </p>
                         </div>

@@ -33,7 +33,7 @@ export function SegmentedTabs<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="flex flex-1 gap-1 rounded-mc-lg border border-mc-border bg-mc-surface p-1"
+      className="flex flex-1 gap-1 rounded-mc-lg border border-mc-border bg-mc-surface-2 p-1"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === value;
@@ -48,13 +48,11 @@ export function SegmentedTabs<T extends string>({
               triggerSoftHaptic();
               onChange(tab.id);
             }}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-mc-md
-                        px-3 py-2 text-[13px] font-bold transition-colors duration-150
-                        ${
-                          isActive
-                            ? 'border border-mc-brand/25 bg-mc-brand-soft text-mc-brand'
-                            : 'border border-transparent text-mc-text-2'
-                        }`}
+            // The selected segment is a neutral raised pill: colour on this
+            // screen belongs to money and status, not to the control.
+            className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-mc-md
+                        px-3 py-1.5 text-[13px] font-bold transition-colors duration-150
+                        ${isActive ? 'bg-mc-surface text-mc-text' : 'text-mc-text-2'}`}
           >
             {tab.label}
             {typeof tab.count === 'number' && (
@@ -63,8 +61,8 @@ export function SegmentedTabs<T extends string>({
                             px-1.5 text-[11px] font-extrabold tabular-nums
                             ${
                               isActive
-                                ? 'bg-mc-brand text-mc-on-brand'
-                                : 'bg-mc-surface-2 text-mc-text-2'
+                                ? 'bg-mc-surface-2 text-mc-text'
+                                : 'bg-mc-surface text-mc-text-2'
                             }`}
               >
                 {tab.count}

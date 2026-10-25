@@ -44,12 +44,11 @@ export function ProfileCard({
           onOpen();
         }}
         className="flex w-full items-center gap-3 rounded-mc-lg border border-mc-border
-                   bg-mc-surface p-3 text-left shadow-[var(--mc-shadow-card)]
-                   transition-transform duration-150 active:scale-[0.99]"
+                   bg-mc-surface p-3 text-left transition-transform duration-150 active:scale-[0.99]"
       >
         <span
-          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden
-                     rounded-full bg-mc-brand-soft text-mc-brand"
+          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden
+                     rounded-full bg-mc-surface-2 text-mc-text-2"
           aria-hidden="true"
         >
           {avatarUrl ? (
@@ -57,29 +56,29 @@ export function ProfileCard({
               src={avatarUrl}
               alt=""
               loading="lazy"
-              width={56}
-              height={56}
+              width={48}
+              height={48}
               className="h-full w-full object-cover"
             />
           ) : (
-            <User className="h-7 w-7" strokeWidth={1.8} />
+            <User className="h-6 w-6" strokeWidth={1.8} />
           )}
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[17px] font-extrabold leading-tight text-mc-text">
+          <span className="block truncate text-[16px] font-extrabold leading-tight text-mc-text">
             {fullName}
           </span>
           {clientCode && (
             <span
-              className="mt-1 inline-flex items-center rounded-full bg-mc-brand-soft px-2 py-0.5
-                         text-[11px] font-extrabold text-mc-brand"
+              className="mt-1 inline-flex items-center rounded-full bg-mc-tile-orange px-2 py-0.5
+                         text-[12px] font-extrabold tracking-[0.02em] text-mc-tile-orange-ink"
             >
               {clientCode}
             </span>
           )}
           {registered && (
-            <span className="mt-1 block truncate text-[11px] font-medium text-mc-text-2">
+            <span className="mt-1 block truncate text-[11px] text-mc-text-2">
               {t('profile.registeredOn', { date: registered })}
             </span>
           )}

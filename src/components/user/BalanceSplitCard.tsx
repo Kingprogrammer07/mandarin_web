@@ -1,4 +1,3 @@
-import { CreditCard, Wallet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { walletService } from '@/api/services/walletService';
@@ -23,7 +22,7 @@ export function BalanceSplitCard() {
   if (isLoading) {
     return (
       <div className="px-4">
-        <div className="h-[76px] animate-pulse rounded-mc-lg border border-mc-border bg-mc-surface-2" />
+        <div className="h-[60px] animate-pulse rounded-mc-lg border border-mc-border bg-mc-surface-2" />
       </div>
     );
   }
@@ -32,48 +31,28 @@ export function BalanceSplitCard() {
   const balance = data?.wallet_balance ?? 0;
   const unit = t('home.summary.currency', "so'm");
 
+  // Colour only when there is something to say: red for money owed, green for
+  // money held. A zero on either side is just a grey zero.
+  const cells = [
+    { key: 'debt', label: t('profile.debt', 'Qarz'), value: debt, tone: debt > 0 ? 'text-mc-danger' : 'text-mc-text-3' },
+    { key: 'balance', label: t('profile.available', 'Mavjud'), value: balance, tone: balance > 0 ? 'text-mc-success' : 'text-mc-text-3' },
+  ];
+
   return (
     <div className="px-4">
-      <div className="flex items-stretch gap-3 rounded-mc-lg border border-mc-border bg-mc-surface p-3 shadow-[var(--mc-shadow-card)]">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full
-                       bg-mc-danger-soft text-mc-danger"
-            aria-hidden="true"
-          >
-            <CreditCard className="h-[18px] w-[18px]" strokeWidth={2} />
-          </span>
-          <span className="min-w-0 overflow-hidden">
-            <span className="block text-[11px] font-medium text-mc-text-2">
-              {t('profile.debt', 'Qarz')}
+      <div className="grid grid-cols-2 divide-x divide-mc-border rounded-mc-lg border border-mc-border bg-mc-surface">
+        {cells.map((cell) => (
+          <div key={cell.key} className="min-w-0 px-3.5 py-2.5">
+            <span className="block text-[11px] font-medium text-mc-text-2">{cell.label}</span>
+            <span
+              className={`mt-0.5 block whitespace-nowrap text-[clamp(14px,4.4vw,16px)] font-extrabold
+                          leading-tight tabular-nums ${cell.tone}`}
+            >
+              {formatUzsAmount(cell.value)}
+              <span className="ml-1 text-[11px] font-bold text-mc-text-2">{unit}</span>
             </span>
-            <span className="block truncate text-[15px] font-extrabold leading-tight text-mc-danger tabular-nums">
-              {formatUzsAmount(debt)}
-              <span className="ml-1 text-[11px] font-bold">{unit}</span>
-            </span>
-          </span>
-        </div>
-
-        <span className="w-px shrink-0 bg-mc-border" aria-hidden="true" />
-
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full
-                       bg-mc-success/12 text-mc-success"
-            aria-hidden="true"
-          >
-            <Wallet className="h-[18px] w-[18px]" strokeWidth={2} />
-          </span>
-          <span className="min-w-0 overflow-hidden">
-            <span className="block text-[11px] font-medium text-mc-text-2">
-              {t('profile.available', 'Mavjud')}
-            </span>
-            <span className="block truncate text-[15px] font-extrabold leading-tight text-mc-success tabular-nums">
-              {formatUzsAmount(balance)}
-              <span className="ml-1 text-[11px] font-bold">{unit}</span>
-            </span>
-          </span>
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   );

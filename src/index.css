@@ -28,6 +28,14 @@
   --color-mc-warn-soft: var(--mc-warn-soft);
   --color-mc-success: var(--mc-success);
   --color-mc-cardface: var(--mc-cardface);
+  --color-mc-tile-orange: var(--mc-tile-orange);
+  --color-mc-tile-orange-ink: var(--mc-tile-orange-ink);
+  --color-mc-tile-rose: var(--mc-tile-rose);
+  --color-mc-tile-rose-ink: var(--mc-tile-rose-ink);
+  --color-mc-tile-green: var(--mc-tile-green);
+  --color-mc-tile-green-ink: var(--mc-tile-green-ink);
+  --color-mc-tile-blue: var(--mc-tile-blue);
+  --color-mc-tile-blue-ink: var(--mc-tile-blue-ink);
   --color-mc-cardface-2: var(--mc-cardface-2);
   --color-mc-danger-fill: var(--mc-danger-fill);
   --color-mc-on-danger: var(--mc-on-danger);
@@ -160,6 +168,13 @@
    * a shadow on a near-black surface is invisible. */
   --mc-shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 8px 24px rgba(16, 16, 20, 0.05);
   --mc-shadow-cta: 0 8px 20px rgba(255, 122, 26, 0.28);
+
+  /* Pale status tints, each with the dark of its own hue as ink (6.4-7.2:1):
+   * the client code, cargo stages and payment chips. */
+  --mc-tile-orange: #ffedd5;  --mc-tile-orange-ink: #9a3412;
+  --mc-tile-rose: #ffe4e6;    --mc-tile-rose-ink: #9f1239;
+  --mc-tile-green: #dcfce7;   --mc-tile-green-ink: #166534;
+  --mc-tile-blue: #dbeafe;    --mc-tile-blue-ink: #1e40af;
 }
 
 .dark {
@@ -202,6 +217,11 @@
 
   --mc-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.38);
   --mc-shadow-cta: 0 8px 20px rgba(255, 122, 26, 0.22);
+
+  --mc-tile-orange: rgba(251, 146, 60, 0.14);  --mc-tile-orange-ink: #fdba74;
+  --mc-tile-rose: rgba(251, 113, 133, 0.14);   --mc-tile-rose-ink: #fda4af;
+  --mc-tile-green: rgba(74, 222, 128, 0.12);   --mc-tile-green-ink: #86efac;
+  --mc-tile-blue: rgba(96, 165, 250, 0.14);    --mc-tile-blue-ink: #93c5fd;
 }
 
 :root {

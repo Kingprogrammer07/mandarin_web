@@ -13,8 +13,6 @@ export interface MenuItem {
 
 interface MenuListProps {
   items: MenuItem[];
-  /** Larger icon chips, used for the contact rows in the design. */
-  variant?: 'plain' | 'chip';
 }
 
 /**
@@ -24,12 +22,12 @@ interface MenuListProps {
  * reads top-to-bottom at any label length — which matters because these labels
  * are translated and Russian runs 20-30% longer than Uzbek.
  */
-export function MenuList({ items, variant = 'plain' }: MenuListProps) {
+export function MenuList({ items }: MenuListProps) {
   if (items.length === 0) return null;
 
   return (
     <div className="px-4">
-      <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]">
+      <div className="overflow-hidden rounded-mc-lg border border-mc-border bg-mc-surface">
         {items.map(({ id, label, Icon, value, onClick }, index) => (
           <button
             key={id}
@@ -38,37 +36,32 @@ export function MenuList({ items, variant = 'plain' }: MenuListProps) {
               triggerSoftHaptic();
               onClick();
             }}
-            className={`flex w-full items-center gap-3 px-3 py-2.5 text-left
-                        transition-colors duration-150
-                        ${index > 0 ? 'border-t border-mc-border' : ''}`}
+            className="flex min-h-[46px] w-full items-center gap-3 pl-3.5 text-left
+                       transition-colors duration-150 active:bg-mc-surface-2"
           >
-            {variant === 'chip' ? (
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-mc-sm
-                           bg-mc-brand-soft text-mc-brand"
-                aria-hidden="true"
-              >
-                <Icon className="h-4 w-4" strokeWidth={2} />
-              </span>
-            ) : (
-              <Icon
-                className="h-[18px] w-[18px] shrink-0 text-mc-brand"
-                strokeWidth={1.9}
-                aria-hidden="true"
-              />
-            )}
+            <Icon
+              className="h-[18px] w-[18px] shrink-0 text-mc-text-2"
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
 
-            <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-mc-text">
-              {label}
+            {/* The rule starts at the label so the icons read as one column. */}
+            <span
+              className={`flex min-h-[46px] min-w-0 flex-1 items-center gap-2 pr-3.5
+                          ${index > 0 ? 'border-t border-mc-border' : ''}`}
+            >
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-mc-text">
+                {label}
+              </span>
+
+              {value && (
+                <span className="shrink-0 truncate text-[12px] text-mc-text-2 tabular-nums">
+                  {value}
+                </span>
+              )}
+
+              <ChevronRight className="h-4 w-4 shrink-0 text-mc-text-3" aria-hidden="true" />
             </span>
-
-            {value && (
-              <span className="shrink-0 truncate text-[12px] font-medium text-mc-text-2">
-                {value}
-              </span>
-            )}
-
-            <ChevronRight className="h-4 w-4 shrink-0 text-mc-text-3" aria-hidden="true" />
           </button>
         ))}
       </div>

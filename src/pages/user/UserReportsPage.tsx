@@ -352,10 +352,10 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
 
                         <div className="flex items-start justify-between gap-3 px-4 pt-3">
                             <div className="min-w-0">
-                                <h1 className="text-[19px] font-extrabold leading-tight tracking-tight text-mc-text">
+                                <h1 className="text-[19px] font-extrabold leading-tight tracking-[-0.02em] text-mc-text">
                                     {t('reports.title')}
                                 </h1>
-                                <p className="mt-0.5 text-[12px] font-medium text-mc-text-2">
+                                <p className="mt-0.5 text-[12px] text-mc-text-2">
                                     {t('reports.subtitle')}
                                 </p>
                             </div>
@@ -376,7 +376,7 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg
                                                border transition-transform duration-150 active:scale-95 ${
                                                    activeTab === 'history'
-                                                       ? 'border-mc-brand bg-mc-brand-soft text-mc-brand'
+                                                       ? 'border-mc-text bg-mc-text text-mc-surface'
                                                        : 'border-mc-border bg-mc-surface text-mc-text-2'
                                                }`}
                                     aria-label={t('tracking.historyTitle', 'Yuklar tarixi')}
@@ -390,7 +390,7 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                                     onClick={handleRefresh}
                                     disabled={isRefreshing}
                                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-lg
-                                               border border-mc-border bg-mc-surface text-mc-brand
+                                               border border-mc-border bg-mc-surface text-mc-text-2
                                                transition-transform duration-150 active:scale-95
                                                disabled:opacity-60"
                                     aria-label={t('reports.retry')}
@@ -558,13 +558,13 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                             className="space-y-4"
                         >
                             <div className="px-4 pt-1">
-                                <h1 className="text-[19px] font-extrabold leading-tight tracking-tight text-mc-text">
+                                <h1 className="text-[19px] font-extrabold leading-tight tracking-[-0.02em] text-mc-text">
                                     {t('reports.detailsTitle', {
                                         flight: selectedFlight,
                                         defaultValue: '{{flight}} tafsilotlari',
                                     })}
                                 </h1>
-                                <p className="mt-0.5 text-[12px] font-medium text-mc-text-2">
+                                <p className="mt-0.5 text-[12px] text-mc-text-2">
                                     {t('reports.detailsSubtitle', 'Yukingiz haqida batafsil ma‘lumot')}
                                 </p>
                             </div>
@@ -691,14 +691,15 @@ export default function UserReportsPage({ onNavigateToDelivery }: UserReportsPag
                 <button
                     type="button"
                     onClick={openPaymentPicker}
-                    className="fixed right-4 z-30 flex h-11 items-center gap-1.5 rounded-full
-                               bg-mc-brand px-4 text-mc-on-brand
-                               shadow-[var(--mc-shadow-cta)] transition-transform
+                    // It floats over the list, so unlike resting cards it keeps a shadow.
+                    className="fixed right-4 z-30 flex h-12 items-center gap-2 rounded-full
+                               bg-mc-brand px-5 text-mc-on-brand
+                               shadow-[0_8px_24px_rgba(16,16,20,0.18)] transition-transform
                                duration-150 active:scale-95
                                bottom-[calc(var(--mc-nav-h,0px)+env(safe-area-inset-bottom)+1rem)]"
                 >
                     <CreditCard className="h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-                    <span className="text-[13px] font-extrabold">
+                    <span className="text-[15px] font-extrabold">
                         {t('dashboard.actions.payment.label', "To'lov qilish")}
                     </span>
                 </button>

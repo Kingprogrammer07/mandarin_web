@@ -1,4 +1,4 @@
-import { ChevronRight, Plane } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ShipmentItem } from '@/api/services/shipmentService';
 import { formatUzsAmount, formatWeightKg } from '@/lib/format';
@@ -58,10 +58,10 @@ export function ShipmentCard({ shipment, onOpen }: ShipmentCardProps) {
       : t('shipments.stageTransit', 'Yo‘lda');
 
   const stageTone = shipment.is_taken_away
-    ? 'border-mc-border bg-mc-surface-2 text-mc-text-2'
+    ? 'bg-mc-surface-2 text-mc-text-2'
     : shipment.is_scanned
-      ? 'border-mc-success/25 bg-mc-success/12 text-mc-success'
-      : 'border-mc-warn/25 bg-mc-warn-soft text-mc-warn';
+      ? 'bg-mc-tile-green text-mc-tile-green-ink'
+      : 'bg-mc-tile-blue text-mc-tile-blue-ink';
 
   // A second chip only when money is still owed. A flight reaches the archive
   // on collection alone — 44% of collected flights in production still carry a
@@ -94,34 +94,25 @@ export function ShipmentCard({ shipment, onOpen }: ShipmentCardProps) {
         ]
           .filter(Boolean)
           .join(', ')}
-        className="w-full rounded-mc-lg border border-mc-border bg-mc-surface p-3 text-left
-                   shadow-[var(--mc-shadow-card)] transition-transform duration-150
-                   active:scale-[0.99]"
+        className="w-full rounded-mc-lg border border-mc-border bg-mc-surface p-3.5 text-left
+                   transition-transform duration-150 active:scale-[0.99]"
       >
         <div className="flex items-start gap-3">
-          <span
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-mc-md
-                       bg-mc-brand-soft text-mc-brand"
-            aria-hidden="true"
-          >
-            <Plane className="h-[22px] w-[22px]" strokeWidth={2} />
-          </span>
-
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
               <span className="truncate text-[17px] font-extrabold leading-tight text-mc-text">
                 {shipment.flight_name}
               </span>
               <span
-                className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5
+                className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5
                             text-[11px] font-bold ${stageTone}`}
               >
                 {stageLabel}
               </span>
               {hasDebt && (
                 <span
-                  className="inline-flex shrink-0 items-center rounded-full border
-                             border-mc-danger/25 bg-mc-danger-soft px-2 py-0.5
+                  className="inline-flex shrink-0 items-center rounded-full
+                             bg-mc-danger-soft px-2.5 py-0.5
                              text-[11px] font-bold text-mc-danger"
                 >
                   {t('reports.status.unpaid')}
@@ -196,14 +187,14 @@ export function ShipmentCard({ shipment, onOpen }: ShipmentCardProps) {
                 : t('reports.totalPrice', 'To‘lov summasi')}
             </span>
             <span
-              className={`mt-0.5 block truncate text-[15px] font-extrabold tabular-nums ${
-                amount === null ? 'text-mc-text' : 'text-mc-danger'
-              }`}
+              // Ink, not red: the "To'lanmagan" chip already flags debt, and a
+              // price that is fully paid is not a warning.
+              className="mt-0.5 block truncate text-[15px] font-extrabold tabular-nums text-mc-text"
             >
               {/* No report yet means no price exists — showing "0 so'm" would
                   read as "nothing to pay", which is a different claim. */}
               {amount === null ? shipment.total_count : formatUzsAmount(amount)}
-              <span className="ml-1 text-[11px] font-bold">
+              <span className="ml-1 text-[11px] font-bold text-mc-text-2">
                 {amount === null
                   ? t('shipments.pcs', 'ta')
                   : t('home.summary.currency', "so'm")}
