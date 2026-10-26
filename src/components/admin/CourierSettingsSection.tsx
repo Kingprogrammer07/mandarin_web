@@ -17,7 +17,8 @@ import CourierAppReleases from './CourierAppReleases';
  *
  * Cash and card are taken by the courier at the door; online goes through NBU
  * once the courier presses «Yetib keldim». With "ask the client" off the client
- * gets no payment question and the courier simply records cash or card.
+ * gets no payment question and the courier simply records cash or card. The
+ * couriers' Telegram message about new stops starts off: it waits for go-live.
  */
 
 const QUERY_KEY = ['system-courier-settings'] as const;
@@ -83,6 +84,7 @@ function CourierSettingsForm({ initial }: { initial: CourierSettings }) {
   const [cash, setCash] = useState(initial.cash_enabled);
   const [card, setCard] = useState(initial.card_enabled);
   const [online, setOnline] = useState(initial.online_enabled);
+  const [orderAlerts, setOrderAlerts] = useState(initial.order_alerts ?? false);
 
   const feeValue = fee.trim() === '' ? NaN : Number(fee);
   const feeInvalid = !Number.isInteger(feeValue) || feeValue < 0 || feeValue > FEE_MAX;
@@ -168,6 +170,20 @@ function CourierSettingsForm({ initial }: { initial: CourierSettings }) {
         )}
       </div>
 
+      <div className="space-y-2">
+        <span className={labelClass}>Kuryerlarga xabar</span>
+        <Toggle
+          checked={orderAlerts}
+          onChange={setOrderAlerts}
+          title="«Skladda yangi zayavka» Telegram’da"
+          hint={
+            orderAlerts
+              ? 'Skladda yangi manzil paydo bo‘lsa, yo‘lda bo‘lmagan kuryerlarga botdan xabar boradi (07:00–21:00)'
+              : 'Kuryerlarga Telegram xabari bormaydi. Ilovadagi ro‘yxat odatdagidek ishlaydi'
+          }
+        />
+      </div>
+
       {noMethod && (
         <p className="text-xs font-semibold text-rose-600 dark:text-rose-300">
           Kamida bitta to‘lov usulini yoqing.
@@ -195,6 +211,7 @@ function CourierSettingsForm({ initial }: { initial: CourierSettings }) {
               cash_enabled: cash,
               card_enabled: card,
               online_enabled: online,
+              order_alerts: orderAlerts,
             })
           }
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 dark:bg-white dark:text-gray-900"

@@ -114,6 +114,8 @@ export interface CourierSettings {
   cash_enabled: boolean;
   card_enabled: boolean;
   online_enabled: boolean;
+  /** «Skladda yangi zayavka» Telegram message to the couriers; missing on a server from before the switch. */
+  order_alerts?: boolean;
   updated_at: string | null;
   updated_by: string | null;
 }

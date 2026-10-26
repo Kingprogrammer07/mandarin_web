@@ -1,28 +1,20 @@
-# TASK: Hamkorga foto hisobot — Mandarin mijozi bilan bir xil ma'lumot
+# TASK: Kuryerlarga «Skladda yangi zayavka» Telegram xabari — o'chirgich
 
 ## Objective
-Foydalanuvchi (2026-10-25): hamkorga foto hisobot bilan har bir mijozning trek kodlari ham
-borsin, va Mandarin mijoziga qanday ma'lumot borsa, hamkorga ham shunday borsin. Kartochkada
-tanlangan: narx ham yuboriladi (kg narxi $, narx $ va so'm, kurs). Bizning karta va to'lov
-havolalari yuborilmaydi.
+Foydalanuvchi (2026-10-26): Telegram'da «Skladda yangi zayavka» xabarlari kela boshladi;
+kuryer moduli hali tayyor emas, xabar odamlarga bormasligi kerak. Xabar faqat «Kuryer»
+roli bor akkauntlarga boradi (mijozlarga emas). Endi super-admin o'chirgichi, sukut
+bo'yicha o'chiq; go-live'da Sozlamalar → Yetkazish'da yoqiladi.
 
 ## Implementation Plan
-- [x] Backend: «kutilayotgan yuklar»da kod qo'shilsa / almashtirilsa / reys yoki mijoz kodi
-      o'zgartirilsa / o'chirilsa, hamkorning shu hisobotlariga `photo_report.updated`
-      (hisobot `updated_at` i oldinga suriladi: pull API bilan bir soat)
-- [x] Backend: unutilgan yuk oqimida mijozning avvalgi hisobotlari ham yangilanadi
-- [x] Backend: payload va pull API ga `price_per_kg_usd`, `price_usd`, `price_uzs`, `usd_rate`
-      (mijoz xabaridagi kurs manbai; kurs olinmasa so'm `null`)
-- [x] Backend testlari
-- [x] Qo'llanma: maydonlar, voqealar, Python misollari (narx ustunlari)
-- [x] Python misollarini haqiqiy payloadlar bilan sinash (qabul qiluvchi + pull)
-- [x] Hamkor hujjati va Telegraph skripti yangilandi
+- [x] Backend: `courier_settings.order_alerts` (migratsiya c2e4a6b8d0f1, server_default false);
+      o'chiq bo'lsa sikl manzillarni belgilaydi, lekin yubormaydi (yoqilganda eskilari ketmaydi)
+- [x] Backend: PUT /api/v1/system/courier — eski panel maydonni yubormasa o'zgarmaydi
+- [x] Web: «Kuryerlarga xabar» o'chirgichi, `order_alerts?` (eski serverda yo'q → o'chiq)
+- [x] Testlar (backend kuryer testlari, web CourierSettingsSection.test.tsx)
 - [x] Commit + push main (bot va web)
 
 ## Walkthrough / Architecture
-Mijozga boradigan xabar trek kodlarni yuborish paytida o'qiydi; hamkor esa hisobot
-saqlanganda olardi. Endi trek kod ro'yxatini o'zgartiruvchi har bir xizmat funksiyasi
-commitdan oldin `queue_track_codes_changed` ni chaqiradi: u hamkor prefiksidagi tegishli
-hisobotlarni topadi, `updated_at` ni suradi va o'sha tranzaksiyada outboxga `updated`
-qo'yadi. Narx mijoz xabaridagidek: og'irlik × kg narxi, so'mga admin kursi (yoki API kursi)
-bilan.
+Alert sikli har 30 s da yangi manzillarni `couriers_alerted_at` orqali bir marta "egallaydi".
+O'chirgich o'chiq bo'lsa egallangan manzillar xabarsiz qoladi, shuning uchun keyin yoqilganda
+eski manzillar haqida xabar ketmaydi. Web sozlama formasi mavjud `Toggle` ni qayta ishlatadi.
