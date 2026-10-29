@@ -1562,7 +1562,8 @@
     "imageAlt": "Taqiqlangan yuk {{index}}",
     "error": "Ma'lumotlarni yuklab bo'lmadi",
     "retry": "Qayta yuklash",
-    "understood": "Tushunarli"
+    "understood": "Tushunarli",
+    "share": "Ulashish"
   },
   "paymentHistory": {
     "title": "To'lovlar tarixi",
@@ -2193,7 +2194,7 @@
     "hoursTitle": "Ish vaqti",
     "contactsTitle": "Bog'lanish",
     "callHint": "Bosing va qo'ng'iroq qiling",
-    "adminChat": "Admin bilan yozishish",
+    "adminChat": "Bog'lanish",
     "dayOff": "Dam olish",
     "visitTitle": "Ofisga borishdan oldin",
     "closedWarning": "Ofis hozir yopiq. Iltimos, ish vaqtida keling yoki telefon qiling.",

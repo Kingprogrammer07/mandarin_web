@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import {
     Bell,
     CheckCheck,
@@ -37,6 +37,23 @@ type CombinedNotification = {
     iconType?: string; // for API notifications
     metadata?: { flightName?: string }; // Extra data like flight name
 
+};
+
+// --- Nudge memory ---
+// The header unmounts on every tab switch, so the "already announced" count has
+// to outlive the component; a ref reset to 0 brought the banner back each time.
+const NUDGE_SEEN_KEY = 'notif_nudge_seen_count';
+const readNudgeSeen = () => {
+    try { return Number(sessionStorage.getItem(NUDGE_SEEN_KEY)) || 0; } catch { return 0; }
+};
+const writeNudgeSeen = (count: number) => {
+    try { sessionStorage.setItem(NUDGE_SEEN_KEY, String(count)); } catch { /* storage blocked: banner just may repeat */ }
+};
+
+type NudgeExit = { x: number; y: number };
+const NUDGE_EXIT_DEFAULT: NudgeExit = { x: 0, y: -8 };
+const nudgeVariants = {
+    exit: (to: NudgeExit) => ({ opacity: 0, x: to.x, y: to.y, scale: 0.96, transition: { duration: 0.2 } }),
 };
 
 // --- Utility: Date Formatting ---
@@ -267,7 +284,8 @@ export default function NotificationCenter() {
     const [isMobile, setIsMobile] = useState(false);
     const [selectedNotification, setSelectedNotification] = useState<CombinedNotification | null>(null);
     const [isNudgeVisible, setIsNudgeVisible] = useState(false);
-    const lastAnnouncedUnreadCount = useRef(0);
+    const [nudgeExit, setNudgeExit] = useState<NudgeExit>(NUDGE_EXIT_DEFAULT);
+    const nudgeDraggedRef = useRef(false);
 
     // Profile for reports
     const { data: user } = useProfile();
@@ -320,7 +338,7 @@ export default function NotificationCenter() {
     });
 
     // 4. Report Unread Count
-    const { data: webFlights = [] } = useQuery({
+    const { data: webFlights = [], isSuccess: isWebFlightsReady } = useQuery({
         queryKey: ['webFlights', user?.client_code],
         queryFn: () => reportService.getWebFlights(user!.client_code),
         enabled: !!user?.client_code,
@@ -337,35 +355,34 @@ export default function NotificationCenter() {
     // Total Unread
     const totalUnreadCount = (apiUnreadData?.count || 0) + reportUnreadCount;
 
+    // Both counts must be loaded: a half-loaded total would lower the stored
+    // count and the banner would pop up again once the rest arrives.
+    const isUnreadReady =
+        apiUnreadData !== undefined && (isWebFlightsReady || (user !== undefined && !user.client_code));
+
     useEffect(() => {
-        // Synchronous resets are intentional: they reset the nudge so the next
-        // appearance starts fresh with the 650ms delay below. The nudge render is
-        // already gated on (totalUnreadCount > 0 && !isOpen), so this can't cause
-        // a visible cascade — hence the rule is suppressed for these two lines.
-        if (totalUnreadCount <= 0) {
-            lastAnnouncedUnreadCount.current = 0;
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setIsNudgeVisible(false);
+        if (!isUnreadReady) return undefined;
+        const seen = readNudgeSeen();
+
+        // Only a count higher than the last announced one shows the banner.
+        // Opening the list, reading or dismissing just records the new count.
+        if (isOpen || totalUnreadCount <= seen) {
+            writeNudgeSeen(totalUnreadCount);
+            if (isOpen || totalUnreadCount <= 0) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setIsNudgeVisible(false);
+            }
             return undefined;
         }
 
-        if (isOpen) {
-            lastAnnouncedUnreadCount.current = totalUnreadCount;
-            setIsNudgeVisible(false);
-            return undefined;
-        }
-
-        if (lastAnnouncedUnreadCount.current === totalUnreadCount) {
-            return undefined;
-        }
-
-        lastAnnouncedUnreadCount.current = totalUnreadCount;
         const timer = window.setTimeout(() => {
+            writeNudgeSeen(totalUnreadCount);
+            setNudgeExit(NUDGE_EXIT_DEFAULT);
             setIsNudgeVisible(true);
         }, 650);
 
         return () => window.clearTimeout(timer);
-    }, [isOpen, totalUnreadCount]);
+    }, [isOpen, totalUnreadCount, isUnreadReady]);
 
     useEffect(() => {
         if (!isNudgeVisible) return undefined;
@@ -527,9 +544,27 @@ export default function NotificationCenter() {
     }, []);
 
     const handleOpenNotificationsFromNudge = useCallback(() => {
+        if (nudgeDraggedRef.current) return;
         setIsNudgeVisible(false);
         setIsOpen(true);
     }, []);
+
+    const dismissNudge = useCallback((to: NudgeExit = NUDGE_EXIT_DEFAULT) => {
+        setNudgeExit(to);
+        setIsNudgeVisible(false);
+    }, []);
+
+    // Swipe up or sideways to dismiss, like a system notification.
+    const handleNudgeDragEnd = useCallback((_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+        const { offset, velocity } = info;
+        if (offset.y < -32 || velocity.y < -400) {
+            dismissNudge({ x: 0, y: -140 });
+        } else if (Math.abs(offset.x) > 80 || Math.abs(velocity.x) > 500) {
+            dismissNudge({ x: Math.sign(offset.x || velocity.x) * 420, y: 0 });
+        }
+        // The click that ends a drag must not open the list.
+        window.setTimeout(() => { nudgeDraggedRef.current = false; }, 0);
+    }, [dismissNudge]);
 
     // --- Notification Panel Content ---
     const renderContent = () => (
@@ -635,14 +670,22 @@ export default function NotificationCenter() {
             />
 
             {typeof document !== 'undefined' && createPortal(
-                <AnimatePresence>
+                <AnimatePresence custom={nudgeExit}>
                     {isNudgeVisible && totalUnreadCount > 0 && !isOpen && (
                         <motion.div
+                            custom={nudgeExit}
+                            variants={nudgeVariants}
                             initial={{ opacity: 0, y: -10, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                            exit="exit"
                             transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                            className="fixed left-4 right-4 top-[5.3rem] z-[9997] mx-auto max-w-[390px] sm:left-auto sm:right-5 sm:top-[5.6rem]"
+                            drag
+                            dragDirectionLock
+                            dragConstraints={{ bottom: 0 }}
+                            dragSnapToOrigin
+                            onDragStart={() => { nudgeDraggedRef.current = true; }}
+                            onDragEnd={handleNudgeDragEnd}
+                            className="fixed cursor-grab active:cursor-grabbing left-4 right-4 top-[5.3rem] z-[9997] mx-auto max-w-[390px] sm:left-auto sm:right-5 sm:top-[5.6rem]"
                         >
                             <div className="relative overflow-hidden rounded-mc-lg border border-mc-brand/20 bg-mc-surface p-3.5 shadow-[0_18px_42px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl dark:border-mc-brand/20">
                                 <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-mc-brand/40 to-transparent" />
@@ -667,7 +710,7 @@ export default function NotificationCenter() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setIsNudgeVisible(false)}
+                                        onClick={() => dismissNudge()}
                                         className="grid h-8 w-8 shrink-0 place-items-center rounded-mc-md text-mc-text-3 transition-colors dark:text-white/38"
                                         aria-label={t('notifications.close')}
                                     >

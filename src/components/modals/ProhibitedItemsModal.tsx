@@ -1,9 +1,11 @@
-import { useEffect, useRef, memo } from "react";
+import { useCallback, useEffect, useRef, memo } from "react";
 import { useTranslation } from 'react-i18next';
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Ban, ChevronRight, AlertTriangle, ChevronLeft } from "lucide-react";
+import { X, Ban, ChevronRight, AlertTriangle, ChevronLeft, Share2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { buildProhibitedShareUrl } from "@/lib/prohibitedShare";
+import { triggerSoftHaptic } from "@/utils/haptics";
 
 // --- Types ---
 interface ProhibitedItem {
@@ -210,6 +212,18 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
 
   const items = data?.data;
 
+  const handleShare = useCallback(() => {
+    if (!items) return;
+    triggerSoftHaptic();
+    const shareUrl = buildProhibitedShareUrl(items);
+    const tg = window.Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(shareUrl);
+    } else {
+      window.open(shareUrl, "_blank", "noopener,noreferrer");
+    }
+  }, [items]);
+
   const modalContent = (
     <AnimatePresence>
       {isOpen && (
@@ -347,11 +361,26 @@ const ProhibitedItemsModal = ({ isOpen, onClose }: ProhibitedItemsModalProps) =>
             </div>
 
             {/* Sticky Footer Button */}
-            <div className="shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-mc-surface border-t border-mc-border">
+            <div className="shrink-0 flex gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-mc-surface border-t border-mc-border">
               <button
+                type="button"
+                onClick={handleShare}
+                disabled={!items}
+                className="
+                  flex h-12 flex-1 items-center justify-center gap-2 rounded-mc-md
+                  border border-mc-border bg-mc-surface-2 text-[14px] font-extrabold text-mc-text
+                  active:scale-[0.98] transition-transform duration-200
+                  disabled:opacity-50
+                "
+              >
+                <Share2 className="h-[18px] w-[18px]" strokeWidth={2} />
+                {t('prohibitedItems.share')}
+              </button>
+              <button
+                type="button"
                 onClick={onClose}
                 className="
-                  w-full h-12 rounded-mc-md text-[14px] font-extrabold
+                  flex-1 h-12 rounded-mc-md text-[14px] font-extrabold
                   bg-mc-danger-fill text-mc-on-danger
                   active:scale-[0.98] transition-transform duration-200
                   shadow-lg shadow-red-500/20
