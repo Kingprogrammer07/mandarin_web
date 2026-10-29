@@ -56,7 +56,8 @@ export function useDeleteExpenseCategory() {
       toast.success("Toifa o'chirildi");
       queryClient.invalidateQueries({ queryKey: expenseKeys.categories() });
     },
-    onError: () => toast.error("Toifa o'chirishda xatolik"),
+    // The server refuses a category that expenses still point at.
+    onError: () => toast.error("Toifa o'chirilmadi: unga yozilgan rasxodlar bo'lsa, o'chirib bo'lmaydi"),
   });
 }
 
@@ -95,15 +96,20 @@ export function useUpdateExpenseEmployee() {
   });
 }
 
-export function useDeleteExpenseEmployee() {
+/**
+ * Takes a person off the «Kim oldi» list without deleting the row: a hard
+ * delete set employee_id to NULL on every past expense, so the record of who
+ * took the money was lost with it.
+ */
+export function useDeactivateExpenseEmployee() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => expenseService.deleteEmployee(id),
+    mutationFn: (id: number) => expenseService.updateEmployee(id, { is_active: false }),
     onSuccess: () => {
-      toast.success("Xodim o'chirildi");
+      toast.success("Xodim ro'yxatdan olindi");
       queryClient.invalidateQueries({ queryKey: expenseKeys.employees() });
     },
-    onError: () => toast.error("Xodim o'chirishda xatolik"),
+    onError: () => toast.error("Xodimni ro'yxatdan olib bo'lmadi"),
   });
 }
 

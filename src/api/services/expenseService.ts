@@ -51,6 +51,8 @@ export interface ExpenseFilters {
   employee_id?: number;
   payment_method?: PaymentMethod;
   created_by?: string;
+  /** Description, category, who took it, who entered it, or an exact amount. */
+  q?: string;
   sort?: 'created_desc' | 'created_asc' | 'amount_desc' | 'amount_asc';
 }
 

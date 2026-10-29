@@ -1246,7 +1246,7 @@ function AppContent() {
             <AdminDeliveryRequestPage />
           )}
           {currentPage === "admin-expenses" && (
-            <ExpensesPage />
+            <ExpensesPage standalone />
           )}
           {currentPage === "flights" && (
             <FlightsPage
