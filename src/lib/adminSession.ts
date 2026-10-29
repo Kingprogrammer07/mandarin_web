@@ -7,8 +7,8 @@
  * reconnect with the dropped token.
  *
  * The client slot is cleared only when it holds a copy of the staff JWT — the
- * role switcher writes one there when a client token exists. A real client
- * session is left alone.
+ * role switcher used to write one there when a client token existed. A real
+ * client session is left alone.
  */
 export function discardAdminSession(sessions: {
   adminToken: string | null;

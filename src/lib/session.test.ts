@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   credentialForPath,
+  isClientEntryPath,
   isClientPath,
   isStaffPath,
   pickSession,
@@ -25,9 +26,11 @@ const STAFF: StoredSessions = { adminToken: 'jwt', adminRole: 'super-admin', use
 const CLIENT: StoredSessions = { adminToken: null, adminRole: null, userToken: 'tok' };
 const BOTH: StoredSessions = { adminToken: 'jwt', adminRole: 'super-admin', userToken: 'tok' };
 
-const STAFF_ROUTE = { isPublic: false, isUserPage: false };
-const USER_ROUTE = { isPublic: false, isUserPage: true };
-const PUBLIC_ROUTE = { isPublic: true, isUserPage: false };
+const STAFF_ROUTE = { isPublic: false, isUserPage: false, isClientEntry: false };
+const USER_ROUTE = { isPublic: false, isUserPage: true, isClientEntry: false };
+const PUBLIC_ROUTE = { isPublic: true, isUserPage: false, isClientEntry: false };
+// `/auth/login`: what every "Mini App" button in the bot opens.
+const ENTRY_ROUTE = { isPublic: false, isUserPage: false, isClientEntry: true };
 
 describe('a public route', () => {
   it('needs no session', () => {
@@ -51,8 +54,10 @@ describe('a staff route', () => {
     expect(pickSession(STAFF, STAFF_ROUTE)).toEqual({ kind: 'admin', role: 'super-admin' });
   });
 
-  it('falls to the client token when there is no staff one', () => {
-    expect(pickSession(CLIENT, STAFF_ROUTE)).toEqual({ kind: 'client' });
+  it('shows the staff login when only a client session is stored', () => {
+    // A client session only opens client pages now, so it used to bounce a
+    // staff member who pressed «Admin panel» back to the client home.
+    expect(pickSession(CLIENT, STAFF_ROUTE)).toEqual({ kind: 'guest' });
   });
 
   it('is a guest with nothing stored', () => {
@@ -90,6 +95,44 @@ describe('a client route', () => {
 
   it('leaves staff routes alone', () => {
     expect(pickSession(BOTH, STAFF_ROUTE)).toEqual({ kind: 'admin', role: 'super-admin' });
+  });
+});
+
+describe("the client app's front door", () => {
+  it('opens the client app for a staff member who is also a customer', () => {
+    // The reported trap: the bot's client button opened the admin panel for
+    // every admin with a staff session stored, so they could not use the
+    // client app the way customers do.
+    expect(pickSession(BOTH, ENTRY_ROUTE)).toEqual({ kind: 'client' });
+  });
+
+  it('still takes a staff member with no client account to the staff panel', () => {
+    expect(pickSession(STAFF, ENTRY_ROUTE)).toEqual({ kind: 'admin', role: 'super-admin' });
+  });
+
+  it('is served by the client session for a customer', () => {
+    expect(pickSession(CLIENT, ENTRY_ROUTE)).toEqual({ kind: 'client' });
+  });
+
+  it('is a guest with nothing stored', () => {
+    expect(pickSession(NONE, ENTRY_ROUTE)).toEqual({ kind: 'guest' });
+  });
+
+  it.each(['/', '/auth/login', '/auth/login/', '/auth/register'])('%s is the front door', (path) => {
+    expect(isClientEntryPath(path)).toBe(true);
+  });
+
+  it.each(['/admin/login', '/admin', '/user/home', '/kassa'])('%s is not', (path) => {
+    expect(isClientEntryPath(path)).toBe(false);
+  });
+
+  it('asks /auth/me with the client token when both are stored', () => {
+    // Sent with the staff JWT instead, a rejected client check would have been
+    // read as the staff session dying and signed the admin out of the panel.
+    const both = { adminToken: 'jwt', userToken: 'tok' };
+    expect(credentialForPath('/auth/login', both)).toBe('client');
+    expect(credentialForPath('/', both)).toBe('client');
+    expect(credentialForPath('/auth/login', { adminToken: 'jwt', userToken: null })).toBe('admin');
   });
 });
 

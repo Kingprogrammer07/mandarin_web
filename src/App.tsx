@@ -22,7 +22,7 @@ import { useMaintenanceWatcher } from "./hooks/useMaintenanceWatcher";
 import { useGlobalEvents } from "./hooks/useGlobalEvents";
 import { useMaintenanceStore } from "./store/useMaintenanceStore";
 import { isMaintenanceScreenPath } from "@/lib/maintenanceScope";
-import { pickSession } from "@/lib/session";
+import { isClientEntryPath, pickSession } from "@/lib/session";
 import { discardAdminSession } from "@/lib/adminSession";
 import { setRouterDepth } from "@/lib/backStack";
 import { isAstatkaFlightName } from "@/lib/astatkaFlight";
@@ -296,9 +296,11 @@ function getDefaultPageForRole(role: string): Page {
   // the static ROLE_CONFIG default (e.g. accountant whose home_page is "/pos"
   // instead of "/verification/search").  ROLE_CONFIG is only a fallback for
   // when there is no token yet (e.g. during the login redirect itself).
-  const claims = getAdminJwtClaims();
-  if (claims.home_page) {
-    const resolved = resolvePageFromPath(claims.home_page);
+  // That JWT is the STAFF session's; a customer who is also staff holds one
+  // too, and it must not send their client session to an admin page.
+  const homePage = role === "user" ? null : getAdminJwtClaims().home_page;
+  if (homePage) {
+    const resolved = resolvePageFromPath(homePage);
     if (!isGuestPage(resolved.page)) return resolved.page;
   }
 
@@ -627,6 +629,14 @@ function AppContent() {
     }
   }, [handleLogout]);
 
+  // The client profile's «Chiqish» ends the client session only. It used to
+  // run the staff sign-out too, so an admin leaving the client app also lost
+  // the admin panel.
+  const handleClientSignOut = useCallback(
+    () => handleLogout(new CustomEvent("auth:logout", { detail: { scope: "client" } })),
+    [handleLogout],
+  );
+
   // ── Initial auth check (runs once on mount) ──────────────────────────────
   useEffect(() => {
     window.addEventListener("auth:logout", handleLogout);
@@ -676,6 +686,7 @@ function AppContent() {
         {
           isPublic: isPublicPage(currentRouteInfo.page),
           isUserPage: USER_PAGES.includes(currentRouteInfo.page),
+          isClientEntry: isClientEntryPath(window.location.pathname),
         },
       );
 
@@ -763,7 +774,10 @@ function AppContent() {
             applyRoute({ page: "login" }, null, "replace");
             return;
           }
-          const role = userData.role ?? "user";
+          // Always "user": `userData.role` is the bot's admin flag, not a staff
+          // role. Routing by it sent an admin's client session to the admin
+          // dashboard, which needs the staff JWT this session does not carry.
+          const role = "user";
           setUserRole(role);
           setIsCheckingAuth(false);
           applyRoute(currentRouteInfo, role, "replace");
@@ -908,16 +922,6 @@ function AppContent() {
       setUserRole(role);
       setIsCheckingAuth(false);
 
-      // AdminLoginForm writes access_token to localStorage *before* calling this
-      // callback, so getAdminJwtClaims() can read the freshly issued token here.
-      const claims = getAdminJwtClaims();
-      // Prefer the home_page encoded by the backend in the JWT — it is role-specific
-      // and may differ from the static ROLE_CONFIG default (e.g. a super-admin
-      // whose home_page is set to "/pos" rather than "/admin/accounts").
-      const jwtHomePage = claims.home_page
-        ? resolvePageFromPath(claims.home_page).page
-        : null;
-
       // Check if the bot had opened a specific URL before login was required.
       // If the role allows that page → go there. Otherwise → JWT/role default.
       const intendedPath = sessionStorage.getItem("intended_path");
@@ -927,9 +931,11 @@ function AppContent() {
         ? resolvePageFromPath(intendedPath)
         : null;
 
+      // getDefaultPageForRole prefers the staff JWT's home_page. AdminLoginForm
+      // writes that token to localStorage *before* calling this callback.
       const targetPage = intendedRoute
         ? checkAccess(intendedRoute.page, role)
-        : (jwtHomePage ?? getDefaultPageForRole(role));
+        : getDefaultPageForRole(role);
 
       const finalRoute: RouteInfo =
         intendedRoute && targetPage === intendedRoute.page
@@ -939,6 +945,13 @@ function AppContent() {
       applyRoute(finalRoute, role, "replace");
     },
     [applyRoute, currentPage],
+  );
+
+  // The customer login form always signs in a client session. The role it
+  // reports is the bot's admin flag, which is not a staff role.
+  const handleClientLoginSuccess = useCallback(
+    () => handleLoginSuccess("user"),
+    [handleLoginSuccess],
   );
 
   // ── Derived flags ────────────────────────────────────────────────────────
@@ -1301,7 +1314,7 @@ function AppContent() {
           {currentPage === "login" && (
             <LoginForm
               onNavigateToRegister={() => navigateToPage("register")}
-              onLoginSuccess={handleLoginSuccess}
+              onLoginSuccess={handleClientLoginSuccess}
             />
           )}
 
@@ -1359,8 +1372,11 @@ function AppContent() {
 
           {currentPage === "user-profile" && (
             <UserPage
-              onLogout={handleSignOut}
+              onLogout={handleClientSignOut}
               onNavigateToReferral={() => navigateToPage("user-referral")}
+              // A full load, not navigateToPage: this page runs the client
+              // session, and the staff panel has to pick its own (or the PIN).
+              onOpenStaffPanel={() => window.location.assign("/admin")}
             />
           )}
 

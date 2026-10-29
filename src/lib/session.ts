@@ -32,6 +32,8 @@ export interface RouteKind {
   isPublic: boolean;
   /** A page a client account opens: `/user/*`, saved cards, referral. */
   isUserPage: boolean;
+  /** The client app's front door — see {@link isClientEntryPath}. */
+  isClientEntry: boolean;
 }
 
 export type SessionChoice =
@@ -64,11 +66,17 @@ export type SessionChoice =
  *    the client app again from that WebView, where both sessions share one
  *    storage context. Being a staff member is not a reason to stop being a
  *    customer.
- * 3. Otherwise a staff session takes the route when one is stored — unless
+ * 3. The client app's front door (the bot's "Mini App" button) goes to the
+ *    client session when there is one. The staff session used to take it, so
+ *    an admin who is also a customer pressed the client button and got the
+ *    admin panel; the profile's «Admin panel» row is their way across now.
+ * 4. Otherwise a staff session takes the route when one is stored — unless
  *    its active role only grants a permission and has no screen. That
  *    session is discarded: serving it reopened a blank page on every load.
- * 4. Otherwise a client token is used, once verified by the caller.
- * 5. Otherwise the visitor is a guest.
+ * 5. Otherwise the visitor is a guest, and a staff page shows its staff login.
+ *    A client token is NOT used here: a client session only ever opens client
+ *    pages, so serving a staff page with it bounced the «Admin panel» row
+ *    straight back to the client home instead of to the PIN screen.
  */
 export function pickSession(
   sessions: StoredSessions,
@@ -89,13 +97,13 @@ export function pickSession(
     return userToken ? { kind: 'client' } : { kind: 'guest' };
   }
 
+  if (route.isClientEntry && userToken) {
+    return { kind: 'client' };
+  }
+
   if (hasAdmin) {
     if (isCapabilityRole(adminRole as string)) return { kind: 'discard-admin' };
     return { kind: 'admin', role: adminRole as string };
-  }
-
-  if (userToken) {
-    return { kind: 'client' };
   }
 
   return { kind: 'guest' };
@@ -123,10 +131,22 @@ export function isClientPath(pathname: string): boolean {
 }
 
 /**
+ * URLs the bot opens the client app at: `/auth/login` (every "Mini App"
+ * button) and `/auth/register`. `/` is the Mini App opened bare from Telegram.
+ */
+const CLIENT_ENTRY_PATHS = new Set(['/', '/auth/login', '/auth/register']);
+
+/** Is this the URL a customer enters the client app through? */
+export function isClientEntryPath(pathname: string): boolean {
+  return CLIENT_ENTRY_PATHS.has(pathname.replace(/\/+$/, '') || '/');
+}
+
+/**
  * Which stored credential a request from this page should carry.
  *
  * Same rule as {@link pickSession}, applied to a request rather than a route:
- * a client page uses the client token, everything else prefers the staff JWT.
+ * a client page uses the client token, the client app's front door does too
+ * when there is one, and everything else prefers the staff JWT.
  * Returning `null` means send neither — the request goes out unauthenticated
  * and the server decides.
  */
@@ -138,6 +158,8 @@ export function credentialForPath(
   if (isClientPath(pathname)) {
     return userToken ? 'client' : null;
   }
+  // `/auth/me` is asked from here, before the app moves on to `/user/home`.
+  if (isClientEntryPath(pathname) && userToken) return 'client';
   if (adminToken) return 'admin';
   return userToken ? 'client' : null;
 }

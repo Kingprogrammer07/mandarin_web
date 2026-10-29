@@ -10,6 +10,7 @@ import {
    CreditCard as CreditCardIcon,
    Headphones,
    Phone,
+   ShieldCheck,
    Smartphone,
    UserPlus,
    UserRound,
@@ -65,9 +66,12 @@ function maskPhone(phone?: string): string {
 const UserPage = ({
    onLogout,
    onNavigateToReferral,
+   onOpenStaffPanel,
 }: {
    onLogout?: () => void;
    onNavigateToReferral?: () => void;
+   /** Opens the staff panel; the row shows only for a client who is also staff. */
+   onOpenStaffPanel?: () => void;
 }) => {
    const { data: user, isLoading, isError, refetch } = useProfile();
    const { mutate: logout } = useLogout(onLogout);
@@ -178,6 +182,18 @@ const UserPage = ({
       },
    ];
 
+   const staffMenu: MenuItem[] =
+      onOpenStaffPanel && user?.is_staff
+         ? [
+              {
+                 id: 'staff-panel',
+                 label: t('profile.menu.staffPanel', 'Admin panel'),
+                 Icon: ShieldCheck,
+                 onClick: onOpenStaffPanel,
+              },
+           ]
+         : [];
+
    const contactMenu: MenuItem[] = [
       {
          id: 'phone',
@@ -264,6 +280,8 @@ const UserPage = ({
                         <BalanceSplitCard />
 
                         <MenuList items={mainMenu} />
+
+                        <MenuList items={staffMenu} />
 
                         {/* Contact rows carry their value inline, so they get the
                             larger icon chips the mockup uses to separate them from

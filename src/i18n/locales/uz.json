@@ -655,7 +655,8 @@
       "activity": "Faollik tarixi",
       "support": "Yordam markazi",
       "phone": "Telefon raqam",
-      "install": "Ekranga qo'shish"
+      "install": "Ekranga qo'shish",
+      "staffPanel": "Admin panel"
     },
     "consent": {
       "title": "Siz rozilik bergan hujjatlar",

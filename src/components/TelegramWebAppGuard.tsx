@@ -236,13 +236,11 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
         return;
       }
 
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
-      }
-
-      // Attempt auto-login if no token exists in either storage
-      if (!sessionStorage.getItem('access_token') && !localStorage.getItem('access_token')) {
+      // Auto-login whenever there is no CLIENT token. That token lives in
+      // sessionStorage, which Telegram drops each time the Mini App closes. A
+      // staff token in localStorage is a separate session and used to block
+      // this, so staff who are also customers met the login form on every open.
+      if (!sessionStorage.getItem('access_token')) {
         try {
           const loginResponse = await telegramAutoLogin(telegramData.initData);
           if (loginResponse && loginResponse.access_token) {
@@ -273,6 +271,13 @@ export default function TelegramWebAppGuard({ children }: TelegramWebAppGuardPro
   }, [isBrowserRoute, shouldRedirectRoot]);
 
   useEffect(() => {
+    // Every page, the staff consoles included: those skip the check below, so
+    // they used to open at half height, where a swipe drags the Telegram sheet
+    // instead of scrolling the page.
+    if (window.Telegram?.WebApp?.initData) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
     if (shouldRedirectRoot) {
       // replace() so the marketing site isn't trapped behind a back-button loop
       window.location.replace(MARKETING_SITE_URL);

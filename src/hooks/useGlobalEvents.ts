@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '@/config/config';
 import { isAdminTokenExpired } from '@/lib/adminTokenClock';
+import { credentialForPath } from '@/lib/session';
 import {
   applyCourierLocation,
   courierDeliveryKey,
@@ -52,7 +53,11 @@ function discardExpiredAdminSession(): void {
 function buildStreamUrl(): string | null {
   const base = API_BASE_URL.replace(/\/$/, '');
   const adminToken = localStorage.getItem('access_token');
-  if (adminToken) {
+  const userToken = sessionStorage.getItem('access_token');
+  // The page picks the stream, as it picks every request's credential: a staff
+  // member in the client app gets the client's events (wallet, notifications).
+  const credential = credentialForPath(window.location.pathname, { adminToken, userToken });
+  if (credential === 'admin' && adminToken) {
     // An expired token would be refused with a 401 that `EventSource` reports
     // as an unreadable connection failure (Firefox even calls it CORS), so it
     // is not worth opening: it only bought ten silent reconnects while the real
@@ -61,8 +66,7 @@ function buildStreamUrl(): string | null {
     if (isAdminTokenExpired(adminToken)) return null;
     return `${base}/api/v1/events/stream?access_token=${encodeURIComponent(adminToken)}`;
   }
-  const userToken = sessionStorage.getItem('access_token');
-  if (userToken) {
+  if (credential === 'client' && userToken) {
     return `${base}/api/v1/events/stream?token=${encodeURIComponent(userToken)}`;
   }
   return null;

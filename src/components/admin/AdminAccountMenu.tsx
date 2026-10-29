@@ -57,9 +57,8 @@ export function AdminAccountMenu({ onLogout }: { onLogout: () => void }) {
         const res = await switchAdminRole(roleName);
         localStorage.setItem('access_token', res.access_token);
         localStorage.setItem('admin_role', res.role_name);
-        if (sessionStorage.getItem('access_token')) {
-          sessionStorage.setItem('access_token', res.access_token);
-        }
+        // Not sessionStorage: that slot is the CLIENT session's. Copying the
+        // staff JWT there logged a staff member out of the client app.
         setClaims(getAdminJwtClaims());
         setOpen(false);
         toast.success(`Rol almashtirildi: ${roleName}`);

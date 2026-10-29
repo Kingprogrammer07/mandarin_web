@@ -18,6 +18,8 @@ export interface ProfileResponse {
     privacy_policy_version?: string | null;
     /** dd.mm.yyyy */
     privacy_policy_accepted_at?: string | null;
+    /** This client also has an active admin-panel account. */
+    is_staff?: boolean;
     // frontend helper
     avatar_url?: string;
 }
