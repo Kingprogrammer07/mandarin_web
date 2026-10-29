@@ -121,7 +121,10 @@ function PaymentDetailPanel({
 
 // ─── Transaction Card ─────────────────────────────────────────────────────────
 
-function TransactionCard({
+const CHIP =
+  "inline-flex max-w-full flex-wrap items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-4 break-words";
+
+export function TransactionCard({
   tx,
   clientId,
 }: {
@@ -144,6 +147,11 @@ function TransactionCard({
         ? "Qisman"
         : "Qarzdorlik";
 
+  // A debt row is written with summa = 0 and the price in total_amount;
+  // summa is only the paid sum on old payment rows that have no total.
+  const amount = tx.total_amount ?? tx.summa ?? 0;
+  const owed = tx.payment_status !== "paid" && tx.remaining_amount > 0 ? tx.remaining_amount : 0;
+
   return (
     <div className="bg-white dark:bg-white/[0.03] rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden">
       <button
@@ -160,13 +168,42 @@ function TransactionCard({
           <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
             {format(new Date(tx.created_at), "dd.MM.yyyy HH:mm")}
           </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {tx.is_taken_away ? (
+              <span className={`${CHIP} bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400`}>
+                Olib ketilgan
+                {tx.taken_away_date && ` · ${format(new Date(tx.taken_away_date), "dd.MM.yyyy")}`}
+              </span>
+            ) : (
+              <span className={`${CHIP} bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300`}>
+                Olib ketilmagan
+              </span>
+            )}
+            {tx.astatka_flight_name && (
+              <span
+                className={`${CHIP} ${
+                  tx.astatka_on_shelf
+                    ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                    : "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
+                }`}
+              >
+                {tx.astatka_on_shelf ? "Ostatkada: " : "Ostatkadan olingan: "}
+                <span className="font-semibold">{tx.astatka_flight_name}</span>
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           <div className="text-right">
             <p className="text-[13px] font-semibold text-gray-900 dark:text-white">
-              {(tx.summa || 0).toLocaleString("ru-RU")} so&apos;m
+              {amount.toLocaleString("ru-RU")} so&apos;m
             </p>
             <p className={`text-[11px] mt-0.5 ${statusColor}`}>{statusLabel}</p>
+            {owed > 0 && owed !== amount && (
+              <p className={`text-[11px] ${statusColor}`}>
+                Qoldiq: {owed.toLocaleString("ru-RU")} so&apos;m
+              </p>
+            )}
           </div>
           {expanded ? (
             <ChevronUp className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />

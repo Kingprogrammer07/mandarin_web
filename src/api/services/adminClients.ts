@@ -59,6 +59,10 @@ export interface ClientTransactionItem {
   taken_away_date?: string | null;
   payment_balance_difference: number;
   created_at: string;
+  /** Astatka (O… flight) that holds — or held — this client's bag from this flight. */
+  astatka_flight_name?: string | null;
+  /** The bag is on that astatka's shelf now. */
+  astatka_on_shelf?: boolean;
 }
 
 export type FinancesFilterType = "all" | "paid" | "unpaid" | "partial" | "taken" | "not_taken";
