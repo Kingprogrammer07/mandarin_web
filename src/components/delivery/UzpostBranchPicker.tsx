@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Building2,
@@ -30,25 +30,47 @@ import {
   type UzpostBranchPickerTheme,
 } from '@/components/delivery/UzpostBranchPicker.theme';
 
-interface UzpostBranchPickerProps {
-  branches: UzpostBranch[];
-  selectedBranch: UzpostBranch | null;
-  suggestedBranch?: UzpostBranch | null;
+/** Any office list the picker can show: UzPost, or BTS whose codes keep a leading zero. */
+export type PickerBranch = Omit<UzpostBranch, 'index'> & { index: number | string };
+
+interface UzpostBranchPickerProps<T extends PickerBranch = PickerBranch> {
+  branches: T[];
+  selectedBranch: T | null;
+  suggestedBranch?: T | null;
   isLoading: boolean;
   isError: boolean;
-  onSelect: (branch: UzpostBranch) => void;
+  onSelect: (branch: T) => void;
   onRetry: () => void;
   theme?: Partial<UzpostBranchPickerTheme>;
+  /** i18n group whose keys override deliveryRequest.branchPicker (e.g. the BTS wording). */
+  textPrefix?: string;
+}
+
+const DEFAULT_TEXT_PREFIX = 'deliveryRequest.branchPicker';
+const PickerTextPrefix = createContext(DEFAULT_TEXT_PREFIX);
+
+function usePickerT() {
+  const { t, i18n } = useTranslation();
+  const prefix = useContext(PickerTextPrefix);
+  return useCallback(
+    (key: string, options?: Record<string, unknown>): string => {
+      const own = `${prefix}.${key}`;
+      return prefix !== DEFAULT_TEXT_PREFIX && i18n.exists(own)
+        ? t(own, options)
+        : t(`${DEFAULT_TEXT_PREFIX}.${key}`, options);
+    },
+    [t, i18n, prefix]
+  );
 }
 
 interface BranchMapControllerProps {
-  branches: UzpostBranch[];
-  selectedBranch: UzpostBranch | null;
+  branches: PickerBranch[];
+  selectedBranch: PickerBranch | null;
   userLocation: UserLocation | null;
   isInteractive: boolean;
 }
 
-interface BranchWithDistance extends UzpostBranch {
+interface BranchWithDistance extends PickerBranch {
   distanceKm: number | null;
 }
 
@@ -106,7 +128,7 @@ function createBranchIcon(color: string, isSelected: boolean): L.DivIcon {
   });
 }
 
-function calculateDistanceKm(from: UserLocation, to: UzpostBranch): number {
+function calculateDistanceKm(from: UserLocation, to: PickerBranch): number {
   const earthRadiusKm = 6371;
   const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
   const latitudeDelta = toRadians(to.latitude - from.latitude);
@@ -217,55 +239,55 @@ function SelectedBranchDetails({
   branch,
   theme,
 }: {
-  branch: UzpostBranch | null;
+  branch: PickerBranch | null;
   theme: UzpostBranchPickerTheme;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { t } = useTranslation();
-  const unavailableLabel = t('deliveryRequest.branchPicker.unavailable');
+  const t = usePickerT();
+  const unavailableLabel = t('unavailable');
 
   if (!branch) {
     return (
       <div className={cn(theme.selectedPanelClassName, 'text-center')}>
         <MapPinned className="mx-auto mb-3 h-10 w-10 text-mc-brand" />
         <p className={cn('text-[13px] font-bold', theme.primaryTextClassName)}>
-          {t('deliveryRequest.branchPicker.emptyTitle')}
+          {t('emptyTitle')}
         </p>
         <p className={cn('mt-1 text-[11px]', theme.mutedTextClassName)}>
-          {t('deliveryRequest.branchPicker.emptyDescription')}
+          {t('emptyDescription')}
         </p>
       </div>
     );
   }
 
   const primaryRows = [
-    { label: t('deliveryRequest.branchPicker.fields.index'), value: String(branch.index) },
-    { label: t('deliveryRequest.branchPicker.fields.address'), value: branch.address },
+    { label: t('fields.index'), value: String(branch.index) },
+    { label: t('fields.address'), value: branch.address },
     {
-      label: t('deliveryRequest.branchPicker.fields.workdays'),
+      label: t('fields.workdays'),
       value: formatNullable(branch.workdays, unavailableLabel),
     },
     {
-      label: t('deliveryRequest.branchPicker.fields.saturday'),
+      label: t('fields.saturday'),
       value: formatNullable(branch.saturday, unavailableLabel),
     },
   ];
   const expandedRows = [
-    { label: t('deliveryRequest.branchPicker.fields.id'), value: String(branch.id) },
+    { label: t('fields.id'), value: String(branch.id) },
     {
-      label: t('deliveryRequest.branchPicker.fields.lunch'),
+      label: t('fields.lunch'),
       value: formatNullable(branch.lunch, unavailableLabel),
     },
     {
-      label: t('deliveryRequest.branchPicker.fields.dayOff'),
+      label: t('fields.dayOff'),
       value: formatNullable(branch.dayOff, unavailableLabel),
     },
     {
-      label: t('deliveryRequest.branchPicker.fields.otherScheduleNotes'),
+      label: t('fields.otherScheduleNotes'),
       value: formatNullable(branch.otherScheduleNotes, unavailableLabel),
     },
-    { label: t('deliveryRequest.branchPicker.fields.latitude'), value: String(branch.latitude) },
-    { label: t('deliveryRequest.branchPicker.fields.longitude'), value: String(branch.longitude) },
+    { label: t('fields.latitude'), value: String(branch.latitude) },
+    { label: t('fields.longitude'), value: String(branch.longitude) },
   ];
 
   return (
@@ -276,7 +298,7 @@ function SelectedBranchDetails({
         </div>
         <div className="min-w-0">
           <p className={cn('text-[11px] font-bold uppercase', theme.mutedTextClassName)}>
-            {t('deliveryRequest.branchPicker.selectedLabel')}
+            {t('selectedLabel')}
           </p>
           <h3 className={cn('mt-0.5 text-[15px] font-extrabold leading-tight', theme.primaryTextClassName)}>
             {branch.name}
@@ -308,7 +330,7 @@ function SelectedBranchDetails({
         onClick={() => setIsExpanded((current) => !current)}
         className="mt-3 flex w-full items-center justify-between gap-3 rounded-mc-md border border-dashed border-mc-brand/20 bg-mc-brand-soft px-3 py-2 text-left text-[11px] font-bold text-mc-brand transition active:scale-[0.99] dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
       >
-        <span>{t('deliveryRequest.branchPicker.expandDetails')}</span>
+        <span>{t('expandDetails')}</span>
         <ChevronDown
           className={cn('h-4 w-4 shrink-0 transition-transform', isExpanded && 'rotate-180')}
         />
@@ -340,11 +362,11 @@ function SelectedBranchPreview({
   theme,
   onReopen,
 }: {
-  branch: UzpostBranch;
+  branch: PickerBranch;
   theme: UzpostBranchPickerTheme;
   onReopen: () => void;
 }) {
-  const { t } = useTranslation();
+  const t = usePickerT();
 
   return (
     <button
@@ -361,7 +383,7 @@ function SelectedBranchPreview({
         </div>
         <div className="min-w-0 flex-1">
           <p className={cn('text-[11px] font-bold uppercase', theme.mutedTextClassName)}>
-            {t('deliveryRequest.branchPicker.selectedLabel')}
+            {t('selectedLabel')}
           </p>
           <h3 className={cn('mt-0.5 text-[15px] font-extrabold leading-tight', theme.primaryTextClassName)}>
             {branch.index} - {branch.name}
@@ -371,7 +393,7 @@ function SelectedBranchPreview({
           </p>
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-mc-md bg-mc-brand-soft px-3 py-1.5 text-[11px] font-bold text-mc-brand dark:bg-mc-brand/10 dark:text-mc-brand">
             <ChevronDown className="-rotate-90 h-3.5 w-3.5" />
-            {t('deliveryRequest.branchPicker.changeSelection')}
+            {t('changeSelection')}
           </p>
         </div>
       </div>
@@ -385,12 +407,12 @@ function SuggestedBranchCard({
   onUse,
   onChooseOther,
 }: {
-  branch: UzpostBranch;
+  branch: PickerBranch;
   theme: UzpostBranchPickerTheme;
   onUse: () => void;
   onChooseOther: () => void;
 }) {
-  const { t } = useTranslation();
+  const t = usePickerT();
 
   return (
     <div className={theme.selectedPanelClassName}>
@@ -400,7 +422,7 @@ function SuggestedBranchCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className={cn('text-[11px] font-bold uppercase', theme.mutedTextClassName)}>
-            {t('deliveryRequest.branchPicker.savedSuggestionLabel')}
+            {t('savedSuggestionLabel')}
           </p>
           <h3 className={cn('mt-0.5 text-[15px] font-extrabold leading-tight', theme.primaryTextClassName)}>
             {branch.index} - {branch.name}
@@ -409,7 +431,7 @@ function SuggestedBranchCard({
             {branch.address}
           </p>
           <p className="mt-2 text-[11px] font-semibold text-mc-brand">
-            {t('deliveryRequest.branchPicker.savedSuggestionHint')}
+            {t('savedSuggestionHint')}
           </p>
         </div>
       </div>
@@ -420,14 +442,14 @@ function SuggestedBranchCard({
           onClick={onUse}
           className="h-11 rounded-mc-lg bg-mc-success px-3 text-[11px] font-extrabold text-white shadow-lg shadow-emerald-500/20 transition active:scale-95"
         >
-          {t('deliveryRequest.branchPicker.useSavedBranch')}
+          {t('useSavedBranch')}
         </button>
         <button
           type="button"
           onClick={onChooseOther}
           className="h-11 rounded-mc-lg border border-mc-brand/20 bg-mc-brand-soft px-3 text-[11px] font-extrabold text-mc-brand transition active:scale-95 dark:border-mc-brand/25 dark:bg-mc-brand/10 dark:text-mc-brand"
         >
-          {t('deliveryRequest.branchPicker.chooseOtherBranch')}
+          {t('chooseOtherBranch')}
         </button>
       </div>
     </div>
@@ -435,6 +457,17 @@ function SuggestedBranchCard({
 }
 
 export const UzpostBranchPicker = memo(function UzpostBranchPicker({
+  textPrefix = DEFAULT_TEXT_PREFIX,
+  ...props
+}: UzpostBranchPickerProps) {
+  return (
+    <PickerTextPrefix.Provider value={textPrefix}>
+      <BranchPickerBody {...props} />
+    </PickerTextPrefix.Provider>
+  );
+}) as <T extends PickerBranch>(props: UzpostBranchPickerProps<T>) => React.JSX.Element;
+
+function BranchPickerBody({
   branches,
   selectedBranch,
   suggestedBranch = null,
@@ -443,8 +476,8 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
   onSelect,
   onRetry,
   theme: themeOverrides,
-}: UzpostBranchPickerProps) {
-  const { t } = useTranslation();
+}: Omit<UzpostBranchPickerProps, 'textPrefix'>) {
+  const t = usePickerT();
   const [searchQuery, setSearchQuery] = useState('');
   const [isPickerOpen, setIsPickerOpen] = useState(() => selectedBranch === null && suggestedBranch === null);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
@@ -538,13 +571,13 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
   }, [matchingBranches, searchQuery, selectedBranch, userLocation]);
 
   const handleBranchSelect = useCallback(
-    (branch: UzpostBranch) => {
+    (branch: PickerBranch) => {
       if (collapseTimeoutRef.current !== null) {
         window.clearTimeout(collapseTimeoutRef.current);
       }
 
       onSelect(branch);
-      toast.success(t('deliveryRequest.branchPicker.selectedToast', { name: branch.name }));
+      toast.success(t('selectedToast', { name: branch.name }));
       playSuccessSound();
       setIsSelectionSettling(true);
       setSearchQuery('');
@@ -597,7 +630,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
 
   const handleLocateUser = async () => {
     if (!navigator.geolocation && !window.Telegram?.WebApp?.LocationManager) {
-      setLocationError(t('deliveryRequest.branchPicker.geolocationUnsupported'));
+      setLocationError(t('geolocationUnsupported'));
       return;
     }
 
@@ -607,7 +640,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
     const nextLocation = await requestUserLocation();
 
     if (!nextLocation) {
-      setLocationError(t('deliveryRequest.branchPicker.geolocationFailed'));
+      setLocationError(t('geolocationFailed'));
       setIsLocating(false);
       return;
     }
@@ -623,7 +656,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         <div className="text-center">
           <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-mc-brand" />
           <p className={cn('text-[13px] font-bold', theme.primaryTextClassName)}>
-            {t('deliveryRequest.branchPicker.loading')}
+            {t('loading')}
           </p>
         </div>
       </div>
@@ -635,7 +668,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
       <div className={cn(theme.shellClassName, 'text-center')}>
         <AlertCircle className="mx-auto mb-3 h-10 w-10 text-mc-danger" />
         <p className={cn('text-[13px] font-bold', theme.primaryTextClassName)}>
-          {t('deliveryRequest.branchPicker.loadError')}
+          {t('loadError')}
         </p>
         <button
           type="button"
@@ -643,7 +676,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           className="mx-auto mt-4 flex h-11 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-5 text-[13px] font-bold text-white shadow-lg shadow-orange-500/20 active:scale-95"
         >
           <RefreshCw className="h-4 w-4" />
-          {t('deliveryRequest.branchPicker.retry')}
+          {t('retry')}
         </button>
       </div>
     );
@@ -695,10 +728,10 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h3 className={cn('text-[15px] font-extrabold', theme.primaryTextClassName)}>
-              {t('deliveryRequest.branchPicker.title')}
+              {t('title')}
             </h3>
             <p className={cn('text-[11px] font-medium', theme.mutedTextClassName)}>
-              {t('deliveryRequest.branchPicker.subtitle', {
+              {t('subtitle', {
                 count: branches.length,
               })}
             </p>
@@ -715,7 +748,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className={theme.searchClassName}
-            placeholder={t('deliveryRequest.branchPicker.searchPlaceholder')}
+            placeholder={t('searchPlaceholder')}
           />
         </div>
 
@@ -740,7 +773,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
             className="inline-flex h-10 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 text-[11px] font-bold text-white shadow-lg shadow-orange-500/20 transition active:scale-95 disabled:opacity-70"
           >
             {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
-            {t('deliveryRequest.branchPicker.locateButton')}
+            {t('locateButton')}
           </button>
           <button
             type="button"
@@ -749,8 +782,8 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           >
             {isMapExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             {isMapExpanded
-              ? t('deliveryRequest.branchPicker.collapseMap')
-              : t('deliveryRequest.branchPicker.expandMap')}
+              ? t('collapseMap')
+              : t('expandMap')}
           </button>
         </div>
 
@@ -769,7 +802,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           className="w-full h-12 rounded-mc-lg bg-mc-surface border border-mc-brand/20 dark:border-mc-brand/20 text-[13px] font-bold text-mc-brand flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
         >
           <MapPin className="h-4 w-4" />
-          {t('deliveryRequest.branchPicker.openMap')}
+          {t('openMap')}
         </button>
       )}
 
@@ -820,7 +853,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                   weight: 3,
                 }}
               >
-                <Popup>{t('deliveryRequest.branchPicker.userLocationPopup')}</Popup>
+                <Popup>{t('userLocationPopup')}</Popup>
               </CircleMarker>
             )}
             {visibleMapBranches.map((branch) => {
@@ -837,7 +870,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
                       <p className="text-[13px] font-bold">{branch.name}</p>
                       <p className="mt-1 text-[11px] text-mc-text-2">{branch.address}</p>
                       <p className="mt-2 text-[11px] font-semibold text-mc-brand">
-                        {t('deliveryRequest.branchPicker.fields.index')}: {branch.index}
+                        {t('fields.index')}: {branch.index}
                       </p>
                     </div>
                   </Popup>
@@ -853,18 +886,14 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
             className="absolute top-2 right-2 z-[1000] inline-flex items-center gap-1.5 rounded-mc-md bg-white/95 dark:bg-mc-cardface/95 px-3 py-2 text-[11px] font-bold text-mc-text shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md active:scale-95 transition-all"
           >
             <Minimize2 className="h-3.5 w-3.5 text-mc-brand" />
-            {t('deliveryRequest.branchPicker.closeMap')}
+            {t('closeMap')}
           </button>
         </div>
       )}
 
       {hiddenBranchCount > 0 && (
         <p className="mt-2 text-[11px] font-medium text-mc-text-2">
-          {t(
-            'deliveryRequest.branchPicker.truncated',
-            'Yaqin {{shown}} ta filial ko‘rsatildi, yana {{hidden}} ta bor — qidiruvdan foydalaning',
-            { shown: filteredBranches.length, hidden: hiddenBranchCount },
-          )}
+          {t('truncated', { shown: filteredBranches.length, hidden: hiddenBranchCount })}
         </p>
       )}
 
@@ -880,7 +909,7 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
           // Without this the list simply renders nothing, which reads as "the
           // search is still running" rather than "no branch matches".
           <p className="py-6 text-center text-[12px] font-medium text-mc-text-2">
-            {t('deliveryRequest.branchPicker.noResults', {
+            {t('noResults', {
               query: searchQuery.trim(),
             })}
           </p>
@@ -941,4 +970,4 @@ export const UzpostBranchPicker = memo(function UzpostBranchPicker({
       </div>
     </div>
   );
-});
+}

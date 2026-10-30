@@ -233,6 +233,15 @@ export async function getWarehousePickupQueue(queueId: number): Promise<Warehous
   return res.data;
 }
 
+/** Filled BTS hand-over blank (.docx) for a BTS delivery-request queue. */
+export async function downloadBtsBlank(queueId: number): Promise<Blob> {
+  const res = await apiClient.get(`/api/v1/warehouse/pickup-queue/${queueId}/bts-blank`, {
+    headers: getAdminHeaders(),
+    responseType: 'blob',
+  });
+  return res.data as Blob;
+}
+
 export async function cancelPickupQueue(
   queueId: number,
   data: PickupQueueCancelRequest,

@@ -8,6 +8,8 @@ export interface AdminStandardDeliveryRequest {
   /** The recipient's name when it is not the account holder's; omitted otherwise. */
   recipient_name?: string;
   caption?: string;
+  /** BTS office code (bts only). */
+  bts_branch_code?: string | null;
   latitude?: number | null;
   longitude?: number | null;
 }

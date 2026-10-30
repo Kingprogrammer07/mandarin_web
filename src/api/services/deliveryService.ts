@@ -104,7 +104,7 @@ export async function submitStandardDelivery(
   deliveryType: 'yandex' | 'mandarin' | 'bts',
   flightNames: string[],
   phoneNumber: string | null,
-  caption: string,
+  caption: string | null,
   /**
    * Null when the client did not drop a map pin — which the form allows.
    * These used to be plain `number`, so the caller substituted 0, and 0,0 is a
@@ -114,7 +114,9 @@ export async function submitStandardDelivery(
   longitude: number | null,
   includeAddress: boolean = false,
   /** Null keeps the profile name — the backend falls back on its own. */
-  recipientName: string | null = null
+  recipientName: string | null = null,
+  /** BTS office code; with it the note becomes optional. */
+  btsBranchCode: string | null = null
 ): Promise<DeliverySuccessResponse> {
   const response = await apiClient.post<DeliverySuccessResponse>(
     '/api/user/delivery/request/standard',
@@ -127,6 +129,7 @@ export async function submitStandardDelivery(
       latitude,
       longitude,
       include_address: includeAddress,
+      bts_branch_code: btsBranchCode,
     }
   );
   return response.data;

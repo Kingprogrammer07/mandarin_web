@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { FileText } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { DeliveryMapPickerLazy } from "@/components/delivery/DeliveryMapPickerLazy";
+import type { BtsBranch } from "@/hooks/useBtsBranches";
+import BtsBranchSelect from "./BtsBranchSelect";
 
 interface StandardDeliveryFormProps {
   caption: string;
@@ -10,6 +12,10 @@ interface StandardDeliveryFormProps {
   onLocationChange: (loc: { latitude: number; longitude: number } | null) => void;
   /** "mandarin": our courier drives to the pin, so it is not optional. */
   pinRequired?: boolean;
+  /** BTS: an office instead of a map pin; the note becomes optional. */
+  isBts?: boolean;
+  btsBranch?: BtsBranch | null;
+  onBtsBranchChange?: (branch: BtsBranch | null) => void;
 }
 
 /** Courier details for self_pickup, yandex, mandarin and bts. The recipient's
@@ -20,18 +26,27 @@ export default function StandardDeliveryForm({
   location,
   onLocationChange,
   pinRequired = false,
+  isBts = false,
+  btsBranch = null,
+  onBtsBranchChange,
 }: StandardDeliveryFormProps) {
   const { t } = useTranslation();
 
   return (
     <div className="space-y-5">
+      {isBts && onBtsBranchChange && (
+        <BtsBranchSelect selected={btsBranch} onChange={onBtsBranchChange} />
+      )}
+
       <div className="space-y-2">
         <Label
           htmlFor="standard-caption"
           className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2"
         >
           <FileText className="w-4 h-4 text-gray-400" aria-hidden="true" />
-          {t("adminDeliveryRequest.standardForm.captionLabel", "Kuryer uchun izoh")}
+          {isBts
+            ? "Izoh (ixtiyoriy)"
+            : t("adminDeliveryRequest.standardForm.captionLabel", "Kuryer uchun izoh")}
         </Label>
         <textarea
           id="standard-caption"
@@ -43,6 +58,7 @@ export default function StandardDeliveryForm({
         />
       </div>
 
+      {!isBts && (
       <div className="space-y-2">
         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {t("adminDeliveryRequest.standardForm.mapLabel", "Joylashuvni xaritadan tanlash")}
@@ -56,6 +72,7 @@ export default function StandardDeliveryForm({
           onClear={() => onLocationChange(null)}
         />
       </div>
+      )}
     </div>
   );
 }

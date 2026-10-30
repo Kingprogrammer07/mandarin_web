@@ -14,6 +14,7 @@ import {
   MapPin,
   Phone,
   MessageSquare,
+  FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,7 +27,9 @@ import type {
   WarehousePickupQueueEntry,
   WarehousePickupQueueTransaction,
 } from "../../api/pickupQueue";
+import { downloadBtsBlank } from "../../api/pickupQueue";
 import { useCancelPickupQueue } from "../../api/hooks/usePickupQueue";
+import { downloadBlob, safeFileName } from "../../utils/downloadFile";
 import { formatCurrencySum, formatTashkentDateTime } from "../../lib/format";
 
 interface PickupQueuePanelProps {
@@ -99,6 +102,19 @@ export default function PickupQueuePanel({
   const goNext = useCallback(() => {
     setLightboxIndex((i) => (i < lightboxPhotos.length - 1 ? i + 1 : 0));
   }, [lightboxPhotos.length]);
+
+  const [blankLoadingId, setBlankLoadingId] = useState<number | null>(null);
+  const handleBtsBlank = useCallback(async (entry: WarehousePickupQueueEntry) => {
+    setBlankLoadingId(entry.queue_id);
+    try {
+      const blob = await downloadBtsBlank(entry.queue_id);
+      downloadBlob(safeFileName(`BTS_${entry.client_code}_${entry.display_number}.docx`), blob);
+    } catch {
+      toast.error("BTS blankasini yuklab bo'lmadi");
+    } finally {
+      setBlankLoadingId(null);
+    }
+  }, []);
 
   const handleCopy = useCallback((text: string | null) => {
     if (!text) return;
@@ -326,6 +342,21 @@ export default function PickupQueuePanel({
                               Nusxa
                             </button>
                           </div>
+                        )}
+
+                        {entry.pickup_method === "bts" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleBtsBlank(entry);
+                            }}
+                            disabled={blankLoadingId === entry.queue_id}
+                            className="flex items-center justify-center gap-2 w-full min-h-11 py-2 rounded-lg bg-white dark:bg-white/[0.06] border border-blue-200 dark:border-blue-500/25 text-blue-700 dark:text-blue-300 text-[12px] font-bold hover:bg-blue-100 dark:hover:bg-blue-500/15 transition-colors disabled:opacity-50"
+                          >
+                            <FileDown className="w-3.5 h-3.5" />
+                            {blankLoadingId === entry.queue_id ? "Tayyorlanmoqda..." : "BTS blankasini yuklab olish"}
+                          </button>
                         )}
 
                         {entry.location_url && (

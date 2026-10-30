@@ -19,6 +19,7 @@ import CargoPreviewList from "@/components/admin/delivery/CargoPreviewList";
 import DeliveryTypeSelector from "@/components/admin/delivery/DeliveryTypeSelector";
 import RecipientFields from "@/components/admin/delivery/RecipientFields";
 import StandardDeliveryForm from "@/components/admin/delivery/StandardDeliveryForm";
+import type { BtsBranch } from "@/hooks/useBtsBranches";
 import { isInCourierArea } from "@/lib/courierArea";
 import UzpostDeliveryForm from "@/components/admin/delivery/UzpostDeliveryForm";
 import UzpostBagSplitPanel from "@/components/admin/delivery/UzpostBagSplitPanel";
@@ -102,6 +103,8 @@ export default function AdminDeliveryRequestPage() {
     longitude: number;
   } | null>(null);
 
+  const [btsBranch, setBtsBranch] = useState<BtsBranch | null>(null);
+
   // Uzpost form state
   const [uzpostBranch, setUzpostBranch] = useState<UzpostBranch | null>(null);
   const [uzpostBagEdit, setUzpostBagEdit] = useState<{
@@ -155,6 +158,7 @@ export default function AdminDeliveryRequestPage() {
     setStandardCaption("");
     setStandardLocation(null);
     setUzpostBranch(null);
+    setBtsBranch(null);
     setUzpostBagEdit(null);
     uzpostSubmissionRef.current = null;
   }, []);
@@ -267,6 +271,7 @@ export default function AdminDeliveryRequestPage() {
     Boolean(context) &&
     submittableFlights.length > 0 &&
     (isUzpost ? Boolean(uzpostBranch) : Boolean(deliveryType)) &&
+    (deliveryType !== "bts" || Boolean(btsBranch)) &&
     !pinMissing &&
     !pinOutside &&
     (!splitsUzpostParcel || uzpostBagErrors.length === 0);
@@ -294,6 +299,7 @@ export default function AdminDeliveryRequestPage() {
           phone_number: recipient.phone_number,
           recipient_name: recipient.recipient_name,
           caption: standardCaption.trim() || undefined,
+          ...(deliveryType === "bts" && btsBranch ? { bts_branch_code: btsBranch.index } : {}),
           latitude: standardLocation?.latitude ?? null,
           longitude: standardLocation?.longitude ?? null,
         },
@@ -342,6 +348,7 @@ export default function AdminDeliveryRequestPage() {
     isUzpost,
     standardCaption,
     standardLocation,
+    btsBranch,
     uzpostBranch,
     uzpostBags,
     standardMutation,
@@ -655,6 +662,9 @@ export default function AdminDeliveryRequestPage() {
                       location={standardLocation}
                       onLocationChange={setStandardLocation}
                       pinRequired={pinRequired}
+                      isBts={deliveryType === "bts"}
+                      btsBranch={btsBranch}
+                      onBtsBranchChange={setBtsBranch}
                     />
                   )}
 

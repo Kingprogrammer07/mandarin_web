@@ -1394,7 +1394,10 @@
         "mapOutsideCity": "Bu nuqta Toshkent shahridan tashqarida. Mandarin kuryeri faqat shahar ichida yetkazadi.",
         "mapNeededToSubmit": "Yuborish uchun xaritada nuqtani belgilang.",
         "includeAddressLabel": "Yashash manzilimni qo'shish",
-        "includeAddressHint": "Yoqilsa, uy manzilingiz operatorlarga ko'rsatiladi"
+        "includeAddressHint": "Yoqilsa, uy manzilingiz operatorlarga ko'rsatiladi",
+        "btsNoteLabel": "Izoh (ixtiyoriy)",
+        "btsNotePlaceholder": "Masalan: olishdan oldin qo'ng'iroq qiling",
+        "btsNoteHint": "Yuk tanlangan BTS filialiga yuboriladi. Qo'shimcha gapingiz bo'lsa yozing."
       },
       "uzpost": {
         "calcTitle": "Hisob-kitob",
@@ -1453,7 +1456,8 @@
       "calcError": "Hisoblashda xatolik",
       "calcFallback": "UzPost narx xizmati hozir ishlamayapti. Taxminiy narx ko'rsatildi.",
       "submitError": "Xatolik yuz berdi",
-      "captionRequired": "Iltimos, kuryer uchun izoh kiriting"
+      "captionRequired": "Iltimos, kuryer uchun izoh kiriting",
+      "btsBranchRequired": "BTS filialini tanlang"
     },
     "map": {
       "openButton": "Xaritadan tanlash",
@@ -1475,7 +1479,28 @@
     },
     "confirmSendAddress": "Rostan ham yashash manzilingizni yubormoqchimisiz?",
     "back": "Ortga",
-    "clearFile": "Faylni o'chirish"
+    "clearFile": "Faylni o'chirish",
+    "btsBranchPicker": {
+      "title": "BTS filialini tanlang",
+      "subtitle": "{{count}} ta BTS filialidan eng moslari ko'rsatilgan",
+      "searchPlaceholder": "Filial kodi, nomi yoki manzil bo'yicha qidiring",
+      "locateButton": "Menga yaqin filiallar",
+      "loading": "BTS filiallari yuklanmoqda...",
+      "loadError": "BTS filiallarini yuklab bo'lmadi",
+      "emptyTitle": "Xaritadan BTS filialini tanlang",
+      "selectedLabel": "Tanlangan BTS filiali",
+      "selectedToast": "{{name}} filiali tanlandi",
+      "savedSuggestionLabel": "Oldingi tanlagan filialingiz",
+      "savedSuggestionHint": "Oxirgi BTS zayavkangiz shu filialga yuborilgan.",
+      "useSavedBranch": "Shu filialni tanlash",
+      "chooseOtherBranch": "Boshqa filial",
+      "noResults": "«{{query}}» bo‘yicha BTS filiali topilmadi",
+      "fields": {
+        "index": "Filial kodi",
+        "workdays": "Ish vaqti",
+        "otherScheduleNotes": "Mo'ljal"
+      }
+    }
   },
   "deliveryHistory": {
     "title": "Zayavkalar tarixi",

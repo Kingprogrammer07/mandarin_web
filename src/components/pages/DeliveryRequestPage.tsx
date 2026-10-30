@@ -41,6 +41,13 @@ import { RecipientNameField } from '@/components/delivery/RecipientNameField';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { BackPriority } from '@/lib/backStack';
 import { useUzpostBranches } from '@/hooks/useUzpostBranches';
+import type { UzpostBranchPicker as UzpostBranchPickerComponent } from '@/components/delivery/UzpostBranchPicker';
+import {
+  useBtsBranches,
+  readLastBtsBranchCode,
+  rememberBtsBranchCode,
+  type BtsBranch,
+} from '@/hooks/useBtsBranches';
 import type { UzpostBranch } from '@/types/uzpostBranch';
 import {
   clearSavedUzpostBranchPreference,
@@ -60,11 +67,12 @@ import { courierFeeKey, getCourierFee } from '@/api/services/courierService';
 import { formatUzsAmount } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 
+// Cast back to the generic signature, which lazy() erases.
 const UzpostBranchPicker = lazy(() =>
   import('@/components/delivery/UzpostBranchPicker').then((module) => ({
     default: module.UzpostBranchPicker,
   }))
-);
+) as unknown as typeof UzpostBranchPickerComponent;
 
 // ============================================
 // TYPES
@@ -479,6 +487,9 @@ interface StepStandardProps {
   onMapClear: () => void;
   includeAddress: boolean;
   onIncludeAddressChange: (value: boolean) => void;
+  /** BTS only: the office picker shown in place of the map pin. */
+  btsPicker?: React.ReactNode;
+  btsBranchSelected?: boolean;
 }
 
 const StepStandardConfirm = memo(
@@ -500,6 +511,8 @@ const StepStandardConfirm = memo(
     onMapClear,
     includeAddress,
     onIncludeAddressChange,
+    btsPicker,
+    btsBranchSelected = false,
   }: StepStandardProps) => {
     const { t } = useTranslation();
     const typeLabel = DELIVERY_OPTIONS.find((o) => o.id === deliveryType)?.label ?? deliveryType;
@@ -508,7 +521,11 @@ const StepStandardConfirm = memo(
     const pinRequired = deliveryType === 'mandarin';
     const pinMissing = pinRequired && mapLocation === null;
     const pinOutside = pinRequired && mapLocation !== null && !isInCourierArea(mapLocation);
-    const canSubmit = caption.trim().length > 0 && !submitting && !pinMissing && !pinOutside;
+    const isBts = deliveryType === 'bts';
+    // BTS goes to an office: the office is required, the note is not.
+    const canSubmit = isBts
+      ? btsBranchSelected && !submitting
+      : caption.trim().length > 0 && !submitting && !pinMissing && !pinOutside;
 
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
@@ -542,6 +559,8 @@ const StepStandardConfirm = memo(
             {t('deliveryRequest.steps.confirm.phoneHint')}
           </p>
         </div>
+
+        {isBts && <div className="mb-4">{btsPicker}</div>}
 
         {/* Optional: include the client's residential address in the admin note.
             Off by default so home addresses aren't shared unless the user wants. */}
@@ -578,21 +597,30 @@ const StepStandardConfirm = memo(
         <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
           <label className="flex items-center gap-2 text-[11px] font-bold text-mc-text-2 mb-2">
             <MapPin className="w-3.5 h-3.5" />
-            {t('deliveryRequest.steps.confirm.captionLabel')}
+            {isBts
+              ? t('deliveryRequest.steps.confirm.btsNoteLabel')
+              : t('deliveryRequest.steps.confirm.captionLabel')}
           </label>
           <textarea
             value={caption}
             onChange={(e) => onCaptionChange(e.target.value)}
-            placeholder={t('deliveryRequest.steps.confirm.captionPlaceholder')}
+            placeholder={
+              isBts
+                ? t('deliveryRequest.steps.confirm.btsNotePlaceholder')
+                : t('deliveryRequest.steps.confirm.captionPlaceholder')
+            }
             rows={4}
             className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-[16px] font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition resize-none"
           />
           <p className="mt-1.5 text-[11px] text-mc-text-3">
-            {t('deliveryRequest.steps.confirm.captionHint')}
+            {isBts
+              ? t('deliveryRequest.steps.confirm.btsNoteHint')
+              : t('deliveryRequest.steps.confirm.captionHint')}
           </p>
         </div>
 
-        {/* Map Picker — lazy loaded */}
+        {/* Map Picker — lazy loaded. BTS delivers to an office, not a pin. */}
+        {!isBts && (
         <div className="mb-4">
           <p className="text-[11px] font-bold text-mc-text-2 mb-2">
             {pinRequired
@@ -616,6 +644,7 @@ const StepStandardConfirm = memo(
             </p>
           )}
         </div>
+        )}
 
         {/* Summary Card */}
         <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-5 mb-4 backdrop-blur-md">
@@ -1602,6 +1631,12 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     getSavedUzpostBranchId()
   );
   const uzpostBranchesQuery = useUzpostBranches(deliveryType === 'uzpost');
+  const [selectedBtsBranch, setSelectedBtsBranch] = useState<BtsBranch | null>(null);
+  const btsBranchesQuery = useBtsBranches(deliveryType === 'bts');
+  const lastBtsBranch = useMemo(() => {
+    const code = readLastBtsBranchCode();
+    return btsBranchesQuery.data?.find((b) => b.index === code) ?? null;
+  }, [btsBranchesQuery.data]);
 
   // Standard delivery form state
   const [standardPhone, setStandardPhone] = useState('');
@@ -1737,6 +1772,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     setDeliveryType(type);
     setSelectedFlights([]);
     setSelectedUzpostBranch(null);
+    setSelectedBtsBranch(null);
     setCalcData(null);
     setProfileIncomplete(false);
     setStandardPhone(userProfile?.phone ?? '');
@@ -1792,7 +1828,11 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
 
   const handleStandardSubmit = useCallback(async () => {
     if (!deliveryType || deliveryType === 'uzpost') return;
-    if (!standardCaption.trim()) {
+    if (deliveryType === 'bts' && !selectedBtsBranch) {
+      toast.error(t('deliveryRequest.toast.btsBranchRequired'));
+      return;
+    }
+    if (deliveryType !== 'bts' && !standardCaption.trim()) {
       toast.error(t('deliveryRequest.toast.captionRequired'));
       return;
     }
@@ -1812,15 +1852,19 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
         deliveryType as 'yandex' | 'mandarin' | 'bts',
         selectedFlights,
         phoneToSend,
-        standardCaption.trim(),
+        standardCaption.trim() || null,
         // null, not 0. The pin is optional for Yandex/BTS (only "mandarin"
         // requires one), and 0,0 is a real point in the Gulf of Guinea that
         // every reader downstream turned into a route link for the courier.
         standardMapLocation?.latitude ?? null,
         standardMapLocation?.longitude ?? null,
         includeAddress,
-        standardRecipient?.trim() || null
+        standardRecipient?.trim() || null,
+        deliveryType === 'bts' ? selectedBtsBranch?.index ?? null : null
       );
+      if (deliveryType === 'bts' && selectedBtsBranch) {
+        rememberBtsBranchCode(selectedBtsBranch.index);
+      }
       setCurrentStep(4);
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string; data?: { detail?: string } };
@@ -1839,7 +1883,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     } finally {
       setSubmitting(false);
     }
-  }, [deliveryType, selectedFlights, standardPhone, standardRecipient, standardCaption, standardMapLocation, includeAddress, t, refetchProfile]);
+  }, [deliveryType, selectedFlights, standardPhone, standardRecipient, standardCaption, standardMapLocation, includeAddress, selectedBtsBranch, t, refetchProfile]);
 
   const handleUzpostSubmit = useCallback(
     async (walletUsed: number, file: File | null, phoneNumber: string) => {
@@ -2178,6 +2222,27 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           onMapClear={() => setStandardMapLocation(null)}
           includeAddress={includeAddress}
           onIncludeAddressChange={setIncludeAddress}
+          btsBranchSelected={selectedBtsBranch !== null}
+          btsPicker={
+            deliveryType === 'bts' ? (
+              <Suspense
+                fallback={
+                  <div className="h-64 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
+                }
+              >
+                <UzpostBranchPicker
+                  branches={btsBranchesQuery.data ?? []}
+                  selectedBranch={selectedBtsBranch}
+                  suggestedBranch={lastBtsBranch}
+                  isLoading={btsBranchesQuery.isLoading}
+                  isError={btsBranchesQuery.isError}
+                  onSelect={setSelectedBtsBranch}
+                  onRetry={() => void btsBranchesQuery.refetch()}
+                  textPrefix="deliveryRequest.btsBranchPicker"
+                />
+              </Suspense>
+            ) : null
+          }
         />
       )}
 

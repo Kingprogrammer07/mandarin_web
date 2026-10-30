@@ -1394,7 +1394,10 @@
         "mapOutsideCity": "Эта точка за пределами Ташкента. Курьер Mandarin доставляет только по городу.",
         "mapNeededToSubmit": "Чтобы отправить заявку, отметьте точку на карте.",
         "includeAddressLabel": "Добавить мой адрес проживания",
-        "includeAddressHint": "Если включено, ваш домашний адрес увидят операторы"
+        "includeAddressHint": "Если включено, ваш домашний адрес увидят операторы",
+        "btsNoteLabel": "Комментарий (необязательно)",
+        "btsNotePlaceholder": "Например: позвоните перед выдачей",
+        "btsNoteHint": "Груз отправим в выбранный филиал BTS. Если есть пожелания, напишите."
       },
       "uzpost": {
         "calcTitle": "Расчёт",
@@ -1453,7 +1456,8 @@
       "calcError": "Ошибка расчёта",
       "calcFallback": "Сервис расчёта UzPost сейчас недоступен. Показана примерная цена.",
       "submitError": "Произошла ошибка",
-      "captionRequired": "Пожалуйста, введите комментарий для курьера"
+      "captionRequired": "Пожалуйста, введите комментарий для курьера",
+      "btsBranchRequired": "Выберите филиал BTS"
     },
     "map": {
       "openButton": "Выбрать на карте",
@@ -1475,7 +1479,28 @@
     },
     "confirmSendAddress": "Вы действительно хотите отправить свой адрес проживания?",
     "back": "Назад",
-    "clearFile": "Удалить файл"
+    "clearFile": "Удалить файл",
+    "btsBranchPicker": {
+      "title": "Выберите филиал BTS",
+      "subtitle": "Показаны ближайшие из {{count}} филиалов BTS",
+      "searchPlaceholder": "Поиск по коду, названию или адресу филиала",
+      "locateButton": "Филиалы рядом со мной",
+      "loading": "Загружаем филиалы BTS...",
+      "loadError": "Не удалось загрузить филиалы BTS",
+      "emptyTitle": "Выберите филиал BTS на карте",
+      "selectedLabel": "Выбранный филиал BTS",
+      "selectedToast": "Выбран филиал {{name}}",
+      "savedSuggestionLabel": "Ваш прошлый филиал",
+      "savedSuggestionHint": "Ваша прошлая заявка BTS ушла в этот филиал.",
+      "useSavedBranch": "Выбрать этот филиал",
+      "chooseOtherBranch": "Другой филиал",
+      "noResults": "Филиал BTS по запросу «{{query}}» не найден",
+      "fields": {
+        "index": "Код филиала",
+        "workdays": "Часы работы",
+        "otherScheduleNotes": "Ориентир"
+      }
+    }
   },
   "deliveryHistory": {
     "title": "История заявок",
