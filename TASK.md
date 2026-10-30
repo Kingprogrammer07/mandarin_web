@@ -1,92 +1,62 @@
-# TASK: To'lov oynasi dizayni va Uzpost zayavkada «Kartaga o'tkazma»
+# TASK: NBU zayavka to'lovidagi pul kamchiliklarini tuzatish
 
-Oldingi vazifa (kartaga o'tkazma, 3-qism) GitHub'da: bot f2ef345, web 0c4cefd, serverga
-chiqmagan; foydalanuvchi 9–13-holatlarni lokalda sinayapti.
+Oldingi vazifa (to'lov oynasi dizayni, Uzpost zayavkada «Kartaga o'tkazma» va Payme) GitHub'da:
+bot 1c9ca6b, web 2692a84 + ba059d7. Serverga chiqmagan: backend va frontend birga, migratsiya
+e2a4c6e8f0b1.
 
 ## Objective
-1. Reys to'lov oynasining 2-qadami (`MakePaymentModal`): bellashayotgan beshta tugma o'rniga
-   bitta «To'lov usuli» ro'yxati va pastda bitta asosiy tugma. Har bir usulning ishlashi
-   (NBU, saqlangan karta, kartaga o'tkazma, online + chek, naqd, balans) o'zgarmaydi.
-2. Uzpost zayavka to'lovida «Kartaga o'tkazma» (aniq summa, bot o'zi tekshiradi): backend,
-   keyin shu ro'yxat Uzpost qadamida. Pul qismi foydalanuvchi «ha» demaguncha push qilinmaydi.
-3. Payme/Click — «Payme va Click to'lov tekshiruvi» oynasidagi yangi to'lov tayyor bo'lgach.
+Foydalanuvchi 30.10 20:03Z: «xa nbu kamchiliklari ham fix qilinsin». Rejadagi uchta kamchilik
+(hujjat «Eski zayavka to'lovlarida topilgan kamchiliklar»):
+
+1. **Qoldiq 1 000 so'mdan kam.** NBU o'z minimumini (1 000) yechadi, ortig'i hamyonga qaytmaydi va
+   POS'da yetkazish to'lovi sifatida yoziladi.
+2. **Hamyon yechilmaydi.** NBU zayavkasida hamyon qismi zayavkadagi asosiy kod bo'yicha birinchi
+   reys yozuvidan ayiriladi. Yozuv qo'shimcha kodda tursa topilmaydi va hamyon yechilmaydi.
+   Ish davomida aniqlandi: yozuv topilsa ham hamyon kamaymaydi, agar pul boshqa reysda tursa —
+   hamyon reysma-reys hisoblanadi (`get_wallet_balances`), shuning uchun ayirma o'sha reysda
+   «qarz» bo'lib chiqadi, hamyon o'zgarmaydi (Postgres'da tekshirildi).
+3. **Tasdiqlangan zayavkali reyslar.** NBU bir soatdan keyin shu reyslarga yana zayavka to'lashga
+   ruxsat beradi. Kartaga o'tkazma va Payme (be52744) buni rad etadi.
+
+Pul qoidasi: foydalanuvchi «ha» demaguncha GitHub'ga yuborilmaydi.
 
 ## Implementation Plan
-Dizayn (shu repo):
-- [x] Summa: chapda katta raqam, ostida vazn / narx / trek kodlar bitta bo'lingan qatorda
-- [x] «Boshqa summa» va «Balansdan foydalanish» bitta guruhda; balans 0 bo'lsa qator yo'q,
-      balans hammasini yopsa u ro'yxatda «Balansdan to'lash» usuli bo'ladi
-- [x] «To'lov usuli» radio ro'yxati (haqiqiy `input type=radio`): saqlangan karta(lar),
-      bank kartasi (NBU), kartaga o'tkazma, online to'lov, naqd — har biri o'z belgisi va
-      bir qatorli izohi bilan
-- [x] Mos kelmaydigan usul o'chiq va sababi yozilgan: NBU balans yoki boshqa summa bilan
-      ishlamaydi (server doim to'liq qarzni yechadi), kartaga o'tkazma balans bilan, naqd
-      boshqa summa bilan
-- [x] Pastda bitta asosiy tugma (tanlangan usulga qarab: «1 210 so'm to'lash» / «Davom
-      etish» / «Balansdan to'lash»), safe-area bilan; boshqa summa noto'g'ri bo'lsa o'chiq
-- [x] NBU 1 000 so'm minimumi: tugma va tasdiqlash oynasi haqiqiy yechiladigan summani
-      ko'rsatadi; tushuntirish ro'yxat ustidagi qutida emas, NBU qatorlarining o'zida
-- [x] Gradient va rangli soyalar olib tashlanadi (2-qadam tugmalari, tasdiqlash oynasi),
-      faqat `--mc-*` tokenlar
-- [x] `data-tour` (pay-amount, pay-methods, pay-wallet, pay-saved-card) saqlanadi; ekranda
-      yo'q element uchun tur qadami tashlanadi
-- [x] Reys almashtirilganda balans / boshqa summa / tanlangan usul tozalanadi
-- [x] i18n: uz/ru yangi kalitlar (`makePayment.methods.*`); eski `belowNbuMinimum*` olib tashlandi
-- [x] Test (vitest: 6 ta yangi, jami 931 o'tdi), tsc, eslint, build; 320/360/390, och va
-      qorong'i skrinshotlar, kesilish tekshiruvi toza
-- [x] Skrinshotlarni foydalanuvchiga ko'rsatish; foydalanuvchi «Ha, yubor» dedi — main'ga push
+- [x] 1. Server qoldiq NBU minimumidan kam bo'lgan zayavka to'lovini qabul qilmaydi (422,
+      `below_minimum`, «hamyonni o'chirib to'lang»). Zayavka uchun 1 000 gacha to'ldirish olib
+      tashlanadi: NBU'dan aynan qoldiq so'raladi. Mini App bu holatni allaqachon to'sadi.
+- [x] 2. NBU zayavka tasdiqlanganda hamyon qismi `WALLET_ADJ:uzpost_wallet` (manfiy) yozuvi bilan
+      yechiladi: mijozning qaysi kodida va qaysi reysda pul tursa ham hamyon aniq shuncha
+      kamayadi, reysda soxta qarz paydo bo'lmaydi, keyingi qayta hisob uni bekor qilmaydi.
+      Zayavka yozuviga `wallet_used` ham yoziladi.
+- [x] 3a. NBU (havola va saqlangan karta) shu reyslarga kutilayotgan yoki tasdiqlangan zayavka
+      bo'lsa rad etadi (409 `request_pending` / `request_approved`), kartaga o'tkazma va Payme
+      bilan bitta tekshiruv (`card_intents.delivery_conflict`).
+- [x] 3b. NBU puli kelganda zayavkani tasdiqlab bo'lmasa (mijoz bekor qilgan, kassir rad etgan
+      yoki shu reyslarga boshqa zayavka bor), pul yo'qolmaydi: yechilgan summa hamyonga
+      (`WALLET_ADJ:nbu_unbooked`), zayavka bekor qilinadi, kutilayotgan POS kartasi yashiriladi,
+      mijozga xabar boradi. Hozir bu holatda pul hech qayerga yozilmaydi.
+- [x] Kassa jurnalida bunday NBU to'lovi hamyon qismisiz ko'rinadi (hamyon ishlatilmagan).
+- [x] Testlar (Postgres): har bir holat; eski manba testlari (test_nbu_minimum_topup) yangi
+      qoidaga moslanadi; to'liq to'plam, ruff
+- [x] Bir martalik puxta tekshiruv (to'liq to'plam 2308 o'tdi, ruff toza)
+- [x] Foydalanuvchiga ko'rsatildi; 30.10 21:22Z «Ha, yubor» → bot 0359e8b (Click SHOP API 030e3b2 ustiga). Serverga chiqmagan, migratsiya yo'q, frontend o'zgarmagan.
 
-Uzpost «Kartaga o'tkazma» (bot repo + shu repo). Pul qismi: foydalanuvchi «ha» demaguncha push yo'q.
-Qaror: zayavka (DeliveryRequest) so'rov ochilganda emas, pul tasdiqlanganda yaratiladi. So'rov
-zayavka qoralamasini saqlaydi. Sabab: to'lanmay qolgan so'rov ortida bo'sh «kutilmoqda» zayavka,
-POS'da shovqin va 1 soatlik qayta yuborish bloki (`_check_rate_limit`) qolmaydi.
-Qaror (o'zgardi): kartaga o'tkazma va Payme butun yetkazish narxini oladi, hamyon bilan birga
-bo'lmaydi (reys oynasidagi kabi). Hamyonni ishlatmoqchi bo'lgan mijoz NBU yoki chek bilan to'laydi.
-- [x] Model + migratsiya e2a4c6e8f0b1: `card_payment_intents.purpose` ('flight' | 'uzpost'),
-      `delivery` (JSONB qoralama: reyslar, filial, telefon, oluvchi), `delivery_request_id` (FK, unique)
-- [x] Servis: `open_delivery_intent`; reys so'rovlari qidiruvi faqat purpose='flight';
-      `owed_between` kutilayotgan zayafka to'lovlarini ham chetlab o'tadi; shu reyslarga kutilayotgan
-      yoki tasdiqlangan zayavka bo'lsa yangi so'rov ochilmaydi
-- [x] API: `POST /payments/card-intent/delivery` (NBU delivery tekshiruvlari bilan, hamyonsiz);
-      `calculate-uzpost` da `card_intent_available` va u bo'lsa eski karta raqami yashiriladi
-- [x] Matcher: uzpost so'rovi Uzpost guruhiga, o'z matni bilan; chek so'rovi va javobi o'sha guruhga
-- [x] Admin «✅ Tasdiqlash»: zayavka yaratiladi va tasdiqlanadi, ortig'i hamyonga (WALLET_ADJ
-      card_overpay), olib ketish navbati, POS, kanal, mijoz
-- [x] Bot o'zi (tugma yoqiq): mavjud shartlar + zayavka shartlari (boshqa zayavka yo'q, so'rov
-      o'zgarmagan, yuk olib ketilmagan); «🤖 Bot qabul qildi» + «↩️ Bekor qilish»
-- [x] «↩️ Bekor qilish»: Uzpost buyurtma yo'q, navbat tegilmagan, ortiqcha ishlatilmagan, zayavka
-      rad etilmagan bo'lsagina; zayavka «kutilmoqda», navbat bekor, POS yashiriladi, ortiqcha qaytadi
-- [x] Backend testlari: tests/test_card_delivery_pg.py (15 ta), butun suite, ruff
-- [x] Frontend: Uzpost qadamida yagona «To'lov usuli» ro'yxati (`PayMethodList`, reys oynasi
-      bilan umumiy): balans hammasini yopsa «Balansdan to'lash», saqlangan karta, bank kartasi,
-      Payme (yoqilgan bo'lsa), kartaga o'tkazma; chek bilan faqat kartaga o'tkazma bo'lmasa;
-      bitta asosiy tugma; `CardTransferPanel` va `PaymePanel` ro'yxat o'rnida ochiladi
-- [x] NBU qoldig'i 1 000 so'mdan kam bo'lsa NBU qatorlari o'chiq (zayavkada ortig'i hamyonga
-      qaytmaydi, mavjud backend xatosi), sababi qatorda yozilgan
-- [x] Kartaga o'tkazma oynasida «Boshqa usulni tanlash» tugmasi (Payme oynasidagi kabi)
-- [x] Frontend testlari (DeliveryRequestPage.test.tsx, 9 ta), tsc, eslint, build;
-      320/360/390, och va qorong'i skrinshotlar, kesilish tekshiruvi toza
-- [x] Foydalanuvchiga ko'rsatildi, «Ha, yubor» (30.10 17:41Z): bot 1c9ca6b, web 2692a84 main'da
-- [ ] Serverga deploy (foydalanuvchi): backend va frontend birga, migratsiya e2a4c6e8f0b1
+Tegilmaydi (alohida ish sifatida aytiladi): kassir va bot tasdiqlaydigan zayavkalar, reys
+to'lovlarida hamyondan foydalanish — ular ham hamyonni reys yozuvidan ayiradi (2-banddagi muammo).
 
 ## Walkthrough / Architecture
-Uzpost kartaga o'tkazma: Mini App `POST /payments/card-intent/delivery` → backend NBU delivery
-tekshiruvlarini (`_prepare_uzpost_delivery_fee`, hamyon 0) qiladi, so'rov `card_payment_intents`
-ga purpose='uzpost' va zayavka qoralamasi bilan yoziladi (summalar reys so'rovlari bilan bitta
-hovuzda, `place_notice` ikkalasini bir xil topadi). Kirim topilganda matcher so'rov turiga qarab:
-reys → `book_online_payment`, uzpost → `card_delivery.book` (zayavka yaratish + tasdiqlash +
-navbat + POS + ortiqcha hamyonga). Post Uzpost guruhiga ketadi. Bekor qilish zayavkani
-«kutilmoqda» ga qaytaradi. Mini App so'rovni `GET /payments/card-intent/{id}` bilan kuzatadi.
+`payments_nbu._prepare_uzpost_delivery_fee` narx va tekshiruvlarni beradi (kartaga o'tkazma va
+Payme ham uni hamyonsiz chaqiradi, shuning uchun NBU'ga xos rad etishlar NBU endpointlarida:
+`init_nbu_delivery_payment`, `charge_nbu_delivery_payment`). Ular zayavka (`pending`) va
+`NbuPayment` (summa = aynan qoldiq, `wallet_used`) yaratadi.
 
-`StepUzpostPayment` ham `payOptions` massivini `PayMethodList` bilan chizadi. Kartaga o'tkazma
-yoki Payme tanlansa ro'yxat o'rnida panel ochiladi (`view`); tizim «orqaga» tugmasi va panel
-ichidagi «Boshqa usulni tanlash» ro'yxatga qaytaradi. To'lov o'tgach `onPaid` filialni eslab
-qoladi, «Tayyor» zayavkalar tarixiga olib boradi.
+NBU SUCCESS (callback, sinxron karta, reconciler) → `nbu_payment.apply_nbu_delivery_payment_success`:
+to'lov qatori qulflanadi (`applied_at` — bir martalik), zayavka qulflanadi. Zayavka `approved`
+bo'lsa (kassir tasdiqlagan) hech narsa qilinmaydi. Zayavka boshqa holatda yoki shu reyslarga
+boshqa kutilayotgan/tasdiqlangan zayavka bo'lsa → «tasdiqlanmadi» yo'li (3b). Aks holda:
+tasdiqlash, hamyon `WALLET_ADJ` bilan, navbat, chek, POS, kanal, mijoz (avvalgidek).
 
-`MakePaymentModal` 2-qadamda usullarni bitta massivdan (`payOptions`) chizadi: har bir
-element o'z kaliti, belgisi, sarlavhasi, izohi, o'chiq bo'lish sababi (`blockedBy`), asosiy
-tugma matni va `run()` ga ega. Tanlov holati faqat kalit (`methodKey`); tanlangan usul o'chib
-qolsa (masalan balans yoqilsa), birinchi ishlaydigan usul tanlanadi, balans o'chirilsa
-oldingi tanlov qaytadi. Pastki tugma `selectedOption.run()` ni chaqiradi — bu oldingi
-tugmalar chaqirgan funksiyalarning o'zi (`setConfirmChargeCard`, `handleNbuPayment`,
-`handleChooseMethod`), shuning uchun 3-qadam va server so'rovlari o'zgarmaydi.
+Hamyon balansi = reyslar bo'yicha musbat qoldiqlar + `WALLET_ADJ` hovuzi. Manfiy `WALLET_ADJ`
+hovuzni kamaytiradi, reys qatorlariga tegmaydi va foydalanuvchi ro'yxatlarida, statistikada
+ko'rinmaydi (`apply_public_transaction_filter`). Kartaga o'tkazma ham ortiqchasini shu yo'l bilan
+yozadi (`card_overpay`).
