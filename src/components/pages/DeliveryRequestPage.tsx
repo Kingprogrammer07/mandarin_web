@@ -24,6 +24,9 @@ import {
   MapPin,
   Phone,
   CreditCard,
+  Landmark,
+  ArrowRightLeft,
+  Smartphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -60,6 +63,17 @@ import {
   type SavedCardItem,
 } from '@/api/services/nbuPaymentService';
 import { openNbuUrl } from '@/utils/nbuReturnContext';
+import {
+  openPaymeCheckout,
+  paymeRefusal,
+  paymeService,
+  type PaymeOrder,
+} from '@/api/services/paymeService';
+import type { CardDeliveryIntentRequest } from '@/api/services/paymentService';
+import { CardTransferPanel } from '@/components/payment/CardTransferPanel';
+import { PaymePanel } from '@/components/payment/PaymePanel';
+import { PayMethodList, SwitchRow, type PayOption } from '@/components/payment/PayMethodList';
+import { formatMaskedCard } from '@/utils/cardMask';
 import { useNbuSessionOpen } from '@/hooks/usePendingNbuOrders';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 import { isInCourierArea } from '@/lib/courierArea';
@@ -157,6 +171,10 @@ const CalcSkeleton = () => (
 const RECEIPT_IMAGE_MAX_WIDTH = 1280;
 const RECEIPT_IMAGE_MAX_HEIGHT = 720;
 const RECEIPT_IMAGE_QUALITY = 0.82;
+/** NBU's gateway minimum (`payments_nbu._MIN_AMOUNT_TIYIN`). */
+const NBU_MIN_UZS = 1000;
+/** Payme refuses a smaller fee (`payme_orders.MIN_AMOUNT`). */
+const PAYME_MIN_UZS = 1000;
 
 async function compressReceiptImage(file: File): Promise<File> {
   if (!file.type.startsWith('image/')) {
@@ -764,9 +782,15 @@ interface StepUzpostProps {
   savedCards: SavedCardItem[];
   onPayOnline: (walletUsed: number, phoneNumber: string) => void;
   onChargeCard: (cardId: number, walletUsed: number, phoneNumber: string) => void;
+  /** Payme Merchant API is switched on: the whole fee on Payme's page. */
+  paymeEnabled: boolean;
+  /** A card transfer or a Payme order paid the fee: the request is made and approved. */
+  onPaid: () => void;
+  /** «Tayyor» after such a payment. */
+  onFinish: () => void;
 }
 
-function StepUzpostPayment({
+export function StepUzpostPayment({
   calcData,
   loading,
   selectedFlights,
@@ -790,11 +814,17 @@ function StepUzpostPayment({
   savedCards,
   onPayOnline,
   onChargeCard,
+  paymeEnabled,
+  onPaid,
+  onFinish,
 }: StepUzpostProps) {
   const { t, i18n } = useTranslation();
   const [useWallet, setUseWallet] = useState(false);
-  // 'online' = NBU card payment, 'manual' = bank-transfer receipt upload.
-  const [payMethod, setPayMethod] = useState<'online' | 'manual'>('online');
+  // The row of «To'lov usuli» the client picked; null until they pick one.
+  const [methodKey, setMethodKey] = useState<string | null>(null);
+  // A card transfer or a Payme order opened from the list, shown in place of it.
+  const [view, setView] = useState<{ kind: 'card' } | { kind: 'payme'; order: PaymeOrder } | null>(null);
+  const [paymeOpening, setPaymeOpening] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [receiptProcessing, setReceiptProcessing] = useState(false);
@@ -806,12 +836,14 @@ function StepUzpostPayment({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const walletApplied = useWallet && calcData ? Math.min(calcData.wallet_balance, calcData.total_amount) : 0;
-  const remaining = calcData ? Math.max(calcData.total_amount - walletApplied, 0) : 0;
   const numberLocale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
+  const formatSom = useCallback(
+    (value: number) => value.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+    [numberLocale],
+  );
   const formatUzs = useCallback(
-    (value: number) => `${value.toLocaleString(numberLocale)} ${t('deliveryRequest.steps.uzpost.currencyUzs')}`,
-    [numberLocale, t],
+    (value: number) => `${formatSom(value)} ${t('deliveryRequest.steps.uzpost.currencyUzs')}`,
+    [formatSom, t],
   );
 
   useEffect(() => {
@@ -1007,6 +1039,13 @@ function StepUzpostPayment({
     toast.success(t('deliveryRequest.toast.copied'));
   };
 
+  // While a card transfer or Payme screen is open the system back button
+  // returns to the list of methods, not to the flights.
+  useBackHandler(view !== null, () => {
+    setView(null);
+    return true;
+  }, BackPriority.MODAL);
+
   if (loading) {
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
@@ -1023,7 +1062,7 @@ function StepUzpostPayment({
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
         <h2 className="text-[17px] font-extrabold mb-4">{t('deliveryRequest.steps.uzpost.warningTitle')}</h2>
 
-        <div className="rounded-mc-lg bg-mc-danger-soft border-2 border-mc-danger/25 dark:border-mc-danger/30 p-6 text-center mb-6">
+        <div className="rounded-mc-lg bg-mc-danger-soft border-2 border-mc-danger/25 p-6 text-center mb-6">
           <AlertTriangle className="w-16 h-16 mx-auto text-mc-danger mb-4" />
           <p className="text-mc-danger font-bold text-[15px] mb-2">
             {t('deliveryRequest.steps.uzpost.weightExceeded')}
@@ -1047,12 +1086,179 @@ function StepUzpostPayment({
     );
   }
 
-  const fullyCoveredByWallet = remaining <= 0;
-  // Online (NBU) payment is offered only when money actually needs collecting and
-  // the gateway is enabled. When the wallet fully covers the fee, we fall back to
-  // the manual submit (no card charge needed).
-  const onlineAvailable = nbuEnabled && !fullyCoveredByWallet;
-  const onlineMode = onlineAvailable && payMethod === 'online';
+  // The request a card transfer or a Payme order makes: the whole fee, never
+  // the wallet's part.
+  const delivery: CardDeliveryIntentRequest | null = selectedBranch
+    ? {
+        flight_names: selectedFlights,
+        location_id: selectedBranch.id,
+        phone_number: phoneNumber.trim() || null,
+        recipient_name: recipientName?.trim() || null,
+      }
+    : null;
+
+  if (view?.kind === 'card' && delivery) {
+    return (
+      <div className="animate-in fade-in slide-in-from-right-4 duration-400">
+        <CardTransferPanel
+          delivery={delivery}
+          onBack={() => setView(null)}
+          onDone={onFinish}
+          onPaid={onPaid}
+        />
+      </div>
+    );
+  }
+
+  if (view?.kind === 'payme' && delivery) {
+    return (
+      <div className="animate-in fade-in slide-in-from-right-4 duration-400">
+        <PaymePanel
+          initialOrder={view.order}
+          reopenOrder={() => paymeService.openDeliveryOrder(delivery)}
+          onPaid={onPaid}
+          onBack={() => setView(null)}
+          onDone={onFinish}
+        />
+      </div>
+    );
+  }
+
+  const total = calcData?.total_amount ?? 0;
+  const walletBalance = calcData?.wallet_balance ?? 0;
+  // A wallet that covers the whole fee is a method of its own («Balansdan
+  // to'lash»), so the switch is offered only for a part of the fee.
+  const walletCoversAll = !!calcData && total > 0 && walletBalance >= total;
+  const hasWalletSwitch = !!calcData && walletBalance > 0 && !walletCoversAll;
+  const walletOn = useWallet && hasWalletSwitch;
+  const walletPart = walletOn ? Math.min(walletBalance, total) : 0;
+  const remaining = Math.max(total - walletPart, 0);
+  // NBU charges at least its floor, and a delivery fee's excess over it is not
+  // credited back the way a flight's is, so a smaller remainder is not offered.
+  const nbuBelowMin =
+    remaining > 0 && remaining < NBU_MIN_UZS
+      ? walletOn
+        ? t('deliveryRequest.steps.uzpost.belowMinWallet', { min: formatSom(NBU_MIN_UZS) })
+        : t('deliveryRequest.steps.uzpost.belowMin', { min: formatSom(NBU_MIN_UZS) })
+      : null;
+  // With card transfer requests the server leaves the card out: a transfer has
+  // to carry its exact sum, so the receipt way is only their fallback.
+  const receiptCard = calcData?.card ?? null;
+  const noWallet = walletOn ? t('cardTransfer.payCardNoWallet') : null;
+
+  const openPayme = async () => {
+    if (!delivery) return;
+    setPaymeOpening(true);
+    try {
+      const order = await paymeService.openDeliveryOrder(delivery);
+      if (order.state === 'open' && order.checkout_url && !openPaymeCheckout(order.checkout_url)) {
+        toast.error(t('payme.badLink'));
+      }
+      setView({ kind: 'payme', order });
+    } catch (err: unknown) {
+      toast.error(paymeRefusal(err, t('makePayment.errorOccurred')));
+    } finally {
+      setPaymeOpening(false);
+    }
+  };
+
+  const payOptions: PayOption[] = [];
+  if (calcData && total > 0) {
+    const payNbu = t('makePayment.methods.payAmount', { amount: formatSom(remaining) });
+    if (walletCoversAll) {
+      payOptions.push({
+        key: 'wallet',
+        icon: Wallet,
+        title: t('makePayment.payWallet'),
+        hint: t('makePayment.methods.walletHint', { amount: formatSom(walletBalance) }),
+        blockedBy: null,
+        cta: t('makePayment.payWallet'),
+        run: () => onSubmit(total, null, phoneNumber),
+      });
+    }
+    if (nbuEnabled) {
+      savedCards.forEach((card) => {
+        const masked = formatMaskedCard(card.card_masked);
+        payOptions.push({
+          key: `saved-${card.id}`,
+          icon: CreditCard,
+          title: card.nickname || masked || t('nbu.cards.namedCardFallback'),
+          hint:
+            card.nickname && masked
+              ? masked
+              : masked
+                ? t('makePayment.methods.savedCardHint')
+                : t('nbu.cards.pendingMasked'),
+          blockedBy: nbuBelowMin,
+          cta: payNbu,
+          run: () => onChargeCard(card.id, walletPart, phoneNumber),
+        });
+      });
+      payOptions.push({
+        key: 'nbu',
+        icon: Landmark,
+        title:
+          savedCards.length > 0
+            ? t('makePayment.methods.nbuOtherCard')
+            : t('makePayment.methods.nbuTitle'),
+        hint: t('makePayment.methods.nbuHint'),
+        blockedBy: nbuBelowMin,
+        cta: payNbu,
+        run: () => onPayOnline(walletPart, phoneNumber),
+      });
+    }
+    if (paymeEnabled) {
+      payOptions.push({
+        key: 'payme',
+        icon: Zap,
+        title: t('payme.title'),
+        hint: t('payme.hint'),
+        blockedBy:
+          noWallet ??
+          (total < PAYME_MIN_UZS
+            ? t('deliveryRequest.steps.uzpost.belowMin', { min: formatSom(PAYME_MIN_UZS) })
+            : null),
+        cta: t('makePayment.methods.payAmount', { amount: formatSom(total) }),
+        run: () => void openPayme(),
+      });
+    }
+    if (calcData.card_intent_available) {
+      payOptions.push({
+        key: 'card',
+        icon: ArrowRightLeft,
+        title: t('cardTransfer.payCard'),
+        hint: t('cardTransfer.payCardHint'),
+        blockedBy: noWallet,
+        cta: t('makePayment.methods.continue'),
+        run: () => setView({ kind: 'card' }),
+      });
+    }
+    if (receiptCard) {
+      payOptions.push({
+        key: 'receipt',
+        icon: Smartphone,
+        title: t('makePayment.payOnline'),
+        hint: t('makePayment.methods.onlineHintCard'),
+        blockedBy: null,
+        cta: t('deliveryRequest.steps.uzpost.submitButton'),
+        run: () => onSubmit(walletPart, receiptFile, phoneNumber),
+      });
+    }
+  }
+
+  const selectedOption =
+    payOptions.find((option) => option.key === methodKey && option.blockedBy === null) ??
+    payOptions.find((option) => option.blockedBy === null) ??
+    null;
+  const receiptChosen = selectedOption?.key === 'receipt';
+  const busy = submitting || paymeOpening;
+  const payDisabled =
+    !selectedOption ||
+    busy ||
+    paymentLocked ||
+    !selectedBranch ||
+    (receiptChosen && (receiptProcessing || !receiptFile));
+
   const cameraOverlay =
     isCameraOpen && typeof document !== 'undefined'
       ? createPortal(
@@ -1075,12 +1281,12 @@ function StepUzpostPayment({
               )}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 bg-gradient-to-t from-black via-black/90 to-transparent p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+            <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 bg-black/80 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={closeReceiptCamera}
                 disabled={isCapturingReceipt}
-                className="h-12 rounded-mc-lg border border-white/30 bg-white/10 px-5 font-bold text-white backdrop-blur-sm active:scale-95 disabled:opacity-60"
+                className="h-12 rounded-mc-lg border border-white/30 bg-white/10 px-5 font-bold text-white active:scale-95 disabled:opacity-60"
               >
                 {t('camera.cancel')}
               </button>
@@ -1088,7 +1294,7 @@ function StepUzpostPayment({
                 type="button"
                 onClick={captureReceiptPhoto}
                 disabled={isCapturingReceipt || !isCameraReady}
-                className="flex h-12 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-6 font-bold text-mc-on-brand shadow-lg shadow-amber-500/30 active:scale-95 disabled:opacity-60"
+                className="flex h-12 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-6 font-bold text-mc-on-brand active:scale-95 disabled:opacity-60"
               >
                 {isCapturingReceipt ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -1123,17 +1329,21 @@ function StepUzpostPayment({
       </div>
 
       {/* Optional phone number */}
-      <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-        <label className="flex items-center gap-2 text-[11px] font-bold text-mc-text-2 mb-2">
-          <Phone className="w-3.5 h-3.5" />
+      <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4">
+        <label
+          htmlFor="uzpost-phone"
+          className="flex items-center gap-2 text-[11px] font-bold text-mc-text-2 mb-2"
+        >
+          <Phone className="w-3.5 h-3.5" aria-hidden="true" />
           {t('deliveryRequest.steps.confirm.phoneLabel')}
         </label>
         <input
+          id="uzpost-phone"
           type="tel"
           value={phoneNumber}
           onChange={(e) => onPhoneChange(e.target.value)}
           placeholder={t('deliveryRequest.steps.confirm.phonePlaceholder')}
-          className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 dark:bg-white/[0.04] px-4 py-3 text-[16px] font-semibold text-mc-text dark:text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
+          className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 px-4 py-3 text-[16px] font-semibold text-mc-text outline-none focus:border-mc-brand focus:ring-1 focus:ring-mc-brand transition"
         />
         <p className="mt-1.5 text-[11px] text-mc-text-3">
           {t('deliveryRequest.steps.uzpost.phoneHint')}
@@ -1144,8 +1354,8 @@ function StepUzpostPayment({
         <Suspense
           fallback={
             <div className="space-y-3">
-              <div className="h-12 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
-              <div className="h-64 rounded-mc-lg bg-mc-surface-2 dark:bg-white/5 animate-pulse" />
+              <div className="h-12 rounded-mc-lg bg-mc-surface-2 animate-pulse" />
+              <div className="h-64 rounded-mc-lg bg-mc-surface-2 animate-pulse" />
             </div>
           }
         >
@@ -1161,355 +1371,225 @@ function StepUzpostPayment({
         </Suspense>
       </div>
 
-      {/* Summary Grid — shown only after branch selected and calc completed */}
+      {/* The weight and the fee — once a branch is picked and priced */}
       {calcData && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 backdrop-blur-md">
-            <p className="text-[11px] text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalWeight')}</p>
-            <p className="text-[16px] font-extrabold">{calcData.total_weight} kg</p>
+        <dl className="mb-4 grid grid-cols-2 divide-x divide-mc-border rounded-mc-md border border-mc-border bg-mc-surface">
+          <div className="min-w-0 px-3.5 py-3">
+            <dt className="text-[11px] font-medium text-mc-text-2">
+              {t('deliveryRequest.steps.uzpost.totalWeight')}
+            </dt>
+            <dd className="mt-0.5 text-[15px] font-extrabold tabular-nums text-mc-text">
+              {calcData.total_weight} kg
+            </dd>
           </div>
-          <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 backdrop-blur-md">
-            <p className="text-[11px] text-mc-text-2 mb-1">{t('deliveryRequest.steps.uzpost.totalAmount')}</p>
-            <p className="text-[16px] font-extrabold text-mc-warn">
-              {calcData.total_amount.toLocaleString()} so'm
-            </p>
+          <div className="min-w-0 px-3.5 py-3">
+            <dt className="text-[11px] font-medium text-mc-text-2">
+              {t('deliveryRequest.steps.uzpost.totalAmount')}
+            </dt>
+            <dd className="mt-0.5 break-words text-[15px] font-extrabold tabular-nums text-mc-text">
+              {formatUzs(total)}
+            </dd>
           </div>
-        </div>
+        </dl>
       )}
 
       {/* Offline estimate notice — UzPost pricing API was unreachable. */}
       {calcData?.fallback && (
-        <div className="flex items-start gap-2 rounded-mc-lg bg-mc-warn-soft border border-mc-warn/25 dark:border-mc-brand/30 p-3 mb-4">
-          <AlertTriangle className="w-4 h-4 text-mc-brand shrink-0 mt-0.5" />
-          <p className="text-mc-warn text-[11px]">
+        <div className="flex items-start gap-2 rounded-mc-md bg-mc-warn-soft border border-mc-warn/25 p-3 mb-4">
+          <AlertTriangle className="w-4 h-4 text-mc-warn shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-mc-text text-[12px] leading-snug">
             {t('deliveryRequest.steps.uzpost.estimateNote')}
           </p>
         </div>
       )}
 
-      {/* Wallet Toggle — shown only after calc completed */}
-      {calcData && (
-        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-mc-md bg-mc-brand-soft flex items-center justify-center text-mc-brand">
-                <Wallet className="w-5 h-5" />
+      {/* The wallet's part of the fee */}
+      {hasWalletSwitch && (
+        <div className="mb-4 rounded-mc-md border border-mc-border bg-mc-surface">
+          <SwitchRow
+            label={t('deliveryRequest.steps.uzpost.walletPay')}
+            hint={t('deliveryRequest.steps.uzpost.walletBalance', {
+              balance: formatSom(walletBalance),
+            })}
+            checked={walletOn}
+            onToggle={() => setUseWallet((on) => !on)}
+          />
+          {walletOn && (
+            <div className="space-y-1 px-3.5 pb-3.5 text-[13px]">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
+                <span className="font-bold text-mc-success tabular-nums">−{formatUzs(walletPart)}</span>
               </div>
-              <div>
-                <p className="font-bold text-[13px]">{t('deliveryRequest.steps.uzpost.walletPay')}</p>
-                <p className="text-[11px] text-mc-text-2">
-                  {t('deliveryRequest.steps.uzpost.walletBalance', { balance: calcData.wallet_balance.toLocaleString() })}
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold text-mc-text">
+                  {t('deliveryRequest.steps.uzpost.remainingPayment')}
+                </span>
+                <span className="font-extrabold text-mc-text tabular-nums">{formatUzs(remaining)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* How to pay: one list, the button under it acts on the chosen row */}
+      {payOptions.length > 0 && (
+        <div className="mb-4">
+          <PayMethodList
+            options={payOptions}
+            selectedKey={selectedOption?.key}
+            onSelect={setMethodKey}
+          />
+        </div>
+      )}
+
+      {/* The receipt way: the card to pay to, and the receipt */}
+      {receiptChosen && receiptCard && (
+        <div className="mb-4 space-y-3">
+          <div className="rounded-mc-md border border-mc-border bg-mc-surface p-3.5">
+            <p className="text-[11px] font-medium text-mc-text-2">
+              {t('deliveryRequest.steps.uzpost.paymentCard')}
+            </p>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words text-[16px] font-bold tabular-nums tracking-[0.04em] text-mc-text">
+                  {receiptCard.card_number}
+                </p>
+                <p className="text-[12px] text-mc-text-2">{receiptCard.card_owner}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(receiptCard.card_number)}
+                aria-label={t('makePayment.copyCard')}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm border border-mc-border bg-mc-surface-2 text-mc-text-2 transition-transform active:scale-90"
+              >
+                <Copy className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[11px] font-medium text-mc-text-2">
+              {t('deliveryRequest.steps.uzpost.uploadReceipt')}
+            </p>
+
+            {receiptFile ? (
+              <div className="rounded-mc-md border-2 border-dashed border-mc-success/50 bg-mc-surface p-3.5">
+                {preview ? (
+                  <div className="relative">
+                    <img
+                      src={preview}
+                      alt={t('makePayment.fileSelected')}
+                      className="max-h-48 w-full rounded-mc-sm object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearFile}
+                      aria-label={t('deliveryRequest.clearFile', "Faylni o'chirish")}
+                      className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-mc-danger-fill text-mc-on-danger transition-transform active:scale-90"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <FileText className="h-8 w-8 shrink-0 text-mc-success" aria-hidden="true" />
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold text-mc-text">
+                          {receiptFile.name}
+                        </p>
+                        <p className="text-[11px] text-mc-text-3">
+                          {(receiptFile.size / 1024).toFixed(0)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearFile}
+                      aria-label={t('deliveryRequest.clearFile', "Faylni o'chirish")}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-mc-danger-soft text-mc-danger transition-transform active:scale-90"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : receiptProcessing ? (
+              <div className="flex w-full flex-col items-center justify-center gap-3 rounded-mc-md border-2 border-dashed border-mc-warn/30 bg-mc-warn-soft p-6">
+                <Loader2 className="h-7 w-7 animate-spin text-mc-warn" aria-hidden="true" />
+                <p className="text-[13px] font-bold text-mc-text">
+                  {t('deliveryRequest.steps.uzpost.compressingReceipt')}
                 </p>
               </div>
-            </div>
-
-            {/* Toggle */}
-            <button
-              onClick={() => setUseWallet(!useWallet)}
-              className={`
-                relative w-14 h-8 rounded-full transition-colors duration-300
-                ${useWallet ? 'bg-mc-brand' : 'bg-mc-surface-2 dark:bg-white/15'}
-              `}
-            >
-              <div
-                className={`
-                  absolute top-1 w-6 h-6 rounded-full bg-white shadow-md
-                  transition-transform duration-300
-                  ${useWallet ? 'translate-x-7' : 'translate-x-1'}
-                `}
-              />
-            </button>
-          </div>
-
-          {useWallet && (
-            <div className="mt-3 pt-3 border-t border-mc-border space-y-1">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.fromWallet')}</span>
-                <span className="font-bold text-mc-success">
-                  -{formatUzs(walletApplied)}
-                </span>
-              </div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-mc-text-2">{t('deliveryRequest.steps.uzpost.remainingPayment')}</span>
-                <span className="font-extrabold text-[15px]">
-                  {formatUzs(remaining)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Payment method toggle — only when there is money to collect online */}
-      {onlineAvailable && (
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setPayMethod('online')}
-            className={`h-12 rounded-mc-lg text-[13px] font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
-              payMethod === 'online'
-                ? 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
-                : 'bg-mc-surface-2 text-mc-text-2'
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            {t('deliveryRequest.steps.uzpost.onlinePayment')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPayMethod('manual')}
-            className={`h-12 rounded-mc-lg text-[13px] font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
-              payMethod === 'manual'
-                ? 'bg-mc-brand text-mc-on-brand shadow-lg shadow-amber-500/25'
-                : 'bg-mc-surface-2 text-mc-text-2'
-            }`}
-          >
-            <Upload className="w-4 h-4" />
-            {t('deliveryRequest.steps.uzpost.receiptUploadTab')}
-          </button>
-        </div>
-      )}
-
-      {/* Online (NBU) payment panel */}
-      {onlineMode && (
-        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[13px] text-mc-text-2">
-              {t('deliveryRequest.steps.uzpost.remainingPayment')}
-            </span>
-            <span className="font-extrabold text-[15px]">{formatUzs(remaining)}</span>
-          </div>
-
-          {savedCards.length > 0 && (
-            <div className="space-y-2 mb-3">
-              <p className="text-[11px] text-mc-text-2 font-medium">
-                {t('deliveryRequest.steps.uzpost.savedCards')}
-              </p>
-              {savedCards.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => onChargeCard(card.id, walletApplied, phoneNumber)}
-                  className="w-full h-12 rounded-mc-lg bg-mc-surface-2 border border-mc-border flex items-center justify-between px-4 text-[13px] font-semibold active:scale-[0.98] transition disabled:opacity-50"
-                >
-                  <span className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-mc-success" />
-                    {card.card_masked || card.nickname || t('deliveryRequest.steps.uzpost.cardFallback')}
-                  </span>
-                  <span className="text-mc-success">
-                    {t('deliveryRequest.steps.uzpost.payButton')}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <p className="text-[11px] text-mc-text-3">
-            {t('deliveryRequest.steps.uzpost.nbuPaymentDescription')}
-          </p>
-        </div>
-      )}
-
-      {/* Card Info (manual transfer only) */}
-      {!onlineMode && calcData && !fullyCoveredByWallet && calcData.card && (
-        <div className="rounded-mc-lg bg-mc-surface border border-mc-border p-4 mb-4 backdrop-blur-md">
-          <p className="text-[11px] text-mc-text-2 mb-2 font-medium">
-            {t('deliveryRequest.steps.uzpost.paymentCard')}
-          </p>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-mono font-bold text-[16px] tracking-wider">
-                {calcData.card.card_number}
-              </p>
-              <p className="text-[11px] text-mc-text-2">
-                {calcData.card.card_owner}
-              </p>
-            </div>
-            <button
-              onClick={() => handleCopy(calcData.card!.card_number)}
-              className="
-                w-11 h-11 rounded-mc-md flex items-center justify-center
-                bg-mc-warn-soft text-mc-warn
-                active:scale-90 transition-transform
-              "
-            >
-              <Copy className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* File Upload (manual transfer only, when payment remains) */}
-      {!onlineMode && !fullyCoveredByWallet && (
-        <div className="mb-6">
-          <p className="text-[11px] text-mc-text-2 mb-2 font-medium">
-            {t('deliveryRequest.steps.uzpost.uploadReceipt')}
-          </p>
-
-          {receiptFile ? (
-            <div className="rounded-mc-lg bg-mc-surface border-2 border-dashed border-mc-success dark:border-mc-success/40 p-4">
-              {preview ? (
-                <div className="relative mb-3">
-                  <img
-                    src={preview}
-                    alt="Receipt preview"
-                    className="w-full max-h-48 object-contain rounded-mc-md"
-                  />
-                  <button
-                    onClick={clearFile}
-                    aria-label={t('deliveryRequest.clearFile', "Faylni o'chirish")}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-mc-danger-fill text-mc-on-danger flex items-center justify-center active:scale-90 transition-transform shadow-lg"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-mc-success" />
-                    <div>
-                      <p className="font-semibold text-[13px] truncate max-w-[200px]">
-                        {receiptFile.name}
-                      </p>
-                      <p className="text-[11px] text-mc-text-3">
-                        {(receiptFile.size / 1024).toFixed(0)} KB
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={clearFile}
-                    aria-label={t('deliveryRequest.clearFile', "Faylni o'chirish")}
-                    className="w-8 h-8 rounded-full bg-mc-danger-soft text-mc-danger flex items-center justify-center active:scale-90 transition-transform"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : receiptProcessing ? (
-            <div className="w-full rounded-mc-lg border-2 border-dashed border-mc-warn/30 bg-mc-warn-soft dark:bg-mc-brand/[0.06] p-8 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-mc-brand" />
-              <p className="font-bold text-[13px] text-mc-warn">
-                {t('deliveryRequest.steps.uzpost.compressingReceipt')}
-              </p>
-            </div>
-          ) : (
-            <div
-              className="
-                w-full rounded-mc-lg border-2 border-dashed
-                border-mc-border dark:border-white/15
-                bg-mc-surface-2
-                p-5 flex flex-col gap-3
-              "
-            >
-              <div className="text-center">
-                <div className="w-14 h-14 mx-auto rounded-mc-lg bg-mc-warn-soft flex items-center justify-center text-mc-brand mb-3">
-                  <Upload className="w-7 h-7" />
-                </div>
-                <p className="font-bold text-[13px] text-mc-text">
+            ) : (
+              <div className="rounded-mc-md border-2 border-dashed border-mc-border bg-mc-surface-2 p-4">
+                <p className="text-center text-[13px] font-bold text-mc-text">
                   {t('deliveryRequest.steps.uzpost.uploadButton')}
                 </p>
-                <p className="text-[11px] text-mc-text-3 mt-0.5">
+                <p className="mt-0.5 text-center text-[11px] text-mc-text-3">
                   {t('deliveryRequest.steps.uzpost.uploadHint')}
                 </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface px-2 text-[13px] font-bold text-mc-text transition-transform active:scale-[0.98]"
+                  >
+                    <Upload className="h-4 w-4 shrink-0 text-mc-text-2" aria-hidden="true" />
+                    <span className="min-w-0 break-words">
+                      {t('deliveryRequest.steps.uzpost.uploadGalleryButton')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openReceiptCamera}
+                    className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-mc-md border border-mc-border bg-mc-surface px-2 text-[13px] font-bold text-mc-text transition-transform active:scale-[0.98]"
+                  >
+                    <Camera className="h-4 w-4 shrink-0 text-mc-text-2" aria-hidden="true" />
+                    <span className="min-w-0 break-words">
+                      {t('deliveryRequest.steps.uzpost.uploadCameraButton')}
+                    </span>
+                  </button>
+                </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-12 rounded-mc-lg bg-white dark:bg-white/10 border border-mc-border text-[13px] font-bold text-mc-text flex items-center justify-center gap-2 active:scale-[0.98] transition"
-                >
-                  <Upload className="w-4 h-4 text-mc-brand" />
-                  {t('deliveryRequest.steps.uzpost.uploadGalleryButton')}
-                </button>
-                <button
-                  type="button"
-                  onClick={openReceiptCamera}
-                  className="h-12 rounded-mc-lg bg-mc-brand text-mc-on-brand text-[13px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-lg shadow-amber-500/20"
-                >
-                  <Camera className="w-4 h-4" />
-                  {t('deliveryRequest.steps.uzpost.uploadCameraButton')}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,.pdf"
-            className="hidden"
-            onChange={handleFileChange}
-          />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
         </div>
       )}
 
       {/* Bottom Actions */}
       <div className="flex gap-3">
         <button
+          type="button"
           onClick={onBack}
           aria-label={t('common.back', 'Ortga')}
-          className="
-            flex-shrink-0 w-14 h-14 rounded-mc-lg flex items-center justify-center
-            bg-mc-surface-2 text-mc-text-2
-            active:scale-95 transition-transform
-          "
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-mc-lg bg-mc-surface-2 text-mc-text-2 transition-transform active:scale-95"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="h-5 w-5" />
         </button>
-        {onlineMode ? (
-          <button
-            onClick={() => onPayOnline(walletApplied, phoneNumber)}
-            disabled={submitting || !selectedBranch || !calcData}
-            className={`
-              flex-1 h-14 rounded-mc-lg font-bold text-[15px]
-              flex items-center justify-center gap-2
-              transition-all duration-200 active:scale-[0.98]
-              ${
-                submitting || paymentLocked || !selectedBranch || !calcData
-                  ? 'bg-mc-surface-2 text-mc-text-2 cursor-not-allowed'
-                  : 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
-              }
-            `}
-          >
-            {paymentLocked ? (
-              t('nbuWatch.waitTitle', "To‘lov tekshirilmoqda")
-            ) : submitting ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                {t('deliveryRequest.steps.uzpost.payAmountButton', { amount: formatUzs(remaining) })}
-                <CreditCard className="w-5 h-5" />
-              </>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={() => onSubmit(walletApplied, receiptFile, phoneNumber)}
-            disabled={submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)}
-            className={`
-              flex-1 h-14 rounded-mc-lg font-bold text-[15px]
-              flex items-center justify-center gap-2
-              transition-all duration-200 active:scale-[0.98]
-              ${
-                submitting || receiptProcessing || !selectedBranch || !calcData || (!fullyCoveredByWallet && !receiptFile)
-                  ? 'bg-mc-surface-2 text-mc-text-2 cursor-not-allowed'
-                  : 'bg-mc-success text-mc-on-success shadow-lg shadow-emerald-500/25'
-              }
-            `}
-          >
-            {submitting ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                {t('deliveryRequest.steps.uzpost.submitButton')}
-                <Check className="w-5 h-5" />
-              </>
-            )}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => selectedOption?.run()}
+          disabled={payDisabled}
+          className="flex min-h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 py-3
+            text-center text-[15px] font-extrabold leading-tight text-mc-on-brand tabular-nums
+            transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy && <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />}
+          {paymentLocked
+            ? t('nbuWatch.waitTitle', 'To‘lov tekshirilmoqda')
+            : selectedOption
+              ? selectedOption.cta
+              : t('makePayment.methods.choose')}
+        </button>
       </div>
     </div>
   );
@@ -1675,6 +1755,15 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
       active = false;
     };
   }, []);
+
+  // Payme Merchant API: off until its keys are on the server.
+  const { data: paymeStatus } = useQuery({
+    queryKey: ['payme-available'],
+    queryFn: paymeService.available,
+    staleTime: 5 * 60_000,
+    enabled: deliveryType === 'uzpost',
+  });
+  const paymeEnabled = paymeStatus?.enabled === true;
 
   // API state
   const [flights, setFlights] = useState<FlightItem[]>([]);
@@ -2048,6 +2137,14 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     [selectedFlights, selectedUzpostBranch, uzpostRecipient, showUzpostApiError]
   );
 
+  // A card transfer or a Payme order paid the fee: the server made the request
+  // and approved it, so the branch is remembered as after any other payment.
+  const handleUzpostPaid = useCallback(() => {
+    if (!selectedUzpostBranch) return;
+    saveUzpostBranchPreference(selectedUzpostBranch);
+    setSavedUzpostBranchId(selectedUzpostBranch.id);
+  }, [selectedUzpostBranch]);
+
   const goBackStep = useCallback(() => {
     setProfileIncomplete(false);
     if (currentStep > 1) {
@@ -2200,6 +2297,9 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           savedCards={savedCards}
           onPayOnline={handleUzpostPayOnline}
           onChargeCard={handleUzpostChargeCard}
+          paymeEnabled={paymeEnabled}
+          onPaid={handleUzpostPaid}
+          onFinish={onNavigateToHistory ?? onBack}
         />
       )}
 

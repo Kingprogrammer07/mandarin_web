@@ -42,7 +42,6 @@ import {
   ArrowRightLeft,
   Smartphone,
   Zap,
-  type LucideIcon,
 } from 'lucide-react';
 import {
   paymentService,
@@ -53,6 +52,7 @@ import { nbuPaymentService, type SavedCardItem } from '@/api/services/nbuPayment
 import { trackCargo, type TrackCodeSearchResponse } from '@/api/services/cargo';
 import { TrackResultCard } from '@/pages/dashboard/components/TrackResultCard';
 import { normalizeNumber } from '@/utils/numberFormat';
+import { formatMaskedCard } from '@/utils/cardMask';
 import { openNbuUrl } from '@/utils/nbuReturnContext';
 import { isCardReauthError, promptCardReauth } from '@/utils/nbuCardReauth';
 import { OfficeVisitSummary } from '@/components/office/OfficeStatus';
@@ -63,6 +63,7 @@ import { pickVisible } from '@/utils/tour';
 import type { DriveStep } from 'driver.js';
 import { AstatkaShelfNote } from '@/components/user/AstatkaShelfNote';
 import { CardTransferPanel } from '@/components/payment/CardTransferPanel';
+import { PayMethodList, SwitchRow, type PayOption } from '@/components/payment/PayMethodList';
 import { PaymePanel } from '@/components/payment/PaymePanel';
 import {
   openPaymeCheckout,
@@ -84,34 +85,12 @@ function formatMoney(value: number | null | undefined): string {
   }).format(value);
 }
 
-/** "6262********2994" → "6262 •••• 2994"; anything else is shown as given. */
-function formatMaskedCard(masked: string | null | undefined): string | null {
-  if (!masked) return null;
-  const head = /^\d{4}/.exec(masked)?.[0];
-  const tail = /\d{4}$/.exec(masked)?.[0];
-  return head && tail ? `${head} •••• ${tail}` : masked;
-}
-
 /** NBU's gateway minimum: a smaller debt is charged this much, the rest goes to the wallet. */
 const NBU_MIN_UZS = 1000;
 /** The smallest part the server takes (`make_payment.py`, "Minimum partial payment"). */
 const PARTIAL_MIN_UZS = 1000;
 /** Payme's order refuses a smaller debt (`payme_orders.MIN_AMOUNT`); there is no floor to raise it to. */
 const PAYME_MIN_UZS = 1000;
-
-/** One row of the «To'lov usuli» list and what the button under it does. */
-interface PayOption {
-  key: string;
-  icon: LucideIcon;
-  title: string;
-  hint: string;
-  /** Why the method cannot take the current wallet / amount choice; null when it can. */
-  blockedBy: string | null;
-  /** Guided-tour anchor carried by the row. */
-  tour?: 'pay-saved-card' | 'pay-wallet';
-  cta: string;
-  run: () => void;
-}
 
 /** Validate receipt file type */
 function isValidReceiptFile(file: File): boolean {
@@ -1534,68 +1513,12 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         )}
 
         {/* ---- How to pay: one list, the button under the sheet acts on it ---- */}
-        <fieldset data-tour="pay-methods" className="min-w-0">
-          <legend className="mb-2.5 text-[13px] font-extrabold text-mc-text">
-            {t('makePayment.methods.title')}
-          </legend>
-          <div className="space-y-2">
-            {payOptions.map((option) => {
-              const selected = option.key === selectedOption?.key;
-              const blocked = option.blockedBy !== null;
-              const Icon = option.icon;
-              return (
-                <label
-                  key={option.key}
-                  data-tour={option.tour}
-                  className={`flex min-h-16 items-center gap-3 rounded-mc-md border bg-mc-surface px-3 py-2.5
-                    outline-offset-2 outline-mc-brand/50 has-[:focus-visible]:outline-2
-                    transition-[transform,border-color] duration-150 ${
-                      blocked ? 'cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
-                    } ${selected ? 'border-mc-brand ring-1 ring-mc-brand' : 'border-mc-border'}`}
-                >
-                  <input
-                    type="radio"
-                    name="pay-method"
-                    value={option.key}
-                    checked={selected}
-                    disabled={blocked}
-                    onChange={() => setMethodKey(option.key)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-sm bg-mc-surface-2 ${
-                      blocked ? 'text-mc-text-3' : selected ? 'text-mc-text' : 'text-mc-text-2'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className={`block break-words text-[15px] font-bold leading-snug tabular-nums ${
-                        blocked ? 'text-mc-text-3' : 'text-mc-text'
-                      }`}
-                    >
-                      {option.title}
-                    </span>
-                    <span className="mt-0.5 block text-[12px] leading-snug text-mc-text-2">
-                      {option.blockedBy ?? option.hint}
-                    </span>
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className={`h-5 w-5 shrink-0 rounded-full transition-[border-width,border-color] duration-150 ${
-                      blocked
-                        ? 'border-2 border-transparent'
-                        : selected
-                          ? 'border-[6px] border-mc-brand'
-                          : 'border-2 border-mc-text-3/60'
-                    }`}
-                  />
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
+        <PayMethodList
+          options={payOptions}
+          selectedKey={selectedOption?.key}
+          onSelect={setMethodKey}
+          tour="pay-methods"
+        />
       </div>
     );
   };
@@ -2346,47 +2269,6 @@ function Fact({
       className="min-w-0 px-3 py-2.5 text-left transition-transform active:scale-[0.97]"
     >
       {content}
-    </button>
-  );
-}
-
-/** A full-width row with an iOS-style switch. */
-function SwitchRow({
-  label,
-  hint,
-  checked,
-  onToggle,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onToggle}
-      className="flex min-h-[52px] w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
-    >
-      <span className="min-w-0">
-        <span className="block text-[13px] font-semibold text-mc-text">{label}</span>
-        {hint && <span className="mt-0.5 block text-[12px] text-mc-text-2 tabular-nums">{hint}</span>}
-      </span>
-      <span
-        aria-hidden="true"
-        className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${
-          checked ? 'bg-mc-brand' : 'bg-mc-text-3/35'
-        }`}
-      >
-        {/* A white knob in both themes, like the bank card face. */}
-        <span
-          className={`absolute top-[2px] left-[2px] h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-transform duration-200 motion-reduce:transition-none ${
-            checked ? 'translate-x-[18px]' : ''
-          }`}
-        />
-      </span>
     </button>
   );
 }

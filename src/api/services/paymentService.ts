@@ -56,6 +56,9 @@ export interface FlightPaymentDetailsResponse {
 /** A card transfer request: pay exactly `amount` to the card before `expires_at`. */
 export interface CardIntent {
   id: number;
+  /** flight: a flight's debt; uzpost: an UzPost delivery fee. */
+  purpose: 'flight' | 'uzpost';
+  /** The flight; of a delivery fee, its flights, comma separated. */
   flight_name: string;
   payment_mode: 'full' | 'partial';
   /** found: the money came, an admin confirms. */
@@ -73,6 +76,8 @@ export interface CardIntent {
   card_last4: string;
   expires_at: string;
   server_time: string;
+  /** The UzPost request the approved money made (a delivery fee's). */
+  delivery_request_id: number | null;
 }
 
 export interface CardIntentRequest {
@@ -80,6 +85,14 @@ export interface CardIntentRequest {
   payment_mode: 'full' | 'partial';
   /** partial only, so'm */
   amount?: number;
+}
+
+/** A card transfer for an UzPost delivery fee: the whole fee, never the wallet. */
+export interface CardDeliveryIntentRequest {
+  flight_names: string[];
+  location_id: number;
+  phone_number?: string | null;
+  recipient_name?: string | null;
 }
 
 export interface WalletOnlyPaymentRequest {
@@ -225,6 +238,12 @@ export const paymentService = {
    */
   openCardIntent: async (data: CardIntentRequest): Promise<CardIntent> => {
     const response = await apiClient.post<CardIntent>(`${BASE}/card-intent`, data);
+    return response.data;
+  },
+
+  /** The delivery request is made, approved, only when the money is approved. */
+  openDeliveryCardIntent: async (data: CardDeliveryIntentRequest): Promise<CardIntent> => {
+    const response = await apiClient.post<CardIntent>(`${BASE}/card-intent/delivery`, data);
     return response.data;
   },
 

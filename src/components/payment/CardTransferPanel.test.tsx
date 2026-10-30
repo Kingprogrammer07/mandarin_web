@@ -9,13 +9,17 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import i18n from '@/i18n/config';
 import uz from '@/i18n/locales/uz.json';
-import type { CardIntent } from '@/api/services/paymentService';
+import type { CardDeliveryIntentRequest, CardIntent } from '@/api/services/paymentService';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/api/client', () => ({ apiClient: {}, apiClientFormData: {} }));
 vi.mock('@/utils/audioUtils', () => ({ playApplePaySound: vi.fn() }));
 vi.mock('@/api/services/paymentService', () => ({
-  paymentService: { openCardIntent: vi.fn(), getCardIntent: vi.fn() },
+  paymentService: {
+    openCardIntent: vi.fn(),
+    openDeliveryCardIntent: vi.fn(),
+    getCardIntent: vi.fn(),
+  },
 }));
 
 import { paymentService } from '@/api/services/paymentService';
@@ -28,6 +32,7 @@ function intent(overrides: Partial<CardIntent> = {}): CardIntent {
   const now = Date.parse('2026-10-30T12:00:00Z');
   return {
     id: 7,
+    purpose: 'flight',
     flight_name: 'M310',
     payment_mode: 'full',
     state: 'open',
@@ -41,29 +46,30 @@ function intent(overrides: Partial<CardIntent> = {}): CardIntent {
     card_last4: '5940',
     expires_at: new Date(now + 30 * 60_000).toISOString(),
     server_time: new Date(now).toISOString(),
+    delivery_request_id: null,
     ...overrides,
   };
 }
 
-function renderPanel(props: Partial<Parameters<typeof CardTransferPanel>[0]> = {}) {
+type Target =
+  | { flightName: string; paymentMode: 'full' | 'partial'; partAmount?: number }
+  | { delivery: CardDeliveryIntentRequest };
+
+function renderPanel(target: Target = { flightName: 'M310', paymentMode: 'full' }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const invalidate = vi.spyOn(client, 'invalidateQueries');
   const onBack = vi.fn();
   const onDone = vi.fn();
-  render(
+  const onPaid = vi.fn();
+  const panel = (shown: Target) => (
     <QueryClientProvider client={client}>
-      <CardTransferPanel
-        flightName="M310"
-        paymentMode="full"
-        onBack={onBack}
-        onDone={onDone}
-        {...props}
-      />
-    </QueryClientProvider>,
+      <CardTransferPanel {...shown} onBack={onBack} onDone={onDone} onPaid={onPaid} />
+    </QueryClientProvider>
   );
-  return { invalidate, onBack, onDone };
+  const { rerender } = render(panel(target));
+  return { invalidate, onBack, onDone, onPaid, rerender: (next: Target) => rerender(panel(next)) };
 }
 
 const digitsOnly = (value: string) => value.replace(/\s/g, '');
@@ -100,7 +106,7 @@ describe('CardTransferPanel', () => {
     const part = intent({ payment_mode: 'partial', pay_amount: 50000, offset: 12, amount: 50012 });
     service.openCardIntent.mockResolvedValue(part);
     service.getCardIntent.mockResolvedValue(part);
-    renderPanel({ paymentMode: 'partial', partAmount: 50000 });
+    renderPanel({ flightName: 'M310', paymentMode: 'partial', partAmount: 50000 });
 
     expect(await screen.findByText(text.restAfter)).toBeInTheDocument();
     expect(screen.getByText((content) => digitsOnly(content) === "289988so'm")).toBeInTheDocument();
@@ -146,5 +152,40 @@ describe('CardTransferPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: uz.makePayment.done }));
     expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  const delivery: CardDeliveryIntentRequest = {
+    flight_names: ['M45', 'M46'],
+    location_id: 117,
+    phone_number: '+998935550011',
+    recipient_name: null,
+  };
+  const fee = () =>
+    intent({ purpose: 'uzpost', flight_name: 'M45, M46', amount: 35037, debt: 35000, pay_amount: 35000 });
+
+  it('asks for an UzPost delivery fee whole, once per delivery', async () => {
+    service.openDeliveryCardIntent.mockResolvedValue(fee());
+    service.getCardIntent.mockResolvedValue(fee());
+    const { rerender } = renderPanel({ delivery });
+
+    expect(await screen.findByText(text.deliveryFee)).toBeInTheDocument();
+    expect(screen.getByText((content) => digitsOnly(content) === '35037')).toBeInTheDocument();
+    expect(service.openDeliveryCardIntent.mock.calls[0][0]).toEqual(delivery);
+    expect(service.openCardIntent).not.toHaveBeenCalled();
+    // The same delivery, rebuilt by a re-render of the page, is the same request.
+    rerender({ delivery: { ...delivery, flight_names: ['M45', 'M46'] } });
+    await waitFor(() => expect(service.getCardIntent).toHaveBeenCalled());
+    expect(service.openDeliveryCardIntent).toHaveBeenCalledOnce();
+  });
+
+  it('names the delivery request the approved money made', async () => {
+    service.openDeliveryCardIntent.mockResolvedValue(fee());
+    service.getCardIntent.mockResolvedValue({ ...fee(), state: 'paid', delivery_request_id: 91 });
+    const { onPaid } = renderPanel({ delivery });
+
+    expect(
+      await screen.findByText((content) => digitsOnly(content) === "35037so'mto'landi,#91zayavkatasdiqlandi."),
+    ).toBeInTheDocument();
+    expect(onPaid).toHaveBeenCalledOnce();
   });
 });

@@ -27,6 +27,8 @@ export interface CalculateUzpostResponse {
   warning: string | null;
   /** True when the price is an offline estimate (UzPost pricing API was down). */
   fallback?: boolean;
+  /** A card transfer goes through `openDeliveryCardIntent`; `card` is then null. */
+  card_intent_available?: boolean;
 }
 
 export interface DeliverySuccessResponse {

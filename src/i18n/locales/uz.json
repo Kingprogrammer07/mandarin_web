@@ -1410,6 +1410,8 @@
         "totalWeight": "Umumiy og'irlik",
         "totalAmount": "Jami summa",
         "walletPay": "Hamyondan to'lash",
+        "belowMin": "{{min}} so'mdan kam summaga bo'lmaydi",
+        "belowMinWallet": "Qoldiq {{min}} so'mdan kam: hamyonni o'chirib to'lang",
         "walletBalance": "Balans: {{balance}} so'm",
         "fromWallet": "Hamyondan",
         "remainingPayment": "Qoldiq to'lov",
@@ -2408,6 +2410,7 @@
     "copyFailed": "Nusxa olinmadi. Raqamni qo'lda yozing.",
     "exactWarn": "Summani yaxlitlamang: oxirgi raqamlar to'lov sizniki ekanini bildiradi.",
     "debt": "Qarz",
+    "deliveryFee": "Yetkazish to'lovi",
     "toWallet": "Balansingizga qaytadi",
     "restAfter": "To'lovdan keyin qoladi",
     "waiting": "O'tkazgach shu oynada kuting: pul kelishi bilan shu yerda ko'rinadi. Chek yuborish shart emas.",
@@ -2418,6 +2421,7 @@
     "foundWaiting": "Tasdiq kutilmoqda",
     "paidTitle": "To'lov qabul qilindi",
     "paidDesc": "{{flight}} reysi uchun {{amount}} so'm hisobingizga yozildi.",
+    "paidDeliveryDesc": "{{amount}} so'm to'landi, #{{request}} zayavka tasdiqlandi.",
     "paidToWallet": "Ortiqcha {{amount}} so'm balansingizga qo'shildi.",
     "expiredTitle": "Vaqt tugadi",
     "expiredDesc": "{{amount}} so'mni ***{{card}} kartaga o'tkazgan bo'lsangiz, kuting: pul kelgach shu yerda ko'rinadi. Hali o'tkazmagan bo'lsangiz, yangi summa oling.",
@@ -2432,7 +2436,9 @@
       "partial_not_allowed": "Bu reys uchun qisman to'lov mumkin emas.",
       "partial_too_small": "Qisman to'lov kamida 1 000 so'm.",
       "partial_too_big": "Bu summa qarzga teng yoki katta: to'liq to'lovni tanlang.",
-      "too_many": "So'rovlar juda ko'p. Birozdan keyin urinib ko'ring."
+      "too_many": "So'rovlar juda ko'p. Birozdan keyin urinib ko'ring.",
+      "request_pending": "Bu reyslar uchun zayavka ko'rib chiqilmoqda: uni kuting yoki bekor qilib qayta yuboring.",
+      "request_approved": "Bu reyslar uchun zayavka allaqachon tasdiqlangan."
     }
   }
 }

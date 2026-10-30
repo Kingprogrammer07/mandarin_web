@@ -1,8 +1,11 @@
 /**
- * Pay a flight by card transfer from the client's own bank app, no receipt.
+ * Pay a flight (or an UzPost delivery fee) by card transfer from the client's
+ * own bank app, no receipt.
  *
  * The server freezes the debt for 30 minutes and gives one of our cards and an
  * exact sum: the debt (or the part) plus 1–99 so'm that nobody else was given.
+ * A delivery fee is paid whole; its delivery request is made, approved, only
+ * when the money is approved.
  * The bank's notice names only the card and the sum, so that sum is what tells
  * whose money it is. A rounded sum cannot be matched and waits for an admin,
  * which is why the screen insists on the exact figure.
@@ -22,6 +25,7 @@ import { AlertCircle, Check, CheckCircle2, Clock, Copy, Loader2, type LucideIcon
 
 import {
   paymentService,
+  type CardDeliveryIntentRequest,
   type CardIntent,
   type CardIntentRequest,
 } from '@/api/services/paymentService';
@@ -207,34 +211,72 @@ const primaryButton =
 const secondaryButton =
   'flex h-12 w-full items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface text-[14px] font-bold text-mc-text transition-transform active:scale-[0.97]';
 
-interface CardTransferPanelProps {
-  flightName: string;
-  paymentMode: 'full' | 'partial';
-  /** The part to pay, so'm (partial only). */
-  partAmount?: number;
+/** What the request pays: a flight's debt (or its part), or a delivery fee. */
+type Target =
+  | { kind: 'flight'; body: CardIntentRequest }
+  | { kind: 'delivery'; body: CardDeliveryIntentRequest };
+
+function openTarget(target: Target): Promise<CardIntent> {
+  return target.kind === 'delivery'
+    ? paymentService.openDeliveryCardIntent(target.body)
+    : paymentService.openCardIntent(target.body);
+}
+
+interface CommonProps {
   /** Back to the choice of method. */
   onBack: () => void;
   /** Close the wizard once the payment is booked. */
   onDone: () => void;
+  /** Once, when the payment is booked. */
+  onPaid?: (intent: CardIntent) => void;
 }
+
+type CardTransferPanelProps = CommonProps &
+  (
+    | {
+        flightName: string;
+        paymentMode: 'full' | 'partial';
+        /** The part to pay, so'm (partial only). */
+        partAmount?: number;
+        delivery?: undefined;
+      }
+    | {
+        /** An UzPost delivery fee: the delivery request the money makes. */
+        delivery: CardDeliveryIntentRequest;
+        flightName?: undefined;
+        paymentMode?: undefined;
+        partAmount?: undefined;
+      }
+  );
 
 export function CardTransferPanel({
   flightName,
   paymentMode,
   partAmount,
+  delivery,
   onBack,
   onDone,
+  onPaid,
 }: CardTransferPanelProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const request = useMemo<CardIntentRequest>(
-    () => ({
-      flight_name: flightName,
-      payment_mode: paymentMode,
-      ...(paymentMode === 'partial' && partAmount ? { amount: partAmount } : {}),
-    }),
-    [flightName, paymentMode, partAmount],
+  // By value: a parent re-render that rebuilds the same delivery must not open
+  // another request.
+  const deliveryKey = delivery ? JSON.stringify(delivery) : null;
+  const target = useMemo<Target>(
+    () =>
+      deliveryKey
+        ? { kind: 'delivery', body: JSON.parse(deliveryKey) as CardDeliveryIntentRequest }
+        : {
+            kind: 'flight',
+            body: {
+              flight_name: flightName ?? '',
+              payment_mode: paymentMode ?? 'full',
+              ...(paymentMode === 'partial' && partAmount ? { amount: partAmount } : {}),
+            },
+          },
+    [deliveryKey, flightName, paymentMode, partAmount],
   );
 
   const {
@@ -243,11 +285,11 @@ export function CardTransferPanel({
     error: refused,
     isPending: opening,
     submittedAt,
-  } = useMutation({ mutationFn: paymentService.openCardIntent });
+  } = useMutation({ mutationFn: openTarget });
 
   useEffect(() => {
-    openIntent(request);
-  }, [openIntent, request]);
+    openIntent(target);
+  }, [openIntent, target]);
 
   const intentId = opened?.id;
   const poll = useQuery({
@@ -281,8 +323,9 @@ export function CardTransferPanel({
       queryClient.invalidateQueries({ queryKey: ['payment-flight-details'] });
       queryClient.invalidateQueries({ queryKey: ['payment-history'] });
       queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
+      onPaid?.(intent);
     }
-  }, [intent, queryClient]);
+  }, [intent, queryClient, onPaid]);
 
   if (refused && !opening) {
     return (
@@ -307,6 +350,7 @@ export function CardTransferPanel({
   }
 
   const full = intent.payment_mode === 'full';
+  const forDelivery = intent.purpose === 'uzpost';
   // Full: the sum is over the debt by the added so'm, which go to the balance.
   const toWallet = Math.max(0, Math.round((intent.amount - intent.debt) * 100) / 100);
   const restAfter = Math.max(0, Math.round((intent.debt - intent.amount) * 100) / 100);
@@ -315,7 +359,12 @@ export function CardTransferPanel({
     return (
       <StatusBlock tone="success" icon={CheckCircle2} title={t('cardTransfer.paidTitle')}>
         <p className="max-w-[280px] text-[13px] font-medium leading-relaxed text-mc-text-2">
-          {t('cardTransfer.paidDesc', { amount: formatSom(intent.amount), flight: intent.flight_name })}
+          {forDelivery && intent.delivery_request_id
+            ? t('cardTransfer.paidDeliveryDesc', {
+                amount: formatSom(intent.amount),
+                request: intent.delivery_request_id,
+              })
+            : t('cardTransfer.paidDesc', { amount: formatSom(intent.amount), flight: intent.flight_name })}
         </p>
         {full && toWallet > 0 && (
           <p className="rounded-mc-md bg-mc-success/12 px-3 py-2 text-[12px] font-semibold text-mc-text">
@@ -357,7 +406,7 @@ export function CardTransferPanel({
         <div className="flex w-full max-w-xs flex-col gap-2.5">
           <button
             type="button"
-            onClick={() => openIntent(request)}
+            onClick={() => openIntent(target)}
             disabled={opening}
             className={primaryButton}
           >
@@ -422,7 +471,10 @@ export function CardTransferPanel({
       </div>
 
       <dl className="space-y-2 rounded-mc-md border border-mc-border px-3.5 py-3 text-[13px]">
-        <Row label={t('cardTransfer.debt')} value={`${formatSom(intent.debt)} so'm`} />
+        <Row
+          label={forDelivery ? t('cardTransfer.deliveryFee') : t('cardTransfer.debt')}
+          value={`${formatSom(intent.debt)} so'm`}
+        />
         {full ? (
           <Row
             label={t('cardTransfer.toWallet')}
@@ -443,6 +495,10 @@ export function CardTransferPanel({
         </span>
         {t('cardTransfer.waiting')}
       </p>
+
+      <button type="button" onClick={onBack} className={secondaryButton}>
+        {t('cardTransfer.otherMethod')}
+      </button>
     </div>
   );
 }

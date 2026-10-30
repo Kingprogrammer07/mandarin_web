@@ -43,7 +43,7 @@ export function RecipientNameField({
         <button
           type="button"
           onClick={() => onChange(isOverridden ? null : profileName)}
-          className="flex min-h-[32px] items-center gap-1 text-[11px] font-bold text-mc-brand active:scale-95"
+          className="-my-1.5 flex min-h-11 items-center gap-1 text-[11px] font-bold text-mc-brand active:scale-95"
         >
           <Pencil className="h-3 w-3" strokeWidth={2.4} aria-hidden="true" />
           {isOverridden
