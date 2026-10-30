@@ -60,6 +60,7 @@ import { useGuideTour } from '@/hooks/useGuideTour';
 import { pickVisible } from '@/utils/tour';
 import type { DriveStep } from 'driver.js';
 import { AstatkaShelfNote } from '@/components/user/AstatkaShelfNote';
+import { CardTransferPanel } from '@/components/payment/CardTransferPanel';
 
 // ============================================================================
 // Helpers
@@ -293,7 +294,7 @@ interface MakePaymentModalProps {
   preselectedFlightName?: string | null;
 }
 
-type PaymentMethod = 'online' | 'cash' | 'wallet';
+type PaymentMethod = 'online' | 'cash' | 'wallet' | 'card';
 type WizardStep = 0 | 1 | 2;
 
 const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymentModalProps) => {
@@ -1121,6 +1122,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     // neither exists, only cash remains (NBU still shows when enabled).
     const hasManualOnline =
       !!details.card_number || (details.payment_links?.length ?? 0) > 0;
+    // Card transfer by request: an exact sum, no receipt. Offered while the
+    // server can give a card; a bank transfer cannot take the wallet's part.
+    const hasCardTransfer = details.card_intent_available === true;
+    const methodCount = 1 + (hasManualOnline ? 1 : 0) + (hasCardTransfer ? 1 : 0);
 
     return (
       <div className="space-y-5">
@@ -1584,8 +1589,48 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             whenever the flight has an active card or payment link. If neither
             exists, only cash remains here (NBU button above still shows when
             enabled). */}
-        <div data-tour="pay-methods" className={`grid gap-3 ${hasManualOnline ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-          {hasManualOnline && (
+        <div data-tour="pay-methods" className={`grid gap-3 ${methodCount > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          {hasCardTransfer && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { if (!useWallet) handleChooseMethod('card'); }}
+              disabled={useWallet}
+              aria-disabled={useWallet}
+              className="h-16 rounded-mc-lg font-extrabold text-[16px]
+                bg-gradient-to-r from-mc-brand to-mc-brand-strong
+                text-mc-on-brand shadow-[var(--mc-shadow-cta)]
+                active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
+                disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <CreditCard className="w-5 h-5" />
+              <span className="flex flex-col items-start leading-tight">
+                <span>{t('cardTransfer.payCard')}</span>
+                <span className="text-[11px] font-semibold opacity-80">
+                  {useWallet ? t('cardTransfer.payCardNoWallet') : t('cardTransfer.payCardHint')}
+                </span>
+              </span>
+            </motion.button>
+          )}
+
+          {hasManualOnline && (hasCardTransfer ? (
+            // Links only (the card is given by request above): one filled
+            // button per row of methods keeps the recommended one obvious.
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => handleChooseMethod('online')}
+              className="h-16 rounded-mc-lg font-extrabold text-[16px]
+                bg-mc-surface text-mc-text border border-mc-border shadow-sm
+                active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
+            >
+              <ExternalLink className="w-5 h-5" />
+              <span className="flex flex-col items-start leading-tight">
+                <span>{t('makePayment.payOnline')}</span>
+                <span className="text-[11px] font-semibold opacity-70">
+                  {t('cardTransfer.linksHint')}
+                </span>
+              </span>
+            </motion.button>
+          ) : (
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => handleChooseMethod('online')}
@@ -1597,7 +1642,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               <CreditCard className="w-5 h-5" />
               {t('makePayment.payOnline')}
             </motion.button>
-          )}
+          ))}
 
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -1608,7 +1653,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               `h-16 rounded-mc-lg font-extrabold text-[16px]
               bg-mc-surface text-mc-text border border-mc-border shadow-sm
               active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
-              disabled:opacity-60 disabled:cursor-not-allowed`
+              disabled:opacity-60 disabled:cursor-not-allowed
+              ${methodCount === 3 ? 'sm:col-span-2' : ''}`
             }
           >
             <Banknote className="w-5 h-5" />
@@ -1764,6 +1810,19 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       );
     }
 
+    // ---- Card transfer by request ----
+    if (paymentMethod === 'card' && selectedFlightName) {
+      return (
+        <CardTransferPanel
+          flightName={selectedFlightName}
+          paymentMode={isPartial ? 'partial' : 'full'}
+          partAmount={isPartial ? effectiveAmount : undefined}
+          onBack={goBack}
+          onDone={handleClose}
+        />
+      );
+    }
+
     // ---- Online Payment — Card + Links + Upload ----
     if (paymentMethod === 'online') {
       const hasCard = !!details?.card_number;
@@ -1805,8 +1864,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 
           {/* Card info */}
           {hasCard && (
-            <div className="rounded-mc-lg p-4 bg-mc-surface-2 border border-mc-border">
-              <p className="text-xs font-medium text-mc-text-3 mb-1">
+            <div className="rounded-mc-lg p-4 bg-mc-cardface">
+              <p className="text-xs font-medium text-white/55 mb-1">
                 {t('makePayment.transferTo')}
               </p>
               <div className="flex items-center justify-between">
@@ -1826,7 +1885,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 </button>
               </div>
               {details!.card_owner && (
-                <p className="text-xs text-mc-text-3 mt-1.5">
+                <p className="text-xs text-white/60 mt-1.5">
                   {t('makePayment.cardOwner')}: {details!.card_owner}
                 </p>
               )}

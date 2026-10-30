@@ -2350,5 +2350,46 @@
         "nbu": "onlayn"
       }
     }
+  },
+  "cardTransfer": {
+    "payCard": "Kartaga o'tkazma",
+    "payCardHint": "Aniq summa · chek shart emas",
+    "payCardNoWallet": "Balans bilan birga bo'lmaydi",
+    "linksHint": "To'lov ilovasi orqali, chek bilan",
+    "title": "Kartaga o'tkazing",
+    "timeLeft": "Qolgan vaqt",
+    "timeUp": "Vaqt tugadi",
+    "cardNumber": "Karta raqami",
+    "amountLabel": "Aynan shu summani o'tkazing",
+    "copyAmount": "Summadan nusxa olish",
+    "copyFailed": "Nusxa olinmadi. Raqamni qo'lda yozing.",
+    "exactWarn": "Summani yaxlitlamang: oxirgi raqamlar to'lov sizniki ekanini bildiradi.",
+    "debt": "Qarz",
+    "toWallet": "Balansingizga qaytadi",
+    "restAfter": "To'lovdan keyin qoladi",
+    "waiting": "O'tkazgach shu oynada kuting: pul kelishi bilan shu yerda ko'rinadi. Chek yuborish shart emas.",
+    "receiptAsked": "Kartaga boshqa summa keldi. Uni siz o'tkazgan bo'lsangiz, Telegram'dagi botimizga to'lov chekini yuboring.",
+    "receiptSent": "Chekingiz adminlarga yuborildi. Tekshirilgach xabar beramiz.",
+    "foundTitle": "Pul keldi",
+    "foundDesc": "Admin tasdiqlamoqda. Tasdiqlangach shu yerda va Telegram'da xabar olasiz.",
+    "foundWaiting": "Tasdiq kutilmoqda",
+    "paidTitle": "To'lov qabul qilindi",
+    "paidDesc": "{{flight}} reysi uchun {{amount}} so'm hisobingizga yozildi.",
+    "paidToWallet": "Ortiqcha {{amount}} so'm balansingizga qo'shildi.",
+    "expiredTitle": "Vaqt tugadi",
+    "expiredDesc": "{{amount}} so'mni ***{{card}} kartaga o'tkazgan bo'lsangiz, kuting: pul kelgach shu yerda ko'rinadi. Hali o'tkazmagan bo'lsangiz, yangi summa oling.",
+    "newRequest": "Yangi summa olish",
+    "otherMethod": "Boshqa usulni tanlash",
+    "opening": "Karta tayyorlanmoqda…",
+    "errors": {
+      "no_card": "Hozir kartaga o'tkazma bilan to'lab bo'lmaydi. Boshqa usulni tanlang.",
+      "paid": "Bu reys to'langan.",
+      "cash_desk": "Bu reys kassada ko'rilgan: kartaga o'tkazma bilan to'lab bo'lmaydi. Boshqa usulni tanlang.",
+      "nothing_owed": "Bu reys bo'yicha qarz yo'q.",
+      "partial_not_allowed": "Bu reys uchun qisman to'lov mumkin emas.",
+      "partial_too_small": "Qisman to'lov kamida 1 000 so'm.",
+      "partial_too_big": "Bu summa qarzga teng yoki katta: to'liq to'lovni tanlang.",
+      "too_many": "So'rovlar juda ko'p. Birozdan keyin urinib ko'ring."
+    }
   }
 }

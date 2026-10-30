@@ -49,6 +49,37 @@ export interface FlightPaymentDetailsResponse {
   card_owner: string | null;
   cargo_prices: CargoPriceItem[];
   payment_links: PaymentLinkItem[];
+  /** A card transfer goes through `openCardIntent`; `card_number` is then null. */
+  card_intent_available?: boolean;
+}
+
+/** A card transfer request: pay exactly `amount` to the card before `expires_at`. */
+export interface CardIntent {
+  id: number;
+  flight_name: string;
+  payment_mode: 'full' | 'partial';
+  /** found: the money came, an admin confirms. */
+  state: 'open' | 'found' | 'expired' | 'paid';
+  /** asked: a transfer of another sum came and the bot asked for its receipt. */
+  receipt: 'asked' | 'sent' | null;
+  amount: number;
+  debt: number;
+  pay_amount: number;
+  /** The so'm added to `pay_amount` so the sum names this request. */
+  offset: number;
+  /** Only while the request is open. */
+  card_number: string | null;
+  card_owner: string | null;
+  card_last4: string;
+  expires_at: string;
+  server_time: string;
+}
+
+export interface CardIntentRequest {
+  flight_name: string;
+  payment_mode: 'full' | 'partial';
+  /** partial only, so'm */
+  amount?: number;
 }
 
 export interface WalletOnlyPaymentRequest {
@@ -185,6 +216,20 @@ export const paymentService = {
       `${BASE}/submit/online`,
       formData,
     );
+    return response.data;
+  },
+
+  /**
+   * Open a card transfer request, or get the one still open for this flight.
+   * Refusals carry `detail = {code, message}`.
+   */
+  openCardIntent: async (data: CardIntentRequest): Promise<CardIntent> => {
+    const response = await apiClient.post<CardIntent>(`${BASE}/card-intent`, data);
+    return response.data;
+  },
+
+  getCardIntent: async (id: number): Promise<CardIntent> => {
+    const response = await apiClient.get<CardIntent>(`${BASE}/card-intent/${id}`);
     return response.data;
   },
 
