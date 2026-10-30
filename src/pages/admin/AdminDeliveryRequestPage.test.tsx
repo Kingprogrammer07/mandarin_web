@@ -56,6 +56,8 @@ vi.mock("@/components/admin/delivery/UzpostDeliveryForm", () => ({
     </button>
   ),
 }));
+// Its suggestions query needs the API client; BTS is not under test here.
+vi.mock("@/components/admin/delivery/BtsBranchSelect", () => ({ default: () => null }));
 vi.mock("@/components/delivery/DeliveryMapPickerLazy", () => ({
   DeliveryMapPickerLazy: ({
     onConfirm,

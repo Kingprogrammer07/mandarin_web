@@ -193,6 +193,23 @@ export interface BranchSuggestionResponse {
  * Chilonzor — so the picker can lead with the few offices there instead of
  * 231 in catalogue order.
  */
+/** BTS offices near the client's code district: codes into bts_branches.json. */
+export interface BtsBranchSuggestionResponse {
+  client_code: string;
+  district: string | null;
+  match_level: "district" | "region" | "none";
+  codes: string[];
+}
+
+export async function getBtsBranchSuggestions(
+  clientCode: string,
+): Promise<BtsBranchSuggestionResponse> {
+  const response = await apiClient.get<BtsBranchSuggestionResponse>(
+    `/api/v1/admin/delivery-requests/bts-branch-suggestions/${encodeURIComponent(clientCode)}`,
+  );
+  return response.data;
+}
+
 export async function getBranchSuggestions(
   clientCode: string,
 ): Promise<BranchSuggestionResponse> {

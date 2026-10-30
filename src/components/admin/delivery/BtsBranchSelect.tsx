@@ -1,21 +1,47 @@
 import { useMemo, useState } from "react";
-import { MapPin, Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { MapPin, Search, Sparkles } from "lucide-react";
+import { getBtsBranchSuggestions } from "@/api/services/adminDeliveryService";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBtsBranches, type BtsBranch } from "@/hooks/useBtsBranches";
 
 // 398 offices; a search narrows it long before scrolling matters.
 const MAX_ROWS = 60;
+/** Tashkent city alone has 88 offices; a region-wide list is cut to a shortcut. */
+const MAX_SUGGESTED = 8;
 
 interface BtsBranchSelectProps {
   selected: BtsBranch | null;
   onChange: (branch: BtsBranch | null) => void;
+  /** Suggests the offices of the district the client's code was issued for. */
+  clientCode?: string | null;
 }
 
 /** BTS office for the parcel: the "Qayerga" line of the printed blank. */
-export default function BtsBranchSelect({ selected, onChange }: BtsBranchSelectProps) {
+export default function BtsBranchSelect({
+  selected,
+  onChange,
+  clientCode = null,
+}: BtsBranchSelectProps) {
   const [query, setQuery] = useState("");
   const { data: branches, isLoading, isError, refetch } = useBtsBranches();
+
+  // Same idea as the UzPost picker: the code names the district, so its
+  // offices lead. A shortcut above the catalogue, never a filter.
+  const { data: suggestions, isLoading: suggestionsLoading } = useQuery({
+    queryKey: ["admin-bts-branch-suggestions", clientCode],
+    queryFn: () => getBtsBranchSuggestions(clientCode as string),
+    enabled: Boolean(clientCode),
+    staleTime: 5 * 60_000,
+  });
+  const suggested = useMemo(() => {
+    if (!branches || !suggestions?.codes.length || query.trim()) return [];
+    const byCode = new Map(branches.map((branch) => [branch.index, branch]));
+    return suggestions.codes
+      .map((code) => byCode.get(code))
+      .filter((branch): branch is BtsBranch => Boolean(branch));
+  }, [branches, suggestions, query]);
 
   const filtered = useMemo(() => {
     const all = branches ?? [];
@@ -78,6 +104,48 @@ export default function BtsBranchSelect({ selected, onChange }: BtsBranchSelectP
             >
               BTS filiallarini yuklab bo'lmadi — qayta urinish
             </button>
+          )}
+
+          {suggestionsLoading && clientCode && !query.trim() && (
+            <p className="py-1.5 text-[12px] text-gray-400">Mijoz kodiga mos filiallar qidirilmoqda…</p>
+          )}
+
+          {suggested.length > 0 && suggestions && (
+            <div className="space-y-1 rounded-xl border border-orange-200 bg-orange-50/60 p-2 dark:border-orange-500/25 dark:bg-orange-500/[0.07]">
+              <p className="flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-orange-700 dark:text-orange-400">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                {suggestions.match_level === "district"
+                  ? `Mijoz kodiga ko'ra — ${suggestions.district}`
+                  : suggestions.district
+                    ? `${suggestions.district} da filial yo'q — viloyat bo'yicha`
+                    : "Mijoz kodiga ko'ra — viloyat filiallari"}
+              </p>
+              {suggestions.match_level === "region" && (
+                <p className="px-1 text-[10px] text-orange-700/70 dark:text-orange-400/70">
+                  Kodda tuman ko'rsatilmagan — tekshirib tanlang.
+                </p>
+              )}
+              {suggested.slice(0, MAX_SUGGESTED).map((branch) => (
+                <button
+                  key={`suggested-${branch.index}`}
+                  type="button"
+                  onClick={() => onChange(branch)}
+                  className="w-full rounded-lg border border-transparent bg-white/70 px-3 py-2 text-left text-sm transition-colors hover:border-orange-300 dark:bg-white/[0.04]"
+                >
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="font-mono text-gray-500">{branch.index}</span> · {branch.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {branch.address}
+                  </p>
+                </button>
+              ))}
+              {suggested.length > MAX_SUGGESTED && (
+                <p className="px-1 pt-0.5 text-[11px] text-orange-700/80 dark:text-orange-400/80">
+                  Yana {suggested.length - MAX_SUGGESTED} ta — qidiruvda tuman yoki nomini yozing
+                </p>
+              )}
+            </div>
           )}
 
           {branches && (

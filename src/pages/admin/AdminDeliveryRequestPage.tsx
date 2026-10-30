@@ -711,6 +711,7 @@ export default function AdminDeliveryRequestPage() {
                       isBts={deliveryType === "bts"}
                       btsBranch={btsBranch}
                       onBtsBranchChange={setBtsBranch}
+                      clientCode={selectedClient.client_code}
                     />
                   )}
 

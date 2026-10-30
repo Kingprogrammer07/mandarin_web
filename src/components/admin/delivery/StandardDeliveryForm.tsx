@@ -16,6 +16,8 @@ interface StandardDeliveryFormProps {
   isBts?: boolean;
   btsBranch?: BtsBranch | null;
   onBtsBranchChange?: (branch: BtsBranch | null) => void;
+  /** Whose request this is: the BTS picker suggests offices from the code. */
+  clientCode?: string | null;
 }
 
 /** Courier details for self_pickup, yandex, mandarin and bts. The recipient's
@@ -29,13 +31,18 @@ export default function StandardDeliveryForm({
   isBts = false,
   btsBranch = null,
   onBtsBranchChange,
+  clientCode = null,
 }: StandardDeliveryFormProps) {
   const { t } = useTranslation();
 
   return (
     <div className="space-y-5">
       {isBts && onBtsBranchChange && (
-        <BtsBranchSelect selected={btsBranch} onChange={onBtsBranchChange} />
+        <BtsBranchSelect
+          selected={btsBranch}
+          onChange={onBtsBranchChange}
+          clientCode={clientCode}
+        />
       )}
 
       <div className="space-y-2">
