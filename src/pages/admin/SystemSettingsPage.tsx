@@ -16,6 +16,7 @@ import ButtonIconsSection from '@/components/admin/ButtonIconsSection';
 import MessageEmojiSection from '@/components/admin/MessageEmojiSection';
 import DailyReportSection from '@/components/admin/DailyReportSection';
 import PaymeClickAutoApproveSection from '@/components/admin/PaymeClickAutoApproveSection';
+import CardTransferAutoApproveSection from '@/components/admin/CardTransferAutoApproveSection';
 import PartnerWebhooksSection from '@/components/admin/PartnerWebhooksSection';
 import {
   Wrench,
@@ -602,6 +603,9 @@ export default function SystemSettingsPage() {
 
       {/* The bot's own approval of clear Payme / Click receipts */}
       <PaymeClickAutoApproveSection />
+
+      {/* The bot's own booking of clear card transfers (CardXabar credits) */}
+      <CardTransferAutoApproveSection />
       </>
       )}
 
