@@ -1824,9 +1824,26 @@
     "noReadyFlights": "Нет рейсов с готовым отчётом",
     "noReadyFlightsHint": "Рейсы без отчёта — в архиве",
     "payCashHint": "Наличными в офисе — подтвердит администратор",
-    "belowNbuMinimum": "Минимальная сумма онлайн-оплаты НБУ — {{min}} сум",
-    "belowNbuMinimumBody": "Ваш долг {{debt}} сум, поэтому будет списано {{min}} сум.",
-    "belowNbuMinimumSurplus": "Излишек {{surplus}} сум поступит в ваш кошелёк и будет использован при следующей оплате."
+    "variousPrices": "Разные",
+    "methods": {
+      "title": "Способ оплаты",
+      "savedCardHint": "Сохранённая карта, в один клик",
+      "nbuTitle": "Банковская карта",
+      "nbuOtherCard": "Другая карта",
+      "nbuHint": "Оплата на странице банка",
+      "onlineHintLinks": "Через {{names}}, с чеком",
+      "onlineHintCardLinks": "На карту или через {{names}}, с чеком",
+      "onlineHintCard": "Переводом на карту, с чеком",
+      "cashTitle": "Наличные",
+      "cashHint": "В офисе, подтвердит администратор",
+      "walletHint": "Ваш баланс: {{amount}} сум",
+      "fullOnly": "Только на всю сумму",
+      "cashNoPartial": "Нельзя с другой суммой",
+      "payAmount": "Оплатить {{amount}} сум",
+      "continue": "Продолжить",
+      "choose": "Выберите способ оплаты",
+      "nbuFloorHint": "Спишется {{min}} сум, излишек {{surplus}} сум поступит на ваш баланс"
+    }
   },
   "adminDeliveryRequest": {
     "title": "Заявка на доставку",

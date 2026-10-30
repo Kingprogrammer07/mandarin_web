@@ -1824,9 +1824,26 @@
     "noReadyFlights": "Hisoboti tayyor reys yo'q",
     "noReadyFlightsHint": "Hisobot yuborilmagan reyslar arxivda",
     "payCashHint": "Ofisga kelib naqd — admin tasdiqlaydi",
-    "belowNbuMinimum": "NBU minimal onlayn to‘lovi — {{min}} so‘m",
-    "belowNbuMinimumBody": "Qarzingiz {{debt}} so‘m, shuning uchun {{min}} so‘m yechiladi.",
-    "belowNbuMinimumSurplus": "Ortiqcha {{surplus}} so‘m hamyoningizga tushadi va keyingi to‘lovda ishlatiladi."
+    "variousPrices": "Turli",
+    "methods": {
+      "title": "To'lov usuli",
+      "savedCardHint": "Saqlangan karta, bir bosishda",
+      "nbuTitle": "Bank kartasi",
+      "nbuOtherCard": "Boshqa karta",
+      "nbuHint": "Bank sahifasida to'laysiz (sahifa ruscha)",
+      "onlineHintLinks": "{{names}} orqali, chek bilan",
+      "onlineHintCardLinks": "Kartaga yoki {{names}} orqali, chek bilan",
+      "onlineHintCard": "Kartaga o'tkazib, chek bilan",
+      "cashTitle": "Naqd",
+      "cashHint": "Ofisda to'laysiz, admin tasdiqlaydi",
+      "walletHint": "Balansingiz: {{amount}} so'm",
+      "fullOnly": "Faqat to'liq summaga",
+      "cashNoPartial": "Boshqa summa bilan bo'lmaydi",
+      "payAmount": "{{amount}} so'm to'lash",
+      "continue": "Davom etish",
+      "choose": "To'lov usulini tanlang",
+      "nbuFloorHint": "{{min}} so'm yechiladi, ortiqcha {{surplus}} so'm balansingizga tushadi"
+    }
   },
   "adminDeliveryRequest": {
     "title": "Yetkazib berish zayavkasi",

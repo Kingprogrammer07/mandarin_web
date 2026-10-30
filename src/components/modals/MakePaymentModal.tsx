@@ -33,14 +33,15 @@ import {
   CheckCircle2,
   Loader2,
   Package,
-  Scale,
   ArrowDownToLine,
-  CircleDollarSign,
   ChevronDown,
-  WalletCards,
   Search,
   ExternalLink,
   Archive,
+  Landmark,
+  ArrowRightLeft,
+  Smartphone,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   paymentService,
@@ -73,6 +74,33 @@ function formatMoney(value: number | null | undefined): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+/** "6262********2994" → "6262 •••• 2994"; anything else is shown as given. */
+function formatMaskedCard(masked: string | null | undefined): string | null {
+  if (!masked) return null;
+  const head = /^\d{4}/.exec(masked)?.[0];
+  const tail = /\d{4}$/.exec(masked)?.[0];
+  return head && tail ? `${head} •••• ${tail}` : masked;
+}
+
+/** NBU's gateway minimum: a smaller debt is charged this much, the rest goes to the wallet. */
+const NBU_MIN_UZS = 1000;
+/** The smallest part the server takes (`make_payment.py`, "Minimum partial payment"). */
+const PARTIAL_MIN_UZS = 1000;
+
+/** One row of the «To'lov usuli» list and what the button under it does. */
+interface PayOption {
+  key: string;
+  icon: LucideIcon;
+  title: string;
+  hint: string;
+  /** Why the method cannot take the current wallet / amount choice; null when it can. */
+  blockedBy: string | null;
+  /** Guided-tour anchor carried by the row. */
+  tour?: 'pay-saved-card' | 'pay-wallet';
+  cta: string;
+  run: () => void;
 }
 
 /** Validate receipt file type */
@@ -167,20 +195,20 @@ const FlightSkeleton = () => (
   </div>
 );
 
-/** Detail skeleton */
+/** Details skeleton: the final layout in flat bars, so nothing jumps when it loads. */
 const DetailSkeleton = () => (
-  <div className="animate-pulse space-y-4 p-1">
-    <div className="h-14 bg-mc-surface-2 rounded-mc-lg" />
-    <div className="space-y-3">
+  <div className="animate-pulse space-y-5" aria-hidden="true">
+    <div>
+      <div className="h-3.5 w-20 rounded-mc-sm bg-mc-surface-2" />
+      <div className="mt-2 h-8 w-40 rounded-mc-sm bg-mc-surface-2" />
+      <div className="mt-4 h-[54px] rounded-mc-md bg-mc-surface-2" />
+    </div>
+    <div className="space-y-2">
+      <div className="h-3.5 w-24 rounded-mc-sm bg-mc-surface-2" />
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="flex justify-between">
-          <div className="h-4 w-24 bg-mc-surface-2 rounded" />
-          <div className="h-4 w-20 bg-mc-surface-2 rounded" />
-        </div>
+        <div key={i} className="h-16 rounded-mc-md bg-mc-surface-2" />
       ))}
     </div>
-    <div className="h-14 bg-mc-surface-2 rounded-mc-lg" />
-    <div className="h-14 bg-mc-surface-2 rounded-mc-lg" />
   </div>
 );
 
@@ -309,6 +337,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   // hidden from the main list and revealed only when the user opens the archive.
   const [showArchive, setShowArchive] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  // The row picked in «To'lov usuli»; `selectedOption` falls back to the first
+  // usable row when this one is blocked by the wallet / amount choice.
+  const [methodKey, setMethodKey] = useState<string | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [isPartial, setIsPartial] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
@@ -370,6 +401,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setSelectedFlightName(null);
     setShowArchive(false);
     setPaymentMethod(null);
+    setMethodKey(null);
     setUseWallet(false);
     setIsPartial(false);
     setCustomAmount('');
@@ -466,7 +498,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
         description: t('tour.payment.wallet.desc'),
       },
     },
-  ], [t]);
+    // The wallet row is not drawn while the balance is empty.
+  ].filter((tourStep) => typeof tourStep.element !== 'string' || !!document.querySelector(tourStep.element)), [t]);
   useGuideTour(
     'payment',
     buildPaymentTour,
@@ -605,37 +638,41 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     return payableAmount;
   }, [isPartial, customAmount, payableAmount]);
 
+  // A wallet that covers the whole debt is a method of its own («Balansdan
+  // to'lash»), so the switch is offered only for a part of the debt.
+  const walletCoversAll =
+    !!details && payableAmount > 0 && details.wallet_balance >= payableAmount;
+  const hasWalletSwitch = !!details && details.wallet_balance > 0 && !walletCoversAll;
+  const walletOn = useWallet && hasWalletSwitch;
+
   const walletDeduction = useMemo(() => {
-    if (!useWallet || !details) return 0;
+    if (!walletOn || !details) return 0;
     return Math.min(details.wallet_balance, effectiveAmount);
-  }, [useWallet, details, effectiveAmount]);
+  }, [walletOn, details, effectiveAmount]);
 
   const finalPayable = useMemo(
     () => Math.max(effectiveAmount - walletDeduction, 0),
     [effectiveAmount, walletDeduction],
   );
 
-  // NBU's gateway minimum (100000 tiyin). Below it the charge is rejected
-  // server-side, so the online button is disabled with an explanation instead.
-  const NBU_MIN_UZS = 1000;
-  const isBelowNbuMinimum = finalPayable > 0 && finalPayable < NBU_MIN_UZS;
+  // The same limits the hint under the field quotes; an empty field is not a part.
+  const partialValid =
+    !isPartial ||
+    (customAmount !== '' &&
+      effectiveAmount >= PARTIAL_MIN_UZS &&
+      effectiveAmount <= payableAmount);
 
-  /**
-   * The three figures the notice quotes, formatted once.
-   *
-   * Kept together so the sum shown always adds up: the same `finalPayable`
-   * feeds the debt and the surplus, and the server derives the identical split
-   * from its own recalculation (`_raise_to_nbu_minimum`). Rounding here is
-   * display-only — the charge itself is computed server-side in tiyin.
-   */
-  const nbuMinimumParts = useMemo(() => {
-    const debt = Math.round(finalPayable);
-    return {
-      min: NBU_MIN_UZS.toLocaleString('uz-UZ'),
-      debt: debt.toLocaleString('uz-UZ'),
-      surplus: Math.max(NBU_MIN_UZS - debt, 0).toLocaleString('uz-UZ'),
-    };
-  }, [finalPayable]);
+  // NBU (saved card or the bank page) always charges the whole debt and never
+  // the wallet (`payments_nbu.py`), so it is not offered with either choice.
+  const nbuBlockedBy = walletOn
+    ? t('cardTransfer.payCardNoWallet')
+    : isPartial
+      ? t('makePayment.methods.fullOnly')
+      : null;
+  // Below NBU's floor the floor is charged and the difference goes to the
+  // wallet; the server makes the same split in tiyin (`_raise_to_nbu_minimum`).
+  const nbuCharge = Math.max(payableAmount, NBU_MIN_UZS);
+  const isBelowNbuMinimum = payableAmount > 0 && payableAmount < NBU_MIN_UZS;
 
   // Required with an online receipt: the server compares them with the
   // Payme / Click payment's card. The reminder shows once a receipt is chosen
@@ -698,6 +735,11 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const handleSelectFlight = useCallback(
     (flight: AvailableFlightItem) => {
       setSelectedFlightName(flight.flight_name);
+      // The wallet part, the custom sum and the method belong to one flight.
+      setUseWallet(false);
+      setIsPartial(false);
+      setCustomAmount('');
+      setMethodKey(null);
       goNext();
     },
     [goNext],
@@ -886,6 +928,127 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     cashMutation,
     onlineMutation,
   ]);
+
+  // ============================================================================
+  // Payment methods — one list, one button under it
+  // ============================================================================
+
+  const detailsReady = !!details && !detailsLoading && !detailsError && details.total_payment != null;
+
+  // Manual online (card / payment links + receipt) is offered whenever the
+  // flight has an active card or a payment link, independent of NBU.
+  const paymentLinkNames = (details?.payment_links ?? []).map((link) => link.name).join(', ');
+  const hasManualOnline = !!details?.card_number || paymentLinkNames !== '';
+  // Card transfer by request: an exact sum, no receipt. The server then hides
+  // `card_number` from the manual method; the bank transfer cannot carry the
+  // wallet's part.
+  const hasCardTransfer = details?.card_intent_available === true;
+
+  const payOptions: PayOption[] = [];
+  if (detailsReady) {
+    const payNow = t('makePayment.methods.payAmount', { amount: formatMoney(nbuCharge) });
+    // NBU refuses anything under its floor: the floor is charged and the rest
+    // credited to the wallet. Said in the NBU rows, beside the choice it affects,
+    // and the button and the confirm drawer quote the same charge.
+    const nbuFloorHint = isBelowNbuMinimum
+      ? t('makePayment.methods.nbuFloorHint', {
+          min: formatMoney(NBU_MIN_UZS),
+          surplus: formatMoney(nbuCharge - payableAmount),
+        })
+      : null;
+    const next = t('makePayment.methods.continue');
+
+    if (walletCoversAll) {
+      payOptions.push({
+        key: 'wallet',
+        icon: Wallet,
+        title: t('makePayment.payWallet'),
+        hint: t('makePayment.methods.walletHint', { amount: formatMoney(details.wallet_balance) }),
+        blockedBy: null,
+        tour: 'pay-wallet',
+        cta: t('makePayment.payWallet'),
+        run: () => handleChooseMethod('wallet'),
+      });
+    }
+
+    if (nbuEnabled) {
+      // Binding a card is not offered here: cards are added from the profile
+      // (`CardsManagerModal`), so this surface stays on the current payment.
+      savedCards.forEach((card, index) => {
+        const masked = formatMaskedCard(card.card_masked);
+        payOptions.push({
+          key: `saved-${card.id}`,
+          icon: CreditCard,
+          title: card.nickname || masked || t('nbu.cards.namedCardFallback'),
+          hint:
+            nbuFloorHint ??
+            (card.nickname && masked
+              ? masked
+              : masked
+                ? t('makePayment.methods.savedCardHint')
+                : t('nbu.cards.pendingMasked')),
+          blockedBy: nbuBlockedBy,
+          tour: index === 0 ? 'pay-saved-card' : undefined,
+          cta: payNow,
+          // A saved card charges through the confirm drawer, never on this tap.
+          run: () => setConfirmChargeCard(card),
+        });
+      });
+      payOptions.push({
+        key: 'nbu',
+        icon: Landmark,
+        title: savedCards.length > 0 ? t('makePayment.methods.nbuOtherCard') : t('makePayment.methods.nbuTitle'),
+        hint: nbuFloorHint ?? t('makePayment.methods.nbuHint'),
+        blockedBy: nbuBlockedBy,
+        cta: payNow,
+        run: () => void handleNbuPayment(),
+      });
+    }
+
+    if (hasCardTransfer) {
+      payOptions.push({
+        key: 'card',
+        icon: ArrowRightLeft,
+        title: t('cardTransfer.payCard'),
+        hint: t('cardTransfer.payCardHint'),
+        blockedBy: walletOn ? t('cardTransfer.payCardNoWallet') : null,
+        cta: next,
+        run: () => handleChooseMethod('card'),
+      });
+    }
+
+    if (hasManualOnline) {
+      payOptions.push({
+        key: 'online',
+        icon: Smartphone,
+        title: t('makePayment.payOnline'),
+        hint: details.card_number
+          ? paymentLinkNames
+            ? t('makePayment.methods.onlineHintCardLinks', { names: paymentLinkNames })
+            : t('makePayment.methods.onlineHintCard')
+          : t('makePayment.methods.onlineHintLinks', { names: paymentLinkNames }),
+        blockedBy: null,
+        cta: next,
+        run: () => handleChooseMethod('online'),
+      });
+    }
+
+    payOptions.push({
+      key: 'cash',
+      icon: Banknote,
+      title: t('makePayment.methods.cashTitle'),
+      hint: t('makePayment.methods.cashHint'),
+      blockedBy: isPartial ? t('makePayment.methods.cashNoPartial') : null,
+      cta: next,
+      run: () => handleChooseMethod('cash'),
+    });
+  }
+
+  const selectedOption =
+    payOptions.find((option) => option.key === methodKey && option.blockedBy === null) ??
+    payOptions.find((option) => option.blockedBy === null) ??
+    null;
+  const payButtonDisabled = !selectedOption || !partialValid || isNbuInitiating;
 
   // ============================================================================
   // Step Renderers
@@ -1112,179 +1275,59 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       );
     }
 
-    const walletCoversAll = details.wallet_balance >= payableAmount && payableAmount > 0;
-
-    const hasSavedCards = savedCards.length > 0;
-
-    // Manual online (card transfer / payment links + receipt upload) is offered
-    // whenever the flight has an active card OR at least one active payment link
-    // — independent of NBU, so NBU and manual can be shown side by side. When
-    // neither exists, only cash remains (NBU still shows when enabled).
-    const hasManualOnline =
-      !!details.card_number || (details.payment_links?.length ?? 0) > 0;
-    // Card transfer by request: an exact sum, no receipt. Offered while the
-    // server can give a card; a bank transfer cannot take the wallet's part.
-    const hasCardTransfer = details.card_intent_available === true;
-    const methodCount = 1 + (hasManualOnline ? 1 : 0) + (hasCardTransfer ? 1 : 0);
+    const multiPrice = details.cargo_prices.length > 1;
+    const hasTrackCodes = details.track_codes.length > 0;
+    const partialOutOfRange = isPartial && customAmount !== '' && !partialValid;
 
     return (
       <div className="space-y-5">
-        {/* Placed above every online option, not beside one of them.
-            A saved card charges in one tap from the block below, so a notice
-            sitting under the main CTA would be read after the money had already
-            moved. Both routes go through the same top-up. */}
-        {nbuEnabled && isBelowNbuMinimum && (
-          <div className="space-y-0.5 rounded-mc-md border border-mc-warn/25 bg-mc-warn-soft px-3 py-2.5 text-[12px] text-mc-text">
-            <p className="font-bold">
-              {t('makePayment.belowNbuMinimum', { min: nbuMinimumParts.min })}
-            </p>
-            <p>
-              {t('makePayment.belowNbuMinimumBody', {
-                debt: nbuMinimumParts.debt,
-                min: nbuMinimumParts.min,
-              })}
-            </p>
-            <p className="font-semibold">
-              {t('makePayment.belowNbuMinimumSurplus', {
-                surplus: nbuMinimumParts.surplus,
-              })}
-            </p>
-          </div>
-        )}
-
-        {/* ---- Saved Cards Section ----
-            Only renders when the user already has at least one tokenised
-            card. Binding a new card is intentionally NOT offered inside the
-            payment flow — users add cards from `CardsManagerModal` (profile)
-            so this surface stays focused on completing the current payment.
-            Each row offers one-tap charge for the resolved payable amount. */}
-        {nbuEnabled && hasSavedCards && (
-          <div data-tour="pay-saved-card" className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[13px] font-extrabold text-mc-text">
-                {t('nbu.cards.title')}
-              </p>
-              <span className="text-[11px] font-medium text-mc-text-3">
-                {t('nbu.cards.tapToPay', "Bir bosishda to'lash")}
-              </span>
-            </div>
-            {savedCards.map((card) => {
-              const primaryLabel =
-                card.nickname || card.card_masked || t('nbu.cards.namedCardFallback');
-              const secondaryLabel = card.card_masked
-                ? (card.nickname ? card.card_masked : t('nbu.cards.tokenized'))
-                : t('nbu.cards.pendingMasked');
-              return (
-                // Sky blue was a third accent hue on a screen that already had
-                // amber and orange; the row now uses the same surface and brand
-                // pair as every other card in the client app.
-                <div
-                  key={card.id}
-                  className="flex items-center gap-2.5 rounded-mc-md border border-mc-border
-                             bg-mc-surface p-2.5"
-                >
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-mc-sm bg-mc-brand-soft text-mc-brand">
-                    <CreditCard className="h-[18px] w-[18px]" strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-bold text-mc-text">
-                      {primaryLabel}
-                    </p>
-                    <p
-                      className={`truncate text-[11px] text-mc-text-2 ${
-                        card.nickname && card.card_masked ? 'font-mono' : ''
-                      }`}
-                    >
-                      {secondaryLabel}
-                    </p>
-                  </div>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setConfirmChargeCard(card)}
-                    className="shrink-0 whitespace-nowrap rounded-mc-sm bg-mc-brand px-3 py-2
-                               text-[11px] font-bold text-mc-on-brand transition-transform
-                               active:scale-95"
-                  >
-                    {t('nbu.cards.payWithCard')}
-                  </motion.button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ---- Big Amount Display ---- */}
-        <div
-          data-tour="pay-amount"
-          className="rounded-mc-lg border border-mc-brand/20 bg-mc-brand-soft px-4 py-5 text-center"
-        >
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-mc-text-2">
+        {/* ---- What is owed ---- */}
+        <div data-tour="pay-amount">
+          <p className="text-[12px] font-semibold text-mc-text-2">
             {details.has_existing_partial
               ? t('makePayment.existingRemaining')
               : t('makePayment.totalAmount')}
           </p>
-          {/* Sized down from 56px: the figure is the point of the screen, but at
-              that size a seven-digit sum wrapped on a narrow phone. `break-words`
-              is the guard if it ever still does. */}
-          <p className="break-words text-[34px] font-extrabold leading-none tracking-tight text-mc-text tabular-nums sm:text-[40px]">
-            {formatMoney(payableAmount)}
-            <span className="ml-2 text-[16px] font-bold text-mc-brand">so'm</span>
+          {/* The figure wraps before the unit, never inside the number. */}
+          <p className="mt-1.5 text-[30px] font-extrabold leading-none tracking-tight text-mc-text tabular-nums min-[360px]:text-[34px]">
+            {formatMoney(payableAmount)}{' '}
+            <span className="text-[16px] font-bold tracking-normal text-mc-text-2">so'm</span>
           </p>
-        </div>
-
-        {/* ---- Flight Info Grid ---- */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <InfoCard
-            icon={<Scale className="w-4 h-4" />}
-            label={t('makePayment.weight')}
-            value={`${details.total_weight.toFixed(2)} kg`}
-          />
-          {details.cargo_prices.length > 1 ? (
-            <InfoCard
-              icon={<CircleDollarSign className="w-4 h-4" />}
-              label={t('makePayment.pricePerKg')}
-              value="Turli"
-              onClick={() => setShowCargoPrices(!showCargoPrices)}
-              trailing={
-                <motion.div
-                  animate={{ rotate: showCargoPrices ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChevronDown className="w-3.5 h-3.5 text-mc-text-3" />
-                </motion.div>
-              }
-            />
-          ) : (
-            <InfoCard
-              icon={<CircleDollarSign className="w-4 h-4" />}
-              label={t('makePayment.pricePerKg')}
-              value={`$${details.price_per_kg_usd.toFixed(2)}`}
-            />
-          )}
           {details.has_existing_partial && details.existing_paid_amount != null && (
-            <InfoCard
-              icon={<CheckCircle2 className="w-4 h-4" />}
-              label={t('makePayment.existingPaid')}
-              value={`${formatMoney(details.existing_paid_amount)} so'm`}
-              accent
-            />
+            <p className="mt-2 text-[12px] font-medium text-mc-text-2">
+              {t('makePayment.existingPaid')}:{' '}
+              <span className="font-bold text-mc-text tabular-nums">
+                {formatMoney(details.existing_paid_amount)} so'm
+              </span>
+            </p>
           )}
-          {details.track_codes.length > 0 && (
-            <InfoCard
-              icon={<Package className="w-4 h-4" />}
-              label={t('makePayment.trackCodes')}
-              value={String(details.track_codes.length)}
-              onClick={() => setShowTrackCodes(!showTrackCodes)}
-              trailing={
-                <motion.div
-                  animate={{ rotate: showTrackCodes ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChevronDown className="w-3.5 h-3.5 text-mc-text-3" />
-                </motion.div>
+
+          {/* Flight facts: one divided strip rather than a grid of boxed tiles. */}
+          <div
+            className={`mt-4 grid divide-x divide-mc-border rounded-mc-md border border-mc-border ${
+              hasTrackCodes ? 'grid-cols-3' : 'grid-cols-2'
+            }`}
+          >
+            <Fact label={t('makePayment.weight')} value={`${details.total_weight.toFixed(2)} kg`} />
+            <Fact
+              label={t('makePayment.pricePerKg')}
+              value={
+                multiPrice
+                  ? t('makePayment.variousPrices')
+                  : `$${details.price_per_kg_usd.toFixed(2)}`
               }
+              expanded={multiPrice ? showCargoPrices : undefined}
+              onToggle={multiPrice ? () => setShowCargoPrices((open) => !open) : undefined}
             />
-          )}
+            {hasTrackCodes && (
+              <Fact
+                label={t('makePayment.trackCodes')}
+                value={String(details.track_codes.length)}
+                expanded={showTrackCodes}
+                onToggle={() => setShowTrackCodes((open) => !open)}
+              />
+            )}
+          </div>
         </div>
 
         {/* ---- Expandable Track Codes List ---- */}
@@ -1297,27 +1340,20 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               transition={{ duration: 0.25, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3 space-y-1.5">
-                <p className="text-[11px] font-medium text-mc-text-3 uppercase tracking-wide mb-2">
-                  {t('makePayment.trackCodes')}
-                </p>
-                {details.track_codes.map((code, idx) => (
-                  <motion.button
+              <div className="divide-y divide-mc-border rounded-mc-md border border-mc-border">
+                {details.track_codes.map((code) => (
+                  <button
                     key={code}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.03 }}
+                    type="button"
                     onClick={() => handleTrackClick(code)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-mc-sm
-                      bg-mc-surface
-                      border border-mc-border
-                      active:scale-[0.98] transition-all group"
+                    className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2.5 text-left
+                      transition-transform active:scale-[0.99]"
                   >
-                    <span className="text-sm font-mono font-semibold text-mc-text truncate">
+                    <span className="min-w-0 break-all font-mono text-[13px] font-semibold text-mc-text">
                       {code}
                     </span>
-                    <Search className="w-3.5 h-3.5 text-mc-text-3 flex-shrink-0 ml-2" />
-                  </motion.button>
+                    <Search className="h-4 w-4 shrink-0 text-mc-text-2" aria-hidden="true" />
+                  </button>
                 ))}
               </div>
             </motion.div>
@@ -1334,338 +1370,157 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
               transition={{ duration: 0.25, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="rounded-mc-md border border-mc-border bg-mc-surface-2 p-3 space-y-2">
-                <p className="text-[11px] font-medium text-mc-text-3 uppercase tracking-wide mb-2">
-                  Har bir yuk narxi
-                </p>
+              <div className="divide-y divide-mc-border rounded-mc-md border border-mc-border">
                 {details.cargo_prices.map((cargo, idx) => (
-                  <motion.div
+                  <div
                     key={idx}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    className="flex items-center justify-between px-3 py-2 rounded-mc-sm
-                      bg-mc-surface
-                      border border-mc-border"
+                    className="flex items-baseline justify-between gap-3 px-3 py-2.5 text-[13px] tabular-nums"
                   >
-                    <div className="flex items-center gap-3">
-                      <Scale className="w-3.5 h-3.5 text-mc-text-3" />
-                      <span className="text-sm text-mc-text-2">
-                        {cargo.weight_kg} kg
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-bold text-mc-text">
-                        ${cargo.price_per_kg_usd.toFixed(2)}
-                      </span>
-                      <span className="text-xs text-mc-text-3 ml-1">/kg</span>
-                    </div>
-                  </motion.div>
+                    <span className="text-mc-text-2">{cargo.weight_kg} kg</span>
+                    <span className="font-bold text-mc-text">
+                      ${cargo.price_per_kg_usd.toFixed(2)}
+                      <span className="ml-0.5 font-medium text-mc-text-2">/kg</span>
+                    </span>
+                  </div>
                 ))}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ---- Partial Toggle ---- */}
-        {partialAllowed && (
-          <div className="space-y-2">
-            <button
-              onClick={() => setIsPartial(!isPartial)}
-              className={`w-full flex items-center justify-between p-3.5 rounded-mc-md border transition-all duration-200 ${
-                isPartial
-                  ? 'bg-mc-brand-soft border-mc-brand/25'
-                  : 'bg-mc-surface border-mc-border'
-              }`}
-            >
-              <span className="text-sm font-semibold text-mc-text">
-                {t('makePayment.customAmount')}
-              </span>
-              <div
-                className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${
-                  isPartial
-                    ? 'bg-mc-brand'
-                    : 'bg-mc-surface-2'
-                }`}
-              >
-                <motion.div
-                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm"
-                  animate={{ left: isPartial ? 18 : 2 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        {/* ---- A custom sum and the wallet's part ---- */}
+        {(partialAllowed || hasWalletSwitch) && (
+          <div className="divide-y divide-mc-border rounded-mc-md border border-mc-border">
+            {partialAllowed && (
+              <div>
+                <SwitchRow
+                  label={t('makePayment.customAmount')}
+                  checked={isPartial}
+                  onToggle={() => setIsPartial((on) => !on)}
                 />
+                {isPartial && (
+                  <div className="px-3.5 pb-3.5">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={customAmount}
+                      onChange={(e) => {
+                        const normalized = normalizeNumber(e.target.value);
+                        if (normalized !== null) {
+                          setCustomAmount(normalized);
+                        }
+                      }}
+                      placeholder={t('makePayment.enterAmount')}
+                      aria-label={t('makePayment.enterAmount')}
+                      aria-invalid={partialOutOfRange || undefined}
+                      className="w-full rounded-mc-md border border-mc-border bg-mc-surface-2 px-4 py-3 text-[18px] font-bold
+                        text-mc-text tabular-nums placeholder:text-mc-text-2 placeholder:font-semibold
+                        focus:border-mc-brand focus:outline-none focus:ring-2 focus:ring-mc-brand/40 transition-colors"
+                    />
+                    <p
+                      className={`mt-1.5 px-1 text-[12px] ${
+                        partialOutOfRange ? 'font-semibold text-mc-warn' : 'text-mc-text-2'
+                      }`}
+                    >
+                      {t('makePayment.minAmount', { amount: formatMoney(PARTIAL_MIN_UZS) })} ·{' '}
+                      {t('makePayment.maxAmount', { amount: formatMoney(payableAmount) })}
+                    </p>
+                  </div>
+                )}
               </div>
-            </button>
-            {isPartial && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={customAmount}
-                  onChange={(e) => {
-                    const normalized = normalizeNumber(e.target.value);
-                    if (normalized !== null) {
-                      setCustomAmount(normalized);
-                    }
-                  }}
-                  placeholder={t('makePayment.enterAmount')}
-                  className="w-full px-4 py-3.5 rounded-mc-md text-lg font-bold
-                    bg-mc-surface
-                    border border-mc-border
-                    text-mc-text
-                    placeholder:text-mc-text-3 dark:placeholder:text-mc-text-2
-                    focus:outline-none focus:ring-2 focus:ring-mc-brand/40 focus:border-mc-brand
-                    transition-all"
+            )}
+            {hasWalletSwitch && (
+              <div data-tour="pay-wallet">
+                <SwitchRow
+                  label={t('makePayment.useWallet')}
+                  hint={`${t('makePayment.yourBalance')}: ${formatMoney(details.wallet_balance)} so'm`}
+                  checked={walletOn}
+                  onToggle={() => setUseWallet((on) => !on)}
                 />
-                <p className="text-xs text-mc-text-3 mt-1 px-1">
-                  {t('makePayment.minAmount', { amount: '1 000' })} ·{' '}
-                  {t('makePayment.maxAmount', {
-                    amount: formatMoney(payableAmount),
-                  })}
-                </p>
-              </motion.div>
+                {walletOn && (
+                  <div className="space-y-1 px-3.5 pb-3.5 text-[13px]">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-mc-text-2">{t('makePayment.walletApplied')}</span>
+                      <span className="font-bold text-mc-success tabular-nums">
+                        −{formatMoney(walletDeduction)} so'm
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-semibold text-mc-text">{t('makePayment.youPay')}</span>
+                      <span className="font-extrabold text-mc-text tabular-nums">
+                        {formatMoney(finalPayable)} so'm
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* ---- Wallet Balance & Toggle ---- */}
-        <div
-          data-tour="pay-wallet"
-          className={`p-3.5 rounded-mc-md border transition-all duration-200 ${
-            details.wallet_balance <= 0
-              ? 'bg-mc-surface-2 border-mc-border dark:border-white/5 opacity-75'
-              : useWallet
-                ? 'bg-mc-success/12 border-mc-success/30'
-                : 'bg-mc-surface border-mc-border'
-          }`}
-        >
-          <button
-            onClick={() => {
-              if (details.wallet_balance > 0) setUseWallet(!useWallet);
-            }}
-            className={`w-full flex items-center justify-between ${
-              details.wallet_balance <= 0 ? 'cursor-not-allowed' : ''
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <WalletCards
-                className={`w-5 h-5 ${
-                  details.wallet_balance <= 0
-                    ? 'text-mc-text-3'
-                    : useWallet
-                      ? 'text-mc-success'
-                      : 'text-mc-text-3'
-                }`}
-              />
-              <div className="text-left">
-                <p className={`text-sm font-semibold ${
-                  details.wallet_balance <= 0
-                    ? 'text-mc-text-3'
-                    : 'text-mc-text'
-                }`}>
-                  {t('makePayment.useWallet')}
-                </p>
-                {details.wallet_balance > 0 ? (
-                  <p className="text-xs text-mc-text-3">
-                    {t('makePayment.yourBalance')}:{' '}
-                    <span className="font-bold text-mc-success">
-                      {formatMoney(details.wallet_balance)} so'm
+        {/* ---- How to pay: one list, the button under the sheet acts on it ---- */}
+        <fieldset data-tour="pay-methods" className="min-w-0">
+          <legend className="mb-2.5 text-[13px] font-extrabold text-mc-text">
+            {t('makePayment.methods.title')}
+          </legend>
+          <div className="space-y-2">
+            {payOptions.map((option) => {
+              const selected = option.key === selectedOption?.key;
+              const blocked = option.blockedBy !== null;
+              const Icon = option.icon;
+              return (
+                <label
+                  key={option.key}
+                  data-tour={option.tour}
+                  className={`flex min-h-16 items-center gap-3 rounded-mc-md border bg-mc-surface px-3 py-2.5
+                    outline-offset-2 outline-mc-brand/50 has-[:focus-visible]:outline-2
+                    transition-[transform,border-color] duration-150 ${
+                      blocked ? 'cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                    } ${selected ? 'border-mc-brand ring-1 ring-mc-brand' : 'border-mc-border'}`}
+                >
+                  <input
+                    type="radio"
+                    name="pay-method"
+                    value={option.key}
+                    checked={selected}
+                    disabled={blocked}
+                    onChange={() => setMethodKey(option.key)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-mc-sm bg-mc-surface-2 ${
+                      blocked ? 'text-mc-text-3' : selected ? 'text-mc-text' : 'text-mc-text-2'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={`block break-words text-[15px] font-bold leading-snug tabular-nums ${
+                        blocked ? 'text-mc-text-3' : 'text-mc-text'
+                      }`}
+                    >
+                      {option.title}
                     </span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-mc-text-3">
-                    Hisobingizda mablag' yo'q
-                  </p>
-                )}
-              </div>
-            </div>
-            <div
-              className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${
-                details.wallet_balance <= 0
-                  ? 'bg-mc-surface-2'
-                  : useWallet
-                    ? 'bg-mc-success'
-                    : 'bg-mc-surface-2'
-              }`}
-            >
-              <motion.div
-                className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm"
-                animate={{ left: useWallet && details.wallet_balance > 0 ? 18 : 2 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              />
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {useWallet && details.wallet_balance > 0 && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-3 pt-3 border-t border-mc-success/25 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-mc-text-2">
-                      {t('makePayment.walletApplied')}
+                    <span className="mt-0.5 block text-[12px] leading-snug text-mc-text-2">
+                      {option.blockedBy ?? option.hint}
                     </span>
-                    <span className="font-bold text-mc-success">
-                      -{formatMoney(walletDeduction)} so'm
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-mc-text">
-                      {t('makePayment.youPay')}
-                    </span>
-                    <span className="font-extrabold text-mc-text">
-                      {formatMoney(finalPayable)} so'm
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* ---- "Wallet Covers All" — special option ---- */}
-        {walletCoversAll && (
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => handleChooseMethod('wallet')}
-            className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
-              bg-gradient-to-r from-mc-success to-mc-success
-              text-mc-on-success shadow-lg shadow-emerald-500/20
-              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
-          >
-            <Wallet className="w-5 h-5" />
-            {t('makePayment.payWallet')}
-          </motion.button>
-        )}
-
-        {/* ---- NBU Online Payment (primary CTA when enabled) ----
-             NBU refuses anything under 1000 so'm, which used to disable this
-             button outright — 49 clients owing under that could not pay online
-             at all, most of them owing under 200 so'm. The gateway's floor is
-             charged instead and the difference is credited to the wallet, which
-             the distributor already books as a credit event.
-
-             The arithmetic is spelled out rather than hidden — see the notice
-             rendered above the saved-card block, which covers both routes. */}
-        {nbuEnabled && (
-          <motion.button
-            data-tour="pay-methods"
-            whileTap={{ scale: 0.97 }}
-            onClick={handleNbuPayment}
-            disabled={isNbuInitiating}
-            className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
-              bg-gradient-to-r from-mc-brand to-mc-brand-strong
-              text-mc-on-brand shadow-lg shadow-sky-500/20
-              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
-              disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isNbuInitiating ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <CreditCard className="w-5 h-5" />
-            )}
-            {/* Three payment buttons sat side by side with no explanation of how
-                they differ — the reported complaint. Each now says what happens. */}
-            <span className="flex flex-col items-start leading-tight">
-              <span>{t('nbu.payOnlineNbu')}</span>
-              <span className="text-[11px] font-semibold opacity-80">
-                {t('nbu.payOnlineNbuHint')}
-              </span>
-            </span>
-          </motion.button>
-        )}
-
-        {/* ---- Payment Method Buttons ----
-            Manual online (card / payment links + receipt) shows alongside NBU
-            whenever the flight has an active card or payment link. If neither
-            exists, only cash remains here (NBU button above still shows when
-            enabled). */}
-        <div data-tour="pay-methods" className={`grid gap-3 ${methodCount > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-          {hasCardTransfer && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { if (!useWallet) handleChooseMethod('card'); }}
-              disabled={useWallet}
-              aria-disabled={useWallet}
-              className="h-16 rounded-mc-lg font-extrabold text-[16px]
-                bg-gradient-to-r from-mc-brand to-mc-brand-strong
-                text-mc-on-brand shadow-[var(--mc-shadow-cta)]
-                active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
-                disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <CreditCard className="w-5 h-5" />
-              <span className="flex flex-col items-start leading-tight">
-                <span>{t('cardTransfer.payCard')}</span>
-                <span className="text-[11px] font-semibold opacity-80">
-                  {useWallet ? t('cardTransfer.payCardNoWallet') : t('cardTransfer.payCardHint')}
-                </span>
-              </span>
-            </motion.button>
-          )}
-
-          {hasManualOnline && (hasCardTransfer ? (
-            // Links only (the card is given by request above): one filled
-            // button per row of methods keeps the recommended one obvious.
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => handleChooseMethod('online')}
-              className="h-16 rounded-mc-lg font-extrabold text-[16px]
-                bg-mc-surface text-mc-text border border-mc-border shadow-sm
-                active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
-            >
-              <ExternalLink className="w-5 h-5" />
-              <span className="flex flex-col items-start leading-tight">
-                <span>{t('makePayment.payOnline')}</span>
-                <span className="text-[11px] font-semibold opacity-70">
-                  {t('cardTransfer.linksHint')}
-                </span>
-              </span>
-            </motion.button>
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => handleChooseMethod('online')}
-              className="h-16 rounded-mc-lg font-extrabold text-[16px]
-                bg-gradient-to-r from-mc-brand to-mc-brand-strong
-                text-mc-on-brand shadow-lg shadow-blue-500/20
-                active:scale-[0.97] transition-all flex items-center justify-center gap-2.5"
-            >
-              <CreditCard className="w-5 h-5" />
-              {t('makePayment.payOnline')}
-            </motion.button>
-          ))}
-
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => { if (!isPartial) handleChooseMethod('cash'); }}
-            disabled={isPartial}
-            aria-disabled={isPartial}
-            className={
-              `h-16 rounded-mc-lg font-extrabold text-[16px]
-              bg-mc-surface text-mc-text border border-mc-border shadow-sm
-              active:scale-[0.97] transition-all flex items-center justify-center gap-2.5
-              disabled:opacity-60 disabled:cursor-not-allowed
-              ${methodCount === 3 ? 'sm:col-span-2' : ''}`
-            }
-          >
-            <Banknote className="w-5 h-5" />
-            <span className="flex flex-col items-start leading-tight">
-              <span>{t('makePayment.payCash')}</span>
-              <span className="text-[11px] font-semibold opacity-70">
-                {t('makePayment.payCashHint')}
-              </span>
-            </span>
-          </motion.button>
-        </div>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`h-5 w-5 shrink-0 rounded-full transition-[border-width,border-color] duration-150 ${
+                      blocked
+                        ? 'border-2 border-transparent'
+                        : selected
+                          ? 'border-[6px] border-mc-brand'
+                          : 'border-2 border-mc-text-3/60'
+                    }`}
+                  />
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
       </div>
     );
   };
@@ -1697,8 +1552,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
           <button
             onClick={handleClose}
             className="mt-4 w-full max-w-[280px] h-16 rounded-mc-lg font-extrabold text-[16px]
-              bg-gradient-to-r from-mc-brand to-mc-brand-strong
-              text-mc-on-brand shadow-xl shadow-amber-500/25
+              bg-mc-brand text-mc-on-brand
               active:scale-[0.97] transition-all"
           >
             {t('makePayment.done')}
@@ -1747,8 +1601,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             onClick={handleConfirm}
             disabled={isSubmitting}
             className="w-full max-w-xs h-14 rounded-mc-lg font-bold text-base
-              bg-gradient-to-r from-mc-brand to-mc-brand-strong
-              text-mc-on-brand shadow-lg shadow-amber-500/20
+              bg-mc-brand text-mc-on-brand
               active:scale-[0.97] transition-all
               disabled:opacity-60 disabled:cursor-not-allowed
               flex items-center justify-center gap-2"
@@ -1791,8 +1644,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             onClick={handleConfirm}
             disabled={isSubmitting}
             className="w-full max-w-xs h-16 rounded-mc-lg font-extrabold text-[16px]
-              bg-gradient-to-r from-mc-success to-mc-success
-              text-mc-on-success shadow-xl shadow-emerald-500/25
+              bg-mc-success text-mc-on-success
               active:scale-[0.97] transition-all
               disabled:opacity-60 disabled:cursor-not-allowed
               flex items-center justify-center gap-2"
@@ -2018,8 +1870,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             onClick={handleConfirm}
             disabled={!receiptFile || !cardLast4Ready || isSubmitting}
             className="w-full h-16 rounded-mc-lg font-extrabold text-[16px]
-              bg-gradient-to-r from-mc-brand to-mc-brand-strong
-              text-mc-on-brand shadow-xl shadow-blue-500/25
+              bg-mc-brand text-mc-on-brand
               active:scale-[0.97] transition-all
               disabled:opacity-50 disabled:cursor-not-allowed
               flex items-center justify-center gap-2.5"
@@ -2081,6 +1932,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="make-payment-title"
             className={`fixed z-[10000] bg-mc-surface
               ${
                 isMobile
@@ -2110,7 +1962,10 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 ) : (
                   <div className="h-10 w-10 shrink-0" />
                 )}
-                <h2 className="min-w-0 flex-1 truncate px-1 text-center text-[15px] font-extrabold text-mc-text">
+                <h2
+                  id="make-payment-title"
+                  className="min-w-0 flex-1 truncate px-1 text-center text-[15px] font-extrabold text-mc-text"
+                >
                   {showSuccess ? t('makePayment.successTitle') : stepTitles[step]}
                 </h2>
                 <button
@@ -2142,6 +1997,25 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 </motion.div>
               </AnimatePresence>
             </div>
+
+            {/* ---- The one pay button of the details step ---- */}
+            {step === 1 && detailsReady && !showSuccess && payOptions.length > 0 && (
+              <div className="shrink-0 border-t border-mc-border bg-mc-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  onClick={() => selectedOption?.run()}
+                  disabled={payButtonDisabled}
+                  className="flex min-h-14 w-full items-center justify-center gap-2 rounded-mc-lg bg-mc-brand px-4 py-3
+                    text-center text-[16px] font-extrabold leading-tight text-mc-on-brand tabular-nums
+                    transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isNbuInitiating && (
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+                  )}
+                  {selectedOption ? selectedOption.cta : t('makePayment.methods.choose')}
+                </button>
+              </div>
+            )}
           </motion.div>
 
           {/* Track Code Bottom Drawer */}
@@ -2199,43 +2073,45 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                   </p>
                 </div>
 
-                {/* Amount */}
-                <div className="text-center py-4 rounded-mc-lg bg-mc-brand-soft border border-mc-brand/20">
-                  <p className="text-xs font-bold uppercase tracking-wider text-mc-brand dark:text-mc-brand mb-1">
+                {/* Amount: what NBU charges, the floor included */}
+                <div className="rounded-mc-lg bg-mc-surface-2 py-4 text-center">
+                  <p className="mb-1.5 text-[12px] font-semibold text-mc-text-2">
                     {t('nbu.confirm.amountLabel')}
                   </p>
-                  <p className="text-4xl font-extrabold text-mc-text tracking-tight">
-                    {formatMoney(payableAmount)}
-                    <span className="text-lg ml-1.5 font-bold text-mc-brand">so'm</span>
+                  <p className="text-[34px] font-extrabold leading-none tracking-tight text-mc-text tabular-nums">
+                    {formatMoney(nbuCharge)}{' '}
+                    <span className="text-[16px] font-bold tracking-normal text-mc-text-2">so'm</span>
                   </p>
                 </div>
 
                 {/* Card + flight */}
                 <div className="space-y-2.5">
-                  <div className="flex items-center gap-3 p-3 rounded-mc-md bg-mc-surface-2 dark:bg-white/[0.03] border border-mc-border">
-                    <div className="w-9 h-9 rounded-mc-sm bg-mc-brand-soft flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="w-4.5 h-4.5 text-mc-brand" />
+                  <div className="flex items-center gap-3 rounded-mc-md border border-mc-border p-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-mc-sm bg-mc-surface-2 text-mc-text-2">
+                      <CreditCard className="h-5 w-5" strokeWidth={1.8} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-mc-text-3">{t('nbu.confirm.cardLabel')}</p>
-                      <p className="text-sm font-bold text-mc-text truncate">
-                        {confirmChargeCard.nickname || confirmChargeCard.card_masked || t('nbu.cards.namedCardFallback')}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] text-mc-text-2">{t('nbu.confirm.cardLabel')}</p>
+                      <p className="break-words text-[13px] font-bold text-mc-text tabular-nums">
+                        {confirmChargeCard.nickname ||
+                          formatMaskedCard(confirmChargeCard.card_masked) ||
+                          t('nbu.cards.namedCardFallback')}
                       </p>
                       {confirmChargeCard.nickname && confirmChargeCard.card_masked && (
-                        <p className="font-mono text-[11px] text-mc-text-2 truncate">
-                          {confirmChargeCard.card_masked}
+                        <p className="text-[11px] text-mc-text-2 tabular-nums">
+                          {formatMaskedCard(confirmChargeCard.card_masked)}
                         </p>
                       )}
                     </div>
                   </div>
                   {selectedFlightName && (
-                    <div className="flex items-center gap-3 p-3 rounded-mc-md bg-mc-surface-2 dark:bg-white/[0.03] border border-mc-border">
-                      <div className="w-9 h-9 rounded-mc-sm bg-mc-brand-soft flex items-center justify-center flex-shrink-0">
-                        <Plane className="w-4.5 h-4.5 text-mc-brand" />
+                    <div className="flex items-center gap-3 rounded-mc-md border border-mc-border p-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-mc-sm bg-mc-surface-2 text-mc-text-2">
+                        <Plane className="h-5 w-5" strokeWidth={1.8} />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-mc-text-3">{t('nbu.confirm.flightLabel')}</p>
-                        <p className="text-sm font-bold text-mc-text truncate">{selectedFlightName}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-mc-text-2">{t('nbu.confirm.flightLabel')}</p>
+                        <p className="break-words text-[13px] font-bold text-mc-text">{selectedFlightName}</p>
                       </div>
                     </div>
                   )}
@@ -2246,8 +2122,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     onClick={confirmCharge}
                     disabled={nbuChargeMutation.isPending}
                     className="w-full h-14 rounded-mc-lg font-extrabold text-[16px]
-                      bg-gradient-to-r from-mc-brand to-mc-brand-strong
-                      text-mc-on-brand shadow-lg shadow-sky-500/25
+                      bg-mc-brand text-mc-on-brand
                       active:scale-[0.97] transition-all
                       disabled:opacity-60 disabled:cursor-not-allowed
                       flex items-center justify-center gap-2"
@@ -2299,14 +2174,14 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     {t('nbu.chargeSuccessBody')}
                   </p>
                 </div>
-                <p className="text-3xl font-extrabold text-mc-success">
-                  {formatMoney(payableAmount)}
+                <p className="text-3xl font-extrabold text-mc-success tabular-nums">
+                  {formatMoney(nbuCharge)}
                   <span className="text-base ml-1.5 font-bold">so'm</span>
                 </p>
 
                 {/* Delivery upsell — strike while the iron is hot */}
                 <div className="w-full max-w-[280px] rounded-mc-lg bg-mc-brand-soft border border-mc-brand/20 p-3 space-y-1">
-                  <p className="text-sm font-extrabold text-mc-brand dark:text-mc-brand">
+                  <p className="text-sm font-extrabold text-mc-brand">
                     {t('nbu.deliveryCta.title', "1 daqiqada zayavka qoldiring")}
                   </p>
                   <p className="text-[11px] text-mc-text-2">
@@ -2316,8 +2191,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 <button
                   onClick={() => { window.location.href = '/?tab=request'; }}
                   className="w-full max-w-[280px] h-14 rounded-mc-lg font-extrabold text-[16px]
-                    bg-gradient-to-r from-mc-brand to-mc-brand-strong
-                    text-mc-on-brand shadow-xl shadow-amber-500/25
+                    bg-mc-brand text-mc-on-brand
                     active:scale-[0.97] transition-all flex items-center justify-center gap-2"
                 >
                   <Package className="w-5 h-5" />
@@ -2326,7 +2200,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                 <button
                   onClick={closeChargeDrawer}
                   className="w-full max-w-[280px] h-12 rounded-mc-lg font-bold text-sm
-                    bg-mc-surface-2 dark:bg-white/10 text-mc-text dark:text-mc-text
+                    bg-mc-surface-2 text-mc-text
                     active:scale-[0.97] transition-all"
                 >
                   {t('nbu.chargeSuccessDone')}
@@ -2344,63 +2218,89 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
 };
 
 // ============================================================================
-// Small reusable sub-component — info card
+// Small sub-components of the details step
 // ============================================================================
 
-const InfoCard = memo(
-  ({
-    icon,
-    label,
-    value,
-    accent = false,
-    onClick,
-    trailing,
-  }: {
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-    accent?: boolean;
-    onClick?: () => void;
-    trailing?: React.ReactNode;
-  }) => (
-    <div
-      onClick={onClick}
-      className={`rounded-mc-md p-3 border ${
-        accent
-          ? 'bg-mc-brand-soft dark:bg-mc-brand/[0.06] border-mc-brand/20'
-          : 'bg-mc-surface-2 dark:bg-white/[0.03] border-mc-border'
-      } ${
-        onClick
-          ? 'cursor-pointer transition-colors active:scale-[0.98]'
-          : ''
-      }`}
+/** One cell of the flight facts strip; a cell with `onToggle` opens its list. */
+function Fact({
+  label,
+  value,
+  expanded,
+  onToggle,
+}: {
+  label: string;
+  value: string;
+  expanded?: boolean;
+  onToggle?: () => void;
+}) {
+  const content = (
+    <>
+      <span className="block text-[11px] font-medium text-mc-text-2">{label}</span>
+      <span className="mt-0.5 flex items-center gap-1 text-[13px] font-bold text-mc-text tabular-nums">
+        <span className="min-w-0 break-words">{value}</span>
+        {onToggle && (
+          <ChevronDown
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 shrink-0 text-mc-text-2 transition-transform duration-200 ${
+              expanded ? 'rotate-180' : ''
+            }`}
+          />
+        )}
+      </span>
+    </>
+  );
+  if (!onToggle) return <div className="min-w-0 px-3 py-2.5">{content}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="min-w-0 px-3 py-2.5 text-left transition-transform active:scale-[0.97]"
     >
-      <div className="flex items-center gap-1.5 mb-1">
-        <span
-          className={
-            accent
-              ? 'text-mc-brand'
-              : 'text-mc-text-3'
-          }
-        >
-          {icon}
-        </span>
-        <span className="text-[11px] font-medium text-mc-text-3 uppercase tracking-wide">
-          {label}
-        </span>
-        {trailing && <span className="ml-auto">{trailing}</span>}
-      </div>
-      <p
-        className={`text-sm font-bold ${
-          accent
-            ? 'text-mc-brand'
-            : 'text-mc-text dark:text-mc-text'
+      {content}
+    </button>
+  );
+}
+
+/** A full-width row with an iOS-style switch. */
+function SwitchRow({
+  label,
+  hint,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onToggle}
+      className="flex min-h-[52px] w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
+    >
+      <span className="min-w-0">
+        <span className="block text-[13px] font-semibold text-mc-text">{label}</span>
+        {hint && <span className="mt-0.5 block text-[12px] text-mc-text-2 tabular-nums">{hint}</span>}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${
+          checked ? 'bg-mc-brand' : 'bg-mc-text-3/35'
         }`}
       >
-        {value}
-      </p>
-    </div>
-  ),
-);
+        {/* A white knob in both themes, like the bank card face. */}
+        <span
+          className={`absolute top-[2px] left-[2px] h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-transform duration-200 motion-reduce:transition-none ${
+            checked ? 'translate-x-[18px]' : ''
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
 
 export default memo(MakePaymentModal);

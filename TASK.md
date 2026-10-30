@@ -1,41 +1,50 @@
-# TASK: Kartaga o'tkazma, 3-qism — bot o'zi qabul qiladi
+# TASK: To'lov oynasi dizayni va Uzpost zayavkada «Kartaga o'tkazma»
+
+Oldingi vazifa (kartaga o'tkazma, 3-qism) GitHub'da: bot f2ef345, web 0c4cefd, serverga
+chiqmagan; foydalanuvchi 9–13-holatlarni lokalda sinayapti.
 
 ## Objective
-CardXabar'da so'rovning aniq summasi 30 daqiqa ichida kelib, hujjatdagi 14 shartning hammasi
-bajarilsa, bot pulni admin «✅ Tasdiqlash» bosgandagidek o'zi yozadi va guruhga
-«🤖 Bot qabul qildi» xabarini «↩️ Bekor qilish» tugmasi bilan yuboradi. Tugma o'chiq
-turganda bot hech narsa yozmaydi, faqat «yoqilganda nima qilardi» deb belgilaydi.
-Reja: https://claude.ai/artifact/NHr6RXC2kjVYXnLEqxu2ew («3-qism rejasi»).
+1. Reys to'lov oynasining 2-qadami (`MakePaymentModal`): bellashayotgan beshta tugma o'rniga
+   bitta «To'lov usuli» ro'yxati va pastda bitta asosiy tugma. Har bir usulning ishlashi
+   (NBU, saqlangan karta, kartaga o'tkazma, online + chek, naqd, balans) o'zgarmaydi.
+2. Uzpost zayavka to'lovida «Kartaga o'tkazma» (aniq summa, bot o'zi tekshiradi): backend,
+   keyin shu ro'yxat Uzpost qadamida. Pul qismi foydalanuvchi «ha» demaguncha push qilinmaydi.
+3. Payme/Click — «Payme va Click to'lov tekshiruvi» oynasidagi yangi to'lov tayyor bo'lgach.
 
 ## Implementation Plan
-Backend (bot repo):
-- [x] Migratsiya: `card_transfer_settings` (bitta qator, o'chiq), `card_notices.auto_result`,
-      `card_notices.booking_snapshot`
-- [x] Bot qarori (shartlar 1–14), kuzatuv qatori «topildi» xabarida
-- [x] O'zi yozish: savepoint, yozilgandan keyin tekshiruv, guruhga xabar commit'dan oldin
-- [x] «↩️ Bekor qilish»: teskari yozuv, qator va POS kartasi oldingi holatga, so'rov yana
-      «admin kutilmoqda», xabarda «✅ Tasdiqlash» qaytadi; rad holatlari (yuk olingan,
-      kassa yozgan, hamyondagi ortiqcha ishlatilgan, bot yozmagan / bekor qilingan)
-- [x] API `GET/PUT /api/v1/system/card-transfer` (super-admin) + 7 kunlik hisob
-- [x] Serverda o'qish uchun hisobot: `scripts/card_transfer_report.sh`
-- [x] Testlar: 9–13-holatlar, har bir shart, bekor qilish va uning rad holatlari
-      (28 ta yangi test; butun backend: 2197 o'tdi)
-- [x] Topilgan xato: bekor qilingandan keyin admin qayta tasdiqlay olmasdi —
-      `card_intents.flight_debt` to'lovi qaytarilgan (sof nol) qatorni yana to'liq qarz deb oladi
+Dizayn (shu repo):
+- [x] Summa: chapda katta raqam, ostida vazn / narx / trek kodlar bitta bo'lingan qatorda
+- [x] «Boshqa summa» va «Balansdan foydalanish» bitta guruhda; balans 0 bo'lsa qator yo'q,
+      balans hammasini yopsa u ro'yxatda «Balansdan to'lash» usuli bo'ladi
+- [x] «To'lov usuli» radio ro'yxati (haqiqiy `input type=radio`): saqlangan karta(lar),
+      bank kartasi (NBU), kartaga o'tkazma, online to'lov, naqd — har biri o'z belgisi va
+      bir qatorli izohi bilan
+- [x] Mos kelmaydigan usul o'chiq va sababi yozilgan: NBU balans yoki boshqa summa bilan
+      ishlamaydi (server doim to'liq qarzni yechadi), kartaga o'tkazma balans bilan, naqd
+      boshqa summa bilan
+- [x] Pastda bitta asosiy tugma (tanlangan usulga qarab: «1 210 so'm to'lash» / «Davom
+      etish» / «Balansdan to'lash»), safe-area bilan; boshqa summa noto'g'ri bo'lsa o'chiq
+- [x] NBU 1 000 so'm minimumi: tugma va tasdiqlash oynasi haqiqiy yechiladigan summani
+      ko'rsatadi; tushuntirish ro'yxat ustidagi qutida emas, NBU qatorlarining o'zida
+- [x] Gradient va rangli soyalar olib tashlanadi (2-qadam tugmalari, tasdiqlash oynasi),
+      faqat `--mc-*` tokenlar
+- [x] `data-tour` (pay-amount, pay-methods, pay-wallet, pay-saved-card) saqlanadi; ekranda
+      yo'q element uchun tur qadami tashlanadi
+- [x] Reys almashtirilganda balans / boshqa summa / tanlangan usul tozalanadi
+- [x] i18n: uz/ru yangi kalitlar (`makePayment.methods.*`); eski `belowNbuMinimum*` olib tashlandi
+- [x] Test (vitest: 6 ta yangi, jami 931 o'tdi), tsc, eslint, build; 320/360/390, och va
+      qorong'i skrinshotlar, kesilish tekshiruvi toza
+- [x] Skrinshotlarni foydalanuvchiga ko'rsatish; foydalanuvchi «Ha, yubor» dedi — main'ga push
 
-Frontend (shu repo):
-- [x] `cardTransferService`: GET/PUT `/api/v1/system/card-transfer`
-- [x] `CardTransferAutoApproveSection`: tugma, o'quvchi holati, 7 kunlik hisob, sabablar
-- [x] Sozlamalar → To'lovlar: Payme/Click bo'limi yonida
-- [x] Testlar, lint, tsc, build (320/360/390px tekshirildi)
-- [ ] Foydalanuvchi «ha» degach: ikkala repo main'ga push, lokal sinov (9–13-holatlar)
+Uzpost «Kartaga o'tkazma» (bot repo + shu repo):
+- [ ] Reja hujjatga yozilgan (bo'lim «Uzpost zayavka»); batafsil qadamlar backendni
+      boshlaganda shu yerga qo'shiladi
 
 ## Walkthrough / Architecture
-Matcher (`card_matcher.place_and_post`) har kirimni joylaydi. «Topildi» (yoki kech) bo'lsa
-`CardAutoApprover.judge` shartlarni tekshiradi va `card_notices.auto_result` ga yozadi:
-`would` (tugma o'chiq, yozardi), sabab kodi yoki `booked`. Tugma yoqiq va hammasi to'g'ri
-bo'lsa `book`: reys qatorini qulflab `book_online_payment` (adminniki bilan bir xil kod,
-`approver_id=None`), keyin `_verify`, keyin guruhga xabar; xabar ketmasa savepoint bekor.
-Commit'dan keyin `finish_online_payment` (mijoz, kanal, POS «🤖 Bot»). Bekor qilish
-`booking_snapshot` bo'yicha hammasini qaytaradi. Admin panel faqat tugma va hisobni
-ko'rsatadi; shartlar backendda.
+`MakePaymentModal` 2-qadamda usullarni bitta massivdan (`payOptions`) chizadi: har bir
+element o'z kaliti, belgisi, sarlavhasi, izohi, o'chiq bo'lish sababi (`blockedBy`), asosiy
+tugma matni va `run()` ga ega. Tanlov holati faqat kalit (`methodKey`); tanlangan usul o'chib
+qolsa (masalan balans yoqilsa), birinchi ishlaydigan usul tanlanadi, balans o'chirilsa
+oldingi tanlov qaytadi. Pastki tugma `selectedOption.run()` ni chaqiradi — bu oldingi
+tugmalar chaqirgan funksiyalarning o'zi (`setConfirmChargeCard`, `handleNbuPayment`,
+`handleChooseMethod`), shuning uchun 3-qadam va server so'rovlari o'zgarmaydi.
