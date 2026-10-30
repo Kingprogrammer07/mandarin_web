@@ -16,6 +16,7 @@ import {
 import type {
   CarouselItemStatsResponse,
   CarouselItemCreateRequest,
+  CarouselItemUpdateRequest,
 } from '../../api/services/adminCarousel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '../../components/ui/drawer';
@@ -28,6 +29,16 @@ import { CarouselCard } from './carousel-components/CarouselCard';
 import { GlobalUploadBadge } from './carousel-components/GlobalUploadBadge';
 import { CarouselForm } from './carousel-components/CarouselForm';
 import type { CarouselFormValues } from './carousel-components/types';
+
+/** The API's own message (already Uzbek) beats a generic one: "Havola
+ *  https:// bilan boshlanishi kerak" tells the admin what to fix. */
+function apiError(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg.trim()) return msg;
+  }
+  return fallback;
+}
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
@@ -94,11 +105,11 @@ export default function AdminCarouselPage({ onBack }: AdminCarouselPageProps) {
       setEditingItem(null);
       setGlobalUpload(UPLOAD_IDLE);
     },
-    onError: () => toast.error("Yaratishda xatolik yuz berdi"),
+    onError: (err) => toast.error(apiError(err, "Yaratishda xatolik yuz berdi")),
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: CarouselItemCreateRequest }) =>
+    mutationFn: ({ id, data }: { id: number; data: CarouselItemUpdateRequest }) =>
       updateCarouselItem(id, data),
     onSuccess: () => {
       toast.success("Element yangilandi");
@@ -107,7 +118,7 @@ export default function AdminCarouselPage({ onBack }: AdminCarouselPageProps) {
       setEditingItem(null);
       setGlobalUpload(UPLOAD_IDLE);
     },
-    onError: () => toast.error("Yangilashda xatolik yuz berdi"),
+    onError: (err) => toast.error(apiError(err, "Yangilashda xatolik yuz berdi")),
   });
 
   const deleteMut = useMutation({
@@ -118,8 +129,8 @@ export default function AdminCarouselPage({ onBack }: AdminCarouselPageProps) {
       setConfirmDeleteId(null);
       setDeletingId(null);
     },
-    onError: () => {
-      toast.error("O'chirishda xatolik yuz berdi");
+    onError: (err) => {
+      toast.error(apiError(err, "O'chirishda xatolik yuz berdi"));
       setDeletingId(null);
     },
   });
@@ -130,18 +141,18 @@ export default function AdminCarouselPage({ onBack }: AdminCarouselPageProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-carousel-stats'] });
     },
-    onError: () => toast.error("Holat o'zgartirishda xatolik"),
+    onError: (err) => toast.error(apiError(err, "Holat o'zgartirishda xatolik")),
     onSettled: () => setTogglingId(null),
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleFormSubmit = useCallback(
-    (data: CarouselItemCreateRequest) => {
+    (data: CarouselItemCreateRequest | CarouselItemUpdateRequest) => {
       if (editingItem) {
         updateMut.mutate({ id: editingItem.id, data });
       } else {
-        createMut.mutate(data);
+        createMut.mutate(data as CarouselItemCreateRequest);
       }
     },
     [editingItem, createMut, updateMut],
@@ -378,6 +389,7 @@ export default function AdminCarouselPage({ onBack }: AdminCarouselPageProps) {
                 key={editingItem?.id ?? 'new'}
                 defaultValues={formDefaultValues}
                 defaultMediaItems={editingItem?.media_items}
+                isEdit={editingItem !== null}
                 onSubmit={handleFormSubmit}
                 onUploadStateChange={setGlobalUpload}
               />
@@ -401,6 +413,7 @@ export default function AdminCarouselPage({ onBack }: AdminCarouselPageProps) {
                 key={editingItem?.id ?? 'new'}
                 defaultValues={formDefaultValues}
                 defaultMediaItems={editingItem?.media_items}
+                isEdit={editingItem !== null}
                 onSubmit={handleFormSubmit}
                 onUploadStateChange={setGlobalUpload}
               />

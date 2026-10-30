@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect, useLayoutEffect, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { X, ChevronLeft, ChevronRight, ArrowUpRight } from 'lucide-react';
 import type { CarouselMediaItemResponse } from '@/api/services/carousel';
 import { trackCarouselClick } from '@/api/services/carousel';
+import { isSafeCarouselLink, openCarouselLink } from '@/lib/carouselLinks';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,20 +16,44 @@ export interface CarouselMediaModalProps {
   title?: string | null;
   subTitle?: string | null;
   actionUrl?: string | null;
-  /** Gallery slides — must already be sorted by `order` before passing in */
+  /** Slides, already sorted by `order`. One slide is fine: a video promo opens
+   *  here with just itself. */
   mediaItems: CarouselMediaItemResponse[];
 }
 
 // ─── Media slide ──────────────────────────────────────────────────────────────
 
-const MediaSlide = memo(({ media }: { media: CarouselMediaItemResponse }) => {
+interface MediaSlideProps {
+  media: CarouselMediaItemResponse;
+  active: boolean;
+}
+
+const MediaSlide = memo(({ media, active }: MediaSlideProps) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Only the slide on screen plays. Starting with sound works because the
+  // client just tapped the promo; if the WebView still refuses, the native
+  // controls are there and one more tap plays it.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (active) {
+      void video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }, [active]);
+
   if (media.media_type === 'video') {
     return (
       <video
+        ref={videoRef}
         src={media.media_url}
-        className="max-w-full max-h-full object-contain rounded-mc-md"
+        className="h-full max-h-full w-full max-w-full bg-black object-contain"
         controls
         playsInline
+        preload="auto"
+        controlsList="nodownload"
       />
     );
   }
@@ -35,133 +61,12 @@ const MediaSlide = memo(({ media }: { media: CarouselMediaItemResponse }) => {
     <img
       src={media.media_url}
       alt=""
-      className="max-w-full max-h-full object-contain rounded-mc-md"
+      className="max-h-full max-w-full select-none object-contain"
       draggable={false}
     />
   );
 });
 MediaSlide.displayName = 'MediaSlide';
-
-// ─── Carousel content (remounted via key on every open → state resets naturally) ──
-
-interface CarouselContentProps {
-  sorted: CarouselMediaItemResponse[];
-  itemId: number;
-  actionUrl: string | null | undefined;
-}
-
-function CarouselContent({ sorted, itemId, actionUrl }: CarouselContentProps) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // On mount (fresh instance after key change), reset scroll to start
-  useLayoutEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = 0;
-    }
-  }, []);
-
-  // Scroll the inner carousel to a specific slide
-  const scrollToSlide = (index: number) => {
-    if (!scrollRef.current) return;
-    const clamped = Math.max(0, Math.min(sorted.length - 1, index));
-    scrollRef.current.scrollTo({ left: scrollRef.current.clientWidth * clamped, behavior: 'smooth' });
-    setActiveIndex(clamped);
-  };
-
-  // Keep activeIndex in sync while the user swipes
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      if (el.clientWidth === 0) return;
-      setActiveIndex(Math.round(el.scrollLeft / el.clientWidth));
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const handleCtaClick = () => {
-    if (!actionUrl) return;
-    trackCarouselClick(itemId);
-    window.open(actionUrl, '_blank');
-  };
-
-  return (
-    <>
-      {/* ── Inner carousel ─────────────────────────────────── */}
-      <div className="flex-1 relative overflow-hidden">
-        <div
-          ref={scrollRef}
-          className="flex h-full overflow-x-auto snap-x snap-mandatory"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {sorted.map((media) => (
-            <div
-              key={media.id}
-              className="flex-shrink-0 w-full h-full snap-start flex items-center justify-center px-4 py-2"
-            >
-              <MediaSlide media={media} />
-            </div>
-          ))}
-        </div>
-
-        {/* Prev / Next arrows — only shown when >1 slide */}
-        {sorted.length > 1 && (
-          <>
-            <button
-              onClick={() => scrollToSlide(activeIndex - 1)}
-              disabled={activeIndex === 0}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 flex items-center justify-center text-white disabled:opacity-20 transition-all"
-              aria-label="Oldingi"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => scrollToSlide(activeIndex + 1)}
-              disabled={activeIndex === sorted.length - 1}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 flex items-center justify-center text-white disabled:opacity-20 transition-all"
-              aria-label="Keyingi"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* ── Dot indicators ─────────────────────────────────── */}
-      {sorted.length > 1 && (
-        <div className="flex justify-center items-center gap-1.5 py-3 shrink-0">
-          {sorted.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => scrollToSlide(i)}
-              className={`rounded-full transition-all duration-300 ${
-                i === activeIndex
-                  ? 'w-5 h-1.5 bg-mc-surface'
-                  : 'w-1.5 h-1.5 bg-white/35'
-              }`}
-              aria-label={`Slayd ${i + 1}`}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ── CTA button ─────────────────────────────────────── */}
-      {actionUrl && (
-        <div className="shrink-0 px-4 pb-6 pt-2">
-          <button
-            onClick={handleCtaClick}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-mc-surface active:scale-[0.98] text-mc-text rounded-mc-lg font-semibold text-[15px] transition-all"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Batafsil ko'rish
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
@@ -174,54 +79,161 @@ export default function CarouselMediaModal({
   actionUrl,
   mediaItems,
 }: CarouselMediaModalProps) {
-  const sorted = [...mediaItems].sort((a, b) => a.order - b.order);
+  const { t } = useTranslation();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const count = mediaItems.length;
+  const hasLink = isSafeCarouselLink(actionUrl);
 
-  if (!isOpen) return null;
+  const scrollToSlide = useCallback((index: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const clamped = Math.max(0, Math.min(count - 1, index));
+    el.scrollTo({ left: el.clientWidth * clamped, behavior: 'smooth' });
+    setActiveIndex(clamped);
+  }, [count]);
+
+  // Follow the swipe so the active slide (and the one video allowed to play)
+  // is always the one on screen.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (el.clientWidth === 0) return;
+      setActiveIndex(Math.round(el.scrollLeft / el.clientWidth));
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [isOpen]);
+
+  // Keyboard on desktop Telegram / browser; the page behind must not scroll.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowRight') scrollToSlide(activeIndex + 1);
+      else if (e.key === 'ArrowLeft') scrollToSlide(activeIndex - 1);
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose, scrollToSlide, activeIndex]);
+
+  const handleCta = () => {
+    if (!hasLink) return;
+    void trackCarouselClick(itemId).catch(() => {});
+    openCarouselLink(actionUrl);
+  };
+
+  if (!isOpen || count === 0) return null;
 
   return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[11000] bg-black/90 flex flex-col"
-      onClick={onClose}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-[11000] flex flex-col bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title || t('dashboard.carousel.media.label', 'Media')}
     >
-      <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className="flex flex-col w-full h-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-end px-4 pt-4 pb-2 shrink-0">
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center transition-colors"
-            aria-label="Yopish"
-          >
-            <X className="w-4 h-4 text-white" />
-          </button>
+      {/* Top bar: position on the left, close on the right. Clear of the
+          status bar and of Telegram's own header in full-screen mode. */}
+      <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <span className="min-w-[44px] text-[13px] font-semibold tabular-nums text-white/70">
+          {count > 1 ? `${activeIndex + 1} / ${count}` : ''}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white transition-colors active:bg-white/20"
+          aria-label={t('dashboard.carousel.media.close', 'Yopish')}
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Slides */}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollRef}
+          className="mc-no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto"
+        >
+          {mediaItems.map((media, i) => (
+            <div
+              key={media.id}
+              className="flex h-full w-full shrink-0 snap-center items-center justify-center"
+            >
+              <MediaSlide media={media} active={i === activeIndex} />
+            </div>
+          ))}
         </div>
 
-        <CarouselContent
-          sorted={sorted}
-          itemId={itemId}
-          actionUrl={actionUrl}
-        />
-
-        {(title || subTitle) && (
-          <div className="shrink-0 px-4 pb-4 pt-2">
-            {title && (
-              <h2 className="text-white font-bold text-lg leading-tight">{title}</h2>
-            )}
-            {subTitle && (
-              <p className="text-white/55 text-sm mt-0.5">{subTitle}</p>
-            )}
-          </div>
+        {count > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => scrollToSlide(activeIndex - 1)}
+              disabled={activeIndex === 0}
+              className="absolute left-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity disabled:opacity-0 sm:flex"
+              aria-label={t('dashboard.carousel.media.prev', 'Oldingi')}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSlide(activeIndex + 1)}
+              disabled={activeIndex === count - 1}
+              className="absolute right-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-opacity disabled:opacity-0 sm:flex"
+              aria-label={t('dashboard.carousel.media.next', 'Keyingi')}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
         )}
-      </motion.div>
+      </div>
+
+      {/* Caption and link */}
+      {(title || subTitle || hasLink || count > 1) && (
+        <div className="shrink-0 space-y-3 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
+          {count > 1 && (
+            <div className="flex justify-center gap-1.5" aria-hidden="true">
+              {mediaItems.map((m, i) => (
+                <span
+                  key={m.id}
+                  className={`h-1.5 rounded-full transition-all duration-200 ${
+                    i === activeIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/30'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+          {(title || subTitle) && (
+            <div>
+              {title && (
+                <h2 className="text-[17px] font-bold leading-snug text-white">{title}</h2>
+              )}
+              {subTitle && (
+                <p className="mt-1 text-[14px] leading-snug text-white/60">{subTitle}</p>
+              )}
+            </div>
+          )}
+          {hasLink && (
+            <button
+              type="button"
+              onClick={handleCta}
+              className="flex w-full items-center justify-center gap-2 rounded-mc-lg bg-white py-3.5 text-[15px] font-semibold text-black transition-transform active:scale-[0.98]"
+            >
+              {t('dashboard.carousel.media.more', "Batafsil")}
+              <ArrowUpRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>,
     document.body,
   );

@@ -1,5 +1,5 @@
-import { memo, useEffect, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { memo, useEffect, useRef, useState } from 'react';
+import { ChevronRight, Play } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CarouselItemData } from '@/pages/user/dashboard-components/types';
 
@@ -16,6 +16,16 @@ interface HomeCarouselCardProps {
  *  150px at the full content width is roughly 2.4:1 — enough vertical room for
  *  an uploaded advert to read as artwork rather than a letterbox strip. */
 const CARD_HEIGHT = 'h-[150px]';
+
+/**
+ * Ask the browser to seek a hair past zero. Android's WebView (Telegram's
+ * in-app browser) blocks autoplay and, with only metadata loaded, paints no
+ * frame at all: the card stayed a black slab. A seek forces one frame to be
+ * decoded, so the card shows the video's opening shot even when it never plays.
+ */
+function withFirstFrameHint(url: string): string {
+  return url.includes('#') ? url : `${url}#t=0.1`;
+}
 
 /**
  * Home-screen carousel card.
@@ -43,6 +53,10 @@ export const HomeCarouselCard = memo(({ item, onView }: HomeCarouselCardProps) =
     typeof window !== 'undefined' &&
     Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const hasAdminGradient = !hasMedia && Boolean(item.gradientStyle);
+  const isVideo = item.mediaType === 'video';
+  // Until a frame is decoded the card shows a quiet placeholder instead of the
+  // bare dark surface, which read as a broken video.
+  const [frameReady, setFrameReady] = useState(false);
 
   useEffect(() => {
     if (!onView || !cardRef.current) return;
@@ -68,10 +82,19 @@ export const HomeCarouselCard = memo(({ item, onView }: HomeCarouselCardProps) =
                     border border-mc-border bg-mc-cardface
                     shadow-[var(--mc-shadow-card)]`}
       >
-        {item.mediaType === 'video' ? (
+        {isVideo && !frameReady && (
+          <div
+            className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_0%,rgba(255,122,26,0.22)_0%,rgba(29,29,36,0)_60%)]"
+            aria-hidden="true"
+          />
+        )}
+        {isVideo ? (
           <video
-            src={item.mediaUrl}
-            className="absolute inset-0 h-full w-full object-cover"
+            src={withFirstFrameHint(item.mediaUrl!)}
+            onLoadedData={() => setFrameReady(true)}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+              frameReady ? 'opacity-100' : 'opacity-0'
+            }`}
             autoPlay={!prefersReducedMotion}
             // Without autoplay the element would paint nothing at all; metadata
             // is enough to show a first frame.
@@ -93,6 +116,20 @@ export const HomeCarouselCard = memo(({ item, onView }: HomeCarouselCardProps) =
           />
         )}
 
+        {/* A video is opened full screen on tap; the glyph says so. Sits in the
+            open area above the caption plate. */}
+        {isVideo && (
+          <span
+            className="absolute left-1/2 top-[30%] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2
+                       items-center justify-center rounded-full border border-white/25
+                       bg-black/35 text-white backdrop-blur-md
+                       shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+            aria-hidden="true"
+          >
+            <Play className="ml-0.5 h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
+          </span>
+        )}
+
         {/* Softens the photo into the caption plate below. Decorative only —
             the plate, not this, is what guarantees the text is readable. */}
         <div
@@ -108,7 +145,7 @@ export const HomeCarouselCard = memo(({ item, onView }: HomeCarouselCardProps) =
             which moves as soon as a title wraps to a second line. 0.86 over the
             worst case (pure white) is 14.2:1 for the title and 9.6:1 for the
             subtitle, whatever the image and however many lines. */}
-        <div className="absolute inset-x-0 bottom-0 bg-[rgba(8,8,10,0.86)] px-3 pt-2 pb-6">
+        <div className="absolute inset-x-0 bottom-0 bg-[rgba(8,8,10,0.86)] px-3.5 py-2.5">
           {title && (
             <h3
               className="line-clamp-2 text-[14px] font-extrabold leading-tight"
@@ -138,7 +175,7 @@ export const HomeCarouselCard = memo(({ item, onView }: HomeCarouselCardProps) =
       <div
         ref={cardRef}
         className={`relative flex w-full ${CARD_HEIGHT} flex-col justify-end overflow-hidden
-                    rounded-mc-lg border border-mc-border p-3 pb-6
+                    rounded-mc-lg border border-mc-border p-3.5
                     shadow-[var(--mc-shadow-card)]`}
         style={{ background: item.gradientStyle }}
       >

@@ -1,18 +1,25 @@
 import { useState, useRef } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
-import { Loader2, Video, Upload, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Loader2, Upload, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { ProgressRing } from './ProgressRing';
 import type { UploadState } from './types';
 import { formatBytes } from './utils';
 import { ACCEPTED_MIME_TYPES } from './types';
 
+/** Seek a hair past zero so browsers paint a first frame instead of black. */
+function withFrameHint(url: string): string {
+  return url.includes('#') ? url : `${url}#t=0.1`;
+}
+
 interface UploadZoneProps {
   uploadState:     UploadState;
   onFileSelected:  (file: File) => void;
   onClear:         () => void;
+  /** Gallery rows: a small thumbnail instead of the full-width player. */
+  compact?:        boolean;
 }
 
-export function UploadZone({ uploadState, onFileSelected, onClear }: UploadZoneProps) {
+export function UploadZone({ uploadState, onFileSelected, onClear, compact = false }: UploadZoneProps) {
   const inputRef   = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -55,39 +62,77 @@ export function UploadZone({ uploadState, onFileSelected, onClear }: UploadZoneP
 
   // ── Success state ──
   if (uploadState.status === 'success' && uploadState.result) {
-    const { result, file } = uploadState;
+    const { result, file, existing } = uploadState;
+    const isVideo = result.media_type === 'video';
+    const name = file?.name ?? (existing ? 'Joriy fayl' : '');
+    const meta = [
+      isVideo ? 'Video' : result.media_type === 'gif' ? 'GIF' : 'Rasm',
+      result.size_bytes > 0 ? formatBytes(result.size_bytes) : null,
+    ].filter(Boolean).join(' · ');
+
     return (
-      <div className="flex items-start gap-3 p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl border border-emerald-200 dark:border-emerald-500/20">
-        <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center">
-          {result.media_type === 'image' || result.media_type === 'gif' ? (
-            <img
-              src={result.media_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Video className="w-5 h-5 text-gray-400" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <p className="text-[13px] font-semibold text-emerald-700 dark:text-emerald-300">
-              Muvaffaqiyatli yuklandi
-            </p>
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 dark:border-white/[0.08] bg-gray-50/80 dark:bg-white/[0.03]">
+        {/* The file itself, not a placeholder icon: on an edit this is the
+            only way to tell which video or banner the item carries. */}
+        {!compact && (
+          <div className="relative aspect-[16/9] bg-black">
+            {isVideo ? (
+              <video
+                src={withFrameHint(result.media_url)}
+                className="h-full w-full object-contain"
+                controls
+                playsInline
+                preload="metadata"
+              />
+            ) : (
+              <img src={result.media_url} alt="" className="h-full w-full object-contain" />
+            )}
           </div>
-          <p className="text-[11px] text-emerald-600/70 dark:text-emerald-400/60 truncate mt-0.5">
-            {file?.name} • {formatBytes(result.size_bytes)}
-          </p>
+        )}
+        <div className={`flex items-center gap-3 ${compact ? 'p-2 pr-3' : 'px-3.5 py-3'}`}>
+          {compact && (
+            <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-black">
+              {isVideo ? (
+                <video src={withFrameHint(result.media_url)} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+              ) : (
+                <img src={result.media_url} alt="" className="h-full w-full object-cover" />
+              )}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              {!existing && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+              <p className="truncate text-[13px] font-semibold text-gray-800 dark:text-gray-100">
+                {existing ? 'Joriy fayl' : 'Yuklandi'}
+                {name && !existing && <span className="font-normal text-gray-500 dark:text-gray-400"> — {name}</span>}
+              </p>
+            </div>
+            <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{meta}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+          >
+            Almashtirish
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            title="Olib tashlash"
+            aria-label="Olib tashlash"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClear}
-          className="p-1 rounded-lg text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors shrink-0"
-          title="Boshqasini tanlash"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          hidden
+          accept={ACCEPTED_MIME_TYPES}
+          onChange={handleChange}
+        />
       </div>
     );
   }
@@ -148,7 +193,7 @@ export function UploadZone({ uploadState, onFileSelected, onClear }: UploadZoneP
         </p>
       </div>
       <p className="text-[10px] text-gray-400 dark:text-gray-600">
-        JPEG · PNG · WebP · GIF · MP4 · MOV · WebM &nbsp;•&nbsp; Rasm ≤50 MB · Video ≤200 MB
+        JPEG · PNG · WebP · GIF · MP4 · WebM &nbsp;•&nbsp; Rasm ≤50 MB · Video ≤200 MB (MP4 tavsiya)
       </p>
       <input
         ref={inputRef}

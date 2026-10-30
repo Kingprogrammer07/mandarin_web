@@ -123,6 +123,9 @@ export async function uploadCarouselMedia(
     '/api/v1/admin/carousel/upload',
     formData,
     {
+      // A 200 MB video over a shop's uplink takes minutes; the client's
+      // default 60 s cut it off and reported a failed upload.
+      timeout: 15 * 60 * 1000,
       onUploadProgress: (event) => {
         if (event.total && onProgress) {
           // Cap at 99 until server responds to avoid premature 100%
@@ -136,18 +139,6 @@ export async function uploadCarouselMedia(
     },
   );
   return res.data;
-}
-
-export async function uploadCarouselMediaBatch(
-  files: File[],
-  onProgress?: (fileIndex: number, percent: number) => void,
-): Promise<CarouselMediaUploadResponse[]> {
-  const promises = files.map((file, index) =>
-    uploadCarouselMedia(file, (percent) => {
-      onProgress?.(index, percent);
-    }),
-  );
-  return Promise.all(promises);
 }
 
 /** Returns all carousel items including inactive ones (admin view). */

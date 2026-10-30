@@ -38,8 +38,10 @@ export const PRESET_COLORS: { hex: string; name: string }[] = [
   { hex: '#a855f7', name: "Binafsha" },
 ];
 
+// AVI and MPEG are gone: no phone browser plays them, so the client saw a
+// black box. The backend refuses them too.
 export const ACCEPTED_MIME_TYPES =
-  'image/jpeg,image/png,image/webp,image/heic,image/gif,video/mp4,video/quicktime,video/webm,video/x-msvideo,video/mpeg';
+  'image/jpeg,image/png,image/webp,image/heic,image/gif,video/mp4,video/quicktime,video/webm';
 
 export const carouselFormSchema = z
   .object({
@@ -50,10 +52,16 @@ export const carouselFormSchema = z
     // Internal hidden fields populated by upload or URL input
     media_url:    z.string().optional(),
     media_s3_key: z.string().optional(),
-    action_url:   z.string().url("To'g'ri URL kiriting").optional().or(z.literal('')),
+    // Same rule as the backend: only links a client can safely be sent to.
+    action_url:   z
+      .string()
+      .trim()
+      .regex(/^(https?:\/\/|tg:\/\/)\S+$/i, "Havola https:// yoki tg:// bilan boshlansin")
+      .optional()
+      .or(z.literal('')),
     text_color:   z.string().regex(/^#[0-9a-fA-F]{6}$/, "Hex rang (#rrggbb)"),
     gradient:     z.string().optional(),
-    order:        z.number().int().min(0),
+    order:        z.number({ error: "Tartib raqamini kiriting" }).int().min(0, "0 yoki undan katta"),
     is_active:    z.boolean(),
   })
   .refine(
@@ -85,6 +93,9 @@ export interface UploadState {
   file:     File | null;
   result:   CarouselMediaUploadResponse | null;
   errorMsg: string | null;
+  /** The file was saved on the item earlier, not picked in this session —
+   *  so there is no file name or size to show, and no upload to report. */
+  existing?: boolean;
 }
 
 export const UPLOAD_IDLE: UploadState = {
@@ -115,6 +126,7 @@ export function galleryItemFromApiMedia(media: CarouselMediaItemResponse): Galle
         size_bytes: 0,
       },
       errorMsg: null,
+      existing: true,
     },
     order: media.order,
   };

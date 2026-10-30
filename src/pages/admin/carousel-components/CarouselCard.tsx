@@ -52,9 +52,11 @@ export const CarouselCard = memo(({
           />
         ) : item.media_type === 'video' ? (
           <video
-            src={item.media_url}
+            // #t=0.1 makes the browser paint the opening frame instead of black.
+            src={item.media_url.includes('#') ? item.media_url : `${item.media_url}#t=0.1`}
             className="w-full h-full object-cover"
             muted
+            playsInline
             preload="metadata"
           />
         ) : null}
@@ -81,11 +83,16 @@ export const CarouselCard = memo(({
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-sm ${
             item.type === 'ad' ? 'bg-blue-500/80 text-white' : 'bg-purple-500/80 text-white'
           }`}>
-            {item.type === 'ad' ? 'AD' : 'FEATURE'}
+            {item.type === 'ad' ? 'Reklama' : 'Yangilik'}
           </span>
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-black/40 text-white/90 backdrop-blur-sm">
             {MEDIA_TYPE_ICON[item.media_type]}
           </span>
+          {item.media_items.length > 0 && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-black/40 text-white/90 backdrop-blur-sm">
+              +{item.media_items.length} slayd
+            </span>
+          )}
         </div>
 
         <div className="absolute top-2 right-2">

@@ -9,7 +9,9 @@ interface GlobalUploadBadgeProps {
 }
 
 export const GlobalUploadBadge = memo(({ uploadState }: GlobalUploadBadgeProps) => {
-  if (uploadState.status === 'idle') return null;
+  // A file already saved on the item is not an upload; announcing "Yuklash
+  // tugadi" the moment an edit opened was noise.
+  if (uploadState.status === 'idle' || uploadState.existing) return null;
 
   return (
     <AnimatePresence>

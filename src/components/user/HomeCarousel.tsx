@@ -191,11 +191,15 @@ export function HomeCarousel({ onItemClick }: HomeCarouselProps) {
     >
       {items.map((item) => {
         const label = item.titleKey ? t(item.titleKey) : item.title;
-        // An API promo carrying neither a link nor a gallery has nowhere to go
-        // (see UserHome.handleCarouselItem). Rendering it as a button would
+        // An API promo with media opens it full screen, and one with a link
+        // follows it (see UserHome.handleCarouselItem). Only a text-only promo
+        // with no link has nowhere to go; rendering that as a button would
         // announce a control, take a tab stop and log a click, all for nothing.
         const isInteractive =
-          !item.fromApi || Boolean(item.actionUrl) || (item.mediaItems?.length ?? 0) > 1;
+          !item.fromApi ||
+          Boolean(item.actionUrl) ||
+          Boolean(item.mediaUrl) ||
+          (item.mediaItems?.length ?? 0) > 0;
         const shared = {
           className:
             'w-full shrink-0 snap-start text-left transition-transform duration-150 rounded-mc-lg',
@@ -230,25 +234,18 @@ export function HomeCarousel({ onItemClick }: HomeCarouselProps) {
           cards. Dots also say how many promos exist, which a scrollbar only
           implies. Hidden for a single card, where there is nothing to indicate.
 
-          Overlaid on the slide rather than stacked beneath it, so the strip
-          occupies one rectangle instead of a card plus a detached row. The pill
-          is a translucent surface: nearly invisible on the light feature cards,
-          and a legible chip over a photo. */}
+          Below the strip, not overlaid on it: over a slide the pill sat on top
+          of any headline that wrapped to a second line. */}
       {isScrollable && items.length > 1 && (
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-3.5 flex justify-center"
-          aria-hidden="true"
-        >
-          <div className="flex items-center gap-1.5 rounded-full border border-mc-border bg-mc-surface/85 px-2 py-1.5 backdrop-blur-sm">
-            {items.map((item, index) => (
-              <span
-                key={itemKey(item)}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  index === activeIndex ? 'w-4 bg-mc-brand' : 'w-1.5 bg-mc-text-3'
-                }`}
-              />
-            ))}
-          </div>
+        <div className="mt-2 flex justify-center gap-1.5" aria-hidden="true">
+          {items.map((item, index) => (
+            <span
+              key={itemKey(item)}
+              className={`h-1.5 rounded-full transition-all duration-200 ${
+                index === activeIndex ? 'w-4 bg-mc-brand' : 'w-1.5 bg-mc-text-3/40'
+              }`}
+            />
+          ))}
         </div>
       )}
     </div>

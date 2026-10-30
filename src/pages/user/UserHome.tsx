@@ -3,6 +3,7 @@ import { useBackHandler } from '@/hooks/useBackHandler';
 import { BackPriority } from '@/lib/backStack';
 import { HomeScreen } from './HomeScreen';
 import type { CarouselItemData } from './dashboard-components/types';
+import { carouselSlides, carouselTapAction, openCarouselLink } from '@/lib/carouselLinks';
 
 const ChinaAddressModal = lazy(() => import('@/components/modals/ChinaAddressModal'));
 const MakePaymentModal = lazy(() => import('@/components/modals/MakePaymentModal'));
@@ -161,12 +162,11 @@ export default function UserHome({
       else if (item.id === STATIC_CARD_DELIVERY) setFullView('request');
       return;
     }
-    // A gallery opens in place; a single-media item with a link leaves the app.
-    if ((item.mediaItems?.length ?? 0) > 1) {
-      setMediaItem(item);
-    } else if (item.actionUrl) {
-      window.open(item.actionUrl, '_blank', 'noopener,noreferrer');
-    }
+    // Media (a video, a gallery, a banner without a link) opens full screen;
+    // a banner advert with a link follows it.
+    const action = carouselTapAction(item);
+    if (action === 'media') setMediaItem(item);
+    else if (action === 'link') openCarouselLink(item.actionUrl);
   }, []);
 
   const handleTrackSearch = useCallback((code: string) => {
@@ -295,7 +295,7 @@ export default function UserHome({
             title={mediaItem.title}
             subTitle={mediaItem.sub}
             actionUrl={mediaItem.actionUrl}
-            mediaItems={mediaItem.mediaItems ?? []}
+            mediaItems={carouselSlides(mediaItem)}
           />
         )}
       </Suspense>

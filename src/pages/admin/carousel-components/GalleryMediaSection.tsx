@@ -91,6 +91,7 @@ export function GalleryMediaSection({
               </span>
               <div className="flex-1 min-w-0">
                 <UploadZone
+                  compact
                   uploadState={item.uploadState}
                   onFileSelected={(file) => onFileSelected(item.localId, file)}
                   onClear={() => onClearItem(item.localId)}

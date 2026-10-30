@@ -1106,6 +1106,13 @@
       "help": {
         "title": "Yordam",
         "sub": "Savol-javob"
+      },
+      "media": {
+        "label": "Media",
+        "close": "Yopish",
+        "prev": "Oldingi",
+        "next": "Keyingi",
+        "more": "Batafsil"
       }
     },
     "actions": {

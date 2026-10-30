@@ -4,9 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Upload, Link2, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react';
 
-import { uploadCarouselMedia, uploadCarouselMediaBatch } from '../../../api/services/adminCarousel';
+import { uploadCarouselMedia } from '../../../api/services/adminCarousel';
 import type {
   CarouselItemCreateRequest,
+  CarouselItemUpdateRequest,
   CarouselMediaItemResponse,
   CarouselMediaType,
   CarouselMediaItemInput,
@@ -15,12 +16,14 @@ import LightSelect from '../../../components/ui/LightSelect';
 import { GalleryMediaSection } from './GalleryMediaSection';
 import { UploadZone } from './UploadZone';
 import { ColorPickerField } from './ColorPickerField';
+import { HomeCarouselCard } from '../../../components/user/HomeCarouselCard';
 import {
   carouselFormSchema,
   EMPTY_FORM,
   UPLOAD_IDLE,
   ITEM_TYPE_OPTIONS,
   MEDIA_TYPE_OPTIONS,
+  galleryItemFromApiMedia,
   type CarouselFormValues,
   type GalleryItemState,
   type MediaInputMode,
@@ -32,11 +35,25 @@ interface CarouselFormProps {
   defaultValues?: CarouselFormValues;
   /** Pre-populated gallery slides when editing a feature item */
   defaultMediaItems?: CarouselMediaItemResponse[];
-  onSubmit: (data: CarouselItemCreateRequest) => void;
+  /** Editing an existing item: cleared fields are sent as null and the
+   *  gallery is always sent, so both can actually be emptied. */
+  isEdit?: boolean;
+  onSubmit: (data: CarouselItemCreateRequest | CarouselItemUpdateRequest) => void;
   onUploadStateChange?: (state: UploadState) => void;
 }
 
-export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUploadStateChange }: CarouselFormProps) {
+/** The API error text (already Uzbek, e.g. the size limit), or a fallback. */
+function errorText(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg.trim()) return msg;
+  }
+  return fallback;
+}
+
+const UPLOAD_FAILED = "Fayl yuklanmadi. Hajmini yoki turini tekshiring.";
+
+export function CarouselForm({ defaultValues, defaultMediaItems, isEdit = false, onSubmit, onUploadStateChange }: CarouselFormProps) {
   const {
     register,
     handleSubmit,
@@ -73,6 +90,7 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
           size_bytes: 0,
         },
         errorMsg: null,
+        existing: true,
       };
     }
     return UPLOAD_IDLE;
@@ -83,26 +101,13 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
   const watchedGradient = useWatch({ control, name: 'gradient' });
   const watchedTitle    = useWatch({ control, name: 'title' });
   const watchedType     = useWatch({ control, name: 'type' });
+  const watchedSub      = useWatch({ control, name: 'sub_title' });
+  const watchedMediaUrl = useWatch({ control, name: 'media_url' });
+  const watchedMedia    = useWatch({ control, name: 'media_type' });
 
   // ── Gallery items state (feature type only) ──────────────────────────────────
   const [galleryItems, setGalleryItems] = useState<GalleryItemState[]>(() =>
-    defaultMediaItems ? defaultMediaItems.map((m) => ({
-      localId: `existing-${m.id}`,
-      id: m.id,
-      uploadState: {
-        status: 'success',
-        progress: 100,
-        file: null,
-        result: {
-          s3_key: m.media_s3_key ?? '',
-          media_url: m.media_url,
-          media_type: m.media_type,
-          size_bytes: 0,
-        },
-        errorMsg: null,
-      },
-      order: m.order,
-    })) : [],
+    defaultMediaItems ? defaultMediaItems.map(galleryItemFromApiMedia) : [],
   );
 
   const handleAddGalleryItem = useCallback(() => {
@@ -134,8 +139,8 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
           ? { ...i, uploadState: { status: 'success', progress: 100, file, result, errorMsg: null } }
           : i,
       ));
-    } catch {
-      const msg = "Fayl yuklanmadi. Hajmini yoki turini tekshiring.";
+    } catch (err) {
+      const msg = errorText(err, UPLOAD_FAILED);
       setGalleryItems((prev) => prev.map((i) =>
         i.localId === localId
           ? { ...i, uploadState: { ...i.uploadState, status: 'error', errorMsg: msg } }
@@ -151,60 +156,43 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
     ));
   }, []);
 
-  const handleBatchGalleryAdd = useCallback(async (files: File[]) => {
-    const startIndex = galleryItems.length;
-    const newLocalIds: string[] = [];
-    const newItems: GalleryItemState[] = files.map((file, idx) => {
-      const localId = `batch-${Date.now()}-${idx}`;
-      newLocalIds.push(localId);
-      return {
-        localId,
-        uploadState: { status: 'uploading', progress: 0, file, result: null, errorMsg: null },
-        order: startIndex + idx,
-      };
+  // Each file settles on its own. With Promise.all one failed file marked
+  // every slot as failed and threw away the uploads that had succeeded.
+  const handleBatchGalleryAdd = useCallback((files: File[]) => {
+    const stamp = Date.now();
+    setGalleryItems((prev) => [
+      ...prev,
+      ...files.map((file, idx) => ({
+        localId: `batch-${stamp}-${idx}`,
+        uploadState: { status: 'uploading' as const, progress: 0, file, result: null, errorMsg: null },
+        order: prev.length + idx,
+      })),
+    ]);
+    files.forEach((file, idx) => {
+      const localId = `batch-${stamp}-${idx}`;
+      uploadCarouselMedia(file, (percent) => {
+        setGalleryItems((prev) => prev.map((i) =>
+          i.localId === localId ? { ...i, uploadState: { ...i.uploadState, progress: percent } } : i,
+        ));
+      })
+        .then((result) => {
+          setGalleryItems((prev) => prev.map((i) =>
+            i.localId === localId
+              ? { ...i, uploadState: { status: 'success', progress: 100, file, result, errorMsg: null } }
+              : i,
+          ));
+        })
+        .catch((err) => {
+          const msg = errorText(err, UPLOAD_FAILED);
+          setGalleryItems((prev) => prev.map((i) =>
+            i.localId === localId
+              ? { ...i, uploadState: { ...i.uploadState, status: 'error', errorMsg: msg } }
+              : i,
+          ));
+          toast.error(`${file.name}: ${msg}`);
+        });
     });
-    setGalleryItems((prev) => [...prev, ...newItems]);
-
-    try {
-      const results = await uploadCarouselMediaBatch(files, (fileIndex: number, percent: number) => {
-        setGalleryItems((prev) => prev.map((item) => {
-          if (item.localId === newLocalIds[fileIndex]) {
-            return { ...item, uploadState: { ...item.uploadState, progress: percent } };
-          }
-          return item;
-        }));
-      });
-      setGalleryItems((prev) => prev.map((item) => {
-        const slotIdx = newLocalIds.indexOf(item.localId);
-        if (slotIdx !== -1) {
-          return {
-            ...item,
-            uploadState: {
-              status: 'success' as const,
-              progress: 100,
-              file: newItems[slotIdx].uploadState.file,
-              result: results[slotIdx],
-              errorMsg: null,
-            },
-          };
-        }
-        return item;
-      }));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Fayllar yuklanmadi. Internet aloqasini tekshiring.";
-      setGalleryItems((prev) => prev.map((item) => {
-        const slotIdx = newLocalIds.indexOf(item.localId);
-        if (slotIdx !== -1 && item.uploadState.status === 'uploading') {
-          return {
-            ...item,
-            uploadState: { ...item.uploadState, status: 'error' as const, errorMsg: msg },
-          };
-        }
-        return item;
-      }));
-      toast.error(msg);
-    }
-  }, [galleryItems.length]);
+  }, []);
 
   // Propagate upload state to parent for the global badge
   useEffect(() => {
@@ -224,8 +212,10 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
       setUploadState({ status: 'success', progress: 100, file, result, errorMsg: null });
       setValue('media_s3_key', result.s3_key);
       setValue('media_url', result.media_url);
-    } catch {
-      const msg = "Fayl yuklanmadi. Hajmini yoki turini tekshiring.";
+      // The server's verdict wins over the browser's MIME guess.
+      setValue('media_type', result.media_type);
+    } catch (err) {
+      const msg = errorText(err, UPLOAD_FAILED);
       setUploadState((prev) => ({ ...prev, status: 'error', errorMsg: msg }));
       toast.error(msg);
     }
@@ -260,26 +250,44 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
           : { ...base, media_url: res.media_url };
       });
 
-    const commonFields = {
+    const isFeature = data.type === 'feature';
+    const media = data.media_s3_key
+      ? { media_s3_key: data.media_s3_key }
+      : { media_url: data.media_url! };
+
+    if (isEdit) {
+      // null, not undefined: undefined is dropped from the JSON, so a field
+      // the admin emptied kept its old text. The gallery goes every time so
+      // removing its last slide is saved too.
+      onSubmit({
+        type:       data.type,
+        title:      data.title?.trim() || null,
+        sub_title:  data.sub_title?.trim() || null,
+        media_type: data.media_type as CarouselMediaType,
+        action_url: data.action_url?.trim() || null,
+        text_color: data.text_color,
+        gradient:   data.gradient?.trim() || null,
+        order:      data.order,
+        is_active:  data.is_active,
+        ...(isFeature ? { media_items: mediaItems } : {}),
+        ...media,
+      });
+      return;
+    }
+
+    onSubmit({
       type:       data.type,
-      title:      data.title || undefined,
-      sub_title:  data.sub_title || undefined,
+      title:      data.title?.trim() || undefined,
+      sub_title:  data.sub_title?.trim() || undefined,
       media_type: data.media_type as CarouselMediaType,
-      action_url: data.action_url || undefined,
+      action_url: data.action_url?.trim() || undefined,
       text_color: data.text_color,
-      gradient:   data.gradient || undefined,
+      gradient:   data.gradient?.trim() || undefined,
       order:      data.order,
       is_active:  data.is_active,
-      ...(data.type === 'feature' && mediaItems.length > 0
-        ? { media_items: mediaItems }
-        : {}),
-    };
-
-    if (data.media_s3_key) {
-      onSubmit({ ...commonFields, media_s3_key: data.media_s3_key });
-    } else {
-      onSubmit({ ...commonFields, media_url: data.media_url! });
-    }
+      ...(isFeature && mediaItems.length > 0 ? { media_items: mediaItems } : {}),
+      ...media,
+    });
   };
 
   const isUploading =
@@ -407,10 +415,13 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
       <div className="space-y-3">
         <p className="block text-[12px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Ko'rinish</p>
 
-        {/* Media type + Order */}
+        {/* Media type + Order. For an uploaded file the type comes from the
+            file itself; a hand-picked "Rasm" on a video made clients load
+            the video into an <img> and see nothing. */}
         <div className="grid grid-cols-2 gap-2">
+          {mediaMode === 'url' ? (
           <div>
-            <label className="block text-[11px] text-gray-400 mb-1">Media</label>
+            <label className="block text-[11px] text-gray-400 mb-1">Media turi</label>
             <Controller
               name="media_type"
               control={control}
@@ -426,15 +437,28 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
               )}
             />
           </div>
+          ) : (
+          <div>
+            <label className="block text-[11px] text-gray-400 mb-1">Media turi</label>
+            <div className={`${inputClass} text-gray-500 dark:text-gray-400`}>
+              {MEDIA_TYPE_OPTIONS.find((o) => o.value === watchedMedia)?.label ?? '—'}
+              <span className="text-[11px] text-gray-400 dark:text-gray-500"> · fayldan</span>
+            </div>
+          </div>
+          )}
           <div>
             <label className="block text-[11px] text-gray-400 mb-1">Tartib</label>
             <input
               type="number"
               min={0}
+              inputMode="numeric"
               {...register('order', { valueAsNumber: true })}
               className={inputClass}
               placeholder="0"
             />
+            {errors.order && (
+              <p className="text-red-500 text-[11px] mt-1">{errors.order.message}</p>
+            )}
           </div>
         </div>
 
@@ -457,7 +481,9 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
           )}
         </div>
 
-        {/* Gradient */}
+        {/* Gradient: the client card paints it only when there is no media,
+            so with a file attached the field changed nothing visible. */}
+        {!watchedMediaUrl && (
         <div>
           <label className="block text-[11px] text-gray-400 mb-1">
             Gradient <span className="text-gray-300 dark:text-gray-600">(ixtiyoriy, CSS)</span>
@@ -468,16 +494,28 @@ export function CarouselForm({ defaultValues, defaultMediaItems, onSubmit, onUpl
             className={`${inputClass} font-mono text-[16px]`}
           />
         </div>
+        )}
 
-        {/* Live preview */}
-        <div
-          className="h-12 rounded-xl flex items-center justify-center text-[13px] font-semibold transition-all px-4"
-          style={{
-            background: watchedGradient || 'linear-gradient(135deg, #1a1a2e, #16213e)',
-            color: /^#[0-9a-fA-F]{6}$/.test(watchedColor) ? watchedColor : '#ffffff',
-          }}
-        >
-          {watchedTitle || "Sarlavha ko'rinishi"}
+        {/* Live preview: the client's own card component, so what the admin
+            sees here is what lands on the home screen. */}
+        <div>
+          <label className="block text-[11px] text-gray-400 mb-2">Mijozga shunday ko'rinadi</label>
+          <div className="rounded-2xl bg-mc-bg p-3">
+            <HomeCarouselCard
+              key={`${watchedMedia}-${watchedMediaUrl ?? ''}`}
+              item={{
+                id: 0,
+                type: watchedType === 'feature' ? 'feature' : 'ad',
+                title: watchedTitle || "Sarlavha shu yerda",
+                sub: watchedSub || undefined,
+                gradientStyle: watchedGradient || 'linear-gradient(135deg, #1a1a2e, #16213e)',
+                mediaType: watchedMedia as CarouselMediaType,
+                mediaUrl: watchedMediaUrl || undefined,
+                textColor: /^#[0-9a-fA-F]{6}$/.test(watchedColor) ? watchedColor : '#ffffff',
+                fromApi: true,
+              }}
+            />
+          </div>
         </div>
       </div>
 
