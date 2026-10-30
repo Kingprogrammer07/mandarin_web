@@ -242,6 +242,17 @@ export async function downloadBtsBlank(queueId: number): Promise<Blob> {
   return res.data as Blob;
 }
 
+/** Several BTS blanks in one .docx, one label per page, in the given order. */
+export async function downloadBtsBlanks(queueIds: number[]): Promise<Blob> {
+  const params = new URLSearchParams();
+  queueIds.forEach((id) => params.append('queue_ids', String(id)));
+  const res = await apiClient.get(`/api/v1/warehouse/pickup-queue/bts-blanks?${params}`, {
+    headers: getAdminHeaders(),
+    responseType: 'blob',
+  });
+  return res.data as Blob;
+}
+
 export async function cancelPickupQueue(
   queueId: number,
   data: PickupQueueCancelRequest,

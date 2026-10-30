@@ -27,9 +27,9 @@ import type {
   WarehousePickupQueueEntry,
   WarehousePickupQueueTransaction,
 } from "../../api/pickupQueue";
-import { downloadBtsBlank } from "../../api/pickupQueue";
+import { downloadBtsBlank, downloadBtsBlanks } from "../../api/pickupQueue";
 import { useCancelPickupQueue } from "../../api/hooks/usePickupQueue";
-import { downloadBlob, safeFileName } from "../../utils/downloadFile";
+import { downloadBlob, fileStamp, safeFileName } from "../../utils/downloadFile";
 import { formatCurrencySum, formatTashkentDateTime } from "../../lib/format";
 
 interface PickupQueuePanelProps {
@@ -116,6 +116,19 @@ export default function PickupQueuePanel({
     }
   }, []);
 
+  const [bulkBlankLoading, setBulkBlankLoading] = useState(false);
+  const handleAllBtsBlanks = useCallback(async (queueIds: number[]) => {
+    setBulkBlankLoading(true);
+    try {
+      const blob = await downloadBtsBlanks(queueIds);
+      downloadBlob(`BTS_blankalar_${queueIds.length}ta_${fileStamp()}.docx`, blob);
+    } catch {
+      toast.error("BTS blankalarini yuklab bo'lmadi");
+    } finally {
+      setBulkBlankLoading(false);
+    }
+  }, []);
+
   const handleCopy = useCallback((text: string | null) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -163,8 +176,26 @@ export default function PickupQueuePanel({
     );
   }
 
+  // Only BTS requests have a blank; the button follows what is on screen.
+  const btsQueueIds = items
+    .filter((e) => e.pickup_method === "bts" && e.source === "delivery_request")
+    .map((e) => e.queue_id);
+
   return (
     <div className="space-y-3">
+      {btsQueueIds.length > 1 && (
+        <button
+          type="button"
+          onClick={() => void handleAllBtsBlanks(btsQueueIds)}
+          disabled={bulkBlankLoading}
+          className="flex items-center justify-center gap-2 w-full min-h-11 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-[13px] font-bold transition disabled:opacity-50"
+        >
+          <FileDown className="w-4 h-4" />
+          {bulkBlankLoading
+            ? "Tayyorlanmoqda..."
+            : `Barcha BTS blankalari (${btsQueueIds.length} ta) — bitta fayl`}
+        </button>
+      )}
       {items.map((entry) => {
         const isExpanded = expandedQueueIds[entry.queue_id] ?? true;
         const statusLabel = PICKUP_STATUS_LABELS[entry.queue_status];
