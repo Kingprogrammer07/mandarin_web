@@ -6,7 +6,9 @@ import type {
 } from "@/api/services/adminDeliveryService";
 import {
   bagsTotalKg,
+  defaultUzpostBags,
   needsUzpostBags,
+  UZPOST_MAX_BAGS,
   splitUzpostParcel,
   uzpostParcelWeightKg,
   validateUzpostBags,
@@ -72,6 +74,14 @@ describe("splitUzpostParcel", () => {
   });
 });
 
+describe("defaultUzpostBags", () => {
+  it("starts a light parcel as one bag and a heavy one from the split", () => {
+    expect(defaultUzpostBags(1.9)).toEqual([{ sequence_no: 1, weight_kg: 1.9 }]);
+    expect(defaultUzpostBags(15).map((bag) => bag.weight_kg)).toEqual([7.5, 7.5]);
+    expect(defaultUzpostBags(0)).toEqual([]);
+  });
+});
+
 describe("uzpostParcelWeightKg", () => {
   it("weighs only cargo still in the warehouse while there is any", () => {
     const flights = [flight("M1", [row(1, "30", { taken: true }), row(2, "15")])];
@@ -120,15 +130,25 @@ describe("validateUzpostBags", () => {
     expect(errors).toEqual(["Qoplar yig'indisi 20.00 kg bo'lishi kerak, hozir 19.00 kg."]);
   });
 
-  it("flags an empty or overweight bag", () => {
+  it("flags an empty bag and accepts a bag of any weight", () => {
     const errors = validateUzpostBags(
       [
         { sequence_no: 1, weight_kg: Number.NaN },
-        { sequence_no: 2, weight_kg: 20.5 },
+        { sequence_no: 2, weight_kg: 35.5 },
       ],
-      20.5,
+      35.5,
     );
-    expect(errors).toContain("1-qop vazni 0 dan katta bo'lishi kerak.");
-    expect(errors).toContain("2-qop vazni 20 kgdan oshmasligi kerak.");
+    expect(errors).toEqual(["1-qop vazni 0 dan katta bo'lishi kerak."]);
+    expect(validateUzpostBags([{ sequence_no: 1, weight_kg: 35.5 }], 35.5)).toEqual([]);
+  });
+
+  it("caps the number of bags", () => {
+    const bags = Array.from({ length: UZPOST_MAX_BAGS + 1 }, (_, index) => ({
+      sequence_no: index + 1,
+      weight_kg: 1,
+    }));
+    expect(validateUzpostBags(bags, UZPOST_MAX_BAGS + 1)).toContain(
+      `Qoplar soni ${UZPOST_MAX_BAGS} tadan oshmasligi kerak.`,
+    );
   });
 });

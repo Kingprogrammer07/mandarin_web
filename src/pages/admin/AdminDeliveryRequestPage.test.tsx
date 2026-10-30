@@ -337,12 +337,35 @@ describe("AdminDeliveryRequestPage", () => {
     ]);
     openFormFor("M300", /^UzPost/);
 
-    expect(screen.queryByText("Qoplarga ajratish")).toBeNull();
+    // The planner is offered, starting from one bag, which files as before.
+    expect(screen.getByText(/1 ta qop/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
     submit();
 
     expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
     expect(sentUzpostForm().has("bags")).toBe(false);
+  });
+
+  it("lets the manager split a light parcel into bags of any weight", () => {
+    state.context.data = contextData([
+      flightWithRows("M300", [
+        { id: 31, weight: "3" },
+        { id: 32, weight: "4" },
+      ]),
+    ]);
+    openFormFor("M300", /^UzPost/);
+
+    fireEvent.click(screen.getByRole("button", { name: /Qop qo'shish/ }));
+    fireEvent.change(screen.getAllByLabelText("Qop vazni")[0], { target: { value: "2" } });
+    fireEvent.change(screen.getAllByLabelText("Qop vazni")[1], { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Filialni tanlash" }));
+    submit();
+
+    expect(state.uzpostMutate).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(sentUzpostForm().get("bags")))).toEqual([
+      { sequence_no: 1, weight_kg: 2 },
+      { sequence_no: 2, weight_kg: 5 },
+    ]);
   });
 
   it("leaves cargo that was already collected out of the bags", () => {
@@ -479,6 +502,38 @@ describe("AdminDeliveryRequestPage", () => {
     openClient();
 
     expect(state.context.refetch).toHaveBeenCalledWith({ cancelRefetch: false });
+  });
+
+  it("offers a jump to «Davom etish» while it is out of sight", () => {
+    let report: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+          report = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      openClient();
+      expect(screen.queryByRole("button", { name: /Pastga/ })).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "M249" }));
+      act(() => report?.([{ isIntersecting: false }]));
+      fireEvent.click(screen.getByRole("button", { name: /1 ta reys · Pastga/ }));
+      expect(scrollIntoView).toHaveBeenCalled();
+
+      act(() => report?.([{ isIntersecting: true }]));
+      expect(screen.queryByRole("button", { name: /Pastga/ })).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+      Element.prototype.scrollIntoView = original;
+    }
   });
 
   it("selects every shown flight, then clears them", () => {

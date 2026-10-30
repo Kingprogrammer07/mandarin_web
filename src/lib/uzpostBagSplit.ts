@@ -5,10 +5,14 @@ import type {
   DeliveryFlightState,
 } from "@/api/services/adminDeliveryService";
 
-/** Above this weight the manager is offered an automatic split. */
+/**
+ * Above this weight the page suggests a split into bags of about this size.
+ * Only a suggestion: the manager may bag any parcel into bags of any weight
+ * (owner, 2026-10-30).
+ */
 export const UZPOST_BAG_AUTO_SPLIT_KG = 10;
-/** Matches the existing delivery_request_bags database constraint. */
-export const UZPOST_BAG_MAX_WEIGHT_KG = 20;
+/** Same cap as the server: each bag is its own paid UzPost order. */
+export const UZPOST_MAX_BAGS = 50;
 export const WEIGHT_TOLERANCE_KG = 0.01;
 
 /**
@@ -61,9 +65,17 @@ export function uzpostParcelWeightKg(
   return roundKg(total);
 }
 
-/** Whether a parcel is heavy enough to open the bag planner. */
+/** Whether a parcel is heavy enough for the page to suggest a split. */
 export function needsUzpostBags(parcelKg: number): boolean {
   return roundKg(parcelKg) > UZPOST_BAG_AUTO_SPLIT_KG;
+}
+
+/** The page's starting plan: the suggested split, else the parcel in one bag. */
+export function defaultUzpostBags(parcelKg: number): UzpostBagDraft[] {
+  const suggested = splitUzpostParcel(parcelKg);
+  if (suggested.length > 0) return suggested;
+  const total = roundKg(parcelKg);
+  return total > 0 ? [{ sequence_no: 1, weight_kg: total }] : [];
 }
 
 /**
@@ -105,13 +117,12 @@ export function validateUzpostBags(
   }
 
   const errors: string[] = [];
+  if (bags.length > UZPOST_MAX_BAGS) {
+    errors.push(`Qoplar soni ${UZPOST_MAX_BAGS} tadan oshmasligi kerak.`);
+  }
   for (const bag of bags) {
     if (!Number.isFinite(bag.weight_kg) || bag.weight_kg <= 0) {
       errors.push(`${bag.sequence_no}-qop vazni 0 dan katta bo'lishi kerak.`);
-    } else if (bag.weight_kg > UZPOST_BAG_MAX_WEIGHT_KG) {
-      errors.push(
-        `${bag.sequence_no}-qop vazni ${UZPOST_BAG_MAX_WEIGHT_KG} kgdan oshmasligi kerak.`,
-      );
     }
   }
 

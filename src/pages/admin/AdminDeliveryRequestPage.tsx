@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
   CheckCircle,
   Info,
@@ -24,9 +25,9 @@ import { isInCourierArea } from "@/lib/courierArea";
 import UzpostDeliveryForm from "@/components/admin/delivery/UzpostDeliveryForm";
 import UzpostBagSplitPanel from "@/components/admin/delivery/UzpostBagSplitPanel";
 import {
+  defaultUzpostBags,
   needsUzpostBags,
   roundKg,
-  splitUzpostParcel,
   uzpostParcelWeightKg,
   validateUzpostBags,
   type UzpostBagDraft,
@@ -195,16 +196,41 @@ export default function AdminDeliveryRequestPage() {
     [selectedFlights, flights],
   );
 
-  // Decided from what is on screen, so a hidden stale name in the selection
-  // cannot turn "select all" into "clear all".
-  const handleSelectAllFlights = useCallback(() => {
-    const all = flights.map((flight) => flight.flight);
-    const everyShownSelected =
-      all.length > 0 && all.every((name) => submittableFlights.includes(name));
-    setSelectedFlights(everyShownSelected ? [] : all);
-  }, [flights, submittableFlights]);
+  // The selector passes the flights its filter shows. Decided from the
+  // submittable selection, so a hidden stale name cannot turn "select all"
+  // into "clear all"; flights outside the filter keep their state.
+  const handleSelectAllFlights = useCallback(
+    (names: string[]) => {
+      const everySelected =
+        names.length > 0 && names.every((name) => submittableFlights.includes(name));
+      setSelectedFlights(
+        everySelected
+          ? submittableFlights.filter((name) => !names.includes(name))
+          : [...new Set([...submittableFlights, ...names])],
+      );
+    },
+    [submittableFlights],
+  );
 
   const canProceedToType = submittableFlights.length > 0;
+
+  // A long flight list pushes «Davom etish» far down; once something is
+  // picked, a floating button jumps there while it is out of sight.
+  const continueRef = useRef<HTMLDivElement | null>(null);
+  const [continueInView, setContinueInView] = useState(true);
+  const watchesContinue = step === "flights" && canProceedToType;
+  useEffect(() => {
+    const target = continueRef.current;
+    if (!watchesContinue || !target || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) =>
+      setContinueInView(entry?.isIntersecting ?? true),
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [watchesContinue]);
+  const showJumpToContinue = watchesContinue && !continueInView;
 
   const hasUnpaidCargo = useMemo(
     () => hasUnpaidRows(flights, submittableFlights),
@@ -215,14 +241,14 @@ export default function AdminDeliveryRequestPage() {
   const isUzpost = deliveryType === "uzpost";
   const canSplitUzpostBags = Boolean(context?.may_override && isUzpost);
 
-  // Cargo over the 10 kg recommendation opens the bag planner, and only for a
-  // filer whose request creates the orders. The manager may still choose one
-  // bag up to the separate 20 kg hard limit.
+  // The bag planner is open for any parcel, but only for a filer whose request
+  // creates the orders. Over 10 kg it starts from a suggested split, otherwise
+  // from one bag; the manager picks any number of bags of any weight.
   const uzpostParcelKg = useMemo(
     () => (canSplitUzpostBags ? uzpostParcelWeightKg(flights, submittableFlights) : 0),
     [canSplitUzpostBags, flights, submittableFlights],
   );
-  const splitsUzpostParcel = canSplitUzpostBags && needsUzpostBags(uzpostParcelKg);
+  const splitsUzpostParcel = canSplitUzpostBags && uzpostParcelKg > 0;
 
   // Edits survive until what they were made for changes: other flights or a
   // refetch that moved the weight bring back a fresh split.
@@ -230,7 +256,7 @@ export default function AdminDeliveryRequestPage() {
     ? `${submittableFlights.join("|")}:${roundKg(uzpostParcelKg)}`
     : "";
   const suggestedUzpostBags = useMemo(
-    () => (splitsUzpostParcel ? splitUzpostParcel(uzpostParcelKg) : []),
+    () => (splitsUzpostParcel ? defaultUzpostBags(uzpostParcelKg) : []),
     [splitsUzpostParcel, uzpostParcelKg],
   );
   const uzpostBags =
@@ -316,7 +342,12 @@ export default function AdminDeliveryRequestPage() {
       if (recipient.recipient_name) {
         formData.append("recipient_name", recipient.recipient_name);
       }
-      if (splitsUzpostParcel) {
+      // One bag of a light parcel is the plain single order it always was;
+      // over 10 kg even one bag is sent as a plan, as before.
+      if (
+        splitsUzpostParcel &&
+        (uzpostBags.length > 1 || needsUzpostBags(uzpostParcelKg))
+      ) {
         formData.append(
           "bags",
           JSON.stringify(
@@ -355,6 +386,7 @@ export default function AdminDeliveryRequestPage() {
     uzpostMutation,
     guardLabelCopies,
     splitsUzpostParcel,
+    uzpostParcelKg,
   ]);
 
   /** A different client: back to the search. */
@@ -602,14 +634,28 @@ export default function AdminDeliveryRequestPage() {
                   </div>
                 </div>
               )}
-              <Button
-                onClick={() => setStep("type")}
-                disabled={!canProceedToType}
-                className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold disabled:opacity-50"
-              >
-                {t("adminDeliveryRequest.actions.continue", "Davom etish")}
-                <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
-              </Button>
+              <div ref={continueRef}>
+                <Button
+                  onClick={() => setStep("type")}
+                  disabled={!canProceedToType}
+                  className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold disabled:opacity-50"
+                >
+                  {t("adminDeliveryRequest.actions.continue", "Davom etish")}
+                  <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+                </Button>
+              </div>
+              {showJumpToContinue && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    continueRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+                  }
+                  className="fixed right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-orange-500 pl-4 pr-5 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition-transform active:scale-95 bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6"
+                >
+                  <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                  {submittableFlights.length} ta reys · Pastga
+                </button>
+              )}
             </motion.div>
           )}
 

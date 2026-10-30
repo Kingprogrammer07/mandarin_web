@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { DeliveryFlightState } from "@/api/services/adminDeliveryService";
-import FlightSelector from "./FlightSelector";
+import FlightSelector, { FLIGHTS_PAGE_SIZE } from "./FlightSelector";
 
 function makeFlight(overrides: Partial<DeliveryFlightState> = {}): DeliveryFlightState {
   return {
@@ -100,5 +100,52 @@ describe("FlightSelector", () => {
     );
     expect(screen.getByRole("button", { name: /M250/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Barchasini bekor qilish" })).toBeInTheDocument();
+  });
+
+  it("pages the flights still in the warehouse", () => {
+    const flights = Array.from({ length: FLIGHTS_PAGE_SIZE + 2 }, (_, index) =>
+      makeFlight({ flight: `M${300 + index}`, active_requests: [] }),
+    );
+    renderSelector({ flights });
+
+    expect(screen.getByRole("button", { name: "M300" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `M${300 + FLIGHTS_PAGE_SIZE}` })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Keyingi sahifa" }));
+    expect(screen.getByRole("button", { name: `M${300 + FLIGHTS_PAGE_SIZE}` })).toBeInTheDocument();
+    expect(screen.getByText(/2 \/ 2/)).toBeInTheDocument();
+  });
+
+  it("folds collected flights away until opened", () => {
+    const flights = [
+      makeFlight({ flight: "M301", active_requests: [] }),
+      makeFlight({ flight: "M290", is_taken_away: true, taken_count: 2, active_requests: [] }),
+    ];
+    renderSelector({ flights, selectedFlights: ["M290"] });
+
+    expect(screen.queryByRole("button", { name: "M290" })).toBeNull();
+    const toggle = screen.getByRole("button", { name: /Olib ketilganlar \(1\)/ });
+    expect(toggle).toHaveTextContent("1 ta tanlangan");
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "M290" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("searches and filters, and selects all of what the filter shows", () => {
+    const flights = [
+      makeFlight({ flight: "M301", payment_status: "paid", active_requests: [] }),
+      makeFlight({ flight: "M302", active_requests: [] }),
+      ...Array.from({ length: 6 }, (_, index) =>
+        makeFlight({ flight: `A${index}`, active_requests: [] }),
+      ),
+    ];
+    const { onSelectAll } = renderSelector({ flights });
+
+    fireEvent.change(screen.getByPlaceholderText(/Reys nomi/), { target: { value: "m30" } });
+    expect(screen.queryByRole("button", { name: "A0" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Qarzdor" }));
+    expect(screen.queryByRole("button", { name: "M301" })).toBeNull();
+    expect(screen.getByRole("button", { name: "M302" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Barchasini tanlash" }));
+    expect(onSelectAll).toHaveBeenCalledWith(["M302"]);
   });
 });
