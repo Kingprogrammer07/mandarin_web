@@ -18,6 +18,7 @@ import DailyReportSection from '@/components/admin/DailyReportSection';
 import PaymeClickAutoApproveSection from '@/components/admin/PaymeClickAutoApproveSection';
 import CardTransferAutoApproveSection from '@/components/admin/CardTransferAutoApproveSection';
 import PartnerWebhooksSection from '@/components/admin/PartnerWebhooksSection';
+import CargoWeightExtraSection from '@/components/admin/CargoWeightExtraSection';
 import {
   Wrench,
   CreditCard,
@@ -35,6 +36,7 @@ import {
   Send,
   Truck,
   Webhook,
+  Package,
 } from 'lucide-react';
 import {
   systemService,
@@ -69,6 +71,7 @@ const SYSTEM_TABS = [
   { key: 'messages', label: 'Xabarlar', icon: Send },
   { key: 'office', label: 'Ofis', icon: MapPin },
   { key: 'payments', label: "To'lovlar", icon: CreditCard },
+  { key: 'cargo', label: 'Yuklar', icon: Package },
   { key: 'delivery', label: 'Yetkazish', icon: Truck },
   { key: 'integrations', label: 'Integratsiyalar', icon: Webhook },
   { key: 'system', label: 'Tizim', icon: Wrench },
@@ -964,6 +967,8 @@ export default function SystemSettingsPage() {
       </div>
       </>
       )}
+
+      {tab === 'cargo' && <CargoWeightExtraSection />}
 
       {tab === 'integrations' && (
       // Partner cargos receive their clients' China-import rows by webhook.

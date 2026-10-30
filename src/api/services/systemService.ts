@@ -346,6 +346,11 @@ export interface NbuReportResendResponse {
   windows: string[];
 }
 
+/** Kilograms added to China-manifest weights wherever they are shown. */
+export interface CargoWeightExtraSettings {
+  extra_kg: number;
+}
+
 export const systemService = {
   async getMaintenanceStatus(): Promise<MaintenanceStatusResponse> {
     const { data } = await apiClient.get<MaintenanceStatusResponse>('/api/v1/system/maintenance-status');
@@ -587,6 +592,21 @@ export const systemService = {
     const { data } = await apiClient.put<AdminLoginAlertSettings>(
       '/api/v1/system/admin-login-alert',
       body,
+    );
+    return data;
+  },
+
+  async getCargoWeightExtra(): Promise<CargoWeightExtraSettings> {
+    const { data } = await apiClient.get<CargoWeightExtraSettings>(
+      '/api/v1/system/cargo-weight-extra',
+    );
+    return data;
+  },
+
+  async updateCargoWeightExtra(extraKg: number): Promise<CargoWeightExtraSettings> {
+    const { data } = await apiClient.put<CargoWeightExtraSettings>(
+      '/api/v1/system/cargo-weight-extra',
+      { extra_kg: extraKg },
     );
     return data;
   },
