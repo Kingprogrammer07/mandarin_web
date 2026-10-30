@@ -27,6 +27,7 @@ import {
   Landmark,
   ArrowRightLeft,
   Smartphone,
+  MousePointerClick,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -64,9 +65,11 @@ import {
 } from '@/api/services/nbuPaymentService';
 import { openNbuUrl } from '@/utils/nbuReturnContext';
 import {
+  clickService,
   openPaymeCheckout,
   paymeRefusal,
   paymeService,
+  type OnlineProvider,
   type PaymeOrder,
 } from '@/api/services/paymeService';
 import type { CardDeliveryIntentRequest } from '@/api/services/paymentService';
@@ -784,7 +787,9 @@ interface StepUzpostProps {
   onChargeCard: (cardId: number, walletUsed: number, phoneNumber: string) => void;
   /** Payme Merchant API is switched on: the whole fee on Payme's page. */
   paymeEnabled: boolean;
-  /** A card transfer or a Payme order paid the fee: the request is made and approved. */
+  /** Click SHOP API is switched on: the whole fee on Click's page. */
+  clickEnabled: boolean;
+  /** A card transfer or a Payme or Click order paid the fee: the request is made and approved. */
   onPaid: () => void;
   /** «Tayyor» after such a payment. */
   onFinish: () => void;
@@ -815,6 +820,7 @@ export function StepUzpostPayment({
   onPayOnline,
   onChargeCard,
   paymeEnabled,
+  clickEnabled,
   onPaid,
   onFinish,
 }: StepUzpostProps) {
@@ -822,8 +828,10 @@ export function StepUzpostPayment({
   const [useWallet, setUseWallet] = useState(false);
   // The row of «To'lov usuli» the client picked; null until they pick one.
   const [methodKey, setMethodKey] = useState<string | null>(null);
-  // A card transfer or a Payme order opened from the list, shown in place of it.
-  const [view, setView] = useState<{ kind: 'card' } | { kind: 'payme'; order: PaymeOrder } | null>(null);
+  // A card transfer or a Payme or Click order opened from the list, shown in place of it.
+  const [view, setView] = useState<
+    { kind: 'card' } | { kind: OnlineProvider; order: PaymeOrder } | null
+  >(null);
   const [paymeOpening, setPaymeOpening] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -1110,12 +1118,14 @@ export function StepUzpostPayment({
     );
   }
 
-  if (view?.kind === 'payme' && delivery) {
+  if (view && view.kind !== 'card' && delivery) {
+    const service = view.kind === 'click' ? clickService : paymeService;
     return (
       <div className="animate-in fade-in slide-in-from-right-4 duration-400">
         <PaymePanel
+          provider={view.kind}
           initialOrder={view.order}
-          reopenOrder={() => paymeService.openDeliveryOrder(delivery)}
+          reopenOrder={() => service.openDeliveryOrder(delivery)}
           onPaid={onPaid}
           onBack={() => setView(null)}
           onDone={onFinish}
@@ -1146,15 +1156,20 @@ export function StepUzpostPayment({
   const receiptCard = calcData?.card ?? null;
   const noWallet = walletOn ? t('cardTransfer.payCardNoWallet') : null;
 
-  const openPayme = async () => {
+  const openProviderOrder = async (provider: OnlineProvider) => {
     if (!delivery) return;
     setPaymeOpening(true);
     try {
-      const order = await paymeService.openDeliveryOrder(delivery);
-      if (order.state === 'open' && order.checkout_url && !openPaymeCheckout(order.checkout_url)) {
-        toast.error(t('payme.badLink'));
+      const service = provider === 'click' ? clickService : paymeService;
+      const order = await service.openDeliveryOrder(delivery);
+      if (
+        order.state === 'open' &&
+        order.checkout_url &&
+        !openPaymeCheckout(order.checkout_url, provider)
+      ) {
+        toast.error(t(`${provider}.badLink`));
       }
-      setView({ kind: 'payme', order });
+      setView({ kind: provider, order });
     } catch (err: unknown) {
       toast.error(paymeRefusal(err, t('makePayment.errorOccurred')));
     } finally {
@@ -1219,7 +1234,22 @@ export function StepUzpostPayment({
             ? t('deliveryRequest.steps.uzpost.belowMin', { min: formatSom(PAYME_MIN_UZS) })
             : null),
         cta: t('makePayment.methods.payAmount', { amount: formatSom(total) }),
-        run: () => void openPayme(),
+        run: () => void openProviderOrder('payme'),
+      });
+    }
+    if (clickEnabled) {
+      payOptions.push({
+        key: 'click',
+        icon: MousePointerClick,
+        title: t('click.title'),
+        hint: t('click.hint'),
+        blockedBy:
+          noWallet ??
+          (total < PAYME_MIN_UZS
+            ? t('deliveryRequest.steps.uzpost.belowMin', { min: formatSom(PAYME_MIN_UZS) })
+            : null),
+        cta: t('makePayment.methods.payAmount', { amount: formatSom(total) }),
+        run: () => void openProviderOrder('click'),
       });
     }
     if (calcData.card_intent_available) {
@@ -1764,6 +1794,14 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
     enabled: deliveryType === 'uzpost',
   });
   const paymeEnabled = paymeStatus?.enabled === true;
+  // Click SHOP API: the same, with its own keys.
+  const { data: clickStatus } = useQuery({
+    queryKey: ['click-available'],
+    queryFn: clickService.available,
+    staleTime: 5 * 60_000,
+    enabled: deliveryType === 'uzpost',
+  });
+  const clickEnabled = clickStatus?.enabled === true;
 
   // API state
   const [flights, setFlights] = useState<FlightItem[]>([]);
@@ -2298,6 +2336,7 @@ export default function DeliveryRequestPage({ onBack, onNavigateToHistory, onGoT
           onPayOnline={handleUzpostPayOnline}
           onChargeCard={handleUzpostChargeCard}
           paymeEnabled={paymeEnabled}
+          clickEnabled={clickEnabled}
           onPaid={handleUzpostPaid}
           onFinish={onNavigateToHistory ?? onBack}
         />

@@ -25,15 +25,22 @@ vi.mock('@/api/services/paymentService', () => ({
 vi.mock('@/api/services/paymeService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/services/paymeService')>()),
   paymeService: { available: vi.fn(), openDeliveryOrder: vi.fn(), getOrder: vi.fn() },
+  clickService: { available: vi.fn(), openDeliveryOrder: vi.fn(), getOrder: vi.fn() },
   openPaymeCheckout: vi.fn(() => true),
 }));
 
 import { paymentService } from '@/api/services/paymentService';
-import { openPaymeCheckout, paymeService, type PaymeOrder } from '@/api/services/paymeService';
+import {
+  clickService,
+  openPaymeCheckout,
+  paymeService,
+  type PaymeOrder,
+} from '@/api/services/paymeService';
 import { StepUzpostPayment } from './DeliveryRequestPage';
 
 const payments = vi.mocked(paymentService);
 const payme = vi.mocked(paymeService);
+const click = vi.mocked(clickService);
 
 const branch: UzpostBranch = {
   id: 12,
@@ -107,6 +114,7 @@ function renderStep(calcData: CalculateUzpostResponse, props: Partial<StepProps>
         nbuEnabled
         savedCards={[]}
         paymeEnabled={false}
+        clickEnabled={false}
         {...handlers}
         {...props}
       />
@@ -278,7 +286,7 @@ describe('StepUzpostPayment — Payme', () => {
     fireEvent.click(payButton());
 
     await waitFor(() => expect(payme.openDeliveryOrder).toHaveBeenCalledWith(theRequest));
-    expect(openPaymeCheckout).toHaveBeenCalledWith(order.checkout_url);
+    expect(openPaymeCheckout).toHaveBeenCalledWith(order.checkout_url, 'payme');
     expect(await screen.findByText(/M310, M311/)).toBeInTheDocument();
   });
 
@@ -294,5 +302,44 @@ describe('StepUzpostPayment — Payme', () => {
     await waitFor(() => expect(onPaid).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole('button', { name: 'Tayyor' }));
     expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StepUzpostPayment — Click', () => {
+  const order: PaymeOrder = {
+    id: 53,
+    kind: 'delivery',
+    flight_name: 'M310, M311',
+    state: 'open',
+    amount: 24_500,
+    checkout_url:
+      'https://my.click.uz/services/pay?service_id=105313&merchant_id=21087&amount=24500.00&transaction_param=53',
+    expires_at: '2026-10-30T12:30:00Z',
+    server_time: '2026-10-30T12:00:00Z',
+    delivery_request_id: null,
+  };
+
+  it('is offered only while the server has it on', () => {
+    renderStep(calc(), { paymeEnabled: true });
+    expect(screen.queryByRole('radio', { name: /Click sahifasida/ })).not.toBeInTheDocument();
+  });
+
+  it("opens the whole fee's order on Click's page; the wallet blocks it", async () => {
+    click.openDeliveryOrder.mockResolvedValue(order);
+    click.getOrder.mockResolvedValue(order);
+    renderStep(calc({ wallet_balance: 10_000 }), { clickEnabled: true });
+
+    fireEvent.click(walletSwitch());
+    expect(method(/Click/)).toBeDisabled();
+    fireEvent.click(walletSwitch());
+
+    fireEvent.click(method(/Click sahifasida/));
+    expect(payButton()).toHaveTextContent(/^24\s500 so'm to'lash$/);
+    fireEvent.click(payButton());
+
+    await waitFor(() => expect(click.openDeliveryOrder).toHaveBeenCalledWith(theRequest));
+    expect(payme.openDeliveryOrder).not.toHaveBeenCalled();
+    expect(openPaymeCheckout).toHaveBeenCalledWith(order.checkout_url, 'click');
+    expect(await screen.findByText('Click yechadigan summa')).toBeInTheDocument();
   });
 });

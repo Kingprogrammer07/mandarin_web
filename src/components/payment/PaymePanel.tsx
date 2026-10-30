@@ -1,11 +1,14 @@
 /**
- * Pay on Payme's own page: a flight's whole debt, or an UzPost delivery fee.
+ * Pay on Payme's or Click's own page: a flight's whole debt, or an UzPost
+ * delivery fee.
  *
- * The caller opened the order (and Payme's page with it). This step shows what
- * Payme charges and for how long, reopens the same page, and polls the order
- * until Payme has performed the payment and the server has booked it. Payme
- * itself refuses an expired or replaced order; a new one starts over, and the
- * server hands back the order Payme is already paying instead of a second one.
+ * The caller opened the order (and the provider's page with it). This step
+ * shows what the provider charges and for how long, reopens the same page, and
+ * polls the order until the provider has taken the money and the server has
+ * booked it. The provider itself refuses an expired or replaced order; a new
+ * one starts over, and the server hands back the order the provider is already
+ * paying instead of a second one. Texts are the provider's section of the
+ * translations (`click.*`), falling back to Payme's (`payme.*`).
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -17,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  Hourglass,
   Loader2,
   RefreshCw,
   Undo2,
@@ -24,9 +28,11 @@ import {
 } from 'lucide-react';
 
 import {
+  clickService,
   openPaymeCheckout,
   paymeRefusal,
   paymeService,
+  type OnlineProvider,
   type PaymeOrder,
 } from '@/api/services/paymeService';
 import { playApplePaySound } from '@/utils/audioUtils';
@@ -113,6 +119,8 @@ const secondaryButton =
 const description = 'max-w-[290px] text-[13px] font-medium leading-relaxed text-mc-text-2';
 
 interface PaymePanelProps {
+  /** Whose page the order is paid on. */
+  provider?: OnlineProvider;
   /** The order the pay button opened. */
   initialOrder: PaymeOrder;
   /** Open the order again (the same one while it is open), for «Yangi buyurtma». */
@@ -125,16 +133,27 @@ interface PaymePanelProps {
   onDone: () => void;
 }
 
-export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }: PaymePanelProps) {
+export function PaymePanel({
+  provider = 'payme',
+  initialOrder,
+  reopenOrder,
+  onPaid,
+  onBack,
+  onDone,
+}: PaymePanelProps) {
   const { t } = useTranslation();
+  /** The provider's text, or Payme's where both say the same. */
+  const tp = (key: string, options?: Record<string, unknown>) =>
+    t([`${provider}.${key}`, `payme.${key}`], options);
+  const service = provider === 'click' ? clickService : paymeService;
   const [current, setCurrent] = useState(() => ({
     order: initialOrder,
     receivedAt: Date.now(),
   }));
 
   const poll = useQuery({
-    queryKey: ['payme-order', current.order.id],
-    queryFn: () => paymeService.getOrder(current.order.id),
+    queryKey: [`${provider}-order`, current.order.id],
+    queryFn: () => service.getOrder(current.order.id),
     refetchInterval: (query) => {
       const state = (query.state.data ?? current.order).state;
       return state === 'open' || state === 'processing' ? POLL_MS : false;
@@ -146,7 +165,7 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
   const receivedAt = poll.data ? poll.dataUpdatedAt : current.receivedAt;
 
   const openPage = (url: string) => {
-    if (!openPaymeCheckout(url)) toast.error(t('payme.badLink'));
+    if (!openPaymeCheckout(url, provider)) toast.error(tp('badLink'));
   };
 
   const reopen = useMutation({
@@ -172,11 +191,11 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
 
   if (order.state === 'paid') {
     return (
-      <StatusBlock tone="success" icon={CheckCircle2} title={t('payme.paidTitle')}>
+      <StatusBlock tone="success" icon={CheckCircle2} title={tp('paidTitle')}>
         <p className={description}>
           {order.kind === 'delivery' && order.delivery_request_id
-            ? t('payme.paidDeliveryDesc', { amount, request: order.delivery_request_id })
-            : t('payme.paidDesc', { amount, flight: order.flight_name })}
+            ? tp('paidDeliveryDesc', { amount, request: order.delivery_request_id })
+            : tp('paidDesc', { amount, flight: order.flight_name })}
         </p>
         <button type="button" onClick={onDone} className={`${primaryButton} max-w-xs`}>
           {t('makePayment.done')}
@@ -187,16 +206,27 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
 
   if (order.state === 'processing') {
     return (
-      <StatusBlock tone="neutral" icon={Loader2} spin title={t('payme.processingTitle')}>
-        <p className={description}>{t('payme.processingDesc', { amount })}</p>
+      <StatusBlock tone="neutral" icon={Loader2} spin title={tp('processingTitle')}>
+        <p className={description}>{tp('processingDesc', { amount })}</p>
+      </StatusBlock>
+    );
+  }
+
+  if (order.state === 'held') {
+    return (
+      <StatusBlock tone="warn" icon={Hourglass} title={tp('heldTitle')}>
+        <p className={description}>{tp('heldDesc', { amount })}</p>
+        <button type="button" onClick={onDone} className={`${secondaryButton} max-w-xs`}>
+          {t('makePayment.done')}
+        </button>
       </StatusBlock>
     );
   }
 
   if (order.state === 'refunded') {
     return (
-      <StatusBlock tone="warn" icon={Undo2} title={t('payme.refundedTitle')}>
-        <p className={description}>{t('payme.refundedDesc', { amount })}</p>
+      <StatusBlock tone="warn" icon={Undo2} title={tp('refundedTitle')}>
+        <p className={description}>{tp('refundedDesc', { amount })}</p>
         <button type="button" onClick={onDone} className={`${secondaryButton} max-w-xs`}>
           {t('makePayment.done')}
         </button>
@@ -210,11 +240,9 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
       <StatusBlock
         tone="warn"
         icon={expired ? Clock : RefreshCw}
-        title={expired ? t('payme.expiredTitle') : t('payme.replacedTitle')}
+        title={expired ? tp('expiredTitle') : tp('replacedTitle')}
       >
-        <p className={description}>
-          {expired ? t('payme.expiredDesc') : t('payme.replacedDesc')}
-        </p>
+        <p className={description}>{expired ? tp('expiredDesc') : tp('replacedDesc')}</p>
         <div className="flex w-full max-w-xs flex-col gap-2.5">
           <button
             type="button"
@@ -223,10 +251,10 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
             className={primaryButton}
           >
             {reopen.isPending && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-            {t('payme.newOrder')}
+            {tp('newOrder')}
           </button>
           <button type="button" onClick={onBack} className={secondaryButton}>
-            {t('payme.otherMethod')}
+            {tp('otherMethod')}
           </button>
         </div>
       </StatusBlock>
@@ -236,13 +264,13 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[16px] font-extrabold text-mc-text">{t('payme.title')}</h3>
+        <h3 className="text-[16px] font-extrabold text-mc-text">{tp('title')}</h3>
         <Countdown order={order} receivedAt={receivedAt} />
       </div>
 
       <div className="rounded-mc-lg border border-mc-border bg-mc-surface-2 p-4">
         <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-mc-text-3">
-          {t('payme.amountLabel')}
+          {tp('amountLabel')}
         </p>
         <p className="mt-1 text-[26px] font-extrabold leading-tight tabular-nums text-mc-text min-[360px]:text-[28px]">
           {amount}
@@ -250,8 +278,8 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
         </p>
         <p className="mt-1.5 break-words text-[12px] font-semibold text-mc-text-2">
           {order.kind === 'delivery'
-            ? t('payme.deliveryFor', { flights: order.flight_name })
-            : t('payme.flightFor', { flight: order.flight_name })}
+            ? tp('deliveryFor', { flights: order.flight_name })
+            : tp('flightFor', { flight: order.flight_name })}
         </p>
       </div>
 
@@ -261,7 +289,7 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
           onClick={() => openPage(order.checkout_url as string)}
           className={primaryButton}
         >
-          {t('payme.open')}
+          {tp('open')}
           <ExternalLink className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />
         </button>
       )}
@@ -271,11 +299,11 @@ export function PaymePanel({ initialOrder, reopenOrder, onPaid, onBack, onDone }
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mc-brand opacity-60 motion-reduce:animate-none" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-mc-brand" />
         </span>
-        {t('payme.waiting')}
+        {tp('waiting')}
       </p>
 
       <button type="button" onClick={onBack} className={secondaryButton}>
-        {t('payme.otherMethod')}
+        {tp('otherMethod')}
       </button>
     </div>
   );

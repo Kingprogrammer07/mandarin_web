@@ -52,18 +52,30 @@ vi.mock('@/api/services/paymeService', async (importOriginal) => ({
     openDeliveryOrder: vi.fn(),
     getOrder: vi.fn(),
   },
+  clickService: {
+    available: vi.fn(),
+    openOrder: vi.fn(),
+    openDeliveryOrder: vi.fn(),
+    getOrder: vi.fn(),
+  },
   openPaymeCheckout: vi.fn(() => true),
 }));
 
 import { toast } from 'sonner';
 import { paymentService } from '@/api/services/paymentService';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
-import { openPaymeCheckout, paymeService, type PaymeOrder } from '@/api/services/paymeService';
+import {
+  clickService,
+  openPaymeCheckout,
+  paymeService,
+  type PaymeOrder,
+} from '@/api/services/paymeService';
 import MakePaymentModal from './MakePaymentModal';
 
 const payments = vi.mocked(paymentService);
 const nbu = vi.mocked(nbuPaymentService);
 const payme = vi.mocked(paymeService);
+const click = vi.mocked(clickService);
 
 function flight(overrides: Partial<FlightPaymentDetailsResponse> = {}): FlightPaymentDetailsResponse {
   return {
@@ -101,12 +113,14 @@ function openFor(
   details: FlightPaymentDetailsResponse,
   cards: SavedCardItem[] = [savedCard],
   paymeOn = false,
+  clickOn = false,
 ) {
   payments.getFlightDetails.mockResolvedValue(details);
   payments.getAvailableFlights.mockResolvedValue({ flights: [], count: 0 });
   nbu.getStatus.mockResolvedValue({ enabled: true });
   nbu.listCards.mockResolvedValue({ items: cards, count: cards.length });
   payme.available.mockResolvedValue({ enabled: paymeOn });
+  click.available.mockResolvedValue({ enabled: clickOn });
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -280,7 +294,7 @@ describe('MakePaymentModal — Payme', () => {
     fireEvent.click(payButton());
 
     await waitFor(() => expect(payme.openOrder).toHaveBeenCalledWith('TEST-K1'));
-    expect(openPaymeCheckout).toHaveBeenCalledWith(paymeOrder().checkout_url);
+    expect(openPaymeCheckout).toHaveBeenCalledWith(paymeOrder().checkout_url, 'payme');
 
     // The step says what Payme charges and reopens the same page.
     expect(await screen.findByText("Payme yechadigan summa")).toBeInTheDocument();
@@ -327,5 +341,46 @@ describe('MakePaymentModal — Payme', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Bu reys kassada ko'rilgan."));
     expect(openPaymeCheckout).not.toHaveBeenCalled();
     expect(screen.getByRole('radio', { name: /Payme sahifasida/ })).toBeInTheDocument();
+  });
+});
+
+describe('MakePaymentModal — Click', () => {
+  const clickUrl = 'https://my.click.uz/services/pay?service_id=105313&merchant_id=21087&amount=125000.00&transaction_param=43';
+
+  it('is offered only while the server has it on, next to Payme', async () => {
+    openFor(flight({ total_payment: 125_000 }), [], true, false);
+    expect(await screen.findByRole('radio', { name: /Payme sahifasida/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Click sahifasida/ })).not.toBeInTheDocument();
+  });
+
+  it("opens Click's page for the whole debt and watches the order", async () => {
+    const order = paymeOrder({ id: 43, checkout_url: clickUrl });
+    click.openOrder.mockResolvedValue(order);
+    click.getOrder.mockResolvedValue(order);
+    openFor(flight({ total_payment: 125_000 }), [], true, true);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Click sahifasida/ }));
+    expect(payButton()).toHaveTextContent(/^125\s000 so'm to'lash$/);
+    fireEvent.click(payButton());
+
+    await waitFor(() => expect(click.openOrder).toHaveBeenCalledWith('TEST-K1'));
+    expect(payme.openOrder).not.toHaveBeenCalled();
+    expect(openPaymeCheckout).toHaveBeenCalledWith(clickUrl, 'click');
+    expect(await screen.findByText('Click yechadigan summa')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Click sahifasini ochish/ }));
+    expect(openPaymeCheckout).toHaveBeenLastCalledWith(clickUrl, 'click');
+    await waitFor(() => expect(click.getOrder).toHaveBeenCalledWith(43));
+  });
+
+  it('money Click took but the bot did not book says to wait for the admin', async () => {
+    click.openOrder.mockResolvedValue(paymeOrder({ id: 43, checkout_url: clickUrl }));
+    click.getOrder.mockResolvedValue(paymeOrder({ id: 43, state: 'held', checkout_url: null }));
+    openFor(flight({ total_payment: 125_000 }), [], false, true);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Click sahifasida/ }));
+    fireEvent.click(payButton());
+
+    expect(await screen.findByText("To'lov tekshiruvda")).toBeInTheDocument();
+    expect(screen.getByText(/Qayta to'lamang/)).toBeInTheDocument();
   });
 });

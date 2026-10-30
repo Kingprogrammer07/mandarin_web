@@ -2103,9 +2103,20 @@
     "expiredTitle": "Vaqt tugadi",
     "expiredDesc": "Buyurtma 30 daqiqa ichida to'lanmadi, pul yechilmadi. Yangi buyurtma oching.",
     "replacedTitle": "Buyurtma yangilangan",
-    "replacedDesc": "Bu to'lov uchun yangiroq Payme buyurtmasi ochilgan. Shuni oching.",
+    "replacedDesc": "Bu to'lov uchun yangiroq buyurtma ochilgan. Shuni oching.",
     "newOrder": "Yangi buyurtma",
     "badLink": "Payme sahifasini ochib bo'lmadi. Keyinroq urinib ko'ring."
+  },
+  "click": {
+    "title": "Click",
+    "hint": "Click sahifasida · chek shart emas",
+    "amountLabel": "Click yechadigan summa",
+    "open": "Click sahifasini ochish",
+    "waiting": "To'lovni Click sahifasida tasdiqlang. Pul tushishi bilan shu yerda ko'rinadi, chek kerak emas.",
+    "processingDesc": "Click {{amount}} so'mni yechmoqda. Bir necha soniyada tasdiqlanadi.",
+    "heldTitle": "To'lov tekshiruvda",
+    "heldDesc": "Click {{amount}} so'mni yechdi, lekin shu orada to'lov ma'lumotlari o'zgargani uchun avtomatik yozilmadi. Qayta to'lamang: admin tekshirib, tez orada hal qiladi.",
+    "badLink": "Click sahifasini ochib bo'lmadi. Keyinroq urinib ko'ring."
   },
   "maintenance": {
     "title": "Texnik ishlar olib borilmoqda",
