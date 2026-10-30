@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { Check, ChevronDown, ImagePlus, Camera, Pencil, Plus, Tag, User, X } from 'lucide-react';
+import { Camera, Check, ChevronDown, ImagePlus, Tag, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useCreateExpense, useUpdateExpense, useUploadExpenseImages } from '@/api/hooks/useExpenses';
@@ -27,8 +27,10 @@ import { cn } from '@/lib/utils';
 
 import { PAYMENT_METHODS } from './expenseUi';
 
+// 48px under a finger, 40px under a mouse. The text stays 16px whatever the
+// pointer, so iOS never zooms the page on focus.
 const CONTROL =
-  'h-12 w-full rounded-mc-sm border border-transparent bg-mc-surface-2 px-3.5 text-base font-medium text-mc-text outline-none transition-[border-color,background-color,box-shadow] placeholder:text-mc-text-2 focus:border-mc-brand/60 focus:bg-mc-surface focus:ring-4 focus:ring-mc-brand/10 aria-[invalid=true]:border-mc-danger/70';
+  'h-12 pointer-fine:h-10 w-full rounded-mc-sm border border-transparent bg-mc-surface-2 px-3.5 text-base font-medium text-mc-text outline-none transition-[border-color,background-color,box-shadow] placeholder:text-mc-text-2 focus:border-mc-brand/60 focus:bg-mc-surface focus:ring-4 focus:ring-mc-brand/10 aria-[invalid=true]:border-mc-danger/70';
 
 function Field({
   id,
@@ -49,7 +51,7 @@ function Field({
 }) {
   return (
     <div className={cn('min-w-0', className)}>
-      <label htmlFor={id} className="mb-1.5 flex items-center gap-1 text-[13px] font-semibold text-mc-text-2">
+      <label htmlFor={id} className="mb-1 flex items-center gap-1 text-[13px] font-semibold text-mc-text-2">
         {label}
         {required && (
           <span aria-hidden className="text-mc-brand">
@@ -59,11 +61,11 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p id={`${id}-msg`} className="mt-1.5 text-[12px] font-semibold text-mc-danger">
+        <p id={`${id}-msg`} className="mt-1 text-[12px] font-semibold text-mc-danger">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-msg`} className="mt-1.5 text-[12px] font-medium text-mc-text-2">
+        <p id={`${id}-msg`} className="mt-1 text-[12px] font-medium text-mc-text-2">
           {hint}
         </p>
       ) : null}
@@ -71,10 +73,15 @@ function Field({
   );
 }
 
+/**
+ * A native select whose chosen name wraps instead of being cut off. The real
+ * <select> lies invisibly over the box, so a tap still opens the phone's own picker.
+ */
 function SelectBox({
   id,
   icon,
   value,
+  display,
   onChange,
   invalid,
   children,
@@ -82,24 +89,38 @@ function SelectBox({
   id: string;
   icon: ReactNode;
   value: string;
+  /** What the box shows: the chosen option's name, or the placeholder. */
+  display: string;
   onChange: (value: string) => void;
   invalid?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-mc-text-2">{icon}</span>
+    <div
+      className={cn(
+        CONTROL,
+        'relative flex h-auto min-h-12 items-center gap-2.5 py-2 pointer-fine:h-auto pointer-fine:min-h-10 pointer-fine:py-1.5',
+        'has-[select:focus]:border-mc-brand/60 has-[select:focus]:bg-mc-surface has-[select:focus]:ring-4 has-[select:focus]:ring-mc-brand/10',
+        invalid && 'border-mc-danger/70',
+      )}
+    >
+      <span aria-hidden className="flex shrink-0 text-mc-text-2">
+        {icon}
+      </span>
+      <span aria-hidden className={cn('min-w-0 flex-1 break-words leading-snug', !value && 'text-mc-text-2')}>
+        {display}
+      </span>
+      <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-mc-text-2" />
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={invalid || undefined}
         aria-describedby={`${id}-msg`}
-        className={cn(CONTROL, 'appearance-none truncate pl-11 pr-10', !value && 'text-mc-text-2')}
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none rounded-mc-sm text-base opacity-0"
       >
         {children}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-mc-text-2" />
     </div>
   );
 }
@@ -348,20 +369,15 @@ export function ExpenseForm({
 
   return (
     <section aria-labelledby={titleId} className="@container/form flex min-h-0 flex-1 flex-col">
-      <header className={cn('flex shrink-0 items-center gap-3 px-5 pb-4', sheet ? 'pt-2' : 'pt-5')}>
-        <span
-          aria-hidden
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mc-brand-soft text-mc-brand"
-        >
-          {editing ? <Pencil className="h-[18px] w-[18px]" strokeWidth={2.2} /> : <Plus className="h-5 w-5" strokeWidth={2.4} />}
-        </span>
+      <header className={cn('flex shrink-0 items-center gap-3 px-4 pb-3', sheet ? 'pt-2' : 'pt-4')}>
         <div className="min-w-0 flex-1">
-          <h2 id={titleId} className="truncate text-[18px] font-extrabold tracking-tight text-mc-text">
+          <h2 id={titleId} className="break-words text-[17px] font-extrabold leading-tight tracking-tight text-mc-text">
             {editing ? 'Rasxodni tahrirlash' : "Yangi rasxod qo'shish"}
           </h2>
           {editing && initialWhen && (
-            <p className="truncate text-[12px] font-medium text-mc-text-2">
-              №{editing.id} · {dmy(initialWhen.ymd)} {initialWhen.hm} · {formatMoney(editing.amount)} so'm
+            <p className="mt-0.5 break-words text-[12px] font-medium text-mc-text-2">
+              №{editing.id} · {dmy(initialWhen.ymd)} {initialWhen.hm} ·{' '}
+              <span className="whitespace-nowrap">{formatMoney(editing.amount)} so'm</span>
             </p>
           )}
         </div>
@@ -377,13 +393,14 @@ export function ExpenseForm({
         )}
       </header>
 
-      <div className={cn('min-h-0 flex-1 px-5', sheet && 'overflow-y-auto overscroll-contain')}>
-        <div className="grid items-start gap-4 @2xl/form:grid-cols-2 @2xl/form:gap-x-5">
+      <div className={cn('min-h-0 flex-1 px-4', sheet && 'overflow-y-auto overscroll-contain')}>
+        <div className="grid items-start gap-3.5 pointer-fine:gap-3 @2xl/form:grid-cols-2 @2xl/form:gap-x-5">
           <Field id={ids.category} label="Rasxod turi" required error={show('category')}>
             <SelectBox
               id={ids.category}
               icon={<Tag className="h-[18px] w-[18px]" />}
               value={categoryId}
+              display={categoryOptions.find((c) => String(c.id) === categoryId)?.name ?? 'Rasxod turini tanlang'}
               invalid={!!show('category')}
               onChange={(v) => {
                 setCategoryId(v);
@@ -420,7 +437,7 @@ export function ExpenseForm({
               placeholder="Masalan: M72 reys – Xitoydan tashish"
               aria-invalid={!!show('description') || undefined}
               aria-describedby={`${ids.description}-msg`}
-              className={cn(CONTROL, 'h-auto min-h-12 resize-none py-3 leading-snug')}
+              className={cn(CONTROL, 'h-auto min-h-12 resize-none py-2.5 leading-snug pointer-fine:h-auto pointer-fine:py-2')}
             />
           </Field>
 
@@ -446,7 +463,7 @@ export function ExpenseForm({
           </Field>
 
           <Field id={ids.date} label="Sana va vaqt" required error={show('date')} hint={dateInWords(ymd, now.ymd)}>
-            <div className="grid grid-cols-[minmax(0,1fr)_136px] gap-2 @max-[23rem]/form:grid-cols-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_136px] gap-2 @max-[21.75rem]/form:grid-cols-1">
               <input
                 id={ids.date}
                 type="date"
@@ -477,7 +494,7 @@ export function ExpenseForm({
           </Field>
 
           <div className="min-w-0">
-            <p id={ids.payment} className="mb-1.5 text-[13px] font-semibold text-mc-text-2">
+            <p id={ids.payment} className="mb-1 text-[13px] font-semibold text-mc-text-2">
               To'lov usuli
             </p>
             <div role="radiogroup" aria-labelledby={ids.payment} className="grid grid-cols-2 gap-2">
@@ -494,7 +511,7 @@ export function ExpenseForm({
                       touch();
                     }}
                     className={cn(
-                      'flex h-12 items-center justify-center gap-2 rounded-mc-sm border text-[15px] font-semibold transition-[border-color,background-color] active:scale-[0.98]',
+                      'flex h-12 items-center justify-center gap-2 rounded-mc-sm border text-[15px] font-semibold pointer-fine:h-10 transition-[border-color,background-color] active:scale-[0.98]',
                       active
                         ? 'border-mc-brand/70 bg-mc-brand-soft text-mc-brand'
                         : 'border-transparent bg-mc-surface-2 text-mc-text hover:border-mc-border',
@@ -513,6 +530,7 @@ export function ExpenseForm({
               id={ids.employee}
               icon={<User className="h-[18px] w-[18px]" />}
               value={employeeId}
+              display={employeeOptions.find((e) => String(e.id) === employeeId)?.full_name ?? 'Xodimni tanlang'}
               onChange={(v) => {
                 setEmployeeId(v);
                 touch();
@@ -528,7 +546,7 @@ export function ExpenseForm({
           </Field>
 
           <div className="min-w-0">
-            <p id={ids.files} className="mb-1.5 text-[13px] font-semibold text-mc-text-2">
+            <p id={ids.files} className="mb-1 text-[13px] font-semibold text-mc-text-2">
               Chek yoki rasm <span className="font-medium">(ixtiyoriy)</span>
             </p>
             <div
@@ -550,7 +568,7 @@ export function ExpenseForm({
               )}
             >
               {images.map((url, i) => (
-                <div key={url} className="relative h-16 w-16 overflow-hidden rounded-mc-sm bg-mc-surface-2">
+                <div key={url} className="relative h-16 w-16 overflow-hidden rounded-mc-sm bg-mc-surface-2 pointer-fine:h-14 pointer-fine:w-14">
                   {isPdf(url) ? (
                     <span className="flex h-full items-center justify-center text-[12px] font-bold text-mc-text-2">PDF</span>
                   ) : (
@@ -570,7 +588,7 @@ export function ExpenseForm({
                 </div>
               ))}
               {pending.map((file, i) => (
-                <div key={`${file.name}-${i}`} className="relative h-16 w-16 overflow-hidden rounded-mc-sm bg-mc-surface-2">
+                <div key={`${file.name}-${i}`} className="relative h-16 w-16 overflow-hidden rounded-mc-sm bg-mc-surface-2 pointer-fine:h-14 pointer-fine:w-14">
                   {previews[i] ? (
                     <img src={previews[i]} alt={file.name} className="h-full w-full object-cover" />
                   ) : (
@@ -589,7 +607,7 @@ export function ExpenseForm({
               <button
                 type="button"
                 onClick={() => cameraRef.current?.click()}
-                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-mc-sm border border-dashed border-mc-text-3/50 text-[11px] font-semibold text-mc-text-2 transition-colors hover:border-mc-brand/60 hover:text-mc-text active:scale-95"
+                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-mc-sm border border-dashed pointer-fine:h-14 pointer-fine:w-14 border-mc-text-3/50 text-[11px] font-semibold text-mc-text-2 transition-colors hover:border-mc-brand/60 hover:text-mc-text active:scale-95"
               >
                 <Camera className="h-[18px] w-[18px]" />
                 Kamera
@@ -597,7 +615,7 @@ export function ExpenseForm({
               <button
                 type="button"
                 onClick={() => filesRef.current?.click()}
-                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-mc-sm border border-dashed border-mc-text-3/50 text-[11px] font-semibold text-mc-text-2 transition-colors hover:border-mc-brand/60 hover:text-mc-text active:scale-95"
+                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-mc-sm border border-dashed pointer-fine:h-14 pointer-fine:w-14 border-mc-text-3/50 text-[11px] font-semibold text-mc-text-2 transition-colors hover:border-mc-brand/60 hover:text-mc-text active:scale-95"
               >
                 <ImagePlus className="h-[18px] w-[18px]" />
                 Fayl
@@ -650,15 +668,15 @@ export function ExpenseForm({
 
       <footer
         className={cn(
-          'flex shrink-0 gap-3 px-5 pt-5 @2xl/form:justify-end',
-          sheet ? 'border-t border-mc-border pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3' : 'pb-5',
+          'flex shrink-0 gap-3 px-4 pt-4 @2xl/form:justify-end',
+          sheet ? 'border-t border-mc-border pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3' : 'pb-4',
         )}
       >
         <button
           type="button"
           onClick={handleCancel}
           disabled={busy}
-          className="h-12 flex-1 rounded-mc-sm border border-mc-border bg-mc-surface text-[15px] font-semibold text-mc-text transition-colors hover:bg-mc-surface-2 active:scale-[0.98] disabled:opacity-50 @2xl/form:max-w-[180px]"
+          className="h-12 flex-1 rounded-mc-sm border border-mc-border bg-mc-surface text-[15px] font-semibold pointer-fine:h-10 text-mc-text transition-colors hover:bg-mc-surface-2 active:scale-[0.98] disabled:opacity-50 @2xl/form:max-w-[180px]"
         >
           Bekor qilish
         </button>
@@ -667,7 +685,7 @@ export function ExpenseForm({
           onClick={handleSubmit}
           disabled={busy}
           aria-busy={busy}
-          className="flex h-12 flex-[1.6] items-center justify-center gap-2 rounded-mc-sm bg-mc-brand text-[15px] font-bold text-mc-on-brand transition-[background-color,transform] hover:bg-mc-brand-strong active:scale-[0.98] disabled:opacity-60 @2xl/form:max-w-[260px]"
+          className="flex h-12 flex-[1.6] items-center justify-center gap-2 rounded-mc-sm bg-mc-brand pointer-fine:h-10 text-[15px] font-bold text-mc-on-brand transition-[background-color,transform] hover:bg-mc-brand-strong active:scale-[0.98] disabled:opacity-60 @2xl/form:max-w-[260px]"
         >
           <Check className="h-[18px] w-[18px]" strokeWidth={2.6} />
           {busy ? 'Saqlanmoqda…' : editing ? "O'zgarishni saqlash" : 'Rasxodni saqlash'}

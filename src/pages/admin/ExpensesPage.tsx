@@ -41,9 +41,13 @@ import { rangeLabel, tashkentNow, within24h, type DateRange } from '@/lib/expens
 import { cn } from '@/lib/utils';
 
 const PER_PAGE = 50;
-/** Below this the form moves into a sheet; from SPLIT up it stands beside the list. */
+/**
+ * Below PHONE the form moves into a sheet. From SPLIT up it stands beside the
+ * list: a 352px form column (date and time still fit side by side) plus the
+ * 640px the table needs. A 1366px laptop with the sidebar open clears it.
+ */
 const PHONE = 768;
-const SPLIT = 1020;
+const SPLIT = 1008;
 
 function useElementWidth(ref: RefObject<HTMLElement | null>): number {
   const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
@@ -327,32 +331,32 @@ export default function ExpensesPage({ standalone = false }: { standalone?: bool
   return (
     <div className={cn(standalone && 'min-h-dvh bg-mc-bg px-4 py-4 text-mc-text md:px-6 md:py-6')}>
       <div ref={rootRef} className="mx-auto w-full max-w-[1500px]">
-        <div className="mb-4 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => window.history.back()}
             aria-label="Orqaga"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm text-mc-text-2 transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mc-sm text-mc-text-2 transition-colors hover:bg-mc-surface-2 hover:text-mc-text active:scale-95 pointer-fine:h-9 pointer-fine:w-9"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-[22px] font-extrabold tracking-tight text-mc-text">Rasxodlar</h1>
+          <h1 className="min-w-0 flex-1 break-words text-[20px] font-extrabold tracking-tight text-mc-text">Rasxodlar</h1>
           <button
             type="button"
             onClick={() => setManage('categories')}
             aria-label="Rasxod turlari"
-            className="flex h-11 shrink-0 items-center gap-2 rounded-mc-sm px-3 text-[14px] font-semibold text-mc-text-2 transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
+            className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-mc-sm px-3 text-[14px] font-semibold text-mc-text-2 transition-colors hover:bg-mc-surface-2 hover:text-mc-text active:scale-95 pointer-fine:h-9"
           >
-            <Tags className="h-[18px] w-[18px]" />
+            <Tags className="h-4 w-4" />
             <span className={cn(mode === 'phone' && 'sr-only')}>Rasxod turlari</span>
           </button>
           <button
             type="button"
             onClick={() => setManage('employees')}
             aria-label="Xodimlar"
-            className="flex h-11 shrink-0 items-center gap-2 rounded-mc-sm px-3 text-[14px] font-semibold text-mc-text-2 transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
+            className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-mc-sm px-3 text-[14px] font-semibold text-mc-text-2 transition-colors hover:bg-mc-surface-2 hover:text-mc-text active:scale-95 pointer-fine:h-9"
           >
-            <Users className="h-[18px] w-[18px]" />
+            <Users className="h-4 w-4" />
             <span className={cn(mode === 'phone' && 'sr-only')}>Xodimlar</span>
           </button>
         </div>
@@ -368,7 +372,7 @@ export default function ExpensesPage({ standalone = false }: { standalone?: bool
           </button>
         )}
 
-        <div className={cn('grid gap-5', mode === 'split' && 'grid-cols-[340px_minmax(0,1fr)] items-start')}>
+        <div className={cn('grid gap-4', mode === 'split' && 'grid-cols-[352px_minmax(0,1fr)] items-start')}>
           {mode !== 'phone' && (
             <div
               ref={formCardRef}

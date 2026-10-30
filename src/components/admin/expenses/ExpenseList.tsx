@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Download,
   FileText,
-  Layers,
   Lock,
   Paperclip,
   Pencil,
@@ -57,8 +56,9 @@ const SORTS: { value: ExpenseSort; label: string }[] = [
   { value: 'amount_asc', label: 'Summa: kichigi' },
 ];
 
+// 44px under a finger, 36px under a mouse; a touch screen keeps the finger size.
 const CHIP =
-  'h-11 shrink-0 appearance-none rounded-mc-sm border text-base font-semibold outline-none transition-colors focus-visible:ring-4 focus-visible:ring-mc-brand/15';
+  'min-h-11 pointer-fine:min-h-9 rounded-mc-sm border text-[14px] font-semibold outline-none transition-colors focus-visible:ring-4 focus-visible:ring-mc-brand/15';
 const CHIP_IDLE = 'border-mc-border bg-mc-surface text-mc-text hover:bg-mc-surface-2';
 const CHIP_ON = 'border-mc-brand/50 bg-mc-brand-soft text-mc-brand';
 
@@ -70,35 +70,46 @@ function Money({ value, className }: { value: number; className?: string }) {
   );
 }
 
+/**
+ * A filter chip over a native select: the chosen name wraps instead of being
+ * cut, and the invisible <select> on top opens the phone's own picker.
+ */
 function FilterSelect({
   label,
+  display,
   value,
   active,
   onChange,
   children,
 }: {
   label: string;
+  /** The chosen option's name, or the filter's own name when nothing is chosen. */
+  display: string;
   value: string;
   active: boolean;
   onChange: (value: string) => void;
   children: ReactNode;
 }) {
   return (
-    <label className="relative shrink-0">
+    <label
+      className={cn(
+        CHIP,
+        'relative flex min-w-0 grow items-center justify-between gap-1.5 py-1.5 pl-3 pr-2.5 @xl/list:grow-0 has-[select:focus-visible]:ring-4 has-[select:focus-visible]:ring-mc-brand/15',
+        active ? CHIP_ON : CHIP_IDLE,
+      )}
+    >
       <span className="sr-only">{label}</span>
+      <span aria-hidden className="min-w-0 break-words leading-tight">
+        {display}
+      </span>
+      <ChevronDown aria-hidden className={cn('h-4 w-4 shrink-0', active ? 'text-mc-brand' : 'text-mc-text-2')} />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(CHIP, 'max-w-[220px] truncate pl-3.5 pr-9', active ? CHIP_ON : CHIP_IDLE)}
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none rounded-mc-sm text-base opacity-0"
       >
         {children}
       </select>
-      <ChevronDown
-        className={cn(
-          'pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2',
-          active ? 'text-mc-brand' : 'text-mc-text-2',
-        )}
-      />
     </label>
   );
 }
@@ -121,12 +132,12 @@ function DateRangeFilter({
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
-        className={cn(CHIP, CHIP_IDLE, 'flex items-center gap-2 pl-3 pr-3 tabular-nums')}
+        className={cn(CHIP, CHIP_IDLE, 'flex grow items-center gap-2 px-3 tabular-nums @xl/list:grow-0')}
         aria-label={`Davr: ${rangeLabel(value)}`}
       >
-        <CalendarDays className="h-[18px] w-[18px] text-mc-text-2" />
-        <span className="whitespace-nowrap">{rangeLabel(value)}</span>
-        <ChevronDown className="h-4 w-4 text-mc-text-2" />
+        <CalendarDays className="h-4 w-4 shrink-0 text-mc-text-2" />
+        <span className="min-w-0 flex-1 text-left">{rangeLabel(value)}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-mc-text-2" />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
@@ -191,14 +202,13 @@ function DateRangeFilter({
 function CategoryChip({ id, name, className }: { id: number; name: string; className?: string }) {
   return (
     <span
-      title={name}
       className={cn(
-        'inline-flex max-w-[180px] items-center rounded-full px-2.5 py-1 text-[12px] font-semibold leading-none',
+        'inline-block max-w-full break-words rounded-mc-sm px-2 py-[3px] text-[12px] font-semibold leading-snug',
         categoryTint(id),
         className,
       )}
     >
-      <span className="truncate">{name}</span>
+      {name}
     </span>
   );
 }
@@ -207,7 +217,7 @@ function PaymentChip({ method }: { method: PaymentMethod }) {
   const m = PAYMENT_METHODS.find((p) => p.value === method);
   const Icon = m?.Icon;
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mc-surface-2 px-2.5 py-1 text-[12px] font-semibold leading-none text-mc-text">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-mc-sm bg-mc-surface-2 px-2 py-[3px] text-[12px] font-semibold leading-snug text-mc-text">
       {Icon && <Icon className="h-3.5 w-3.5 text-mc-text-2" />}
       {m?.label ?? method}
     </span>
@@ -393,7 +403,7 @@ function RowActions({
   onEdit: (e: Expense) => void;
   onDelete: (e: Expense) => void;
 }) {
-  const box = 'h-9 w-9';
+  const box = 'h-11 w-11 pointer-fine:h-8 pointer-fine:w-8';
   const lockNote = "24 soatdan keyin faqat super-admin o'zgartiradi";
   return (
     <div className="flex shrink-0 items-center gap-1.5">
@@ -525,14 +535,8 @@ export function ExpenseList(props: ExpenseListProps) {
       aria-labelledby="expense-list-title"
       className="@container/list min-w-0 rounded-mc-xl border border-mc-border bg-mc-surface shadow-[var(--mc-shadow-card)]"
     >
-      <header className="flex items-center gap-3 px-4 pb-4 pt-5 @lg/list:px-5">
-        <span
-          aria-hidden
-          className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mc-brand-soft text-mc-brand @sm/list:flex"
-        >
-          <Layers className="h-[18px] w-[18px]" strokeWidth={2.2} />
-        </span>
-        <h2 id="expense-list-title" className="min-w-0 flex-1 text-[18px] font-extrabold leading-tight tracking-tight text-mc-text">
+      <header className="flex items-center gap-2 px-4 pb-3 pt-4">
+        <h2 id="expense-list-title" className="min-w-0 flex-1 break-words text-[17px] font-extrabold leading-tight tracking-tight text-mc-text">
           Rasxodlar ro'yxati
         </h2>
         <button
@@ -540,9 +544,9 @@ export function ExpenseList(props: ExpenseListProps) {
           onClick={props.onExport}
           disabled={props.exporting}
           aria-label="Excelga yuklab olish"
-          className="flex h-11 shrink-0 items-center gap-2 rounded-mc-sm border border-mc-border bg-mc-surface px-3 text-[14px] font-semibold text-mc-text transition-colors hover:bg-mc-surface-2 disabled:opacity-50 @lg/list:px-4"
+          className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-mc-sm border border-mc-border bg-mc-surface px-3 text-[14px] font-semibold text-mc-text transition-colors hover:bg-mc-surface-2 active:scale-[0.98] disabled:opacity-50 pointer-fine:h-9 pointer-fine:min-w-9"
         >
-          <Download className="h-[18px] w-[18px]" />
+          <Download className="h-4 w-4" />
           <span className="hidden @md/list:inline">{props.exporting ? 'Yuklanmoqda…' : 'Excel'}</span>
         </button>
         <button
@@ -550,42 +554,47 @@ export function ExpenseList(props: ExpenseListProps) {
           onClick={props.onPrint}
           disabled={props.printing}
           aria-label="Chop etish"
-          className="flex h-11 shrink-0 items-center gap-2 rounded-mc-sm border border-mc-border bg-mc-surface px-3 text-[14px] font-semibold text-mc-text transition-colors hover:bg-mc-surface-2 disabled:opacity-50 @lg/list:px-4"
+          className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-mc-sm border border-mc-border bg-mc-surface px-3 text-[14px] font-semibold text-mc-text transition-colors hover:bg-mc-surface-2 active:scale-[0.98] disabled:opacity-50 pointer-fine:h-9 pointer-fine:min-w-9"
         >
-          <Printer className="h-[18px] w-[18px]" />
+          <Printer className="h-4 w-4" />
           <span className="hidden @md/list:inline">{props.printing ? 'Tayyorlanmoqda…' : 'Chop etish'}</span>
         </button>
       </header>
 
-      {/* Filters: search on its own line and a sideways-scrolling chip row on a
-          phone; one wrapping row on a wide card. */}
-      <div className="flex flex-col gap-2 px-4 @3xl/list:flex-row @3xl/list:flex-wrap @3xl/list:items-center @lg/list:px-5">
-        <div className="relative @3xl/list:order-last @3xl/list:min-w-[220px] @3xl/list:flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-mc-text-2" />
+      {/* Filters: search, then chips that wrap and fill each line on a phone
+          (none hides past the edge); one row on a wide card. */}
+      <div className="flex flex-col gap-2 px-4 @3xl/list:flex-row @3xl/list:flex-wrap @3xl/list:items-center">
+        <div className="relative @3xl/list:order-last @3xl/list:min-w-[200px] @3xl/list:flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mc-text-2" />
           <input
             type="search"
             value={search}
             onChange={(e) => props.onSearch(e.target.value)}
-            placeholder="Tavsif, toifa, xodim, summa…"
+            placeholder="Tavsif, xodim, summa…"
             aria-label="Qidirish"
             maxLength={100}
-            className="h-11 w-full rounded-mc-sm border border-mc-border bg-mc-surface pl-11 pr-11 text-base font-medium text-mc-text outline-none placeholder:text-mc-text-2 focus:border-mc-brand/60 focus:ring-4 focus:ring-mc-brand/10 [&::-webkit-search-cancel-button]:hidden"
+            className={cn(
+              'h-11 w-full rounded-mc-sm border border-mc-border bg-mc-surface pl-9 text-base font-medium text-mc-text outline-none placeholder:text-mc-text-2 focus:border-mc-brand/60 focus:ring-4 focus:ring-mc-brand/10 pointer-fine:h-9 [&::-webkit-search-cancel-button]:hidden',
+              // Room for the clear button only when it shows, so the hint fits a 320px phone.
+              search ? 'pr-11' : 'pr-3',
+            )}
           />
           {search && (
             <button
               type="button"
               onClick={() => props.onSearch('')}
               aria-label="Qidiruvni tozalash"
-              className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-mc-sm text-mc-text-2 hover:bg-mc-surface-2"
+              className="absolute right-0.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-mc-sm text-mc-text-2 hover:bg-mc-surface-2 pointer-fine:h-8 pointer-fine:w-8"
             >
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] @xl/list:mx-0 @xl/list:flex-wrap @xl/list:overflow-visible @xl/list:px-0 @xl/list:pb-0 @3xl/list:contents [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-wrap gap-2 @3xl/list:contents">
           <DateRangeFilter value={range} today={today} onChange={props.onRange} />
           <FilterSelect
             label="Rasxod turi"
+            display={categories.find((c) => c.id === categoryId)?.name ?? 'Rasxod turi'}
             value={categoryId === undefined ? '' : String(categoryId)}
             active={categoryId !== undefined}
             onChange={(v) => props.onCategory(v ? Number(v) : undefined)}
@@ -599,6 +608,7 @@ export function ExpenseList(props: ExpenseListProps) {
           </FilterSelect>
           <FilterSelect
             label="To'lov usuli"
+            display={payment ? PAYMENT_LABEL[payment] : "To'lov usuli"}
             value={payment ?? ''}
             active={payment !== undefined}
             onChange={(v) => props.onPayment((v || undefined) as PaymentMethod | undefined)}
@@ -612,6 +622,7 @@ export function ExpenseList(props: ExpenseListProps) {
           </FilterSelect>
           <FilterSelect
             label="Kim oldi"
+            display={employees.find((e) => e.id === employeeId)?.full_name ?? 'Kim oldi'}
             value={employeeId === undefined ? '' : String(employeeId)}
             active={employeeId !== undefined}
             onChange={(v) => props.onEmployee(v ? Number(v) : undefined)}
@@ -623,7 +634,13 @@ export function ExpenseList(props: ExpenseListProps) {
               </option>
             ))}
           </FilterSelect>
-          <FilterSelect label="Saralash" value={sort} active={false} onChange={(v) => props.onSort(v as ExpenseSort)}>
+          <FilterSelect
+            label="Saralash"
+            display={SORTS.find((s) => s.value === sort)?.label ?? ''}
+            value={sort}
+            active={false}
+            onChange={(v) => props.onSort(v as ExpenseSort)}
+          >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
@@ -636,11 +653,11 @@ export function ExpenseList(props: ExpenseListProps) {
       {/* The period's totals, read from the server for the same filters. */}
       <div
         aria-live="polite"
-        className="mx-4 mt-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 rounded-mc-md bg-mc-surface-2 px-4 py-3 @lg/list:mx-5"
+        className="mx-4 mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-1.5 rounded-mc-md bg-mc-surface-2 px-3.5 py-2.5"
       >
         <div className="min-w-0">
           <p className="text-[12px] font-semibold text-mc-text-2">Jami rasxod</p>
-          <p className="text-[22px] font-extrabold leading-tight tracking-tight text-mc-text">
+          <p className="text-[20px] font-extrabold leading-tight tracking-tight text-mc-text">
             {summary ? <Money value={summary.total_amount} /> : summaryLoading ? '…' : '—'}
           </p>
         </div>
@@ -704,7 +721,7 @@ export function ExpenseList(props: ExpenseListProps) {
         ) : (
           <>
             {/* Phone: stacked rows. */}
-            <ul className={cn('divide-y divide-mc-border @min-[680px]/list:hidden', refreshing && 'opacity-60 transition-opacity')}>
+            <ul className={cn('divide-y divide-mc-border @min-[640px]/list:hidden', refreshing && 'opacity-60 transition-opacity')}>
               {rows.map((e) => {
                 const when = spentAt(e);
                 const open = openId === e.id;
@@ -723,11 +740,12 @@ export function ExpenseList(props: ExpenseListProps) {
                       }}
                       className="px-4 py-3.5 outline-none focus-visible:bg-mc-surface-2"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="line-clamp-2 min-w-0 break-words text-[15px] font-semibold leading-snug text-mc-text">
+                      {/* A very large amount drops under the description instead of squeezing it. */}
+                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                        <p className="min-w-0 grow basis-[7.5rem] break-words text-[15px] font-semibold leading-snug text-mc-text">
                           {e.description || '—'}
                         </p>
-                        <Money value={e.amount} className="shrink-0 text-[15px] font-extrabold text-mc-text" />
+                        <Money value={e.amount} className="ml-auto shrink-0 text-[15px] font-extrabold text-mc-text" />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <CategoryChip id={e.category_id} name={e.category_name} />
@@ -763,29 +781,29 @@ export function ExpenseList(props: ExpenseListProps) {
 
             {/* Wide card: the table. Payment and "Kim oldi" get their own
                 columns from @5xl; below that they ride under the description. */}
-            <div className={cn('hidden px-2 @min-[680px]/list:block', refreshing && 'opacity-60 transition-opacity')}>
+            <div className={cn('hidden px-2 @min-[640px]/list:block', refreshing && 'opacity-60 transition-opacity')}>
               <table className="w-full border-separate border-spacing-0 text-left">
                 <thead>
                   <tr className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.04em] text-mc-text-2">
-                    <th scope="col" className="w-10 px-3 py-3 text-right font-semibold">#</th>
-                    <th scope="col" className="px-3 py-3 font-semibold">Sana / vaqt</th>
-                    <th scope="col" className="w-full px-3 py-3 font-semibold">Tavsif</th>
-                    <th scope="col" className="hidden px-3 py-3 font-semibold @5xl/list:table-cell">Rasxod turi</th>
-                    <th scope="col" className="px-3 py-3 text-right font-semibold">Summa</th>
-                    <th scope="col" className="hidden px-3 py-3 font-semibold @5xl/list:table-cell">To'lov usuli</th>
-                    <th scope="col" className="hidden px-3 py-3 font-semibold @5xl/list:table-cell">Kim oldi</th>
-                    <th scope="col" className="px-3 py-3 text-right font-semibold">Amallar</th>
+                    <th scope="col" className="w-8 px-2 py-2.5 text-right font-semibold">#</th>
+                    <th scope="col" className="px-2.5 py-2.5 font-semibold">Sana / vaqt</th>
+                    <th scope="col" className="w-full px-2.5 py-2.5 font-semibold">Tavsif</th>
+                    <th scope="col" className="hidden px-2.5 py-2.5 font-semibold @5xl/list:table-cell">Rasxod turi</th>
+                    <th scope="col" className="px-2.5 py-2.5 text-right font-semibold">Summa</th>
+                    <th scope="col" className="hidden px-2.5 py-2.5 font-semibold @5xl/list:table-cell">To'lov usuli</th>
+                    <th scope="col" className="hidden px-2.5 py-2.5 font-semibold @5xl/list:table-cell">Kim oldi</th>
+                    <th scope="col" className="px-2.5 py-2.5 text-right font-semibold">Amallar</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((e, i) => {
                     const when = spentAt(e);
                     const open = openId === e.id;
-                    const cell = cn('border-t border-mc-border px-3 py-3 align-middle', open && 'bg-mc-surface-2/60');
+                    const cell = cn('border-t border-mc-border px-2.5 py-2 align-middle', open && 'bg-mc-surface-2/60');
                     return (
                       <Fragment key={e.id}>
                         <tr onClick={() => toggle(e.id)} className="cursor-pointer transition-colors hover:bg-mc-surface-2/60">
-                          <td className={cn(cell, 'text-right text-[13px] tabular-nums text-mc-text-2')}>
+                          <td className={cn(cell, 'px-2 text-right text-[12px] tabular-nums text-mc-text-2')}>
                             {(page - 1) * perPage + i + 1}
                           </td>
                           <td className={cn(cell, 'whitespace-nowrap tabular-nums')}>
@@ -800,18 +818,13 @@ export function ExpenseList(props: ExpenseListProps) {
                                 ev.stopPropagation();
                                 toggle(e.id);
                               }}
-                              title={e.description ?? undefined}
-                              className="block w-full truncate text-left text-[14px] font-semibold text-mc-text outline-none focus-visible:underline"
+                              className="block w-full break-words text-left text-[14px] font-semibold leading-snug text-mc-text outline-none focus-visible:underline"
                             >
                               {e.description || '—'}
                             </button>
-                            <span className="mt-1 flex min-w-0 items-center gap-2 text-[12px] text-mc-text-2">
-                              <CategoryChip
-                                id={e.category_id}
-                                name={e.category_name}
-                                className="max-w-[160px] shrink-0 @5xl/list:hidden"
-                              />
-                              <span className="truncate @5xl/list:hidden">
+                            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-mc-text-2">
+                              <CategoryChip id={e.category_id} name={e.category_name} className="@5xl/list:hidden" />
+                              <span className="min-w-0 break-words @5xl/list:hidden">
                                 {PAYMENT_LABEL[e.payment_method]}
                                 {e.employee_name && ` · ${e.employee_name}`}
                               </span>
@@ -819,7 +832,8 @@ export function ExpenseList(props: ExpenseListProps) {
                             </span>
                           </td>
                           <td className={cn(cell, 'hidden @5xl/list:table-cell')}>
-                            <CategoryChip id={e.category_id} name={e.category_name} />
+                            {/* Its own column: one line up to 220px, wrapped past it; never cut. */}
+                            <CategoryChip id={e.category_id} name={e.category_name} className="w-max max-w-[220px]" />
                           </td>
                           <td className={cn(cell, 'text-right')}>
                             <Money value={e.amount} className="text-[14px] font-extrabold text-mc-text" />
@@ -827,8 +841,8 @@ export function ExpenseList(props: ExpenseListProps) {
                           <td className={cn(cell, 'hidden @5xl/list:table-cell')}>
                             <PaymentChip method={e.payment_method} />
                           </td>
-                          <td className={cn(cell, 'hidden max-w-[160px] @5xl/list:table-cell')}>
-                            <span className="block truncate text-[13px] text-mc-text">{e.employee_name ?? '—'}</span>
+                          <td className={cn(cell, 'hidden max-w-[140px] @5xl/list:table-cell')}>
+                            <span className="block break-words text-[13px] text-mc-text">{e.employee_name ?? '—'}</span>
                           </td>
                           <td className={cell}>
                             <div className="flex justify-end">
@@ -853,7 +867,7 @@ export function ExpenseList(props: ExpenseListProps) {
         )}
       </div>
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-mc-border px-4 py-3 @lg/list:px-5">
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-mc-border px-4 py-2.5">
         <p className="text-[13px] font-semibold text-mc-text-2">
           Jami: <span className="tabular-nums text-mc-text">{total}</span> ta yozuv
           {pages > 1 && (
@@ -870,7 +884,7 @@ export function ExpenseList(props: ExpenseListProps) {
               onClick={() => onPage(page - 1)}
               disabled={page <= 1}
               aria-label="Oldingi sahifa"
-              className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-text hover:bg-mc-surface-2 disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-text hover:bg-mc-surface-2 active:scale-95 disabled:opacity-40 pointer-fine:h-9 pointer-fine:w-9"
             >
               <ChevronLeft className="h-[18px] w-[18px]" />
             </button>
@@ -882,7 +896,7 @@ export function ExpenseList(props: ExpenseListProps) {
               onClick={() => onPage(page + 1)}
               disabled={page >= pages}
               aria-label="Keyingi sahifa"
-              className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-text hover:bg-mc-surface-2 disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-mc-sm border border-mc-border text-mc-text hover:bg-mc-surface-2 active:scale-95 disabled:opacity-40 pointer-fine:h-9 pointer-fine:w-9"
             >
               <ChevronRight className="h-[18px] w-[18px]" />
             </button>
