@@ -92,6 +92,9 @@ export interface ExpenseSummaryResponse {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 const BASE = '/api/v1/expenses';
+// The list and create routes are `/expenses/`. Without the slash the server
+// answers with a redirect to an http:// URL, which an https page blocks.
+const COLLECTION = `${BASE}/`;
 
 function getAdminHeaders() {
   const token = localStorage.getItem('access_token');
@@ -135,14 +138,14 @@ export const expenseService = {
 
   // Expenses
   getExpenses: async (page = 1, per_page = 20, filters: ExpenseFilters = {}): Promise<ExpenseListResponse> => {
-    const res = await apiClient.get<ExpenseListResponse>(BASE, {
+    const res = await apiClient.get<ExpenseListResponse>(COLLECTION, {
       params: { page, per_page, ...filters },
       headers: getAdminHeaders(),
     });
     return res.data;
   },
   createExpense: async (data: CreateExpenseRequest): Promise<Expense> => {
-    const res = await apiClient.post<Expense>(BASE, data, { headers: getAdminHeaders() });
+    const res = await apiClient.post<Expense>(COLLECTION, data, { headers: getAdminHeaders() });
     return res.data;
   },
   updateExpense: async (id: number, data: UpdateExpenseRequest): Promise<Expense> => {
