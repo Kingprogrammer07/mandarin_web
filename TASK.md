@@ -66,7 +66,8 @@ bo'lmaydi (reys oynasidagi kabi). Hamyonni ishlatmoqchi bo'lgan mijoz NBU yoki c
 - [x] Kartaga o'tkazma oynasida «Boshqa usulni tanlash» tugmasi (Payme oynasidagi kabi)
 - [x] Frontend testlari (DeliveryRequestPage.test.tsx, 9 ta), tsc, eslint, build;
       320/360/390, och va qorong'i skrinshotlar, kesilish tekshiruvi toza
-- [ ] Foydalanuvchiga ko'rsatish; «ha» desa ikkala repo push, backend va frontend birga deploy
+- [x] Foydalanuvchiga ko'rsatildi, «Ha, yubor» (30.10 17:41Z): bot 1c9ca6b, web 2692a84 main'da
+- [ ] Serverga deploy (foydalanuvchi): backend va frontend birga, migratsiya e2a4c6e8f0b1
 
 ## Walkthrough / Architecture
 Uzpost kartaga o'tkazma: Mini App `POST /payments/card-intent/delivery` → backend NBU delivery
