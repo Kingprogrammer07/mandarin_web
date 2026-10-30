@@ -2079,6 +2079,32 @@
       "body": "To‘lov oynasi yopilgan. Qaytadan boshlashingiz mumkin."
     }
   },
+  "payme": {
+    "title": "Payme",
+    "hint": "Payme sahifasida · chek shart emas",
+    "minAmount": "{{min}} so'mdan kam qarzga bo'lmaydi",
+    "timeLeft": "Qolgan vaqt",
+    "timeUp": "Vaqt tugadi",
+    "amountLabel": "Payme yechadigan summa",
+    "flightFor": "{{flight}} reysi uchun",
+    "deliveryFor": "UzPost yetkazish: {{flights}}",
+    "open": "Payme sahifasini ochish",
+    "waiting": "To'lovni Payme sahifasida tasdiqlang. Pul tushishi bilan shu yerda ko'rinadi, chek kerak emas.",
+    "otherMethod": "Boshqa usulni tanlash",
+    "processingTitle": "To'lov bajarilmoqda",
+    "processingDesc": "Payme {{amount}} so'mni yechmoqda. Bir necha soniyada tasdiqlanadi.",
+    "paidTitle": "To'lov qabul qilindi",
+    "paidDesc": "{{amount}} so'm {{flight}} reysiga yozildi.",
+    "paidDeliveryDesc": "{{amount}} so'm to'landi, #{{request}} zayavka tasdiqlandi.",
+    "refundedTitle": "To'lov qaytarildi",
+    "refundedDesc": "Payme {{amount}} so'mni kartangizga qaytardi.",
+    "expiredTitle": "Vaqt tugadi",
+    "expiredDesc": "Buyurtma 30 daqiqa ichida to'lanmadi, pul yechilmadi. Yangi buyurtma oching.",
+    "replacedTitle": "Buyurtma yangilangan",
+    "replacedDesc": "Bu to'lov uchun yangiroq Payme buyurtmasi ochilgan. Shuni oching.",
+    "newOrder": "Yangi buyurtma",
+    "badLink": "Payme sahifasini ochib bo'lmadi. Keyinroq urinib ko'ring."
+  },
   "maintenance": {
     "title": "Texnik ishlar olib borilmoqda",
     "body": "Hozir tizimda texnik xizmat ko'rsatilyapti. Iltimos biroz vaqtdan keyin qayta urinib ko'ring. Vaqt ko'p ketmaydi — rahmat sabringiz uchun.",

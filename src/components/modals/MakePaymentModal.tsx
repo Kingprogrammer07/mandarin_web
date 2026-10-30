@@ -41,6 +41,7 @@ import {
   Landmark,
   ArrowRightLeft,
   Smartphone,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -62,6 +63,13 @@ import { pickVisible } from '@/utils/tour';
 import type { DriveStep } from 'driver.js';
 import { AstatkaShelfNote } from '@/components/user/AstatkaShelfNote';
 import { CardTransferPanel } from '@/components/payment/CardTransferPanel';
+import { PaymePanel } from '@/components/payment/PaymePanel';
+import {
+  openPaymeCheckout,
+  paymeRefusal,
+  paymeService,
+  type PaymeOrder,
+} from '@/api/services/paymeService';
 
 // ============================================================================
 // Helpers
@@ -88,6 +96,8 @@ function formatMaskedCard(masked: string | null | undefined): string | null {
 const NBU_MIN_UZS = 1000;
 /** The smallest part the server takes (`make_payment.py`, "Minimum partial payment"). */
 const PARTIAL_MIN_UZS = 1000;
+/** Payme's order refuses a smaller debt (`payme_orders.MIN_AMOUNT`); there is no floor to raise it to. */
+const PAYME_MIN_UZS = 1000;
 
 /** One row of the «To'lov usuli» list and what the button under it does. */
 interface PayOption {
@@ -322,7 +332,7 @@ interface MakePaymentModalProps {
   preselectedFlightName?: string | null;
 }
 
-type PaymentMethod = 'online' | 'cash' | 'wallet' | 'card';
+type PaymentMethod = 'online' | 'cash' | 'wallet' | 'card' | 'payme';
 type WizardStep = 0 | 1 | 2;
 
 const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymentModalProps) => {
@@ -356,6 +366,9 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
   const [trackData, setTrackData] = useState<TrackCodeSearchResponse | null>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isNbuInitiating, setIsNbuInitiating] = useState(false);
+  // The Payme order the pay button opened; its step polls it until it is booked.
+  const [paymeOrder, setPaymeOrder] = useState<PaymeOrder | null>(null);
+  const [isPaymeOpening, setIsPaymeOpening] = useState(false);
   // Tracks which card's charge is in flight (used to reset state cleanly); the
   // value itself isn't rendered — the drawer reflects status via the mutation.
   const [, setChargingCardId] = useState<number | null>(null);
@@ -415,6 +428,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     setConfirmChargeCard(null);
     setChargeDone(false);
     setChargingCardId(null);
+    setPaymeOrder(null);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -514,6 +528,15 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     enabled: isOpen,
   });
   const nbuEnabled = nbuStatus?.enabled === true;
+
+  // Payme Merchant API: off until its keys are on the server.
+  const { data: paymeStatus } = useQuery({
+    queryKey: ['payme-available'],
+    queryFn: paymeService.available,
+    staleTime: 5 * 60_000,
+    enabled: isOpen,
+  });
+  const paymeEnabled = paymeStatus?.enabled === true;
 
   // Saved cards list
   const { data: nbuCardsData } = useQuery({
@@ -871,6 +894,39 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     }
   }, [selectedFlightName, t]);
 
+  // Payme: the server opens the order for the whole debt (or hands back the
+  // open one, or the one Payme is paying), Payme's page opens on this tap and
+  // the next step watches the order until it is booked.
+  const handlePaymePayment = useCallback(async () => {
+    if (!selectedFlightName) return;
+    setIsPaymeOpening(true);
+    try {
+      const order = await paymeService.openOrder(selectedFlightName);
+      if (order.state === 'open' && order.checkout_url && !openPaymeCheckout(order.checkout_url)) {
+        toast.error(t('payme.badLink'));
+      }
+      setPaymeOrder(order);
+      setPaymentMethod('payme');
+      goNext();
+    } catch (err: unknown) {
+      toast.error(paymeRefusal(err, t('makePayment.errorOccurred')));
+    } finally {
+      setIsPaymeOpening(false);
+    }
+  }, [selectedFlightName, goNext, t]);
+
+  const reopenPaymeOrder = useCallback(
+    () => paymeService.openOrder(selectedFlightName ?? ''),
+    [selectedFlightName],
+  );
+
+  const handlePaymePaid = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['payment-available-flights'] });
+    queryClient.invalidateQueries({ queryKey: ['payment-flight-details'] });
+    queryClient.invalidateQueries({ queryKey: ['payment-history'] });
+    queryClient.invalidateQueries({ queryKey: ['walletBalance'] });
+  }, [queryClient]);
+
   // Execute the charge for the card the user confirmed in the drawer.
   const confirmCharge = useCallback(() => {
     if (!confirmChargeCard || !selectedFlightName) return;
@@ -1005,6 +1061,24 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       });
     }
 
+    if (paymeEnabled) {
+      // Payme's order is the whole debt and never the wallet's part, as NBU's,
+      // and it has no floor to raise a small debt to: the server refuses one.
+      payOptions.push({
+        key: 'payme',
+        icon: Zap,
+        title: t('payme.title'),
+        hint: t('payme.hint'),
+        blockedBy:
+          nbuBlockedBy ??
+          (payableAmount < PAYME_MIN_UZS
+            ? t('payme.minAmount', { min: formatMoney(PAYME_MIN_UZS) })
+            : null),
+        cta: t('makePayment.methods.payAmount', { amount: formatMoney(payableAmount) }),
+        run: () => void handlePaymePayment(),
+      });
+    }
+
     if (hasCardTransfer) {
       payOptions.push({
         key: 'card',
@@ -1048,7 +1122,8 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
     payOptions.find((option) => option.key === methodKey && option.blockedBy === null) ??
     payOptions.find((option) => option.blockedBy === null) ??
     null;
-  const payButtonDisabled = !selectedOption || !partialValid || isNbuInitiating;
+  const payButtonDisabled =
+    !selectedOption || !partialValid || isNbuInitiating || isPaymeOpening;
 
   // ============================================================================
   // Step Renderers
@@ -1662,6 +1737,19 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
       );
     }
 
+    // ---- Payme's page ----
+    if (paymentMethod === 'payme' && paymeOrder) {
+      return (
+        <PaymePanel
+          initialOrder={paymeOrder}
+          reopenOrder={reopenPaymeOrder}
+          onPaid={handlePaymePaid}
+          onBack={goBack}
+          onDone={handleClose}
+        />
+      );
+    }
+
     // ---- Card transfer by request ----
     if (paymentMethod === 'card' && selectedFlightName) {
       return (
@@ -2009,7 +2097,7 @@ const MakePaymentModal = ({ isOpen, onClose, preselectedFlightName }: MakePaymen
                     text-center text-[16px] font-extrabold leading-tight text-mc-on-brand tabular-nums
                     transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isNbuInitiating && (
+                  {(isNbuInitiating || isPaymeOpening) && (
                     <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
                   )}
                   {selectedOption ? selectedOption.cta : t('makePayment.methods.choose')}

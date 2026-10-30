@@ -44,13 +44,26 @@ vi.mock('@/api/services/nbuPaymentService', () => ({
     chargeSavedCard: vi.fn(),
   },
 }));
+vi.mock('@/api/services/paymeService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/services/paymeService')>()),
+  paymeService: {
+    available: vi.fn(),
+    openOrder: vi.fn(),
+    openDeliveryOrder: vi.fn(),
+    getOrder: vi.fn(),
+  },
+  openPaymeCheckout: vi.fn(() => true),
+}));
 
+import { toast } from 'sonner';
 import { paymentService } from '@/api/services/paymentService';
 import { nbuPaymentService } from '@/api/services/nbuPaymentService';
+import { openPaymeCheckout, paymeService, type PaymeOrder } from '@/api/services/paymeService';
 import MakePaymentModal from './MakePaymentModal';
 
 const payments = vi.mocked(paymentService);
 const nbu = vi.mocked(nbuPaymentService);
+const payme = vi.mocked(paymeService);
 
 function flight(overrides: Partial<FlightPaymentDetailsResponse> = {}): FlightPaymentDetailsResponse {
   return {
@@ -84,11 +97,16 @@ const savedCard: SavedCardItem = {
   created_at: '2026-10-01T00:00:00Z',
 };
 
-function openFor(details: FlightPaymentDetailsResponse, cards: SavedCardItem[] = [savedCard]) {
+function openFor(
+  details: FlightPaymentDetailsResponse,
+  cards: SavedCardItem[] = [savedCard],
+  paymeOn = false,
+) {
   payments.getFlightDetails.mockResolvedValue(details);
   payments.getAvailableFlights.mockResolvedValue({ flights: [], count: 0 });
   nbu.getStatus.mockResolvedValue({ enabled: true });
   nbu.listCards.mockResolvedValue({ items: cards, count: cards.length });
+  payme.available.mockResolvedValue({ enabled: paymeOn });
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -203,5 +221,111 @@ describe('MakePaymentModal — details step', () => {
 
     fireEvent.click(payButton());
     expect(await screen.findByText("Balansdan to'lov")).toBeInTheDocument();
+  });
+});
+
+function paymeOrder(overrides: Partial<PaymeOrder> = {}): PaymeOrder {
+  return {
+    id: 41,
+    kind: 'flight',
+    flight_name: 'TEST-K1',
+    state: 'open',
+    amount: 125_000,
+    checkout_url: 'https://checkout.paycom.uz/bT1hYmM7YWMub3JkZXJfaWQ9NDE=',
+    expires_at: '2026-10-30T12:30:00Z',
+    server_time: '2026-10-30T12:00:00Z',
+    delivery_request_id: null,
+    ...overrides,
+  };
+}
+
+describe('MakePaymentModal — Payme', () => {
+  it('is offered only while the server has it on', async () => {
+    openFor(flight(), [], false);
+
+    const methods = await screen.findByRole('group', { name: "To'lov usuli" });
+    await waitFor(() => expect(within(methods).getAllByRole('radio')).toHaveLength(4));
+    expect(screen.queryByRole('radio', { name: /Payme sahifasida/ })).not.toBeInTheDocument();
+  });
+
+  it("takes NBU's limits: the whole debt, never the wallet's part", async () => {
+    openFor(flight({ total_payment: 2_456_500, wallet_balance: 120_000, partial_allowed: true }), [], true);
+
+    const row = await screen.findByRole('radio', { name: /Payme sahifasida/ });
+    expect(row).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('switch', { name: /Balansdan foydalanish/ }));
+    expect(row).toBeDisabled();
+    expect(screen.getAllByText("Balans bilan birga bo'lmaydi")).toHaveLength(3);
+    fireEvent.click(screen.getByRole('switch', { name: /Balansdan foydalanish/ }));
+
+    fireEvent.click(screen.getByRole('switch', { name: /Boshqa summa/ }));
+    expect(row).toBeDisabled();
+  });
+
+  it('is off under 1 000 so\'m, which Payme does not take', async () => {
+    openFor(flight({ total_payment: 640 }), [], true);
+
+    expect(await screen.findByRole('radio', { name: /Payme/ })).toBeDisabled();
+    expect(screen.getByText(/^1\s000 so'mdan kam qarzga bo'lmaydi$/)).toBeInTheDocument();
+  });
+
+  it("opens Payme's page on the tap and watches the order until it is booked", async () => {
+    payme.openOrder.mockResolvedValue(paymeOrder());
+    payme.getOrder.mockResolvedValue(paymeOrder());
+    openFor(flight({ total_payment: 125_000 }), [], true);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Payme sahifasida/ }));
+    expect(payButton()).toHaveTextContent(/^125\s000 so'm to'lash$/);
+    fireEvent.click(payButton());
+
+    await waitFor(() => expect(payme.openOrder).toHaveBeenCalledWith('TEST-K1'));
+    expect(openPaymeCheckout).toHaveBeenCalledWith(paymeOrder().checkout_url);
+
+    // The step says what Payme charges and reopens the same page.
+    expect(await screen.findByText("Payme yechadigan summa")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Payme sahifasini ochish/ }));
+    expect(openPaymeCheckout).toHaveBeenCalledTimes(2);
+    expect(payme.openOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the booking once Payme has performed the payment', async () => {
+    payme.openOrder.mockResolvedValue(paymeOrder());
+    payme.getOrder.mockResolvedValue(paymeOrder({ state: 'paid', checkout_url: null }));
+    openFor(flight({ total_payment: 125_000 }), [], true);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Payme sahifasida/ }));
+    fireEvent.click(payButton());
+
+    expect(await screen.findByText("To'lov qabul qilindi")).toBeInTheDocument();
+    expect(screen.getByText(/^125\s000 so'm TEST-K1 reysiga yozildi\.$/)).toBeInTheDocument();
+  });
+
+  it('an order Payme is already paying opens no second page', async () => {
+    payme.openOrder.mockResolvedValue(paymeOrder({ state: 'processing', checkout_url: null }));
+    payme.getOrder.mockResolvedValue(paymeOrder({ state: 'processing', checkout_url: null }));
+    openFor(flight({ total_payment: 125_000 }), [], true);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Payme sahifasida/ }));
+    fireEvent.click(payButton());
+
+    expect(await screen.findByText("To'lov bajarilmoqda")).toBeInTheDocument();
+    expect(openPaymeCheckout).not.toHaveBeenCalled();
+  });
+
+  it("says the server's reason and stays on the list when no order is opened", async () => {
+    payme.openOrder.mockRejectedValue({
+      status: 409,
+      message: 'Serverda xatolik yuz berdi.',
+      data: { detail: { code: 'cash_desk', message: "Bu reys kassada ko'rilgan." } },
+    });
+    openFor(flight({ total_payment: 125_000 }), [], true);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Payme sahifasida/ }));
+    fireEvent.click(payButton());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Bu reys kassada ko'rilgan."));
+    expect(openPaymeCheckout).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: /Payme sahifasida/ })).toBeInTheDocument();
   });
 });
